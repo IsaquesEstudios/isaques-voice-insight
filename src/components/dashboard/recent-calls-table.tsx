@@ -34,7 +34,7 @@ const statusStyles: Record<Status, string> = {
 
 export function RecentCallsTable() {
   return (
-    <Card className="border-border/60 bg-card/70">
+    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div>
           <CardTitle className="text-base font-semibold">Chamadas Recentes</CardTitle>
