@@ -9,8 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TelefoniaRouteImport } from './routes/telefonia'
+import { Route as HistoricoRouteImport } from './routes/historico'
+import { Route as CrmRouteImport } from './routes/crm'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as AssistentesRouteImport } from './routes/assistentes'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TelefoniaRoute = TelefoniaRouteImport.update({
+  id: '/telefonia',
+  path: '/telefonia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoricoRoute = HistoricoRouteImport.update({
+  id: '/historico',
+  path: '/historico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmRoute = CrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssistentesRoute = AssistentesRouteImport.update({
+  id: '/assistentes',
+  path: '/assistentes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +49,102 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assistentes': typeof AssistentesRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/crm': typeof CrmRoute
+  '/historico': typeof HistoricoRoute
+  '/telefonia': typeof TelefoniaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assistentes': typeof AssistentesRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/crm': typeof CrmRoute
+  '/historico': typeof HistoricoRoute
+  '/telefonia': typeof TelefoniaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assistentes': typeof AssistentesRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/crm': typeof CrmRoute
+  '/historico': typeof HistoricoRoute
+  '/telefonia': typeof TelefoniaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/assistentes'
+    | '/configuracoes'
+    | '/crm'
+    | '/historico'
+    | '/telefonia'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/assistentes'
+    | '/configuracoes'
+    | '/crm'
+    | '/historico'
+    | '/telefonia'
+  id:
+    | '__root__'
+    | '/'
+    | '/assistentes'
+    | '/configuracoes'
+    | '/crm'
+    | '/historico'
+    | '/telefonia'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssistentesRoute: typeof AssistentesRoute
+  ConfiguracoesRoute: typeof ConfiguracoesRoute
+  CrmRoute: typeof CrmRoute
+  HistoricoRoute: typeof HistoricoRoute
+  TelefoniaRoute: typeof TelefoniaRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/telefonia': {
+      id: '/telefonia'
+      path: '/telefonia'
+      fullPath: '/telefonia'
+      preLoaderRoute: typeof TelefoniaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/historico': {
+      id: '/historico'
+      path: '/historico'
+      fullPath: '/historico'
+      preLoaderRoute: typeof HistoricoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm': {
+      id: '/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof CrmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assistentes': {
+      id: '/assistentes'
+      path: '/assistentes'
+      fullPath: '/assistentes'
+      preLoaderRoute: typeof AssistentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssistentesRoute: AssistentesRoute,
+  ConfiguracoesRoute: ConfiguracoesRoute,
+  CrmRoute: CrmRoute,
+  HistoricoRoute: HistoricoRoute,
+  TelefoniaRoute: TelefoniaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
