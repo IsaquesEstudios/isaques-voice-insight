@@ -14,7 +14,7 @@ interface MetricCardProps {
 export function MetricCard({ label, value, delta, hint, icon: Icon }: MetricCardProps) {
   const positive = delta >= 0;
   return (
-    <Card className="group relative overflow-hidden border-border/60 bg-card/70 p-5 transition-all hover:border-primary/40 hover:shadow-glow">
+    <Card className="group relative overflow-hidden border-white/[0.08] bg-card/20 p-5 backdrop-blur-2xl transition-all hover:border-primary/30 hover:shadow-glow">
       <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/5 blur-2xl transition-opacity group-hover:bg-primary/10" />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">

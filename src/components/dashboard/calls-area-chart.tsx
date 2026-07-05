@@ -14,7 +14,7 @@ const data = Array.from({ length: 15 }).map((_, i) => {
 
 export function CallsAreaChart() {
   return (
-    <Card className="border-border/60 bg-card/70">
+    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-semibold">Volume de Ligações</CardTitle>
