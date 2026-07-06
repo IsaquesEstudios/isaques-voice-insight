@@ -33,20 +33,7 @@ export const Route = createFileRoute("/assistentes")({
 
 type AssistantStatus = "Ativo" | "Rascunho" | "Pausado";
 
-interface VapiAssistant {
-  id: string;
-  name?: string | null;
-  voice?: {
-    provider?: string;
-    voiceId?: string;
-  } | null;
-  model?: {
-    provider?: string;
-    model?: string;
-  } | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
+type VapiAssistant = VapiAssistantDTO;
 
 const gradients = [
   "from-primary/40 to-primary/5",
