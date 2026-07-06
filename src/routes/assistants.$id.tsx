@@ -1411,6 +1411,21 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "gcalCreate" || selected.kind === "gcalCheck") {
+      const name = gcName.trim() || "google_calendar_tool";
+      const type =
+        selected.kind === "gcalCreate"
+          ? "google.calendar.createEvent"
+          : "google.calendar.checkAvailability";
+      const tool: VapiTool = { type, name };
+      if (gcDescription.trim()) tool.description = gcDescription.trim();
+      if (gcCalendarId.trim()) tool.calendarId = gcCalendarId.trim();
+      if (gcTimezone.trim()) tool.timezone = gcTimezone.trim();
+      if (gcMessages.length > 0) {
+        tool.messages = gcMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
