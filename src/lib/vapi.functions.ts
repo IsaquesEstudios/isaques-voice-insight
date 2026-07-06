@@ -119,13 +119,12 @@ function sanitizeModelTool(tool: any): any {
   }
 
   if (tool.type === "voicemail") {
+    // Vapi's voicemail built-in tool only accepts `type` and `messages` —
+    // top-level `name`, `description`, and `metadata` are rejected.
     return {
       type: "voicemail",
       ...(Array.isArray(tool.messages) && tool.messages.length > 0
         ? { messages: tool.messages.map(sanitizeToolMessage) }
-        : {}),
-      ...(tool.metadata && typeof tool.metadata === "object"
-        ? { metadata: tool.metadata }
         : {}),
     };
   }
