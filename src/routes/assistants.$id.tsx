@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
@@ -10,6 +10,16 @@ import {
   Settings2,
   Save,
   Loader2,
+  Play,
+  FileText,
+  Plus,
+  Pencil,
+  Trash2,
+  PhoneForwarded,
+  CalendarCheck,
+  Mail,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
