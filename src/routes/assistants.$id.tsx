@@ -1372,11 +1372,142 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                 )}
 
                 {selected?.kind === "dtmf" && (
-                  <p className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground backdrop-blur-xl">
-                    Esta ferramenta não requer configuração adicional. Ao salvar, será
-                    enviado apenas{" "}
-                    <span className="font-mono text-foreground">{`{ type: "dtmf" }`}</span>.
-                  </p>
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dt-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="dt-name"
+                          value={dtName}
+                          onChange={(e) => setDtName(e.target.value)}
+                          placeholder="dtmf_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dt-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="dt-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={dtDescription}
+                          onChange={(e) => setDtDescription(e.target.value)}
+                          placeholder="Explique para a IA quando usar essa ferramenta."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {dtDescription.length}/1000
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* SIP INFO Checkbox */}
+                    <label
+                      htmlFor="dt-sipinfo"
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl hover:bg-background/40"
+                    >
+                      <Checkbox
+                        id="dt-sipinfo"
+                        checked={dtSipInfo}
+                        onCheckedChange={(v) => setDtSipInfo(v === true)}
+                        className="mt-0.5"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-foreground">
+                            Send DTMF via SIP INFO
+                          </span>
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Use SIP INFO messages for DTMF signaling instead of RFC 2833 (RTP events).
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Panel 2 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setDtMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {dtMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida. Adicione mensagens de status opcionais.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {dtMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setDtMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setDtMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                placeholder="Frase que a IA vai falar neste momento..."
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 {selected?.kind === "endCall" && (
