@@ -937,6 +937,14 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setQDescription("");
     setQKnowledgeBases([]);
     setQMessages([]);
+    setArName("");
+    setArDescription("");
+    setArUrl("");
+    setArMethod("GET");
+    setArHeaders([]);
+    setArBodyLocked(false);
+    setArStaticFields([]);
+    setArMessages([]);
   }
 
   function openDialog() {
