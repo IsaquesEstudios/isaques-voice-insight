@@ -721,10 +721,22 @@ function findCatalogItemByVapiType(type: string): CatalogItem | undefined {
     ? "slack"
     : type.startsWith("google.sheets.")
       ? "sheets"
-      : type;
+      : type === "google.calendar.createEvent"
+        ? "gcalCreate"
+        : type === "google.calendar.checkAvailability"
+          ? "gcalCheck"
+          : type;
   for (const section of TOOL_CATALOG) {
     for (const item of section.items) {
       if (item.vapiType === normalized) return item;
+      if (item.subItems) {
+        for (const sub of item.subItems) {
+          if (sub.vapiType === normalized) {
+            // Return sub-item merged with a label prefix so cards show which variant.
+            return { ...sub, label: `${item.label} — ${sub.label}` };
+          }
+        }
+      }
     }
   }
   return undefined;
