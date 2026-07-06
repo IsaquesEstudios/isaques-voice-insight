@@ -852,8 +852,25 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
-    if (selected.kind === "endCall" || selected.kind === "dtmf") {
-      return { type: selected.kind };
+    if (selected.kind === "dtmf") {
+      return { type: "dtmf" };
+    }
+    if (selected.kind === "endCall") {
+      const name = ecName.trim() || "endCall";
+      const tool: VapiTool = { type: "endCall", name };
+      if (ecDescription.trim()) tool.description = ecDescription.trim();
+      const messages = ecMessages
+        .filter((m) => m.mode !== "default")
+        .map((m) => {
+          const msg: Record<string, unknown> = {
+            type: m.type,
+            content: m.mode === "custom" ? m.content : "",
+          };
+          if (m.blocking) msg.blocking = true;
+          return msg;
+        });
+      if (messages.length > 0) tool.messages = messages;
+      return tool;
     }
     if (selected.kind === "function") {
       const name = fnName.trim();
