@@ -16,11 +16,20 @@ import {
   Pencil,
   Trash2,
   PhoneForwarded,
-  CalendarCheck,
-  Mail,
-  ShieldCheck,
+  PhoneOff,
+  Hash,
+  Code2,
   Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
