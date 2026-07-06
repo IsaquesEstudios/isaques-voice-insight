@@ -624,7 +624,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
