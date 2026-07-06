@@ -1137,6 +1137,34 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "query") {
+      if (qKnowledgeBases.length === 0) {
+        toast.error("Adicione pelo menos uma base de conhecimento.");
+        return null;
+      }
+      for (const kb of qKnowledgeBases) {
+        if (!kb.fileId.trim()) {
+          toast.error("Informe o ID de todas as bases de conhecimento.");
+          return null;
+        }
+      }
+      const name = qName.trim() || "query_tool";
+      const tool: VapiTool = {
+        type: "query",
+        name,
+        description: qDescription.trim(),
+        knowledgeBases: qKnowledgeBases.map((kb, idx) => ({
+          name: `kb-${idx + 1}`,
+          provider: "google",
+          description: qDescription.trim() || "Knowledge base",
+          fileIds: [kb.fileId.trim()],
+        })),
+      };
+      if (qMessages.length > 0) {
+        tool.messages = qMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
