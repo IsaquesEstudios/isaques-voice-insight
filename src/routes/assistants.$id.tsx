@@ -155,6 +155,8 @@ function AssistantDetailPage() {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
 
   const [form, setForm] = useState<FormState>(empty);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [tools, setTools] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
