@@ -960,6 +960,16 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setArBodyLocked(false);
     setArStaticFields([]);
     setArMessages([]);
+    setMcpName("mcp_tool");
+    setMcpDescription("");
+    setMcpServerUrl("");
+    setMcpTimeout(20);
+    setMcpAuth("none");
+    setMcpHeaders([]);
+    setMcpStaticIp(false);
+    setMcpEncryptedPaths([]);
+    setMcpProtocol("shttp");
+    setMcpMessages([]);
   }
 
   function openDialog() {
