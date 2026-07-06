@@ -1270,6 +1270,42 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "mcp") {
+      const url = mcpServerUrl.trim();
+      if (!url) {
+        toast.error("Informe a Server URL do MCP.");
+        return null;
+      }
+      if (!/^https?:\/\//.test(url)) {
+        toast.error("A Server URL deve começar com http(s)://");
+        return null;
+      }
+      const name = mcpName.trim() || "mcp_tool";
+      const tool: VapiTool = {
+        type: "mcp",
+        name,
+        server: {
+          url,
+          timeoutSeconds: mcpTimeout,
+        },
+        protocol: mcpProtocol,
+      };
+      if (mcpDescription.trim()) tool.description = mcpDescription.trim();
+      if (mcpHeaders.length > 0) {
+        const headers: Record<string, string> = {};
+        for (const h of mcpHeaders) {
+          const k = h.key.trim();
+          if (k) headers[k] = h.value;
+        }
+        if (Object.keys(headers).length > 0) {
+          (tool.server as Record<string, unknown>).headers = headers;
+        }
+      }
+      if (mcpMessages.length > 0) {
+        tool.messages = mcpMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
