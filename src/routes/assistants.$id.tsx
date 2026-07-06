@@ -765,6 +765,13 @@ interface EndCallMessage {
   blocking: boolean;
 }
 
+type VoicemailScriptMode = "assistant" | "custom" | "skip";
+
+interface VoicemailMessage {
+  type: TransferMessageType;
+  content: string;
+}
+
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
