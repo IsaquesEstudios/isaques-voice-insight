@@ -707,6 +707,28 @@ interface ToolsTabProps {
   isLoading: boolean;
 }
 
+type TransferDestination =
+  | { type: "number"; number: string }
+  | { type: "sip"; sipUri: string };
+
+type TransferMessageType =
+  | "request-start"
+  | "request-complete"
+  | "request-failed"
+  | "request-response-delayed";
+
+interface TransferMessage {
+  type: TransferMessageType;
+  content: string;
+}
+
+const TRANSFER_MESSAGE_LABELS: Record<TransferMessageType, string> = {
+  "request-start": "Request Start Variant",
+  "request-complete": "Request Complete",
+  "request-failed": "Request Failed",
+  "request-response-delayed": "Request Response Delayed",
+};
+
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
