@@ -473,7 +473,12 @@ function AssistantDetailPage() {
             <LogsTab />
           </TabsContent>
           <TabsContent value="tools" className="mt-0">
-            <ToolsTab />
+            <ToolsTab
+              id={id}
+              tools={tools}
+              onToolsChange={setTools}
+              isLoading={isLoading}
+            />
           </TabsContent>
           <TabsContent value="analysis" className="mt-0">
             <AnalysisTab />
