@@ -818,6 +818,23 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [smsBodyPreset, setSmsBodyPreset] = useState("");
   const [smsMessages, setSmsMessages] = useState<VoicemailMessage[]>([]);
 
+  // sipRequest configuration state
+  const [srName, setSrName] = useState("sip_request_tool");
+  const [srDescription, setSrDescription] = useState(
+    "Send a SIP INFO/MESSAGE/NOTIFY request with optional headers and body.",
+  );
+  const [srAsync, setSrAsync] = useState(false);
+  const [srStrict, setSrStrict] = useState(false);
+  const [srParamsMode, setSrParamsMode] = useState<"visual" | "json">("visual");
+  const [srParamsJson, setSrParamsJson] = useState("{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}");
+  const [srParamsLocked, setSrParamsLocked] = useState(false);
+  const [srSipVerb, setSrSipVerb] = useState<"INFO" | "MESSAGE" | "NOTIFY">("INFO");
+  const [srHeadersLocked, setSrHeadersLocked] = useState(false);
+  const [srBodyMode, setSrBodyMode] = useState<"schema" | "raw">("schema");
+  const [srBodyRaw, setSrBodyRaw] = useState("");
+  const [srBodyLocked, setSrBodyLocked] = useState(false);
+  const [srMessages, setSrMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
