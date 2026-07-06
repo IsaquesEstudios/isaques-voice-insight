@@ -118,6 +118,18 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "voicemail") {
+    return {
+      type: "voicemail",
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+      ...(tool.metadata && typeof tool.metadata === "object"
+        ? { metadata: tool.metadata }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
