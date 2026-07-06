@@ -945,6 +945,13 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [gsRange, setGsRange] = useState("");
   const [gsMessages, setGsMessages] = useState<VoicemailMessage[]>([]);
 
+  // google calendar configuration state (shared between createEvent and checkAvailability)
+  const [gcName, setGcName] = useState("google_calendar_tool");
+  const [gcDescription, setGcDescription] = useState("");
+  const [gcCalendarId, setGcCalendarId] = useState("");
+  const [gcTimezone, setGcTimezone] = useState("");
+  const [gcMessages, setGcMessages] = useState<VoicemailMessage[]>([]);
+
 
 
   function resetForm() {
