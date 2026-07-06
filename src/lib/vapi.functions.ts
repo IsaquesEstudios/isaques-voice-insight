@@ -189,6 +189,24 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "apiRequest") {
+    // Vapi's apiRequest tool accepts top-level name/description/url/method,
+    // plus headers (JsonSchema), body (JsonSchema), messages.
+    return {
+      type: "apiRequest",
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(typeof tool.url === "string" ? { url: tool.url } : {}),
+      ...(typeof tool.method === "string" ? { method: tool.method } : {}),
+      ...(tool.headers !== undefined ? { headers: tool.headers } : {}),
+      ...(tool.body !== undefined ? { body: tool.body } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+      ...(tool.rejectionPlan ? { rejectionPlan: tool.rejectionPlan } : {}),
+    };
+  }
+
   return tool;
 }
 

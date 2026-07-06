@@ -47,6 +47,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -625,7 +631,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -670,7 +676,7 @@ const TOOL_CATALOG: CatalogSection[] = [
   {
     title: "Integrations",
     items: [
-      { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "function", vapiType: "function" },
+      { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest" },
       { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "comingSoon" },
       { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "comingSoon" },
       { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "comingSoon" },
@@ -867,6 +873,16 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [qKnowledgeBases, setQKnowledgeBases] = useState<Array<{ fileId: string }>>([]);
   const [qMessages, setQMessages] = useState<VoicemailMessage[]>([]);
 
+  // apiRequest configuration state
+  const [arName, setArName] = useState("");
+  const [arDescription, setArDescription] = useState("");
+  const [arUrl, setArUrl] = useState("");
+  const [arMethod, setArMethod] = useState<"GET" | "POST" | "PUT" | "PATCH" | "DELETE">("GET");
+  const [arHeaders, setArHeaders] = useState<Array<{ key: string; value: string }>>([]);
+  const [arBodyLocked, setArBodyLocked] = useState(false);
+  const [arStaticFields, setArStaticFields] = useState<Array<{ key: string; value: string }>>([]);
+  const [arMessages, setArMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -921,6 +937,14 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setQDescription("");
     setQKnowledgeBases([]);
     setQMessages([]);
+    setArName("");
+    setArDescription("");
+    setArUrl("");
+    setArMethod("GET");
+    setArHeaders([]);
+    setArBodyLocked(false);
+    setArStaticFields([]);
+    setArMessages([]);
   }
 
   function openDialog() {
@@ -1162,6 +1186,62 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       };
       if (qMessages.length > 0) {
         tool.messages = qMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (selected.kind === "apiRequest") {
+      const name = arName.trim();
+      if (!name) {
+        toast.error("Nome da ferramenta é obrigatório.");
+        return null;
+      }
+      if (!/^[a-zA-Z0-9_-]{1,40}$/.test(name)) {
+        toast.error("Nome deve conter apenas letras, números, _ ou - (máx 40).");
+        return null;
+      }
+      const url = arUrl.trim();
+      if (!url.startsWith("https://")) {
+        toast.error("A URL deve começar com https://.");
+        return null;
+      }
+      const tool: VapiTool = {
+        type: "apiRequest",
+        name,
+        method: arMethod,
+        url,
+      };
+      if (arDescription.trim()) tool.description = arDescription.trim();
+      if (arHeaders.length > 0) {
+        const props: Record<string, unknown> = {};
+        const required: string[] = [];
+        for (const h of arHeaders) {
+          const k = h.key.trim();
+          if (!k) continue;
+          props[k] = { type: "string", ...(h.value.trim() ? { default: h.value.trim() } : {}) };
+          required.push(k);
+        }
+        if (Object.keys(props).length > 0) {
+          tool.headers = { type: "object", properties: props, required };
+        }
+      }
+      if (arStaticFields.length > 0) {
+        const props: Record<string, unknown> = {};
+        for (const f of arStaticFields) {
+          const k = f.key.trim();
+          if (!k) continue;
+          props[k] = { type: "string", ...(f.value.trim() ? { default: f.value.trim() } : {}) };
+        }
+        if (Object.keys(props).length > 0) {
+          tool.body = {
+            type: "object",
+            properties: props,
+            required: Object.keys(props),
+            ...(arBodyLocked ? { additionalProperties: false } : {}),
+          };
+        }
+      }
+      if (arMessages.length > 0) {
+        tool.messages = arMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -3054,6 +3134,349 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {selected?.kind === "apiRequest" && (
+                  <div className="space-y-4">
+                    {/* Section 1 — Base Configuration (always visible) */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Plug className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Base Configuration
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ar-name" className="text-xs">Tool Name *</Label>
+                        <Input
+                          id="ar-name"
+                          value={arName}
+                          onChange={(e) => setArName(e.target.value.replace(/\s+/g, ""))}
+                          placeholder="e.g., getUserData, sendNotification"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ar-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="ar-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={arDescription}
+                          onChange={(e) => setArDescription(e.target.value)}
+                          placeholder="Explique quando a IA deve chamar essa API."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ar-url" className="text-xs">Request URL *</Label>
+                        <Input
+                          id="ar-url"
+                          value={arUrl}
+                          onChange={(e) => setArUrl(e.target.value)}
+                          placeholder="https://www.vapi.ai"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          The endpoint URL where the API request will be sent. Must use HTTPS.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Request HTTP Method *</Label>
+                        <Select value={arMethod} onValueChange={(v) => setArMethod(v as typeof arMethod)}>
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(["GET", "POST", "PUT", "PATCH", "DELETE"] as const).map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Sections 2-8 — Collapsible */}
+                    <Accordion type="multiple" className="space-y-3">
+                      <AccordionItem value="auth" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Authorization &amp; Headers
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-4 pb-4">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-foreground">Authorization</p>
+                            <p className="text-[11px] text-muted-foreground">Configure authentication for API requests</p>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                              <Plus className="h-3 w-3" />
+                              Add Auth
+                            </Button>
+                          </div>
+                          <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-foreground">Request Headers</p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setArHeaders((p) => [...p, { key: "", value: "" }])}
+                                className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Header
+                              </Button>
+                            </div>
+                            {arHeaders.length === 0 ? (
+                              <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                                No headers configured.
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                {arHeaders.map((h, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={h.key}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setArHeaders((prev) => prev.map((it, i) => i === idx ? { ...it, key: val } : it));
+                                      }}
+                                      placeholder="Header name"
+                                      className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                    />
+                                    <Input
+                                      value={h.value}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setArHeaders((prev) => prev.map((it, i) => i === idx ? { ...it, value: val } : it));
+                                      }}
+                                      placeholder="Value"
+                                      className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setArHeaders((prev) => prev.filter((_, i) => i !== idx))}
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      aria-label="Remover header"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="body" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Request Body
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                              <Plus className="h-3 w-3" />
+                              Add Property
+                            </Button>
+                            <p className="mt-3 text-[11px] text-muted-foreground">No parameters defined</p>
+                          </div>
+                          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <Checkbox checked={arBodyLocked} onCheckedChange={(v) => setArBodyLocked(v === true)} />
+                            Lock schema (no additional properties)
+                          </label>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="static" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Static Body Fields
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-[11px] text-muted-foreground">
+                              Key-value pairs always sent in the request body. Values support Liquid templates.
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setArStaticFields((p) => [...p, { key: "", value: "" }])}
+                              className="h-7 shrink-0 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                            >
+                              <Plus className="h-3 w-3" />
+                              Add Field
+                            </Button>
+                          </div>
+                          {arStaticFields.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                              No static body fields configured. Click &apos;Add Field&apos; to add one.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {arStaticFields.map((f, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <Input
+                                    value={f.key}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setArStaticFields((prev) => prev.map((it, i) => i === idx ? { ...it, key: val } : it));
+                                    }}
+                                    placeholder="Field name"
+                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                  />
+                                  <Input
+                                    value={f.value}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setArStaticFields((prev) => prev.map((it, i) => i === idx ? { ...it, value: val } : it));
+                                    }}
+                                    placeholder="Value (supports {{liquid}})"
+                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                  />
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setArStaticFields((prev) => prev.filter((_, i) => i !== idx))}
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    aria-label="Remover campo"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="encryption" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Encryption Settings
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-2 pb-4">
+                          <p className="text-[11px] text-muted-foreground">
+                            Configure which request body fields should be encrypted.
+                          </p>
+                          <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                            No encrypted fields configured.
+                          </p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="response" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Response Body
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <p className="text-[11px] text-muted-foreground">
+                            Assign dynamic variables extracted from the API response data.
+                          </p>
+                          <div className="overflow-hidden rounded-lg border border-white/[0.06]">
+                            <table className="w-full text-[11px]">
+                              <thead className="bg-background/40">
+                                <tr className="text-left text-muted-foreground">
+                                  <th className="px-3 py-2 font-medium">Variable</th>
+                                  <th className="px-3 py-2 font-medium">Type</th>
+                                  <th className="px-3 py-2 font-medium">Required</th>
+                                  <th className="px-3 py-2 font-medium">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
+                                    No response variables defined.
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                            <Plus className="h-3 w-3" />
+                            Add Property
+                          </Button>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="aliases" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Aliases
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <p className="text-[11px] text-muted-foreground">
+                            Define aliases for response fields to expose simpler variable names to the model.
+                          </p>
+                          <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                            No aliases configured. Click &apos;Add Alias&apos; to add one.
+                          </p>
+                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                            <Plus className="h-3 w-3" />
+                            Add Alias
+                          </Button>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="messages" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                        <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
+                          Messages
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <div className="flex items-center justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                                  <Plus className="h-3 w-3" />
+                                  Add Message
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                                  <DropdownMenuItem
+                                    key={t}
+                                    onClick={() => setArMessages((p) => [...p, { type: t, content: "" }])}
+                                  >
+                                    {TRANSFER_MESSAGE_LABELS[t]}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                          {arMessages.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                              Nenhuma mensagem definida.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {arMessages.map((m, idx) => (
+                                <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-semibold text-foreground">
+                                      {TRANSFER_MESSAGE_LABELS[m.type]}
+                                    </span>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setArMessages((prev) => prev.filter((_, i) => i !== idx))}
+                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                      aria-label="Remover mensagem"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                  <Textarea
+                                    rows={2}
+                                    value={m.content}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setArMessages((prev) => prev.map((it, i) => i === idx ? { ...it, content: val } : it));
+                                    }}
+                                    className="border-white/[0.08] bg-background/40 text-xs"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </div>
                 )}
 
