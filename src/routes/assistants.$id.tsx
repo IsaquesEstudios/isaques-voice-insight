@@ -1082,6 +1082,51 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "handoff") {
+      if (hoDestinations.length === 0) {
+        toast.error("Adicione pelo menos um destino de handoff.");
+        return null;
+      }
+      for (const d of hoDestinations) {
+        if (!d.assistantId.trim()) {
+          toast.error("Selecione o assistente de destino em todos os destinos.");
+          return null;
+        }
+      }
+      let parameters: unknown = {};
+      if (hoParamsMode === "json") {
+        try {
+          parameters = JSON.parse(hoParamsJson);
+        } catch {
+          toast.error("JSON Schema inválido no painel Parameters.");
+          return null;
+        }
+      } else {
+        parameters = {
+          type: "object",
+          properties: {},
+          required: [],
+          ...(hoParamsLocked ? { additionalProperties: false } : {}),
+        };
+      }
+      const tool: VapiTool = {
+        type: "handoff",
+        name: hoName.trim() || "handoff_tool",
+        description: hoDescription.trim(),
+        async: hoAsync,
+        strict: hoStrict,
+        parameters,
+        destinations: hoDestinations.map((d) => ({
+          type: "assistant",
+          assistantId: d.assistantId,
+          ...(d.description.trim() ? { description: d.description.trim() } : {}),
+        })),
+      };
+      if (hoMessages.length > 0) {
+        tool.messages = hoMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
