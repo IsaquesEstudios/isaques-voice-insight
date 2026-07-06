@@ -129,6 +129,21 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "sms") {
+    // Vapi's sms built-in tool accepts `type`, `messages`, and `metadata`
+    // (used for from/to/body config on the Twilio side). Strip top-level
+    // `name`/`description` which are rejected on built-in tools.
+    return {
+      type: "sms",
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+      ...(tool.metadata && typeof tool.metadata === "object"
+        ? { metadata: tool.metadata }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
