@@ -15,6 +15,7 @@ import { Route as CrmRouteImport } from './routes/crm'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as AssistentesRouteImport } from './routes/assistentes'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssistantsIdRouteImport } from './routes/assistants.$id'
 
 const TelefoniaRoute = TelefoniaRouteImport.update({
   id: '/telefonia',
@@ -46,6 +47,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssistantsIdRoute = AssistantsIdRouteImport.update({
+  id: '/assistants/$id',
+  path: '/assistants/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/telefonia': typeof TelefoniaRoute
+  '/assistants/$id': typeof AssistantsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/telefonia': typeof TelefoniaRoute
+  '/assistants/$id': typeof AssistantsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/telefonia': typeof TelefoniaRoute
+  '/assistants/$id': typeof AssistantsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/telefonia'
+    | '/assistants/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/telefonia'
+    | '/assistants/$id'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/telefonia'
+    | '/assistants/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   CrmRoute: typeof CrmRoute
   HistoricoRoute: typeof HistoricoRoute
   TelefoniaRoute: typeof TelefoniaRoute
+  AssistantsIdRoute: typeof AssistantsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assistants/$id': {
+      id: '/assistants/$id'
+      path: '/assistants/$id'
+      fullPath: '/assistants/$id'
+      preLoaderRoute: typeof AssistantsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   CrmRoute: CrmRoute,
   HistoricoRoute: HistoricoRoute,
   TelefoniaRoute: TelefoniaRoute,
+  AssistantsIdRoute: AssistantsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
