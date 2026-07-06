@@ -891,7 +891,14 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       return tool;
     }
     if (selected.kind === "dtmf") {
-      return { type: "dtmf" };
+      const name = dtName.trim() || "dtmf_tool";
+      const tool: VapiTool = { type: "dtmf", name };
+      if (dtDescription.trim()) tool.description = dtDescription.trim();
+      if (dtSipInfo) tool.sipInfoDtmfEnabled = true;
+      if (dtMessages.length > 0) {
+        tool.messages = dtMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
     }
     if (selected.kind === "endCall") {
       const name = ecName.trim() || "endCall";
