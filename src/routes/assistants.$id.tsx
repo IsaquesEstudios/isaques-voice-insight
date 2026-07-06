@@ -634,7 +634,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -682,7 +682,7 @@ const TOOL_CATALOG: CatalogSection[] = [
       { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest" },
       { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "mcp", vapiType: "mcp" },
       { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "slack", vapiType: "slack" },
-      { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "comingSoon" },
+      { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "sheets", vapiType: "sheets" },
     ],
   },
 ];
@@ -700,7 +700,11 @@ const DEFAULT_FN_PARAMS = `{
 
 function findCatalogItemByVapiType(type: string): CatalogItem | undefined {
   // Normalize namespaced Vapi tool types (e.g. slack.message.send) to catalog keys.
-  const normalized = type.startsWith("slack.") ? "slack" : type;
+  const normalized = type.startsWith("slack.")
+    ? "slack"
+    : type.startsWith("google.sheets.")
+      ? "sheets"
+      : type;
   for (const section of TOOL_CATALOG) {
     for (const item of section.items) {
       if (item.vapiType === normalized) return item;
@@ -905,6 +909,13 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [slDescription, setSlDescription] = useState("");
   const [slMessages, setSlMessages] = useState<VoicemailMessage[]>([]);
 
+  // google sheets configuration state
+  const [gsName, setGsName] = useState("google_sheets_tool");
+  const [gsDescription, setGsDescription] = useState("");
+  const [gsSpreadsheetId, setGsSpreadsheetId] = useState("");
+  const [gsRange, setGsRange] = useState("");
+  const [gsMessages, setGsMessages] = useState<VoicemailMessage[]>([]);
+
 
 
   function resetForm() {
@@ -982,6 +993,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setSlName("slack_send_message_tool");
     setSlDescription("");
     setSlMessages([]);
+    setGsName("google_sheets_tool");
+    setGsDescription("");
+    setGsSpreadsheetId("");
+    setGsRange("");
+    setGsMessages([]);
   }
 
   function openDialog() {
@@ -1327,6 +1343,30 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       if (slDescription.trim()) tool.description = slDescription.trim();
       if (slMessages.length > 0) {
         tool.messages = slMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (selected.kind === "sheets") {
+      const spreadsheetId = gsSpreadsheetId.trim();
+      const range = gsRange.trim();
+      if (!spreadsheetId) {
+        toast.error("Spreadsheet ID é obrigatório.");
+        return null;
+      }
+      if (!range) {
+        toast.error("Range é obrigatório.");
+        return null;
+      }
+      const name = gsName.trim() || "google_sheets_tool";
+      const tool: VapiTool = {
+        type: "google.sheets.row.append",
+        name,
+        spreadsheetId,
+        range,
+      };
+      if (gsDescription.trim()) tool.description = gsDescription.trim();
+      if (gsMessages.length > 0) {
+        tool.messages = gsMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -3978,6 +4018,150 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setSlMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
+                                }}
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {selected?.kind === "sheets" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="gs-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="gs-name"
+                          value={gsName}
+                          onChange={(e) => setGsName(e.target.value)}
+                          placeholder="google_sheets_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="gs-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="gs-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={gsDescription}
+                          onChange={(e) => setGsDescription(e.target.value)}
+                          placeholder="Explique quando a IA deve adicionar linhas à planilha."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">{gsDescription.length}/1000</p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Google Sheets Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-start gap-2">
+                        <Sheet className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Google Sheets Settings</h3>
+                          <p className="text-[11px] text-muted-foreground">Configure the Google Sheet and range for this tool</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="gs-sid" className="text-xs">
+                          Spreadsheet ID <span className="text-rose-400">*</span>
+                        </Label>
+                        <Input
+                          id="gs-sid"
+                          value={gsSpreadsheetId}
+                          onChange={(e) => setGsSpreadsheetId(e.target.value)}
+                          placeholder="Enter Spreadsheet ID"
+                          className={cn(
+                            "border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl",
+                            !gsSpreadsheetId.trim() && "border-rose-500/40",
+                          )}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          The ID of the Google Sheet to append data to
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="gs-range" className="text-xs">
+                          Range <span className="text-rose-400">*</span>
+                        </Label>
+                        <Input
+                          id="gs-range"
+                          value={gsRange}
+                          onChange={(e) => setGsRange(e.target.value)}
+                          placeholder="Enter Range (e.g., Sheet1!A:Z)"
+                          className={cn(
+                            "border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl",
+                            !gsRange.trim() && "border-rose-500/40",
+                          )}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          The range where the data should be appended (e.g., Sheet1, Sheet1!A:Z)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 3 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Messages</h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" /> Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() => setGsMessages((p) => [...p, { type: t, content: "" }])}
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {gsMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {gsMessages.map((m, idx) => (
+                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setGsMessages((prev) => prev.filter((_, i) => i !== idx))}
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGsMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
                                 }}
                                 className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                               />
