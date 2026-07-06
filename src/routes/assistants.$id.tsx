@@ -917,6 +917,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setHoParamsLocked(false);
     setHoDestinations([]);
     setHoMessages([]);
+    setQName("query_tool");
+    setQDescription("");
+    setQKnowledgeBases([]);
+    setQMessages([]);
   }
 
   function openDialog() {
