@@ -781,15 +781,38 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   function buildTool(): VapiTool | null {
     if (!selected) return null;
     if (selected.kind === "transferCall") {
-      const number = transferNumber.trim();
-      if (!number) {
-        toast.error("Informe o número de destino.");
+      if (tcDestinations.length === 0) {
+        toast.error("Adicione pelo menos um destino de transferência.");
         return null;
       }
-      return {
+      for (const d of tcDestinations) {
+        if (d.type === "number" && !d.number.trim()) {
+          toast.error("Preencha todos os números de destino.");
+          return null;
+        }
+        if (d.type === "sip" && !d.sipUri.trim()) {
+          toast.error("Preencha todas as URIs SIP.");
+          return null;
+        }
+      }
+      const name = tcName.trim() || "transferCall";
+      const tool: VapiTool = {
         type: "transferCall",
-        destinations: [{ type: "number", number }],
+        name,
+        destinations: tcDestinations.map((d) =>
+          d.type === "number"
+            ? { type: "number", number: d.number.trim() }
+            : { type: "sip", sipUri: d.sipUri.trim() },
+        ),
       };
+      if (tcDescription.trim()) tool.description = tcDescription.trim();
+      if (tcMessages.length > 0) {
+        tool.messages = tcMessages.map((m) => ({
+          type: m.type,
+          content: m.content,
+        }));
+      }
+      return tool;
     }
     if (selected.kind === "endCall" || selected.kind === "dtmf") {
       return { type: selected.kind };
