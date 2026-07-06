@@ -232,6 +232,19 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "google.sheets.row.append") {
+    return {
+      type: "google.sheets.row.append",
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(typeof tool.spreadsheetId === "string" ? { spreadsheetId: tool.spreadsheetId } : {}),
+      ...(typeof tool.range === "string" ? { range: tool.range } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
