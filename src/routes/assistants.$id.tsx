@@ -17,7 +17,16 @@ import {
   Trash2,
   PhoneForwarded,
   PhoneOff,
+  Voicemail,
   Hash,
+  MessageSquare,
+  Radio,
+  Shuffle,
+  Search,
+  Plug,
+  ServerCog,
+  Slack,
+  Sheet,
   Code2,
   Sparkles,
 } from "lucide-react";
@@ -594,13 +603,54 @@ function LogsTab() {
 type VapiToolType = "transferCall" | "endCall" | "dtmf" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type VapiTool = Record<string, any> & { type: VapiToolType };
+type VapiTool = Record<string, any> & { type: string };
 
-const TOOL_TYPES: { value: VapiToolType; label: string; description: string; icon: typeof PhoneForwarded; gradient: string }[] = [
-  { value: "transferCall", label: "Transferir Ligação", description: "Encaminha para um número externo.", icon: PhoneForwarded, gradient: "from-primary/30 to-primary/5" },
-  { value: "endCall", label: "Encerrar Ligação", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, gradient: "from-chart-2/30 to-chart-2/5" },
-  { value: "dtmf", label: "Teclado (DTMF)", description: "Envia tons DTMF durante a chamada.", icon: Hash, gradient: "from-chart-3/30 to-chart-3/5" },
-  { value: "function", label: "Função Customizada", description: "Chama seu webhook com parâmetros.", icon: Code2, gradient: "from-chart-5/30 to-chart-5/5" },
+type CatalogKind = VapiToolType | "comingSoon";
+
+interface CatalogItem {
+  key: string;
+  label: string;
+  description: string;
+  icon: typeof PhoneForwarded;
+  iconColor: string; // tailwind text color class
+  iconBg: string; // tailwind bg color class
+  kind: CatalogKind;
+  vapiType?: VapiToolType;
+}
+
+interface CatalogSection {
+  title: string;
+  items: CatalogItem[];
+}
+
+const TOOL_CATALOG: CatalogSection[] = [
+  {
+    title: "Phone Call Tools",
+    items: [
+      { key: "transferCall", label: "Transfer Call", description: "Encaminha a ligação para um número externo.", icon: PhoneForwarded, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "transferCall", vapiType: "transferCall" },
+      { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall" },
+      { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "comingSoon" },
+      { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf" },
+      { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "comingSoon" },
+      { key: "sip", label: "SIP Request", description: "Executa requisições SIP customizadas.", icon: Radio, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "comingSoon" },
+    ],
+  },
+  {
+    title: "Assistant Tools",
+    items: [
+      { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "comingSoon" },
+      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "comingSoon" },
+    ],
+  },
+  {
+    title: "Integrations",
+    items: [
+      { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "function", vapiType: "function" },
+      { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "comingSoon" },
+      { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "comingSoon" },
+      { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "comingSoon" },
+    ],
+  },
 ];
 
 const DEFAULT_FN_PARAMS = `{
@@ -614,16 +664,24 @@ const DEFAULT_FN_PARAMS = `{
   "required": []
 }`;
 
-function toolMeta(type: string) {
-  return (
-    TOOL_TYPES.find((t) => t.value === type) ?? {
-      value: type as VapiToolType,
-      label: type,
-      description: "Ferramenta customizada.",
-      icon: Code2,
-      gradient: "from-muted/30 to-muted/5",
+function findCatalogItemByVapiType(type: string): CatalogItem | undefined {
+  for (const section of TOOL_CATALOG) {
+    for (const item of section.items) {
+      if (item.vapiType === type) return item;
     }
-  );
+  }
+  return undefined;
+}
+
+function toolCardMeta(tool: VapiTool) {
+  const item = findCatalogItemByVapiType(tool.type);
+  if (item) return item;
+  return {
+    label: tool.type,
+    icon: Code2,
+    iconColor: "text-muted-foreground",
+    iconBg: "bg-muted/20",
+  } as Pick<CatalogItem, "label" | "icon" | "iconColor" | "iconBg">;
 }
 
 function toolTitle(tool: VapiTool): string {
@@ -643,9 +701,10 @@ interface ToolsTabProps {
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"select" | "configure">("select");
+  const [selected, setSelected] = useState<CatalogItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [type, setType] = useState<VapiToolType>("function");
   const [transferNumber, setTransferNumber] = useState("");
   const [fnName, setFnName] = useState("");
   const [fnDescription, setFnDescription] = useState("");
@@ -653,7 +712,6 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [fnParams, setFnParams] = useState(DEFAULT_FN_PARAMS);
 
   function resetForm() {
-    setType("function");
     setTransferNumber("");
     setFnName("");
     setFnDescription("");
@@ -661,8 +719,27 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setFnParams(DEFAULT_FN_PARAMS);
   }
 
+  function openDialog() {
+    resetForm();
+    setSelected(null);
+    setStep("select");
+    setOpen(true);
+  }
+
+  function pickItem(item: CatalogItem) {
+    setSelected(item);
+    setStep("configure");
+  }
+
+  function backToSelect() {
+    setStep("select");
+    setSelected(null);
+    resetForm();
+  }
+
   function buildTool(): VapiTool | null {
-    if (type === "transferCall") {
+    if (!selected) return null;
+    if (selected.kind === "transferCall") {
       const number = transferNumber.trim();
       if (!number) {
         toast.error("Informe o número de destino.");
@@ -673,42 +750,44 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
         destinations: [{ type: "number", number }],
       };
     }
-    if (type === "endCall" || type === "dtmf") {
-      return { type };
+    if (selected.kind === "endCall" || selected.kind === "dtmf") {
+      return { type: selected.kind };
     }
-    // function
-    const name = fnName.trim();
-    if (!name || /\s/.test(name)) {
-      toast.error("Nome da função é obrigatório e não pode conter espaços.");
-      return null;
+    if (selected.kind === "function") {
+      const name = fnName.trim();
+      if (!name || /\s/.test(name)) {
+        toast.error("Nome da função é obrigatório e não pode conter espaços.");
+        return null;
+      }
+      let parameters: unknown;
+      try {
+        parameters = JSON.parse(fnParams);
+      } catch {
+        toast.error("JSON Schema inválido no campo de parâmetros.");
+        return null;
+      }
+      if (
+        !parameters ||
+        typeof parameters !== "object" ||
+        (parameters as { type?: string }).type !== "object"
+      ) {
+        toast.error('Parameters deve ser um JSON Schema com "type": "object".');
+        return null;
+      }
+      const tool: VapiTool = {
+        type: "function",
+        function: {
+          name,
+          description: fnDescription.trim(),
+          parameters,
+        },
+      };
+      if (serverUrl.trim()) {
+        tool.server = { url: serverUrl.trim() };
+      }
+      return tool;
     }
-    let parameters: unknown;
-    try {
-      parameters = JSON.parse(fnParams);
-    } catch {
-      toast.error("JSON Schema inválido no campo de parâmetros.");
-      return null;
-    }
-    if (
-      !parameters ||
-      typeof parameters !== "object" ||
-      (parameters as { type?: string }).type !== "object"
-    ) {
-      toast.error('Parameters deve ser um JSON Schema com "type": "object".');
-      return null;
-    }
-    const tool: VapiTool = {
-      type: "function",
-      function: {
-        name,
-        description: fnDescription.trim(),
-        parameters,
-      },
-    };
-    if (serverUrl.trim()) {
-      tool.server = { url: serverUrl.trim() };
-    }
-    return tool;
+    return null;
   }
 
   async function handleSubmit() {
@@ -721,7 +800,7 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       onToolsChange(nextTools);
       toast.success("Ferramenta adicionada.");
       setOpen(false);
-      resetForm();
+      backToSelect();
     } catch (err) {
       console.error(err);
       toast.error("Erro ao adicionar ferramenta.");
@@ -753,10 +832,7 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
         </div>
         <Button
           className="gap-2 shadow-glow"
-          onClick={() => {
-            resetForm();
-            setOpen(true);
-          }}
+          onClick={openDialog}
           disabled={isLoading}
         >
           <Plus className="h-4 w-4" />
@@ -772,23 +848,22 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {tools.map((tool, index) => {
-          const meta = toolMeta(tool.type);
+          const meta = toolCardMeta(tool);
           const Icon = meta.icon;
           return (
             <Card
               key={index}
               className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
             >
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60",
-                  meta.gradient,
-                )}
-                aria-hidden
-              />
               <CardContent className="relative space-y-4 p-5">
                 <div className="flex items-start justify-between">
-                  <div className="grid h-11 w-11 place-items-center rounded-xl bg-background/60 text-primary backdrop-blur-xl">
+                  <div
+                    className={cn(
+                      "grid h-11 w-11 place-items-center rounded-xl backdrop-blur-xl",
+                      meta.iconBg,
+                      meta.iconColor,
+                    )}
+                  >
                     <Icon className="h-5 w-5" />
                   </div>
                   <Button
@@ -814,126 +889,221 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-          <DialogHeader>
-            <DialogTitle>Adicionar Ferramenta</DialogTitle>
-            <DialogDescription>
-              Configure uma nova ferramenta seguindo o schema oficial da Vapi.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Tipo de Ferramenta</Label>
-              <Select value={type} onValueChange={(v) => setType(v as VapiToolType)}>
-                <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                  {TOOL_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {TOOL_TYPES.find((t) => t.value === type)?.description}
-              </p>
+        <DialogContent className="max-w-2xl border-white/[0.08] bg-card/90 p-0 backdrop-blur-2xl">
+          {step === "select" ? (
+            <div className="flex max-h-[80vh] flex-col">
+              <DialogHeader className="border-b border-white/[0.06] px-6 py-4">
+                <DialogTitle>Adicionar Ferramenta</DialogTitle>
+                <DialogDescription>
+                  Escolha o tipo de ferramenta que o assistente poderá usar.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 overflow-y-auto px-6 py-5">
+                {TOOL_CATALOG.map((section) => (
+                  <div key={section.title} className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                      {section.title}
+                    </p>
+                    <div className="space-y-1.5">
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => pickItem(item)}
+                            className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-background/30 p-3 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-background/50"
+                          >
+                            <div
+                              className={cn(
+                                "grid h-10 w-10 shrink-0 place-items-center rounded-lg",
+                                item.iconBg,
+                                item.iconColor,
+                              )}
+                            >
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground">
+                                {item.label}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {item.description}
+                              </p>
+                            </div>
+                            {item.kind === "comingSoon" && (
+                              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                Em breve
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-
-            {type === "transferCall" && (
-              <div className="space-y-2">
-                <Label htmlFor="transfer-number">Número de Destino</Label>
-                <Input
-                  id="transfer-number"
-                  value={transferNumber}
-                  onChange={(e) => setTransferNumber(e.target.value)}
-                  placeholder="+5511999999999"
-                  className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Formato E.164, ex.: +5511999999999.
-                </p>
+          ) : (
+            <div className="flex max-h-[85vh] flex-col">
+              <div className="border-b border-white/[0.06] px-6 py-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={backToSelect}
+                  className="mb-2 -ml-2 h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Voltar
+                </Button>
+                <div className="flex items-center gap-3">
+                  {selected && (
+                    <div
+                      className={cn(
+                        "grid h-10 w-10 place-items-center rounded-lg",
+                        selected.iconBg,
+                        selected.iconColor,
+                      )}
+                    >
+                      <selected.icon className="h-5 w-5" />
+                    </div>
+                  )}
+                  <div>
+                    <DialogTitle className="text-base">
+                      {selected?.label ?? "Configurar Ferramenta"}
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">
+                      {selected?.description}
+                    </DialogDescription>
+                  </div>
+                </div>
               </div>
-            )}
 
-            {(type === "endCall" || type === "dtmf") && (
-              <p className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground backdrop-blur-xl">
-                Este tipo de ferramenta não exige parâmetros adicionais. Ao salvar, será
-                enviado apenas <span className="font-mono text-foreground">{`{ type: "${type}" }`}</span>.
-              </p>
-            )}
+              <div className="space-y-4 overflow-y-auto px-6 py-5">
+                {selected?.kind === "transferCall" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="transfer-number">Número de Destino</Label>
+                    <Input
+                      id="transfer-number"
+                      value={transferNumber}
+                      onChange={(e) => setTransferNumber(e.target.value)}
+                      placeholder="+5511999999999"
+                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Formato E.164, ex.: +5511999999999.
+                    </p>
+                  </div>
+                )}
 
-            {type === "function" && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="fn-name">function.name</Label>
-                  <Input
-                    id="fn-name"
-                    value={fnName}
-                    onChange={(e) => setFnName(e.target.value.replace(/\s+/g, ""))}
-                    placeholder="get_availability"
-                    className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fn-desc">function.description</Label>
-                  <Textarea
-                    id="fn-desc"
-                    rows={2}
-                    value={fnDescription}
-                    onChange={(e) => setFnDescription(e.target.value)}
-                    placeholder="Explique para a IA quando e como usar essa função."
-                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="server-url">server.url</Label>
-                  <Input
-                    id="server-url"
-                    value={serverUrl}
-                    onChange={(e) => setServerUrl(e.target.value)}
-                    placeholder="https://seu-dominio.com/webhook"
-                    className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fn-params">function.parameters (JSON Schema)</Label>
-                  <Textarea
-                    id="fn-params"
-                    rows={10}
-                    value={fnParams}
-                    onChange={(e) => setFnParams(e.target.value)}
-                    spellCheck={false}
-                    className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Deve ser um JSON Schema válido com <span className="font-mono">"type": "object"</span>.
+                {(selected?.kind === "endCall" || selected?.kind === "dtmf") && (
+                  <p className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground backdrop-blur-xl">
+                    Esta ferramenta não requer configuração adicional. Ao salvar, será
+                    enviado apenas{" "}
+                    <span className="font-mono text-foreground">{`{ type: "${selected.kind}" }`}</span>.
                   </p>
-                </div>
-              </div>
-            )}
-          </div>
+                )}
 
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Salvar
-            </Button>
-          </DialogFooter>
+                {selected?.kind === "function" && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="fn-name">Nome da Função</Label>
+                      <Input
+                        id="fn-name"
+                        value={fnName}
+                        onChange={(e) => setFnName(e.target.value.replace(/\s+/g, ""))}
+                        placeholder="get_availability"
+                        className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fn-desc">Descrição</Label>
+                      <Textarea
+                        id="fn-desc"
+                        rows={2}
+                        value={fnDescription}
+                        onChange={(e) => setFnDescription(e.target.value)}
+                        placeholder="Explique para a IA quando e como usar essa função."
+                        className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="server-url">URL do Webhook</Label>
+                      <Input
+                        id="server-url"
+                        value={serverUrl}
+                        onChange={(e) => setServerUrl(e.target.value)}
+                        placeholder="https://seu-dominio.com/webhook"
+                        className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fn-params">Parameters (JSON Schema)</Label>
+                      <Textarea
+                        id="fn-params"
+                        rows={10}
+                        value={fnParams}
+                        onChange={(e) => setFnParams(e.target.value)}
+                        spellCheck={false}
+                        className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Deve ser um JSON Schema válido com{" "}
+                        <span className="font-mono">"type": "object"</span>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {selected?.kind === "comingSoon" && (
+                  <div className="rounded-xl border border-dashed border-white/[0.1] bg-background/20 p-6 text-center">
+                    <div
+                      className={cn(
+                        "mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl",
+                        selected.iconBg,
+                        selected.iconColor,
+                      )}
+                    >
+                      <selected.icon className="h-6 w-6" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
+                      {selected.label} — em breve
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Configuração nativa de integração em breve. Utilize o{" "}
+                      <span className="text-foreground">API Request</span> para
+                      conectar via Webhook por enquanto.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="border-t border-white/[0.06] px-6 py-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => setOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || selected?.kind === "comingSoon"}
+                  className="gap-2"
+                >
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+
 
 /* ------------------------------- Analysis ------------------------------- */
 
