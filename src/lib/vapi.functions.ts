@@ -176,6 +176,19 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "query") {
+    // Vapi's query tool accepts: type, knowledgeBases, messages. Top-level
+    // name/description are rejected (kept in UI state only).
+    return {
+      type: "query",
+      ...(Array.isArray(tool.knowledgeBases) ? { knowledgeBases: tool.knowledgeBases } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+      ...(tool.rejectionPlan ? { rejectionPlan: tool.rejectionPlan } : {}),
+    };
+  }
+
   return tool;
 }
 
