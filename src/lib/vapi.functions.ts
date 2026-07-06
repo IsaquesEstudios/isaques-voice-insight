@@ -144,6 +144,23 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "sipRequest") {
+    return {
+      type: "sipRequest",
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(typeof tool.async === "boolean" ? { async: tool.async } : {}),
+      ...(typeof tool.strict === "boolean" ? { strict: tool.strict } : {}),
+      ...(tool.parameters !== undefined ? { parameters: tool.parameters } : {}),
+      ...(typeof tool.sipVerb === "string" ? { sipVerb: tool.sipVerb } : {}),
+      ...(tool.headers !== undefined ? { headers: tool.headers } : {}),
+      ...(tool.body !== undefined ? { body: tool.body } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
