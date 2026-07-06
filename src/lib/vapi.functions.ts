@@ -132,6 +132,8 @@ export interface AssistantConfigInput {
   model?: string;
   voiceProvider?: string;
   voiceId?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tools?: any[];
 }
 
 // Partial PATCH used by the details page — only touches provided fields.
