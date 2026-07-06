@@ -11,7 +11,8 @@ export interface VapiAssistantDTO {
 }
 
 // Full raw shape used by the edit/duplicate flows.
-export type VapiAssistantRaw = Record<string, unknown> & { id: string };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type VapiAssistantRaw = Record<string, any> & { id: string };
 
 export interface AssistantInput {
   name: string;
