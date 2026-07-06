@@ -977,6 +977,9 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setMcpEncryptedPaths([]);
     setMcpProtocol("shttp");
     setMcpMessages([]);
+    setSlName("slack_send_message_tool");
+    setSlDescription("");
+    setSlMessages([]);
   }
 
   function openDialog() {
