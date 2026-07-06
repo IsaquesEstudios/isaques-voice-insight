@@ -1580,13 +1580,8 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                     <div className="space-y-1.5">
                       {section.items.map((item) => {
                         const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => pickItem(item)}
-                            className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-background/30 p-3 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-background/50"
-                          >
+                        const buttonInner = (
+                          <>
                             <div
                               className={cn(
                                 "grid h-10 w-10 shrink-0 place-items-center rounded-lg",
@@ -1609,6 +1604,53 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                                 Em breve
                               </span>
                             )}
+                            {item.subItems && (
+                              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                {item.subItems.length} opções
+                              </span>
+                            )}
+                          </>
+                        );
+                        const btnClass = "group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-background/30 p-3 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-background/50";
+                        if (item.subItems && item.subItems.length > 0) {
+                          return (
+                            <DropdownMenu key={item.key}>
+                              <DropdownMenuTrigger asChild>
+                                <button type="button" className={btnClass}>
+                                  {buttonInner}
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-72 border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+                                {item.subItems.map((sub) => {
+                                  const SubIcon = sub.icon;
+                                  return (
+                                    <DropdownMenuItem
+                                      key={sub.key}
+                                      onClick={() => pickItem(sub)}
+                                      className="gap-3 py-2"
+                                    >
+                                      <div className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-md", sub.iconBg, sub.iconColor)}>
+                                        <SubIcon className="h-4 w-4" />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-foreground">{sub.label}</p>
+                                        <p className="truncate text-xs text-muted-foreground">{sub.description}</p>
+                                      </div>
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          );
+                        }
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => pickItem(item)}
+                            className={btnClass}
+                          >
+                            {buttonInner}
                           </button>
                         );
                       })}
