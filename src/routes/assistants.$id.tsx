@@ -687,6 +687,19 @@ const TOOL_CATALOG: CatalogSection[] = [
       { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "mcp", vapiType: "mcp" },
       { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "slack", vapiType: "slack" },
       { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "sheets", vapiType: "sheets" },
+      {
+        key: "gcal",
+        label: "Google Calendar",
+        description: "Cria eventos e verifica disponibilidade no Google Calendar.",
+        icon: Calendar,
+        iconColor: "text-blue-500",
+        iconBg: "bg-blue-500/10",
+        kind: "gcalParent",
+        subItems: [
+          { key: "gcalCreate", label: "Create Event", description: "Cria um novo evento no Google Calendar.", icon: CalendarPlus, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCreate", vapiType: "gcalCreate" },
+          { key: "gcalCheck", label: "Check Availability", description: "Verifica disponibilidade em um Google Calendar.", icon: CalendarCheck, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCheck", vapiType: "gcalCheck" },
+        ],
+      },
     ],
   },
 ];
