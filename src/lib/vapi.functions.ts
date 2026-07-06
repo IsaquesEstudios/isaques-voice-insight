@@ -146,22 +146,36 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
     const body: Record<string, unknown> = {};
     if (typeof data.name === "string") body.name = data.name.trim();
     if (typeof data.firstMessage === "string") body.firstMessage = data.firstMessage;
-    if (data.modelProvider || data.model || typeof data.systemPrompt === "string") {
-      const model: Record<string, unknown> = {};
+
+    // Tools live under model.tools on Vapi — if we're patching either the
+    // model or the tools array we must send the merged model back whole.
+    const needsModelPatch =
+      Boolean(data.modelProvider) ||
+      Boolean(data.model) ||
+      typeof data.systemPrompt === "string" ||
+      Array.isArray(data.tools);
+
+    if (needsModelPatch) {
+      const current = (await vapiFetch(`/assistant/${data.id}`, {
+        method: "GET",
+      })) as VapiAssistantRaw;
+      const currentModel = (current?.model ?? {}) as Record<string, unknown>;
+      const model: Record<string, unknown> = { ...currentModel };
       if (data.modelProvider) model.provider = data.modelProvider;
       if (data.model) model.model = data.model;
       if (typeof data.systemPrompt === "string") {
         model.messages = [{ role: "system", content: data.systemPrompt }];
       }
+      if (Array.isArray(data.tools)) model.tools = data.tools;
       body.model = model;
     }
+
     if (data.voiceProvider || data.voiceId) {
       body.voice = {
         ...(data.voiceProvider ? { provider: data.voiceProvider } : {}),
         ...(data.voiceId ? { voiceId: data.voiceId } : {}),
       };
     }
-    if (Array.isArray(data.tools)) body.tools = data.tools;
     return (await vapiFetch(`/assistant/${data.id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
