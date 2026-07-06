@@ -996,6 +996,57 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "sipRequest") {
+      const name = srName.trim() || "sip_request_tool";
+      let parameters: unknown = {};
+      if (srParamsMode === "json") {
+        try {
+          parameters = JSON.parse(srParamsJson);
+        } catch {
+          toast.error("JSON Schema inválido no painel Parameters.");
+          return null;
+        }
+      } else {
+        parameters = {
+          type: "object",
+          properties: {},
+          required: [],
+          ...(srParamsLocked ? { additionalProperties: false } : {}),
+        };
+      }
+      const headers: Record<string, unknown> = {
+        type: "object",
+        properties: {},
+        required: [],
+        ...(srHeadersLocked ? { additionalProperties: false } : {}),
+      };
+      let body: unknown;
+      if (srBodyMode === "raw") {
+        body = srBodyRaw;
+      } else {
+        body = {
+          type: "object",
+          properties: {},
+          required: [],
+          ...(srBodyLocked ? { additionalProperties: false } : {}),
+        };
+      }
+      const tool: VapiTool = {
+        type: "sipRequest",
+        name,
+        description: srDescription.trim(),
+        async: srAsync,
+        strict: srStrict,
+        parameters,
+        sipVerb: srSipVerb,
+        headers,
+        body,
+      };
+      if (srMessages.length > 0) {
+        tool.messages = srMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
