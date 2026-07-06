@@ -160,6 +160,22 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "handoff") {
+    // Vapi's handoff tool accepts: type, destinations, messages, defaultResult,
+    // function, rejectionPlan. Strip name/description/async/strict/parameters
+    // which the dashboard UI keeps locally but are rejected server-side.
+    return {
+      type: "handoff",
+      ...(Array.isArray(tool.destinations) ? { destinations: tool.destinations } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+      ...(typeof tool.defaultResult === "string" ? { defaultResult: tool.defaultResult } : {}),
+      ...(tool.function ? { function: tool.function } : {}),
+      ...(tool.rejectionPlan ? { rejectionPlan: tool.rejectionPlan } : {}),
+    };
+  }
+
   return tool;
 }
 

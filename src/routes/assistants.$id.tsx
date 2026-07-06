@@ -84,6 +84,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   getVapiAssistant,
+  listVapiAssistants,
   saveVapiAssistantConfig,
 } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
@@ -624,7 +625,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -662,7 +663,7 @@ const TOOL_CATALOG: CatalogSection[] = [
   {
     title: "Assistant Tools",
     items: [
-      { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "comingSoon" },
+      { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "handoff", vapiType: "handoff" },
       { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "comingSoon" },
     ],
   },
@@ -835,6 +836,31 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [srBodyLocked, setSrBodyLocked] = useState(false);
   const [srMessages, setSrMessages] = useState<VoicemailMessage[]>([]);
 
+  // handoff configuration state
+  const [hoName, setHoName] = useState("handoff_tool");
+  const [hoDescription, setHoDescription] = useState("");
+  const [hoAsync, setHoAsync] = useState(false);
+  const [hoStrict, setHoStrict] = useState(false);
+  const [hoParamsMode, setHoParamsMode] = useState<"visual" | "json">("visual");
+  const [hoParamsJson, setHoParamsJson] = useState("{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}");
+  const [hoParamsLocked, setHoParamsLocked] = useState(false);
+  const [hoDestinations, setHoDestinations] = useState<Array<{ assistantId: string; description: string }>>([]);
+  const [hoMessages, setHoMessages] = useState<VoicemailMessage[]>([]);
+  const [hoAssistantOptions, setHoAssistantOptions] = useState<Array<{ id: string; name: string | null }>>([]);
+  const loadAssistants = useServerFn(listVapiAssistants);
+  useEffect(() => {
+    let mounted = true;
+    loadAssistants()
+      .then((rows) => {
+        if (!mounted) return;
+        setHoAssistantOptions(rows.filter((r) => r.id !== id).map((r) => ({ id: r.id, name: r.name ?? null })));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [id, loadAssistants]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -876,6 +902,15 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setSrBodyRaw("");
     setSrBodyLocked(false);
     setSrMessages([]);
+    setHoName("handoff_tool");
+    setHoDescription("");
+    setHoAsync(false);
+    setHoStrict(false);
+    setHoParamsMode("visual");
+    setHoParamsJson("{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}");
+    setHoParamsLocked(false);
+    setHoDestinations([]);
+    setHoMessages([]);
   }
 
   function openDialog() {
@@ -1044,6 +1079,51 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       };
       if (srMessages.length > 0) {
         tool.messages = srMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (selected.kind === "handoff") {
+      if (hoDestinations.length === 0) {
+        toast.error("Adicione pelo menos um destino de handoff.");
+        return null;
+      }
+      for (const d of hoDestinations) {
+        if (!d.assistantId.trim()) {
+          toast.error("Selecione o assistente de destino em todos os destinos.");
+          return null;
+        }
+      }
+      let parameters: unknown = {};
+      if (hoParamsMode === "json") {
+        try {
+          parameters = JSON.parse(hoParamsJson);
+        } catch {
+          toast.error("JSON Schema inválido no painel Parameters.");
+          return null;
+        }
+      } else {
+        parameters = {
+          type: "object",
+          properties: {},
+          required: [],
+          ...(hoParamsLocked ? { additionalProperties: false } : {}),
+        };
+      }
+      const tool: VapiTool = {
+        type: "handoff",
+        name: hoName.trim() || "handoff_tool",
+        description: hoDescription.trim(),
+        async: hoAsync,
+        strict: hoStrict,
+        parameters,
+        destinations: hoDestinations.map((d) => ({
+          type: "assistant",
+          assistantId: d.assistantId,
+          ...(d.description.trim() ? { description: d.description.trim() } : {}),
+        })),
+      };
+      if (hoMessages.length > 0) {
+        tool.messages = hoMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -2457,6 +2537,292 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setSrMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {selected?.kind === "handoff" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings & Options */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ho-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="ho-name"
+                          value={hoName}
+                          onChange={(e) => setHoName(e.target.value)}
+                          placeholder="handoff_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ho-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="ho-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={hoDescription}
+                          onChange={(e) => setHoDescription(e.target.value)}
+                          placeholder="Explique quando a IA deve transferir para outro assistente."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {hoDescription.length}/1000
+                        </p>
+                      </div>
+                      <div className="space-y-3 border-t border-white/[0.06] pt-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-foreground">Async</p>
+                            <p className="text-[11px] text-muted-foreground">Tool executes asynchronously</p>
+                          </div>
+                          <Switch checked={hoAsync} onCheckedChange={setHoAsync} />
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-foreground">Strict</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Enforces strict parameter validation. Requires all properties to be marked as required and schema locked.
+                            </p>
+                          </div>
+                          <Switch checked={hoStrict} onCheckedChange={setHoStrict} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Parameters */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Parameters
+                          </h3>
+                        </div>
+                        <div className="flex overflow-hidden rounded-md border border-white/[0.08]">
+                          <button
+                            type="button"
+                            onClick={() => setHoParamsMode("visual")}
+                            className={cn(
+                              "px-3 py-1 text-[11px]",
+                              hoParamsMode === "visual" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            Visual
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHoParamsMode("json")}
+                            className={cn(
+                              "px-3 py-1 text-[11px]",
+                              hoParamsMode === "json" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            JSON
+                          </button>
+                        </div>
+                      </div>
+                      {hoParamsMode === "visual" ? (
+                        <div className="space-y-3">
+                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                              <Plus className="h-3 w-3" />
+                              Add Property
+                            </Button>
+                            <p className="mt-3 text-[11px] text-muted-foreground">No parameters defined</p>
+                          </div>
+                          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <Checkbox
+                              checked={hoParamsLocked}
+                              onCheckedChange={(v) => setHoParamsLocked(v === true)}
+                            />
+                            Lock schema (no additional properties)
+                          </label>
+                        </div>
+                      ) : (
+                        <Textarea
+                          rows={10}
+                          value={hoParamsJson}
+                          onChange={(e) => setHoParamsJson(e.target.value)}
+                          spellCheck={false}
+                          className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                        />
+                      )}
+                    </div>
+
+                    {/* Panel 3 — Handoff Destinations */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2">
+                          <Shuffle className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                              Handoff Destinations
+                            </h3>
+                            <p className="text-[11px] text-muted-foreground">
+                              Configure assistant destinations for handoffs
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setHoDestinations((p) => [...p, { assistantId: "", description: "" }])
+                          }
+                          className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add Destination
+                        </Button>
+                      </div>
+
+                      {hoDestinations.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          No destinations configured. Click &apos;Add Destination&apos; to add your first destination.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {hoDestinations.map((d, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                  <Select
+                                    value={d.assistantId}
+                                    onValueChange={(v) =>
+                                      setHoDestinations((prev) =>
+                                        prev.map((it, i) => (i === idx ? { ...it, assistantId: v } : it)),
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                      <SelectValue placeholder="Selecione um assistente" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {hoAssistantOptions.length === 0 ? (
+                                        <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                                          Nenhum outro assistente disponível
+                                        </div>
+                                      ) : (
+                                        hoAssistantOptions.map((a) => (
+                                          <SelectItem key={a.id} value={a.id}>
+                                            {a.name || a.id.slice(0, 8)}
+                                          </SelectItem>
+                                        ))
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setHoDestinations((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover destino"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Input
+                                value={d.description}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHoDestinations((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, description: val } : it)),
+                                  );
+                                }}
+                                placeholder="Descrição (quando transferir para este assistente)"
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Panel 4 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setHoMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {hoMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {hoMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setHoMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHoMessages((prev) =>
                                     prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
                                   );
                                 }}
