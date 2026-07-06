@@ -488,7 +488,7 @@ function AssistentesPage() {
                     <span className="text-[11px] text-muted-foreground">
                       Atualizado {metrics.updatedAgo}
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div className="relative z-20 flex items-center gap-1">
                       <Button
                         size="icon"
                         variant="ghost"
