@@ -898,6 +898,13 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [mcpProtocol, setMcpProtocol] = useState<"shttp" | "sse">("shttp");
   const [mcpMessages, setMcpMessages] = useState<VoicemailMessage[]>([]);
 
+  // slack configuration state
+  const [slName, setSlName] = useState("slack_send_message_tool");
+  const [slDescription, setSlDescription] = useState("");
+  const [slMessages, setSlMessages] = useState<VoicemailMessage[]>([]);
+
+
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
