@@ -931,14 +931,3 @@ function ToggleRow({
     </div>
   );
 }
-
-        <Link
-          to="/assistentes"
-          className="mt-4 text-xs text-primary underline-offset-4 hover:underline"
-        >
-          Voltar para a lista
-        </Link>
-      </CardContent>
-    </Card>
-  );
-}
