@@ -934,7 +934,6 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     </div>
   );
 }
-}
 
 /* ------------------------------- Analysis ------------------------------- */
 
