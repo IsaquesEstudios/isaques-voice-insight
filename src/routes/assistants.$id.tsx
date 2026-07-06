@@ -863,6 +863,19 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setSmsToPreset("");
     setSmsBodyPreset("");
     setSmsMessages([]);
+    setSrName("sip_request_tool");
+    setSrDescription("Send a SIP INFO/MESSAGE/NOTIFY request with optional headers and body.");
+    setSrAsync(false);
+    setSrStrict(false);
+    setSrParamsMode("visual");
+    setSrParamsJson("{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}");
+    setSrParamsLocked(false);
+    setSrSipVerb("INFO");
+    setSrHeadersLocked(false);
+    setSrBodyMode("schema");
+    setSrBodyRaw("");
+    setSrBodyLocked(false);
+    setSrMessages([]);
   }
 
   function openDialog() {
