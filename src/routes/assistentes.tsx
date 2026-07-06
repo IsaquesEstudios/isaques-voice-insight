@@ -104,8 +104,6 @@ function AssistentesPage() {
       cancelled = true;
     };
   }, [fetchAssistants]);
-    };
-  }, []);
 
   const enriched = useMemo(
     () =>
