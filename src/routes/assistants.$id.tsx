@@ -146,10 +146,10 @@ function AssistantDetailPage() {
           name: typeof a.name === "string" ? a.name : "",
           firstMessage: typeof a.firstMessage === "string" ? a.firstMessage : "",
           systemPrompt,
-          modelProvider: a?.model?.provider ?? "openai",
-          model: a?.model?.model ?? "gpt-4o",
-          voiceProvider: a?.voice?.provider ?? "11labs",
-          voiceId: a?.voice?.voiceId ?? "burt",
+          modelProvider: typeof a?.model?.provider === "string" ? a.model.provider : "",
+          model: typeof a?.model?.model === "string" ? a.model.model : "",
+          voiceProvider: typeof a?.voice?.provider === "string" ? a.voice.provider : "",
+          voiceId: typeof a?.voice?.voiceId === "string" ? a.voice.voiceId : "",
           status: typeof a.name === "string" && a.name.trim() ? "Ativo" : "Rascunho",
         });
       } catch (err) {
