@@ -861,6 +861,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     };
   }, [id, loadAssistants]);
 
+  // query configuration state
+  const [qName, setQName] = useState("query_tool");
+  const [qDescription, setQDescription] = useState("");
+  const [qKnowledgeBases, setQKnowledgeBases] = useState<Array<{ fileId: string }>>([]);
+  const [qMessages, setQMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
