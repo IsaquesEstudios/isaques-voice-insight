@@ -664,7 +664,7 @@ const TOOL_CATALOG: CatalogSection[] = [
     title: "Assistant Tools",
     items: [
       { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "handoff", vapiType: "handoff" },
-      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "comingSoon" },
+      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "query", vapiType: "query" },
     ],
   },
   {
