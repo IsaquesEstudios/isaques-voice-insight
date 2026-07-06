@@ -1189,6 +1189,62 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "apiRequest") {
+      const name = arName.trim();
+      if (!name) {
+        toast.error("Nome da ferramenta é obrigatório.");
+        return null;
+      }
+      if (!/^[a-zA-Z0-9_-]{1,40}$/.test(name)) {
+        toast.error("Nome deve conter apenas letras, números, _ ou - (máx 40).");
+        return null;
+      }
+      const url = arUrl.trim();
+      if (!url.startsWith("https://")) {
+        toast.error("A URL deve começar com https://.");
+        return null;
+      }
+      const tool: VapiTool = {
+        type: "apiRequest",
+        name,
+        method: arMethod,
+        url,
+      };
+      if (arDescription.trim()) tool.description = arDescription.trim();
+      if (arHeaders.length > 0) {
+        const props: Record<string, unknown> = {};
+        const required: string[] = [];
+        for (const h of arHeaders) {
+          const k = h.key.trim();
+          if (!k) continue;
+          props[k] = { type: "string", ...(h.value.trim() ? { default: h.value.trim() } : {}) };
+          required.push(k);
+        }
+        if (Object.keys(props).length > 0) {
+          tool.headers = { type: "object", properties: props, required };
+        }
+      }
+      if (arStaticFields.length > 0) {
+        const props: Record<string, unknown> = {};
+        for (const f of arStaticFields) {
+          const k = f.key.trim();
+          if (!k) continue;
+          props[k] = { type: "string", ...(f.value.trim() ? { default: f.value.trim() } : {}) };
+        }
+        if (Object.keys(props).length > 0) {
+          tool.body = {
+            type: "object",
+            properties: props,
+            required: Object.keys(props),
+            ...(arBodyLocked ? { additionalProperties: false } : {}),
+          };
+        }
+      }
+      if (arMessages.length > 0) {
+        tool.messages = arMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
