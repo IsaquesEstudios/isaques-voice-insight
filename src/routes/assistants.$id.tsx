@@ -33,7 +33,10 @@ import {
   Phone,
   PhoneOff as PhoneOffIcon,
   Info,
+  Globe,
+  Lock,
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import {
   DropdownMenu,
   DropdownMenuContent,
