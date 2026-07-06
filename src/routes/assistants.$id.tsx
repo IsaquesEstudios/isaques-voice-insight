@@ -39,6 +39,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -729,6 +737,28 @@ const TRANSFER_MESSAGE_LABELS: Record<TransferMessageType, string> = {
   "request-response-delayed": "Request Response Delayed",
 };
 
+const END_CALL_MESSAGE_TYPES = [
+  "request-start",
+  "request-complete",
+  "request-failed",
+] as const;
+type EndCallMessageType = (typeof END_CALL_MESSAGE_TYPES)[number];
+
+const END_CALL_MESSAGE_LABELS: Record<EndCallMessageType, string> = {
+  "request-start": "Request Start",
+  "request-complete": "Request Complete",
+  "request-failed": "Request Failed",
+};
+
+type EndCallMessageMode = "default" | "none" | "custom";
+
+interface EndCallMessage {
+  type: EndCallMessageType;
+  mode: EndCallMessageMode;
+  content: string;
+  blocking: boolean;
+}
+
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
@@ -748,6 +778,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [tcDestinations, setTcDestinations] = useState<TransferDestination[]>([]);
   const [tcMessages, setTcMessages] = useState<TransferMessage[]>([]);
 
+  // endCall configuration state
+  const [ecName, setEcName] = useState("endCall");
+  const [ecDescription, setEcDescription] = useState("");
+  const [ecMessages, setEcMessages] = useState<EndCallMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -758,6 +793,9 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setTcDescription("");
     setTcDestinations([]);
     setTcMessages([]);
+    setEcName("endCall");
+    setEcDescription("");
+    setEcMessages([]);
   }
 
   function openDialog() {
@@ -814,8 +852,25 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
-    if (selected.kind === "endCall" || selected.kind === "dtmf") {
-      return { type: selected.kind };
+    if (selected.kind === "dtmf") {
+      return { type: "dtmf" };
+    }
+    if (selected.kind === "endCall") {
+      const name = ecName.trim() || "endCall";
+      const tool: VapiTool = { type: "endCall", name };
+      if (ecDescription.trim()) tool.description = ecDescription.trim();
+      const messages = ecMessages
+        .filter((m) => m.mode !== "default")
+        .map((m) => {
+          const msg: Record<string, unknown> = {
+            type: m.type,
+            content: m.mode === "custom" ? m.content : "",
+          };
+          if (m.blocking) msg.blocking = true;
+          return msg;
+        });
+      if (messages.length > 0) tool.messages = messages;
+      return tool;
     }
     if (selected.kind === "function") {
       const name = fnName.trim();
@@ -1250,12 +1305,235 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                   </div>
                 )}
 
-                {(selected?.kind === "endCall" || selected?.kind === "dtmf") && (
+                {selected?.kind === "dtmf" && (
                   <p className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground backdrop-blur-xl">
                     Esta ferramenta não requer configuração adicional. Ao salvar, será
                     enviado apenas{" "}
-                    <span className="font-mono text-foreground">{`{ type: "${selected.kind}" }`}</span>.
+                    <span className="font-mono text-foreground">{`{ type: "dtmf" }`}</span>.
                   </p>
+                )}
+
+                {selected?.kind === "endCall" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ec-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="ec-name"
+                          value={ecName}
+                          onChange={(e) => setEcName(e.target.value)}
+                          placeholder="end_call_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ec-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="ec-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={ecDescription}
+                          onChange={(e) => setEcDescription(e.target.value)}
+                          placeholder="Describe the tool in a few sentences"
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {ecDescription.length}/1000
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {END_CALL_MESSAGE_TYPES.map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setEcMessages((p) => [
+                                    ...p,
+                                    { type: t, mode: "default", content: "", blocking: false },
+                                  ])
+                                }
+                              >
+                                {END_CALL_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {ecMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida. Adicione mensagens para os estágios da chamada.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {ecMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-3 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {END_CALL_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setEcMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  Message Option
+                                </Label>
+                                <RadioGroup
+                                  value={m.mode}
+                                  onValueChange={(v) =>
+                                    setEcMessages((prev) =>
+                                      prev.map((it, i) =>
+                                        i === idx ? { ...it, mode: v as EndCallMessageMode } : it,
+                                      ),
+                                    )
+                                  }
+                                  className="space-y-1.5"
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <RadioGroupItem value="default" id={`ec-${idx}-default`} className="mt-0.5" />
+                                    <Label htmlFor={`ec-${idx}-default`} className="cursor-pointer text-xs font-normal">
+                                      Default
+                                      <span className="ml-1 text-[10px] text-muted-foreground">
+                                        (server will use default message)
+                                      </span>
+                                    </Label>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <RadioGroupItem value="none" id={`ec-${idx}-none`} className="mt-0.5" />
+                                    <Label htmlFor={`ec-${idx}-none`} className="cursor-pointer text-xs font-normal">
+                                      None
+                                      <span className="ml-1 text-[10px] text-muted-foreground">
+                                        (no message will be spoken)
+                                      </span>
+                                    </Label>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <RadioGroupItem value="custom" id={`ec-${idx}-custom`} className="mt-0.5" />
+                                    <Label htmlFor={`ec-${idx}-custom`} className="cursor-pointer text-xs font-normal">
+                                      Custom
+                                    </Label>
+                                  </div>
+                                </RadioGroup>
+
+                                {m.mode === "custom" && (
+                                  <div className="space-y-2 pl-6">
+                                    <Textarea
+                                      rows={2}
+                                      value={m.content}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setEcMessages((prev) =>
+                                          prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                        );
+                                      }}
+                                      placeholder="Frase que a IA vai falar..."
+                                      className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      disabled
+                                      className="h-6 gap-1 px-2 text-[11px] text-muted-foreground/60"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                      Add variant
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-start gap-2 rounded border border-white/[0.04] bg-background/30 p-2">
+                                <Checkbox
+                                  id={`ec-${idx}-blocking`}
+                                  checked={m.blocking}
+                                  onCheckedChange={(v) =>
+                                    setEcMessages((prev) =>
+                                      prev.map((it, i) =>
+                                        i === idx ? { ...it, blocking: v === true } : it,
+                                      ),
+                                    )
+                                  }
+                                  className="mt-0.5"
+                                />
+                                <Label
+                                  htmlFor={`ec-${idx}-blocking`}
+                                  className="cursor-pointer text-[11px] font-normal leading-snug text-muted-foreground"
+                                >
+                                  Wait for selected message to be spoken before triggering tool call
+                                </Label>
+                              </div>
+
+                              <Collapsible>
+                                <div className="flex items-center justify-between">
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                                    >
+                                      <ChevronDown className="h-3 w-3" />
+                                      Conditions
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled
+                                    className="h-6 gap-1 px-2 text-[11px] text-muted-foreground/60"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Add
+                                  </Button>
+                                </div>
+                                <CollapsibleContent className="pt-2">
+                                  <p className="rounded border border-dashed border-white/[0.06] bg-background/20 p-2 text-[11px] text-muted-foreground">
+                                    Configuração de condições em breve.
+                                  </p>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 {selected?.kind === "function" && (
