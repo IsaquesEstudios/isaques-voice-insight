@@ -902,6 +902,15 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setSrBodyRaw("");
     setSrBodyLocked(false);
     setSrMessages([]);
+    setHoName("handoff_tool");
+    setHoDescription("");
+    setHoAsync(false);
+    setHoStrict(false);
+    setHoParamsMode("visual");
+    setHoParamsJson("{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}");
+    setHoParamsLocked(false);
+    setHoDestinations([]);
+    setHoMessages([]);
   }
 
   function openDialog() {
