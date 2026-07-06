@@ -778,6 +778,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [tcDestinations, setTcDestinations] = useState<TransferDestination[]>([]);
   const [tcMessages, setTcMessages] = useState<TransferMessage[]>([]);
 
+  // endCall configuration state
+  const [ecName, setEcName] = useState("endCall");
+  const [ecDescription, setEcDescription] = useState("");
+  const [ecMessages, setEcMessages] = useState<EndCallMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -788,6 +793,9 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setTcDescription("");
     setTcDestinations([]);
     setTcMessages([]);
+    setEcName("endCall");
+    setEcDescription("");
+    setEcMessages([]);
   }
 
   function openDialog() {
