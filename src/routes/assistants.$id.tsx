@@ -836,6 +836,31 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [srBodyLocked, setSrBodyLocked] = useState(false);
   const [srMessages, setSrMessages] = useState<VoicemailMessage[]>([]);
 
+  // handoff configuration state
+  const [hoName, setHoName] = useState("handoff_tool");
+  const [hoDescription, setHoDescription] = useState("");
+  const [hoAsync, setHoAsync] = useState(false);
+  const [hoStrict, setHoStrict] = useState(false);
+  const [hoParamsMode, setHoParamsMode] = useState<"visual" | "json">("visual");
+  const [hoParamsJson, setHoParamsJson] = useState("{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}");
+  const [hoParamsLocked, setHoParamsLocked] = useState(false);
+  const [hoDestinations, setHoDestinations] = useState<Array<{ assistantId: string; description: string }>>([]);
+  const [hoMessages, setHoMessages] = useState<VoicemailMessage[]>([]);
+  const [hoAssistantOptions, setHoAssistantOptions] = useState<Array<{ id: string; name: string | null }>>([]);
+  const loadAssistants = useServerFn(listVapiAssistants);
+  useEffect(() => {
+    let mounted = true;
+    loadAssistants()
+      .then((rows) => {
+        if (!mounted) return;
+        setHoAssistantOptions(rows.filter((r) => r.id !== id).map((r) => ({ id: r.id, name: r.name ?? null })));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [id, loadAssistants]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
