@@ -737,6 +737,28 @@ const TRANSFER_MESSAGE_LABELS: Record<TransferMessageType, string> = {
   "request-response-delayed": "Request Response Delayed",
 };
 
+const END_CALL_MESSAGE_TYPES = [
+  "request-start",
+  "request-complete",
+  "request-failed",
+] as const;
+type EndCallMessageType = (typeof END_CALL_MESSAGE_TYPES)[number];
+
+const END_CALL_MESSAGE_LABELS: Record<EndCallMessageType, string> = {
+  "request-start": "Request Start",
+  "request-complete": "Request Complete",
+  "request-failed": "Request Failed",
+};
+
+type EndCallMessageMode = "default" | "none" | "custom";
+
+interface EndCallMessage {
+  type: EndCallMessageType;
+  mode: EndCallMessageMode;
+  content: string;
+  blocking: boolean;
+}
+
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
