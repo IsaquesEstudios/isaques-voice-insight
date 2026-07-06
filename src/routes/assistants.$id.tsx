@@ -993,6 +993,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setSlName("slack_send_message_tool");
     setSlDescription("");
     setSlMessages([]);
+    setGsName("google_sheets_tool");
+    setGsDescription("");
+    setGsSpreadsheetId("");
+    setGsRange("");
+    setGsMessages([]);
   }
 
   function openDialog() {
