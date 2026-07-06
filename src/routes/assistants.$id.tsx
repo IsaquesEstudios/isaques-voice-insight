@@ -811,6 +811,13 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [dtSipInfo, setDtSipInfo] = useState(false);
   const [dtMessages, setDtMessages] = useState<VoicemailMessage[]>([]);
 
+  // sms configuration state
+  const [smsName, setSmsName] = useState("send_text_tool");
+  const [smsDescription, setSmsDescription] = useState("");
+  const [smsToPreset, setSmsToPreset] = useState("");
+  const [smsBodyPreset, setSmsBodyPreset] = useState("");
+  const [smsMessages, setSmsMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -834,6 +841,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setDtDescription("");
     setDtSipInfo(false);
     setDtMessages([]);
+    setSmsName("send_text_tool");
+    setSmsDescription("");
+    setSmsToPreset("");
+    setSmsBodyPreset("");
+    setSmsMessages([]);
   }
 
   function openDialog() {
