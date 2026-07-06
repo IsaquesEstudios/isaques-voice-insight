@@ -84,6 +84,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   getVapiAssistant,
+  listVapiAssistants,
   saveVapiAssistantConfig,
 } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
