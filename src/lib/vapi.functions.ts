@@ -58,6 +58,50 @@ async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
   return text ? JSON.parse(text) : null;
 }
 
+// Vapi's transient tools inside assistant.model.tools are strict. Some native
+// dashboard controls expose display fields, but built-in tools reject them in
+// the API payload (ex: endCall/transferCall reject top-level name/description).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sanitizeModelTool(tool: any): any {
+  if (!tool || typeof tool !== "object") return tool;
+
+  if (tool.type === "endCall") {
+    return {
+      type: "endCall",
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages }
+        : {}),
+      ...(tool.rejectionPlan ? { rejectionPlan: tool.rejectionPlan } : {}),
+    };
+  }
+
+  if (tool.type === "transferCall") {
+    return {
+      type: "transferCall",
+      ...(Array.isArray(tool.destinations) ? { destinations: tool.destinations } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages }
+        : {}),
+      ...(tool.rejectionPlan ? { rejectionPlan: tool.rejectionPlan } : {}),
+    };
+  }
+
+  if (tool.type === "dtmf") {
+    return {
+      type: "dtmf",
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages }
+        : {}),
+      ...(typeof tool.sipInfoDtmfEnabled === "boolean"
+        ? { sipInfoDtmfEnabled: tool.sipInfoDtmfEnabled }
+        : {}),
+      ...(tool.rejectionPlan ? { rejectionPlan: tool.rejectionPlan } : {}),
+    };
+  }
+
+  return tool;
+}
+
 export const listVapiAssistants = createServerFn({ method: "GET" }).handler(
   async (): Promise<VapiAssistantDTO[]> => {
     const data = await vapiFetch("/assistant", { method: "GET" });
@@ -166,7 +210,7 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       if (typeof data.systemPrompt === "string") {
         model.messages = [{ role: "system", content: data.systemPrompt }];
       }
-      if (Array.isArray(data.tools)) model.tools = data.tools;
+      if (Array.isArray(data.tools)) model.tools = data.tools.map(sanitizeModelTool);
       body.model = model;
     }
 
