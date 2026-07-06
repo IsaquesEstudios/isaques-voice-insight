@@ -909,6 +909,13 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [slDescription, setSlDescription] = useState("");
   const [slMessages, setSlMessages] = useState<VoicemailMessage[]>([]);
 
+  // google sheets configuration state
+  const [gsName, setGsName] = useState("google_sheets_tool");
+  const [gsDescription, setGsDescription] = useState("");
+  const [gsSpreadsheetId, setGsSpreadsheetId] = useState("");
+  const [gsRange, setGsRange] = useState("");
+  const [gsMessages, setGsMessages] = useState<VoicemailMessage[]>([]);
+
 
 
   function resetForm() {
