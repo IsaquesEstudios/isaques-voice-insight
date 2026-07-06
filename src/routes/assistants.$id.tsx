@@ -20,6 +20,7 @@ import {
   Voicemail,
   Hash,
   MessageSquare,
+  MessageCircle,
   Radio,
   Shuffle,
   Search,
@@ -29,7 +30,15 @@ import {
   Sheet,
   Code2,
   Sparkles,
+  Phone,
+  PhoneOff as PhoneOffIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -698,6 +707,28 @@ interface ToolsTabProps {
   isLoading: boolean;
 }
 
+type TransferDestination =
+  | { type: "number"; number: string }
+  | { type: "sip"; sipUri: string };
+
+type TransferMessageType =
+  | "request-start"
+  | "request-complete"
+  | "request-failed"
+  | "request-response-delayed";
+
+interface TransferMessage {
+  type: TransferMessageType;
+  content: string;
+}
+
+const TRANSFER_MESSAGE_LABELS: Record<TransferMessageType, string> = {
+  "request-start": "Request Start Variant",
+  "request-complete": "Request Complete",
+  "request-failed": "Request Failed",
+  "request-response-delayed": "Request Response Delayed",
+};
+
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
@@ -711,12 +742,22 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [serverUrl, setServerUrl] = useState("");
   const [fnParams, setFnParams] = useState(DEFAULT_FN_PARAMS);
 
+  // transferCall configuration state
+  const [tcName, setTcName] = useState("transferCall");
+  const [tcDescription, setTcDescription] = useState("");
+  const [tcDestinations, setTcDestinations] = useState<TransferDestination[]>([]);
+  const [tcMessages, setTcMessages] = useState<TransferMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
     setFnDescription("");
     setServerUrl("");
     setFnParams(DEFAULT_FN_PARAMS);
+    setTcName("transferCall");
+    setTcDescription("");
+    setTcDestinations([]);
+    setTcMessages([]);
   }
 
   function openDialog() {
@@ -740,15 +781,38 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   function buildTool(): VapiTool | null {
     if (!selected) return null;
     if (selected.kind === "transferCall") {
-      const number = transferNumber.trim();
-      if (!number) {
-        toast.error("Informe o número de destino.");
+      if (tcDestinations.length === 0) {
+        toast.error("Adicione pelo menos um destino de transferência.");
         return null;
       }
-      return {
+      for (const d of tcDestinations) {
+        if (d.type === "number" && !d.number.trim()) {
+          toast.error("Preencha todos os números de destino.");
+          return null;
+        }
+        if (d.type === "sip" && !d.sipUri.trim()) {
+          toast.error("Preencha todas as URIs SIP.");
+          return null;
+        }
+      }
+      const name = tcName.trim() || "transferCall";
+      const tool: VapiTool = {
         type: "transferCall",
-        destinations: [{ type: "number", number }],
+        name,
+        destinations: tcDestinations.map((d) =>
+          d.type === "number"
+            ? { type: "number", number: d.number.trim() }
+            : { type: "sip", sipUri: d.sipUri.trim() },
+        ),
       };
+      if (tcDescription.trim()) tool.description = tcDescription.trim();
+      if (tcMessages.length > 0) {
+        tool.messages = tcMessages.map((m) => ({
+          type: m.type,
+          content: m.content,
+        }));
+      }
+      return tool;
     }
     if (selected.kind === "endCall" || selected.kind === "dtmf") {
       return { type: selected.kind };
@@ -981,18 +1045,208 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
 
               <div className="space-y-4 overflow-y-auto px-6 py-5">
                 {selected?.kind === "transferCall" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="transfer-number">Número de Destino</Label>
-                    <Input
-                      id="transfer-number"
-                      value={transferNumber}
-                      onChange={(e) => setTransferNumber(e.target.value)}
-                      placeholder="+5511999999999"
-                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Formato E.164, ex.: +5511999999999.
-                    </p>
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tc-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="tc-name"
+                          value={tcName}
+                          onChange={(e) => setTcName(e.target.value)}
+                          placeholder="transfer_call_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Padrão da Vapi é <span className="font-mono">transferCall</span>. Edite se necessário.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tc-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="tc-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={tcDescription}
+                          onChange={(e) => setTcDescription(e.target.value)}
+                          placeholder="Explique para a IA quando usar essa ferramenta."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {tcDescription.length}/1000
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Destinations */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Destinations
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Destination
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setTcDestinations((p) => [...p, { type: "number", number: "" }])
+                              }
+                            >
+                              <Phone className="mr-2 h-3.5 w-3.5" />
+                              Phone Number
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setTcDestinations((p) => [...p, { type: "sip", sipUri: "" }])
+                              }
+                            >
+                              <Radio className="mr-2 h-3.5 w-3.5" />
+                              SIP
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {tcDestinations.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                          <PhoneOffIcon className="h-6 w-6 text-muted-foreground/60" />
+                          <p className="text-xs text-muted-foreground">
+                            No destinations configured. Click 'Add Destination' to add a transfer destination.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {tcDestinations.map((d, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-background/40 p-2 backdrop-blur-xl"
+                            >
+                              <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                {d.type === "number" ? "Phone" : "SIP"}
+                              </span>
+                              <Input
+                                value={d.type === "number" ? d.number : d.sipUri}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTcDestinations((prev) =>
+                                    prev.map((it, i) =>
+                                      i !== idx
+                                        ? it
+                                        : it.type === "number"
+                                          ? { ...it, number: val }
+                                          : { ...it, sipUri: val },
+                                    ),
+                                  );
+                                }}
+                                placeholder={d.type === "number" ? "+5511999999999" : "sip:user@domain.com"}
+                                className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() =>
+                                  setTcDestinations((prev) => prev.filter((_, i) => i !== idx))
+                                }
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                aria-label="Remover destino"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Panel 3 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setTcMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {tcMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida. Adicione mensagens para o status da transferência.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {tcMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setTcMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTcMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                placeholder="Frase que a IA vai falar neste momento..."
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
