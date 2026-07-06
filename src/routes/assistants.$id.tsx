@@ -637,12 +637,12 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "gcalCreate" | "gcalCheck" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
 
-type CatalogKind = VapiToolType | "comingSoon";
+type CatalogKind = VapiToolType | "comingSoon" | "gcalParent";
 
 interface CatalogItem {
   key: string;
@@ -653,6 +653,7 @@ interface CatalogItem {
   iconBg: string; // tailwind bg color class
   kind: CatalogKind;
   vapiType?: VapiToolType;
+  subItems?: CatalogItem[];
 }
 
 interface CatalogSection {
