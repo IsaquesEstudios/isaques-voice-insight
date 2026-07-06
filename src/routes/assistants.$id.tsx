@@ -912,6 +912,22 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "sms") {
+      const name = smsName.trim() || "send_text_tool";
+      const tool: VapiTool = { type: "sms", name };
+      if (smsDescription.trim()) tool.description = smsDescription.trim();
+      // Preset fields (dashboard-only helpers) are stashed on `metadata`.
+      // Vapi rejects unknown top-level keys on built-in tools; metadata is
+      // stripped in the sanitizer to match the API contract.
+      const metadata: Record<string, string> = {};
+      if (smsToPreset.trim()) metadata.toPreset = smsToPreset.trim();
+      if (smsBodyPreset.trim()) metadata.bodyPreset = smsBodyPreset.trim();
+      if (Object.keys(metadata).length > 0) tool.metadata = metadata;
+      if (smsMessages.length > 0) {
+        tool.messages = smsMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "endCall") {
       const name = ecName.trim() || "endCall";
       const tool: VapiTool = { type: "endCall", name };
