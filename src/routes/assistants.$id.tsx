@@ -32,6 +32,7 @@ import {
   Sparkles,
   Phone,
   PhoneOff as PhoneOffIcon,
+  Info,
 } from "lucide-react";
 import {
   DropdownMenu,
