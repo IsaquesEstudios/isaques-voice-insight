@@ -461,33 +461,477 @@ function AssistantDetailPage() {
             </div>
           </TabsContent>
 
-          {[
-            { value: "logs", label: "Logs" },
-            { value: "tools", label: "Tools" },
-            { value: "analysis", label: "Analysis" },
-            { value: "advanced", label: "Advanced" },
-          ].map((tab) => (
-            <TabsContent key={tab.value} value={tab.value} className="mt-0">
-              <BlankState label={tab.label} />
-            </TabsContent>
-          ))}
+          <TabsContent value="logs" className="mt-0">
+            <LogsTab />
+          </TabsContent>
+          <TabsContent value="tools" className="mt-0">
+            <ToolsTab />
+          </TabsContent>
+          <TabsContent value="analysis" className="mt-0">
+            <AnalysisTab />
+          </TabsContent>
+          <TabsContent value="advanced" className="mt-0">
+            <AdvancedTab />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardShell>
   );
 }
 
-function BlankState({ label }: { label: string }) {
+/* -------------------------------- Logs -------------------------------- */
+
+interface LogRow {
+  id: string;
+  when: string;
+  phone: string;
+  duration: string;
+  cost: string;
+}
+
+const MOCK_LOGS: LogRow[] = [
+  { id: "1", when: "06/07/2026 14:32", phone: "+55 11 98765-4321", duration: "03:12", cost: "$0.42" },
+  { id: "2", when: "06/07/2026 13:58", phone: "+55 21 99123-4567", duration: "01:47", cost: "$0.24" },
+  { id: "3", when: "06/07/2026 12:15", phone: "+55 31 98888-1122", duration: "05:03", cost: "$0.68" },
+  { id: "4", when: "06/07/2026 11:02", phone: "+1 415 555-2201", duration: "02:21", cost: "$0.31" },
+  { id: "5", when: "05/07/2026 19:44", phone: "+55 11 97777-9090", duration: "00:38", cost: "$0.09" },
+];
+
+function LogsTab() {
   return (
     <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-      <CardContent className="flex min-h-[320px] flex-col items-center justify-center gap-2 p-10 text-center">
-        <p className="text-sm font-medium text-foreground">
-          Configurações de {label} em breve
-        </p>
-        <p className="max-w-sm text-xs text-muted-foreground">
-          Estamos preparando esta seção. Em breve você poderá gerenciar {label.toLowerCase()}{" "}
-          diretamente por aqui.
-        </p>
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Histórico do Agente</h2>
+            <p className="text-xs text-muted-foreground">
+              Últimas interações registradas por este assistente.
+            </p>
+          </div>
+          <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
+            Dados de exemplo
+          </span>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="border-white/[0.06] hover:bg-transparent">
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                Data/Hora
+              </TableHead>
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                Telefone
+              </TableHead>
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                Duração
+              </TableHead>
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                Custo
+              </TableHead>
+              <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">
+                Ações
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {MOCK_LOGS.map((row) => (
+              <TableRow
+                key={row.id}
+                className="border-white/[0.04] transition-colors hover:bg-white/[0.03]"
+              >
+                <TableCell className="text-sm text-foreground">{row.when}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {row.phone}
+                </TableCell>
+                <TableCell className="text-sm text-foreground">{row.duration}</TableCell>
+                <TableCell className="text-sm text-foreground">{row.cost}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 hover:text-primary"
+                      aria-label="Reproduzir áudio"
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 hover:text-primary"
+                      aria-label="Ver transcrição"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* -------------------------------- Tools -------------------------------- */
+
+interface ToolCard {
+  id: string;
+  name: string;
+  description: string;
+  icon: typeof PhoneForwarded;
+  gradient: string;
+}
+
+const MOCK_TOOLS: ToolCard[] = [
+  {
+    id: "t1",
+    name: "transferCall",
+    description: "Transfere a ligação para um humano quando o lead pede atendimento.",
+    icon: PhoneForwarded,
+    gradient: "from-primary/30 to-primary/5",
+  },
+  {
+    id: "t2",
+    name: "checkAvailability",
+    description: "Consulta a agenda e retorna horários livres para agendamento.",
+    icon: CalendarCheck,
+    gradient: "from-chart-2/30 to-chart-2/5",
+  },
+  {
+    id: "t3",
+    name: "sendConfirmationEmail",
+    description: "Dispara e-mail de confirmação após a conversão da chamada.",
+    icon: Mail,
+    gradient: "from-chart-3/30 to-chart-3/5",
+  },
+  {
+    id: "t4",
+    name: "verifyCustomer",
+    description: "Valida CPF e dados cadastrais do cliente na base interna.",
+    icon: ShieldCheck,
+    gradient: "from-chart-5/30 to-chart-5/5",
+  },
+];
+
+function ToolsTab() {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Ferramentas do Agente</h2>
+          <p className="text-xs text-muted-foreground">
+            Funções que o assistente pode invocar durante a chamada.
+          </p>
+        </div>
+        <Button className="gap-2 shadow-glow">
+          <Plus className="h-4 w-4" />
+          Adicionar Ferramenta
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {MOCK_TOOLS.map((t) => (
+          <Card
+            key={t.id}
+            className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+          >
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60",
+                t.gradient,
+              )}
+              aria-hidden
+            />
+            <CardContent className="relative space-y-4 p-5">
+              <div className="flex items-start justify-between">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-background/60 text-primary backdrop-blur-xl">
+                  <t.icon className="h-5 w-5" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 hover:text-primary"
+                    aria-label="Editar ferramenta"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    aria-label="Excluir ferramenta"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-foreground">{t.name}</p>
+                <p className="text-xs text-muted-foreground">{t.description}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- Analysis ------------------------------- */
+
+interface SchemaField {
+  id: string;
+  name: string;
+  type: "string" | "number" | "boolean";
+  description: string;
+}
+
+function AnalysisTab() {
+  const [successCriteria, setSuccessCriteria] = useState(
+    "A ligação é considerada bem-sucedida quando o lead demonstra interesse claro no produto e concorda em receber um contato do time comercial.",
+  );
+  const [fields, setFields] = useState<SchemaField[]>([
+    { id: "f1", name: "nome", type: "string", description: "Nome completo do lead" },
+    { id: "f2", name: "email", type: "string", description: "E-mail principal para contato" },
+    { id: "f3", name: "orcamento", type: "number", description: "Orçamento estimado em BRL" },
+  ]);
+
+  function addField() {
+    setFields((prev) => [
+      ...prev,
+      {
+        id: `f${Date.now()}`,
+        name: "",
+        type: "string",
+        description: "",
+      },
+    ]);
+  }
+
+  function updateField(id: string, patch: Partial<SchemaField>) {
+    setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }
+
+  function removeField(id: string) {
+    setFields((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="space-y-4 p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Critério de Sucesso</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Descreva em linguagem natural quando a IA deve marcar a ligação como convertida.
+          </p>
+          <Textarea
+            rows={5}
+            value={successCriteria}
+            onChange={(e) => setSuccessCriteria(e.target.value)}
+            className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+          />
+        </CardContent>
+      </Card>
+
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="space-y-4 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Extração de Dados</h2>
+              <p className="text-xs text-muted-foreground">
+                Campos que a IA deve capturar automaticamente durante a chamada.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={addField} className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar Campo
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <div className="hidden grid-cols-[1fr_140px_1.5fr_40px] gap-2 px-1 text-[10px] uppercase tracking-wide text-muted-foreground md:grid">
+              <span>Nome do campo</span>
+              <span>Tipo</span>
+              <span>Descrição</span>
+              <span />
+            </div>
+            {fields.length === 0 && (
+              <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 p-4 text-center text-xs text-muted-foreground">
+                Nenhum campo definido. Clique em "Adicionar Campo" para começar.
+              </p>
+            )}
+            {fields.map((field) => (
+              <div
+                key={field.id}
+                className="grid grid-cols-1 gap-2 rounded-xl border border-white/[0.06] bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_40px]"
+              >
+                <Input
+                  value={field.name}
+                  onChange={(e) => updateField(field.id, { name: e.target.value })}
+                  placeholder="ex: telefone"
+                  className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                />
+                <Select
+                  value={field.type}
+                  onValueChange={(v) =>
+                    updateField(field.id, { type: v as SchemaField["type"] })
+                  }
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                    <SelectItem value="string">string</SelectItem>
+                    <SelectItem value="number">number</SelectItem>
+                    <SelectItem value="boolean">boolean</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={field.description}
+                  onChange={(e) => updateField(field.id, { description: e.target.value })}
+                  placeholder="Explique o que a IA deve capturar"
+                  className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => removeField(field.id)}
+                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                  aria-label="Remover campo"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------- Advanced ------------------------------- */
+
+function AdvancedTab() {
+  const [maxDuration, setMaxDuration] = useState(30);
+  const [silenceTimeout, setSilenceTimeout] = useState(20);
+  const [backgroundSound, setBackgroundSound] = useState("office");
+  const [recording, setRecording] = useState(true);
+  const [hipaa, setHipaa] = useState(false);
+  const [endCallOnSilence, setEndCallOnSilence] = useState(true);
+
+  return (
+    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <CardContent className="space-y-6 p-6">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Configurações Avançadas</h2>
+          <p className="text-xs text-muted-foreground">
+            Ajustes finos de comportamento e privacidade da chamada.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="space-y-2 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+            <Label htmlFor="max-duration">Duração Máxima da Chamada (min)</Label>
+            <Input
+              id="max-duration"
+              type="number"
+              min={1}
+              value={maxDuration}
+              onChange={(e) => setMaxDuration(Number(e.target.value))}
+              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              A ligação é encerrada automaticamente após este tempo.
+            </p>
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+            <Label htmlFor="silence">Tempo de Silêncio para Desligar (s)</Label>
+            <Input
+              id="silence"
+              type="number"
+              min={1}
+              value={silenceTimeout}
+              onChange={(e) => setSilenceTimeout(Number(e.target.value))}
+              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Encerra a chamada após o intervalo sem áudio do cliente.
+            </p>
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+            <Label>Som de Fundo</Label>
+            <Select value={backgroundSound} onValueChange={setBackgroundSound}>
+              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                <SelectItem value="office">Office</SelectItem>
+                <SelectItem value="static">Static</SelectItem>
+                <SelectItem value="none">None</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Ruído ambiente que torna a conversa mais natural.
+            </p>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+            <Label>Privacidade & Gravação</Label>
+            <ToggleRow
+              label="Gravar Ligações"
+              description="Armazena o áudio completo para reprodução posterior."
+              checked={recording}
+              onChange={setRecording}
+            />
+            <ToggleRow
+              label="Modo HIPAA"
+              description="Não persiste transcrições nem áudios sensíveis."
+              checked={hipaa}
+              onChange={setHipaa}
+            />
+            <ToggleRow
+              label="Desligar em silêncio prolongado"
+              description="Aplica o timeout de silêncio configurado ao lado."
+              checked={endCallOnSilence}
+              onChange={setEndCallOnSilence}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm text-foreground">{label}</p>
+        <p className="text-[11px] text-muted-foreground">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
         <Link
           to="/assistentes"
           className="mt-4 text-xs text-primary underline-offset-4 hover:underline"
