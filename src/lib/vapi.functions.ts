@@ -245,6 +245,22 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (
+    tool.type === "google.calendar.createEvent" ||
+    tool.type === "google.calendar.checkAvailability"
+  ) {
+    return {
+      type: tool.type,
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(typeof tool.calendarId === "string" ? { calendarId: tool.calendarId } : {}),
+      ...(typeof tool.timezone === "string" ? { timezone: tool.timezone } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
