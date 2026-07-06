@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -391,6 +391,12 @@ function AssistentesPage() {
                   )}
                   aria-hidden
                 />
+                <Link
+                  to="/assistants/$id"
+                  params={{ id: raw.id }}
+                  aria-label={`Abrir ${raw.name ?? "assistente"}`}
+                  className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                />
                 <CardContent className="relative space-y-4 p-5">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -408,7 +414,7 @@ function AssistentesPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="ghost" className="h-8 w-8">
+                        <Button size="icon" variant="ghost" className="relative z-20 h-8 w-8">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -482,7 +488,7 @@ function AssistentesPage() {
                     <span className="text-[11px] text-muted-foreground">
                       Atualizado {metrics.updatedAgo}
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div className="relative z-20 flex items-center gap-1">
                       <Button
                         size="icon"
                         variant="ghost"

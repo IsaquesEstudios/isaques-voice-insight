@@ -123,6 +123,48 @@ export const updateVapiAssistant = createServerFn({ method: "POST" })
     })) as VapiAssistantRaw;
   });
 
+export interface AssistantConfigInput {
+  id: string;
+  name?: string;
+  firstMessage?: string;
+  systemPrompt?: string;
+  modelProvider?: string;
+  model?: string;
+  voiceProvider?: string;
+  voiceId?: string;
+}
+
+// Partial PATCH used by the details page — only touches provided fields.
+export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
+  .inputValidator((input: AssistantConfigInput) => {
+    if (!input?.id) throw new Error("id é obrigatório");
+    return input;
+  })
+  .handler(async ({ data }): Promise<VapiAssistantRaw> => {
+    const body: Record<string, unknown> = {};
+    if (typeof data.name === "string") body.name = data.name.trim();
+    if (typeof data.firstMessage === "string") body.firstMessage = data.firstMessage;
+    if (data.modelProvider || data.model || typeof data.systemPrompt === "string") {
+      const model: Record<string, unknown> = {};
+      if (data.modelProvider) model.provider = data.modelProvider;
+      if (data.model) model.model = data.model;
+      if (typeof data.systemPrompt === "string") {
+        model.messages = [{ role: "system", content: data.systemPrompt }];
+      }
+      body.model = model;
+    }
+    if (data.voiceProvider || data.voiceId) {
+      body.voice = {
+        ...(data.voiceProvider ? { provider: data.voiceProvider } : {}),
+        ...(data.voiceId ? { voiceId: data.voiceId } : {}),
+      };
+    }
+    return (await vapiFetch(`/assistant/${data.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    })) as VapiAssistantRaw;
+  });
+
 export const deleteVapiAssistant = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
