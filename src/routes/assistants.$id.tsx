@@ -624,7 +624,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -655,7 +655,7 @@ const TOOL_CATALOG: CatalogSection[] = [
       { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall" },
       { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "voicemail", vapiType: "voicemail" },
       { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf" },
-      { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "comingSoon" },
+      { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "sms", vapiType: "sms" },
       { key: "sip", label: "SIP Request", description: "Executa requisições SIP customizadas.", icon: Radio, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "comingSoon" },
     ],
   },
@@ -811,6 +811,13 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [dtSipInfo, setDtSipInfo] = useState(false);
   const [dtMessages, setDtMessages] = useState<VoicemailMessage[]>([]);
 
+  // sms configuration state
+  const [smsName, setSmsName] = useState("send_text_tool");
+  const [smsDescription, setSmsDescription] = useState("");
+  const [smsToPreset, setSmsToPreset] = useState("");
+  const [smsBodyPreset, setSmsBodyPreset] = useState("");
+  const [smsMessages, setSmsMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -834,6 +841,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setDtDescription("");
     setDtSipInfo(false);
     setDtMessages([]);
+    setSmsName("send_text_tool");
+    setSmsDescription("");
+    setSmsToPreset("");
+    setSmsBodyPreset("");
+    setSmsMessages([]);
   }
 
   function openDialog() {
@@ -897,6 +909,22 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       if (dtSipInfo) tool.sipInfoDtmfEnabled = true;
       if (dtMessages.length > 0) {
         tool.messages = dtMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (selected.kind === "sms") {
+      const name = smsName.trim() || "send_text_tool";
+      const tool: VapiTool = { type: "sms", name };
+      if (smsDescription.trim()) tool.description = smsDescription.trim();
+      // Preset fields (dashboard-only helpers) are stashed on `metadata`.
+      // Vapi rejects unknown top-level keys on built-in tools; metadata is
+      // stripped in the sanitizer to match the API contract.
+      const metadata: Record<string, string> = {};
+      if (smsToPreset.trim()) metadata.toPreset = smsToPreset.trim();
+      if (smsBodyPreset.trim()) metadata.bodyPreset = smsBodyPreset.trim();
+      if (Object.keys(metadata).length > 0) tool.metadata = metadata;
+      if (smsMessages.length > 0) {
+        tool.messages = smsMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -1912,6 +1940,180 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                     </div>
                   </div>
                 )}
+
+                {selected?.kind === "sms" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sms-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="sms-name"
+                          value={smsName}
+                          onChange={(e) => setSmsName(e.target.value)}
+                          placeholder="send_text_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sms-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="sms-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={smsDescription}
+                          onChange={(e) => setSmsDescription(e.target.value)}
+                          placeholder="Explique para a IA quando enviar SMS."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {smsDescription.length}/1000
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — SMS Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          SMS Settings
+                        </h3>
+                      </div>
+
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3">
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+                        <p className="text-[11px] leading-relaxed text-amber-200/90">
+                          No configured Twilio numbers found. Add one in{" "}
+                          <span className="font-semibold underline underline-offset-2">Phone Numbers</span>.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">From Phone Number *</Label>
+                        <Select disabled>
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione um número Twilio" />
+                          </SelectTrigger>
+                          <SelectContent />
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="sms-to" className="text-xs">To Phone Number (Preset)</Label>
+                        <Input
+                          id="sms-to"
+                          value={smsToPreset}
+                          onChange={(e) => setSmsToPreset(e.target.value)}
+                          placeholder="{{customer.number}}"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Optional preset recipient phone number. Supports LiquidJS templates (e.g., {"{{customer.number}}"}). When set, this overrides any model-provided value.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="sms-body" className="text-xs">Message Body (Preset)</Label>
+                        <Textarea
+                          id="sms-body"
+                          rows={3}
+                          value={smsBodyPreset}
+                          onChange={(e) => setSmsBodyPreset(e.target.value)}
+                          placeholder="Seu horário está confirmado para {{appointmentDate}}."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Optional preset message body. Supports LiquidJS templates (e.g., {"{{appointmentDate}}"}). When set, this overrides any model-provided value.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 3 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setSmsMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {smsMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {smsMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setSmsMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSmsMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                placeholder="Frase que a IA vai falar neste momento..."
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+
 
 
                 {selected?.kind === "function" && (
