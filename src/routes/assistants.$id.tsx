@@ -39,6 +39,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import {
   getVapiAssistant,
   saveVapiAssistantConfig,
 } from "@/lib/vapi.functions";
