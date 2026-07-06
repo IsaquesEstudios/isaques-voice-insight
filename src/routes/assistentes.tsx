@@ -80,39 +80,30 @@ function formatVoice(a: VapiAssistant) {
 }
 
 function AssistentesPage() {
+  const fetchAssistants = useServerFn(listVapiAssistants);
   const [assistants, setAssistants] = useState<VapiAssistant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
 
-    async function fetchAssistants() {
+    (async () => {
       try {
-        const key = import.meta.env.VITE_VAPI_PRIVATE_KEY as string | undefined;
-        if (!key) {
-          throw new Error("VITE_VAPI_PRIVATE_KEY não configurada");
-        }
-        const res = await fetch("https://api.vapi.ai/assistant", {
-          headers: { Authorization: `Bearer ${key}` },
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`Vapi retornou ${res.status}`);
-        const data = (await res.json()) as VapiAssistant[];
+        const data = await fetchAssistants();
         if (!cancelled) setAssistants(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (cancelled || (err as Error).name === "AbortError") return;
+        if (cancelled) return;
         console.error(err);
         toast.error("Não foi possível carregar os assistentes da Vapi.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
-    }
+    })();
 
-    fetchAssistants();
     return () => {
       cancelled = true;
-      controller.abort();
+    };
+  }, [fetchAssistants]);
     };
   }, []);
 
