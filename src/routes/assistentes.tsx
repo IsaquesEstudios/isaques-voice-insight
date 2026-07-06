@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bot,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { listVapiAssistants, type VapiAssistantDTO } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/assistentes")({
