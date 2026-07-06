@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bot,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { listVapiAssistants, type VapiAssistantDTO } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/assistentes")({
@@ -31,20 +33,7 @@ export const Route = createFileRoute("/assistentes")({
 
 type AssistantStatus = "Ativo" | "Rascunho" | "Pausado";
 
-interface VapiAssistant {
-  id: string;
-  name?: string | null;
-  voice?: {
-    provider?: string;
-    voiceId?: string;
-  } | null;
-  model?: {
-    provider?: string;
-    model?: string;
-  } | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
+type VapiAssistant = VapiAssistantDTO;
 
 const gradients = [
   "from-primary/40 to-primary/5",
@@ -91,41 +80,30 @@ function formatVoice(a: VapiAssistant) {
 }
 
 function AssistentesPage() {
+  const fetchAssistants = useServerFn(listVapiAssistants);
   const [assistants, setAssistants] = useState<VapiAssistant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
 
-    async function fetchAssistants() {
+    (async () => {
       try {
-        const key = import.meta.env.VITE_VAPI_PRIVATE_KEY as string | undefined;
-        if (!key) {
-          throw new Error("VITE_VAPI_PRIVATE_KEY não configurada");
-        }
-        const res = await fetch("https://api.vapi.ai/assistant", {
-          headers: { Authorization: `Bearer ${key}` },
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`Vapi retornou ${res.status}`);
-        const data = (await res.json()) as VapiAssistant[];
+        const data = await fetchAssistants();
         if (!cancelled) setAssistants(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (cancelled || (err as Error).name === "AbortError") return;
+        if (cancelled) return;
         console.error(err);
         toast.error("Não foi possível carregar os assistentes da Vapi.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
-    }
+    })();
 
-    fetchAssistants();
     return () => {
       cancelled = true;
-      controller.abort();
     };
-  }, []);
+  }, [fetchAssistants]);
 
   const enriched = useMemo(
     () =>
