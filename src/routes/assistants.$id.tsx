@@ -20,6 +20,7 @@ import {
   Voicemail,
   Hash,
   MessageSquare,
+  MessageCircle,
   Radio,
   Shuffle,
   Search,
@@ -29,7 +30,15 @@ import {
   Sheet,
   Code2,
   Sparkles,
+  Phone,
+  PhoneOff as PhoneOffIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
   Dialog,
