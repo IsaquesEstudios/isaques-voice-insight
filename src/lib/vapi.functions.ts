@@ -221,6 +221,17 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "slack.message.send") {
+    return {
+      type: "slack.message.send",
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
