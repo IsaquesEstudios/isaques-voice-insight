@@ -720,12 +720,22 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [serverUrl, setServerUrl] = useState("");
   const [fnParams, setFnParams] = useState(DEFAULT_FN_PARAMS);
 
+  // transferCall configuration state
+  const [tcName, setTcName] = useState("transferCall");
+  const [tcDescription, setTcDescription] = useState("");
+  const [tcDestinations, setTcDestinations] = useState<TransferDestination[]>([]);
+  const [tcMessages, setTcMessages] = useState<TransferMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
     setFnDescription("");
     setServerUrl("");
     setFnParams(DEFAULT_FN_PARAMS);
+    setTcName("transferCall");
+    setTcDescription("");
+    setTcDestinations([]);
+    setTcMessages([]);
   }
 
   function openDialog() {
