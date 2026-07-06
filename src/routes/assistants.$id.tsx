@@ -623,7 +623,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -652,7 +652,7 @@ const TOOL_CATALOG: CatalogSection[] = [
     items: [
       { key: "transferCall", label: "Transfer Call", description: "Encaminha a ligação para um número externo.", icon: PhoneForwarded, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "transferCall", vapiType: "transferCall" },
       { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall" },
-      { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "comingSoon" },
+      { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "voicemail", vapiType: "voicemail" },
       { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf" },
       { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "comingSoon" },
       { key: "sip", label: "SIP Request", description: "Executa requisições SIP customizadas.", icon: Radio, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "comingSoon" },
@@ -765,6 +765,13 @@ interface EndCallMessage {
   blocking: boolean;
 }
 
+type VoicemailScriptMode = "assistant" | "custom" | "skip";
+
+interface VoicemailMessage {
+  type: TransferMessageType;
+  content: string;
+}
+
 function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
   const [open, setOpen] = useState(false);
@@ -789,6 +796,14 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [ecDescription, setEcDescription] = useState("");
   const [ecMessages, setEcMessages] = useState<EndCallMessage[]>([]);
 
+  // voicemail configuration state
+  const [vmName, setVmName] = useState("voicemail_tool");
+  const [vmDescription, setVmDescription] = useState("");
+  const [vmScriptMode, setVmScriptMode] = useState<VoicemailScriptMode>("assistant");
+  const [vmScriptContent, setVmScriptContent] = useState("");
+  const [vmBeepDetection, setVmBeepDetection] = useState(false);
+  const [vmMessages, setVmMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -802,6 +817,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setEcName("endCall");
     setEcDescription("");
     setEcMessages([]);
+    setVmName("voicemail_tool");
+    setVmDescription("");
+    setVmScriptMode("assistant");
+    setVmScriptContent("");
+    setVmBeepDetection(false);
+    setVmMessages([]);
   }
 
   function openDialog() {
@@ -876,6 +897,27 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
           return msg;
         });
       if (messages.length > 0) tool.messages = messages;
+      return tool;
+    }
+    if (selected.kind === "voicemail") {
+      if (vmScriptMode === "custom" && !vmScriptContent.trim()) {
+        toast.error('Escreva o script personalizado ou escolha outra opção em "What should the caller hear?".');
+        return null;
+      }
+      const name = vmName.trim() || "voicemail_tool";
+      const tool: VapiTool = { type: "voicemail", name };
+      if (vmDescription.trim()) tool.description = vmDescription.trim();
+      // Vapi tools accept a free-form `metadata` object; we use it to persist
+      // dashboard-only preferences (script mode/content, beep detection)
+      // that are not first-class fields on the voicemail tool schema.
+      tool.metadata = {
+        voicemailScriptMode: vmScriptMode,
+        ...(vmScriptMode === "custom" ? { voicemailScript: vmScriptContent.trim() } : {}),
+        beepDetectionEnabled: vmBeepDetection,
+      };
+      if (vmMessages.length > 0) {
+        tool.messages = vmMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
       return tool;
     }
     if (selected.kind === "function") {
@@ -1541,6 +1583,187 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                     </div>
                   </div>
                 )}
+
+                {selected?.kind === "voicemail" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vm-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="vm-name"
+                          value={vmName}
+                          onChange={(e) => setVmName(e.target.value)}
+                          placeholder="voicemail_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vm-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="vm-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={vmDescription}
+                          onChange={(e) => setVmDescription(e.target.value)}
+                          placeholder="Leave a voicemail message when you determine the call reached voicemail."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {vmDescription.length}/1000
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Voicemail Script */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Voicemail className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Voicemail Script
+                        </h3>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        When the LLM determines it has reached voicemail, it will call this tool and speak the script below before the call worker ends the call.
+                      </p>
+                      <Label className="text-xs">What should the caller hear?</Label>
+                      <RadioGroup
+                        value={vmScriptMode}
+                        onValueChange={(v) => setVmScriptMode(v as VoicemailScriptMode)}
+                        className="grid gap-2"
+                      >
+                        {([
+                          { value: "assistant", title: "Use assistant voicemail message", subtitle: "Falls back to the assistant's 'voicemailMessage' setting." },
+                          { value: "custom", title: "Use custom script", subtitle: "Provide a message for the assistant to speak once it confirms a voicemail greeting." },
+                          { value: "skip", title: "Skip speaking a voicemail", subtitle: "The assistant will silently end the call after invoking the tool." },
+                        ] as const).map((opt) => (
+                          <label
+                            key={opt.value}
+                            htmlFor={`vm-mode-${opt.value}`}
+                            className={cn(
+                              "flex cursor-pointer items-start gap-3 rounded-lg border border-white/[0.08] bg-background/40 p-3 backdrop-blur-xl transition-colors hover:bg-background/60",
+                              vmScriptMode === opt.value && "border-primary/60 bg-primary/[0.06]",
+                            )}
+                          >
+                            <RadioGroupItem id={`vm-mode-${opt.value}`} value={opt.value} className="mt-0.5" />
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-semibold text-foreground">{opt.title}</p>
+                              <p className="text-[11px] text-muted-foreground">{opt.subtitle}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </RadioGroup>
+
+                      {vmScriptMode === "custom" && (
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="vm-script" className="text-xs">Script content</Label>
+                          <Textarea
+                            id="vm-script"
+                            rows={4}
+                            value={vmScriptContent}
+                            onChange={(e) => setVmScriptContent(e.target.value)}
+                            placeholder="Hi, this is {{company}}. {{message}}. Please call us back at {{phone}}."
+                            className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Panel 3 — Beep Detection */}
+                    <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-background/30 px-4 py-3 backdrop-blur-xl">
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">Enable beep detection</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Espera o bipe da caixa postal antes de iniciar a mensagem.
+                        </p>
+                      </div>
+                      <Switch checked={vmBeepDetection} onCheckedChange={setVmBeepDetection} />
+                    </div>
+
+                    {/* Panel 4 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setVmMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {vmMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida. Adicione mensagens de status opcionais.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {vmMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setVmMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setVmMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                placeholder="Frase que a IA vai falar neste momento..."
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
 
                 {selected?.kind === "function" && (
                   <div className="space-y-3">
