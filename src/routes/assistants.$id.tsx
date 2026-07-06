@@ -625,7 +625,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -664,7 +664,7 @@ const TOOL_CATALOG: CatalogSection[] = [
     title: "Assistant Tools",
     items: [
       { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "handoff", vapiType: "handoff" },
-      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "comingSoon" },
+      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "query", vapiType: "query" },
     ],
   },
   {
@@ -861,6 +861,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     };
   }, [id, loadAssistants]);
 
+  // query configuration state
+  const [qName, setQName] = useState("query_tool");
+  const [qDescription, setQDescription] = useState("");
+  const [qKnowledgeBases, setQKnowledgeBases] = useState<Array<{ fileId: string }>>([]);
+  const [qMessages, setQMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -911,6 +917,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setHoParamsLocked(false);
     setHoDestinations([]);
     setHoMessages([]);
+    setQName("query_tool");
+    setQDescription("");
+    setQKnowledgeBases([]);
+    setQMessages([]);
   }
 
   function openDialog() {
@@ -1124,6 +1134,34 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       };
       if (hoMessages.length > 0) {
         tool.messages = hoMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (selected.kind === "query") {
+      if (qKnowledgeBases.length === 0) {
+        toast.error("Adicione pelo menos uma base de conhecimento.");
+        return null;
+      }
+      for (const kb of qKnowledgeBases) {
+        if (!kb.fileId.trim()) {
+          toast.error("Informe o ID de todas as bases de conhecimento.");
+          return null;
+        }
+      }
+      const name = qName.trim() || "query_tool";
+      const tool: VapiTool = {
+        type: "query",
+        name,
+        description: qDescription.trim(),
+        knowledgeBases: qKnowledgeBases.map((kb, idx) => ({
+          name: `kb-${idx + 1}`,
+          provider: "google",
+          description: qDescription.trim() || "Knowledge base",
+          fileIds: [kb.fileId.trim()],
+        })),
+      };
+      if (qMessages.length > 0) {
+        tool.messages = qMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -2823,6 +2861,189 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setHoMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {selected?.kind === "query" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="q-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="q-name"
+                          value={qName}
+                          onChange={(e) => setQName(e.target.value)}
+                          placeholder="query_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="q-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="q-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={qDescription}
+                          onChange={(e) => setQDescription(e.target.value)}
+                          placeholder="Explique quando a IA deve consultar a base de conhecimento."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">
+                          {qDescription.length}/1000
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Knowledge Bases */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2">
+                          <ServerCog className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                              Knowledge Bases
+                            </h3>
+                            <p className="text-[11px] text-muted-foreground">
+                              Configure knowledge bases for your query tool
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setQKnowledgeBases((p) => [...p, { fileId: "" }])
+                          }
+                          className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add Knowledge Base
+                        </Button>
+                      </div>
+
+                      {qKnowledgeBases.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-8 text-center">
+                          <ServerCog className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                          <p className="text-xs font-medium text-foreground">No knowledge bases configured</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Click &apos;Add Knowledge Base&apos; to add one
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {qKnowledgeBases.map((kb, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <Input
+                                value={kb.fileId}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setQKnowledgeBases((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, fileId: val } : it)),
+                                  );
+                                }}
+                                placeholder="ID do documento / File ID"
+                                className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() =>
+                                  setQKnowledgeBases((prev) => prev.filter((_, i) => i !== idx))
+                                }
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                aria-label="Remover base de conhecimento"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Panel 3 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setQMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {qMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {qMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setQMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setQMessages((prev) =>
                                     prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
                                   );
                                 }}
