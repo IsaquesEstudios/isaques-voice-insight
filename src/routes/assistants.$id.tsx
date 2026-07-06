@@ -699,9 +699,11 @@ const DEFAULT_FN_PARAMS = `{
 }`;
 
 function findCatalogItemByVapiType(type: string): CatalogItem | undefined {
+  // Normalize namespaced Vapi tool types (e.g. slack.message.send) to catalog keys.
+  const normalized = type.startsWith("slack.") ? "slack" : type;
   for (const section of TOOL_CATALOG) {
     for (const item of section.items) {
-      if (item.vapiType === type) return item;
+      if (item.vapiType === normalized) return item;
     }
   }
   return undefined;
