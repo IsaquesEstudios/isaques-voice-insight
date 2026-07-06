@@ -591,46 +591,157 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-interface ToolCard {
-  id: string;
-  name: string;
-  description: string;
-  icon: typeof PhoneForwarded;
-  gradient: string;
-}
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "function";
 
-const MOCK_TOOLS: ToolCard[] = [
-  {
-    id: "t1",
-    name: "transferCall",
-    description: "Transfere a ligação para um humano quando o lead pede atendimento.",
-    icon: PhoneForwarded,
-    gradient: "from-primary/30 to-primary/5",
-  },
-  {
-    id: "t2",
-    name: "checkAvailability",
-    description: "Consulta a agenda e retorna horários livres para agendamento.",
-    icon: CalendarCheck,
-    gradient: "from-chart-2/30 to-chart-2/5",
-  },
-  {
-    id: "t3",
-    name: "sendConfirmationEmail",
-    description: "Dispara e-mail de confirmação após a conversão da chamada.",
-    icon: Mail,
-    gradient: "from-chart-3/30 to-chart-3/5",
-  },
-  {
-    id: "t4",
-    name: "verifyCustomer",
-    description: "Valida CPF e dados cadastrais do cliente na base interna.",
-    icon: ShieldCheck,
-    gradient: "from-chart-5/30 to-chart-5/5",
-  },
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type VapiTool = Record<string, any> & { type: VapiToolType };
+
+const TOOL_TYPES: { value: VapiToolType; label: string; description: string; icon: typeof PhoneForwarded; gradient: string }[] = [
+  { value: "transferCall", label: "Transferir Ligação", description: "Encaminha para um número externo.", icon: PhoneForwarded, gradient: "from-primary/30 to-primary/5" },
+  { value: "endCall", label: "Encerrar Ligação", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, gradient: "from-chart-2/30 to-chart-2/5" },
+  { value: "dtmf", label: "Teclado (DTMF)", description: "Envia tons DTMF durante a chamada.", icon: Hash, gradient: "from-chart-3/30 to-chart-3/5" },
+  { value: "function", label: "Função Customizada", description: "Chama seu webhook com parâmetros.", icon: Code2, gradient: "from-chart-5/30 to-chart-5/5" },
 ];
 
-function ToolsTab() {
+const DEFAULT_FN_PARAMS = `{
+  "type": "object",
+  "properties": {
+    "example": {
+      "type": "string",
+      "description": "Descreva este parâmetro"
+    }
+  },
+  "required": []
+}`;
+
+function toolMeta(type: string) {
+  return (
+    TOOL_TYPES.find((t) => t.value === type) ?? {
+      value: type as VapiToolType,
+      label: type,
+      description: "Ferramenta customizada.",
+      icon: Code2,
+      gradient: "from-muted/30 to-muted/5",
+    }
+  );
+}
+
+function toolTitle(tool: VapiTool): string {
+  if (tool.type === "function") {
+    return tool.function?.name ?? "function";
+  }
+  return tool.type;
+}
+
+interface ToolsTabProps {
+  id: string;
+  tools: VapiTool[];
+  onToolsChange: (tools: VapiTool[]) => void;
+  isLoading: boolean;
+}
+
+function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
+  const saveConfig = useServerFn(saveVapiAssistantConfig);
+  const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [type, setType] = useState<VapiToolType>("function");
+  const [transferNumber, setTransferNumber] = useState("");
+  const [fnName, setFnName] = useState("");
+  const [fnDescription, setFnDescription] = useState("");
+  const [serverUrl, setServerUrl] = useState("");
+  const [fnParams, setFnParams] = useState(DEFAULT_FN_PARAMS);
+
+  function resetForm() {
+    setType("function");
+    setTransferNumber("");
+    setFnName("");
+    setFnDescription("");
+    setServerUrl("");
+    setFnParams(DEFAULT_FN_PARAMS);
+  }
+
+  function buildTool(): VapiTool | null {
+    if (type === "transferCall") {
+      const number = transferNumber.trim();
+      if (!number) {
+        toast.error("Informe o número de destino.");
+        return null;
+      }
+      return {
+        type: "transferCall",
+        destinations: [{ type: "number", number }],
+      };
+    }
+    if (type === "endCall" || type === "dtmf") {
+      return { type };
+    }
+    // function
+    const name = fnName.trim();
+    if (!name || /\s/.test(name)) {
+      toast.error("Nome da função é obrigatório e não pode conter espaços.");
+      return null;
+    }
+    let parameters: unknown;
+    try {
+      parameters = JSON.parse(fnParams);
+    } catch {
+      toast.error("JSON Schema inválido no campo de parâmetros.");
+      return null;
+    }
+    if (
+      !parameters ||
+      typeof parameters !== "object" ||
+      (parameters as { type?: string }).type !== "object"
+    ) {
+      toast.error('Parameters deve ser um JSON Schema com "type": "object".');
+      return null;
+    }
+    const tool: VapiTool = {
+      type: "function",
+      function: {
+        name,
+        description: fnDescription.trim(),
+        parameters,
+      },
+    };
+    if (serverUrl.trim()) {
+      tool.server = { url: serverUrl.trim() };
+    }
+    return tool;
+  }
+
+  async function handleSubmit() {
+    const newTool = buildTool();
+    if (!newTool) return;
+    setIsSubmitting(true);
+    try {
+      const nextTools = [...tools, newTool];
+      await saveConfig({ data: { id, tools: nextTools } });
+      onToolsChange(nextTools);
+      toast.success("Ferramenta adicionada.");
+      setOpen(false);
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao adicionar ferramenta.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete(index: number) {
+    const nextTools = tools.filter((_, i) => i !== index);
+    try {
+      await saveConfig({ data: { id, tools: nextTools } });
+      onToolsChange(nextTools);
+      toast.success("Ferramenta removida.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao remover ferramenta.");
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -640,59 +751,189 @@ function ToolsTab() {
             Funções que o assistente pode invocar durante a chamada.
           </p>
         </div>
-        <Button className="gap-2 shadow-glow">
+        <Button
+          className="gap-2 shadow-glow"
+          onClick={() => {
+            resetForm();
+            setOpen(true);
+          }}
+          disabled={isLoading}
+        >
           <Plus className="h-4 w-4" />
           Adicionar Ferramenta
         </Button>
       </div>
 
+      {tools.length === 0 && !isLoading && (
+        <p className="rounded-xl border border-dashed border-white/[0.08] bg-background/20 p-8 text-center text-xs text-muted-foreground">
+          Nenhuma ferramenta configurada. Clique em "Adicionar Ferramenta" para começar.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {MOCK_TOOLS.map((t) => (
-          <Card
-            key={t.id}
-            className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
-          >
-            <div
-              className={cn(
-                "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60",
-                t.gradient,
-              )}
-              aria-hidden
-            />
-            <CardContent className="relative space-y-4 p-5">
-              <div className="flex items-start justify-between">
-                <div className="grid h-11 w-11 place-items-center rounded-xl bg-background/60 text-primary backdrop-blur-xl">
-                  <t.icon className="h-5 w-5" />
-                </div>
-                <div className="flex items-center gap-1">
+        {tools.map((tool, index) => {
+          const meta = toolMeta(tool.type);
+          const Icon = meta.icon;
+          return (
+            <Card
+              key={index}
+              className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+            >
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60",
+                  meta.gradient,
+                )}
+                aria-hidden
+              />
+              <CardContent className="relative space-y-4 p-5">
+                <div className="flex items-start justify-between">
+                  <div className="grid h-11 w-11 place-items-center rounded-xl bg-background/60 text-primary backdrop-blur-xl">
+                    <Icon className="h-5 w-5" />
+                  </div>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 hover:text-primary"
-                    aria-label="Editar ferramenta"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
+                    onClick={() => handleDelete(index)}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     aria-label="Excluir ferramenta"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <p className="font-mono text-sm font-semibold text-foreground">{t.name}</p>
-                <p className="text-xs text-muted-foreground">{t.description}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="space-y-1">
+                  <p className="font-mono text-sm font-semibold text-foreground">
+                    {toolTitle(tool)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{meta.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle>Adicionar Ferramenta</DialogTitle>
+            <DialogDescription>
+              Configure uma nova ferramenta seguindo o schema oficial da Vapi.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tipo de Ferramenta</Label>
+              <Select value={type} onValueChange={(v) => setType(v as VapiToolType)}>
+                <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                  {TOOL_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {TOOL_TYPES.find((t) => t.value === type)?.description}
+              </p>
+            </div>
+
+            {type === "transferCall" && (
+              <div className="space-y-2">
+                <Label htmlFor="transfer-number">Número de Destino</Label>
+                <Input
+                  id="transfer-number"
+                  value={transferNumber}
+                  onChange={(e) => setTransferNumber(e.target.value)}
+                  placeholder="+5511999999999"
+                  className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Formato E.164, ex.: +5511999999999.
+                </p>
+              </div>
+            )}
+
+            {(type === "endCall" || type === "dtmf") && (
+              <p className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground backdrop-blur-xl">
+                Este tipo de ferramenta não exige parâmetros adicionais. Ao salvar, será
+                enviado apenas <span className="font-mono text-foreground">{`{ type: "${type}" }`}</span>.
+              </p>
+            )}
+
+            {type === "function" && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="fn-name">function.name</Label>
+                  <Input
+                    id="fn-name"
+                    value={fnName}
+                    onChange={(e) => setFnName(e.target.value.replace(/\s+/g, ""))}
+                    placeholder="get_availability"
+                    className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fn-desc">function.description</Label>
+                  <Textarea
+                    id="fn-desc"
+                    rows={2}
+                    value={fnDescription}
+                    onChange={(e) => setFnDescription(e.target.value)}
+                    placeholder="Explique para a IA quando e como usar essa função."
+                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="server-url">server.url</Label>
+                  <Input
+                    id="server-url"
+                    value={serverUrl}
+                    onChange={(e) => setServerUrl(e.target.value)}
+                    placeholder="https://seu-dominio.com/webhook"
+                    className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fn-params">function.parameters (JSON Schema)</Label>
+                  <Textarea
+                    id="fn-params"
+                    rows={10}
+                    value={fnParams}
+                    onChange={(e) => setFnParams(e.target.value)}
+                    spellCheck={false}
+                    className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Deve ser um JSON Schema válido com <span className="font-mono">"type": "object"</span>.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
 }
 
 /* ------------------------------- Analysis ------------------------------- */
