@@ -899,6 +899,27 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       if (messages.length > 0) tool.messages = messages;
       return tool;
     }
+    if (selected.kind === "voicemail") {
+      if (vmScriptMode === "custom" && !vmScriptContent.trim()) {
+        toast.error('Escreva o script personalizado ou escolha outra opção em "What should the caller hear?".');
+        return null;
+      }
+      const name = vmName.trim() || "voicemail_tool";
+      const tool: VapiTool = { type: "voicemail", name };
+      if (vmDescription.trim()) tool.description = vmDescription.trim();
+      // Vapi tools accept a free-form `metadata` object; we use it to persist
+      // dashboard-only preferences (script mode/content, beep detection)
+      // that are not first-class fields on the voicemail tool schema.
+      tool.metadata = {
+        voicemailScriptMode: vmScriptMode,
+        ...(vmScriptMode === "custom" ? { voicemailScript: vmScriptContent.trim() } : {}),
+        beepDetectionEnabled: vmBeepDetection,
+      };
+      if (vmMessages.length > 0) {
+        tool.messages = vmMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
