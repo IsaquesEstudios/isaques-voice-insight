@@ -391,6 +391,12 @@ function AssistentesPage() {
                   )}
                   aria-hidden
                 />
+                <Link
+                  to="/assistants/$id"
+                  params={{ id: raw.id }}
+                  aria-label={`Abrir ${raw.name ?? "assistente"}`}
+                  className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                />
                 <CardContent className="relative space-y-4 p-5">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
