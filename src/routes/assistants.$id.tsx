@@ -873,6 +873,16 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [qKnowledgeBases, setQKnowledgeBases] = useState<Array<{ fileId: string }>>([]);
   const [qMessages, setQMessages] = useState<VoicemailMessage[]>([]);
 
+  // apiRequest configuration state
+  const [arName, setArName] = useState("");
+  const [arDescription, setArDescription] = useState("");
+  const [arUrl, setArUrl] = useState("");
+  const [arMethod, setArMethod] = useState<"GET" | "POST" | "PUT" | "PATCH" | "DELETE">("GET");
+  const [arHeaders, setArHeaders] = useState<Array<{ key: string; value: string }>>([]);
+  const [arBodyLocked, setArBodyLocked] = useState(false);
+  const [arStaticFields, setArStaticFields] = useState<Array<{ key: string; value: string }>>([]);
+  const [arMessages, setArMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
