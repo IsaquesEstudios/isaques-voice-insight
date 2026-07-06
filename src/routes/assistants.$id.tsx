@@ -1034,6 +1034,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setGsSpreadsheetId("");
     setGsRange("");
     setGsMessages([]);
+    setGcName("google_calendar_tool");
+    setGcDescription("");
+    setGcCalendarId("");
+    setGcTimezone("");
+    setGcMessages([]);
   }
 
   function openDialog() {
