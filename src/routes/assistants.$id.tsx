@@ -804,6 +804,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [vmBeepDetection, setVmBeepDetection] = useState(false);
   const [vmMessages, setVmMessages] = useState<VoicemailMessage[]>([]);
 
+  // dtmf configuration state
+  const [dtName, setDtName] = useState("dtmf_tool");
+  const [dtDescription, setDtDescription] = useState("");
+  const [dtSipInfo, setDtSipInfo] = useState(false);
+  const [dtMessages, setDtMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -823,6 +829,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setVmScriptContent("");
     setVmBeepDetection(false);
     setVmMessages([]);
+    setDtName("dtmf_tool");
+    setDtDescription("");
+    setDtSipInfo(false);
+    setDtMessages([]);
   }
 
   function openDialog() {
