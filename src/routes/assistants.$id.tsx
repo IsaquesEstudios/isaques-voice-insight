@@ -346,7 +346,7 @@ function AssistantDetailPage() {
                         disabled={isLoading}
                       >
                         <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                          <SelectValue />
+                          <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                           {MODEL_PROVIDERS.map((p) => (
@@ -365,7 +365,7 @@ function AssistantDetailPage() {
                         disabled={isLoading}
                       >
                         <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                          <SelectValue />
+                          <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                           {modelOptions.map((m) => (
@@ -397,7 +397,7 @@ function AssistantDetailPage() {
                         disabled={isLoading}
                       >
                         <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                          <SelectValue />
+                          <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                           {VOICE_PROVIDERS.map((p) => (
@@ -416,7 +416,7 @@ function AssistantDetailPage() {
                         disabled={isLoading}
                       >
                         <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                          <SelectValue />
+                          <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                           {voiceOptions.map((v) => (
