@@ -161,6 +161,7 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
         ...(data.voiceId ? { voiceId: data.voiceId } : {}),
       };
     }
+    if (Array.isArray(data.tools)) body.tools = data.tools;
     return (await vapiFetch(`/assistant/${data.id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
