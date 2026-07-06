@@ -114,11 +114,11 @@ const empty: FormState = {
   name: "",
   firstMessage: "",
   systemPrompt: "",
-  modelProvider: "openai",
-  model: "gpt-4o",
-  voiceProvider: "11labs",
-  voiceId: "burt",
-  status: "Ativo",
+  modelProvider: "",
+  model: "",
+  voiceProvider: "",
+  voiceId: "",
+  status: "Rascunho",
 };
 
 function AssistantDetailPage() {
