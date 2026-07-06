@@ -2194,7 +2194,281 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                   </div>
                 )}
 
+                {selected?.kind === "sipRequest" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings & Options */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          Tool Settings
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sr-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="sr-name"
+                          value={srName}
+                          onChange={(e) => setSrName(e.target.value)}
+                          placeholder="sip_request_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sr-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="sr-desc"
+                          rows={3}
+                          value={srDescription}
+                          onChange={(e) => setSrDescription(e.target.value)}
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                      </div>
 
+                      <div className="space-y-3 border-t border-white/[0.06] pt-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-foreground">Async</p>
+                            <p className="text-[11px] text-muted-foreground">Tool executes asynchronously</p>
+                          </div>
+                          <Switch checked={srAsync} onCheckedChange={setSrAsync} />
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-medium text-foreground">Strict</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Enforces strict parameter validation. Requires all properties to be marked as required and schema locked.
+                            </p>
+                          </div>
+                          <Switch checked={srStrict} onCheckedChange={setSrStrict} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Parameters */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Parameters
+                          </h3>
+                        </div>
+                        <div className="flex overflow-hidden rounded-md border border-white/[0.08]">
+                          <button
+                            type="button"
+                            onClick={() => setSrParamsMode("visual")}
+                            className={cn(
+                              "px-3 py-1 text-[11px]",
+                              srParamsMode === "visual" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            Visual
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSrParamsMode("json")}
+                            className={cn(
+                              "px-3 py-1 text-[11px]",
+                              srParamsMode === "json" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            JSON
+                          </button>
+                        </div>
+                      </div>
+                      {srParamsMode === "visual" ? (
+                        <div className="space-y-3">
+                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                              <Plus className="h-3 w-3" />
+                              Add Property
+                            </Button>
+                            <p className="mt-3 text-[11px] text-muted-foreground">No parameters defined</p>
+                          </div>
+                          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <Checkbox
+                              checked={srParamsLocked}
+                              onCheckedChange={(v) => setSrParamsLocked(v === true)}
+                            />
+                            Lock schema (no additional properties)
+                          </label>
+                        </div>
+                      ) : (
+                        <Textarea
+                          rows={10}
+                          value={srParamsJson}
+                          onChange={(e) => setSrParamsJson(e.target.value)}
+                          spellCheck={false}
+                          className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                        />
+                      )}
+                    </div>
+
+                    {/* Panel 3 — SIP Settings */}
+                    <div className="space-y-4 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Radio className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                          SIP Settings
+                        </h3>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">SIP verb</Label>
+                        <Select value={srSipVerb} onValueChange={(v) => setSrSipVerb(v as typeof srSipVerb)}>
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="INFO">INFO</SelectItem>
+                            <SelectItem value="MESSAGE">MESSAGE</SelectItem>
+                            <SelectItem value="NOTIFY">NOTIFY</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                        <p className="text-xs font-semibold text-foreground">Headers</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Define SIP headers to include in the request.
+                        </p>
+                        <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
+                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                            <Plus className="h-3 w-3" />
+                            Add Property
+                          </Button>
+                        </div>
+                        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <Checkbox
+                            checked={srHeadersLocked}
+                            onCheckedChange={(v) => setSrHeadersLocked(v === true)}
+                          />
+                          Lock schema (no additional properties)
+                        </label>
+                      </div>
+
+                      <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">Body</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Use a raw string body, or define a JSON schema.
+                            </p>
+                          </div>
+                          <Select value={srBodyMode} onValueChange={(v) => setSrBodyMode(v as "schema" | "raw")}>
+                            <SelectTrigger className="h-7 w-[150px] border-white/[0.08] bg-background/40 text-[11px] backdrop-blur-xl">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="schema">Schema builder</SelectItem>
+                              <SelectItem value="raw">Raw string</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {srBodyMode === "schema" ? (
+                          <>
+                            <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
+                              <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                                <Plus className="h-3 w-3" />
+                                Add Property
+                              </Button>
+                            </div>
+                            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <Checkbox
+                                checked={srBodyLocked}
+                                onCheckedChange={(v) => setSrBodyLocked(v === true)}
+                              />
+                              Lock schema (no additional properties)
+                            </label>
+                          </>
+                        ) : (
+                          <Textarea
+                            rows={5}
+                            value={srBodyRaw}
+                            onChange={(e) => setSrBodyRaw(e.target.value)}
+                            placeholder="Raw body payload"
+                            className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Panel 4 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                            Messages
+                          </h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" />
+                              Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() =>
+                                  setSrMessages((p) => [...p, { type: t, content: "" }])
+                                }
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {srMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {srMessages.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setSrMessages((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSrMessages((prev) =>
+                                    prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
+                                  );
+                                }}
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
 
                 {selected?.kind === "function" && (
