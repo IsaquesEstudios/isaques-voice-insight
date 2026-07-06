@@ -1346,6 +1346,30 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "sheets") {
+      const spreadsheetId = gsSpreadsheetId.trim();
+      const range = gsRange.trim();
+      if (!spreadsheetId) {
+        toast.error("Spreadsheet ID é obrigatório.");
+        return null;
+      }
+      if (!range) {
+        toast.error("Range é obrigatório.");
+        return null;
+      }
+      const name = gsName.trim() || "google_sheets_tool";
+      const tool: VapiTool = {
+        type: "google.sheets.row.append",
+        name,
+        spreadsheetId,
+        range,
+      };
+      if (gsDescription.trim()) tool.description = gsDescription.trim();
+      if (gsMessages.length > 0) {
+        tool.messages = gsMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
