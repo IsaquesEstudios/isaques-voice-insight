@@ -40,22 +40,35 @@ function buildPayload(input: AssistantInput) {
 }
 
 async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
-  const res = await fetch(`https://api.vapi.ai${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("Vapi API error", res.status, body);
-    throw new Error(`Vapi ${init.method ?? "GET"} ${path} retornou ${res.status}`);
+  const maxAttempts = 3;
+  let lastStatus = 0;
+  let lastBody = "";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await fetch(`https://api.vapi.ai${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${getKey()}`,
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+    if (res.ok) {
+      if (res.status === 204) return null;
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    }
+    lastStatus = res.status;
+    lastBody = await res.text().catch(() => "");
+    // Retry on transient upstream failures (502/503/504); fail fast on 4xx.
+    if (res.status < 500 || attempt === maxAttempts) break;
+    await new Promise((r) => setTimeout(r, 300 * attempt));
   }
-  if (res.status === 204) return null;
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
+  console.error("Vapi API error", lastStatus, lastBody);
+  throw new Error(
+    lastStatus >= 500 && lastStatus < 600
+      ? `A API da Vapi está temporariamente indisponível (${lastStatus}). Tente novamente em instantes.`
+      : `Vapi ${init.method ?? "GET"} ${path} retornou ${lastStatus}`,
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
