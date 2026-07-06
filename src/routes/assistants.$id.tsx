@@ -886,6 +886,18 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [arStaticFields, setArStaticFields] = useState<Array<{ key: string; value: string }>>([]);
   const [arMessages, setArMessages] = useState<VoicemailMessage[]>([]);
 
+  // mcp configuration state
+  const [mcpName, setMcpName] = useState("mcp_tool");
+  const [mcpDescription, setMcpDescription] = useState("");
+  const [mcpServerUrl, setMcpServerUrl] = useState("");
+  const [mcpTimeout, setMcpTimeout] = useState(20);
+  const [mcpAuth, setMcpAuth] = useState("none");
+  const [mcpHeaders, setMcpHeaders] = useState<Array<{ key: string; value: string }>>([]);
+  const [mcpStaticIp, setMcpStaticIp] = useState(false);
+  const [mcpEncryptedPaths, setMcpEncryptedPaths] = useState<string[]>([]);
+  const [mcpProtocol, setMcpProtocol] = useState<"shttp" | "sse">("shttp");
+  const [mcpMessages, setMcpMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
