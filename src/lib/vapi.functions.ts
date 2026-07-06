@@ -207,6 +207,20 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (tool.type === "mcp") {
+    // Vapi's mcp tool accepts: type, server (url/timeoutSeconds/headers),
+    // protocol ("shttp" | "sse"), messages. Top-level name/description are
+    // dashboard-only and stripped server-side.
+    return {
+      type: "mcp",
+      ...(tool.server && typeof tool.server === "object" ? { server: tool.server } : {}),
+      ...(typeof tool.protocol === "string" ? { protocol: tool.protocol } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
   return tool;
 }
 

@@ -33,7 +33,10 @@ import {
   Phone,
   PhoneOff as PhoneOffIcon,
   Info,
+  Globe,
+  Lock,
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -631,7 +634,7 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
@@ -677,7 +680,7 @@ const TOOL_CATALOG: CatalogSection[] = [
     title: "Integrations",
     items: [
       { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest" },
-      { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "comingSoon" },
+      { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "mcp", vapiType: "mcp" },
       { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "comingSoon" },
       { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "comingSoon" },
     ],
@@ -883,6 +886,18 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [arStaticFields, setArStaticFields] = useState<Array<{ key: string; value: string }>>([]);
   const [arMessages, setArMessages] = useState<VoicemailMessage[]>([]);
 
+  // mcp configuration state
+  const [mcpName, setMcpName] = useState("mcp_tool");
+  const [mcpDescription, setMcpDescription] = useState("");
+  const [mcpServerUrl, setMcpServerUrl] = useState("");
+  const [mcpTimeout, setMcpTimeout] = useState(20);
+  const [mcpAuth, setMcpAuth] = useState("none");
+  const [mcpHeaders, setMcpHeaders] = useState<Array<{ key: string; value: string }>>([]);
+  const [mcpStaticIp, setMcpStaticIp] = useState(false);
+  const [mcpEncryptedPaths, setMcpEncryptedPaths] = useState<string[]>([]);
+  const [mcpProtocol, setMcpProtocol] = useState<"shttp" | "sse">("shttp");
+  const [mcpMessages, setMcpMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -945,6 +960,16 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setArBodyLocked(false);
     setArStaticFields([]);
     setArMessages([]);
+    setMcpName("mcp_tool");
+    setMcpDescription("");
+    setMcpServerUrl("");
+    setMcpTimeout(20);
+    setMcpAuth("none");
+    setMcpHeaders([]);
+    setMcpStaticIp(false);
+    setMcpEncryptedPaths([]);
+    setMcpProtocol("shttp");
+    setMcpMessages([]);
   }
 
   function openDialog() {
@@ -1242,6 +1267,42 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       if (arMessages.length > 0) {
         tool.messages = arMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (selected.kind === "mcp") {
+      const url = mcpServerUrl.trim();
+      if (!url) {
+        toast.error("Informe a Server URL do MCP.");
+        return null;
+      }
+      if (!/^https?:\/\//.test(url)) {
+        toast.error("A Server URL deve começar com http(s)://");
+        return null;
+      }
+      const name = mcpName.trim() || "mcp_tool";
+      const tool: VapiTool = {
+        type: "mcp",
+        name,
+        server: {
+          url,
+          timeoutSeconds: mcpTimeout,
+        },
+        protocol: mcpProtocol,
+      };
+      if (mcpDescription.trim()) tool.description = mcpDescription.trim();
+      if (mcpHeaders.length > 0) {
+        const headers: Record<string, string> = {};
+        for (const h of mcpHeaders) {
+          const k = h.key.trim();
+          if (k) headers[k] = h.value;
+        }
+        if (Object.keys(headers).length > 0) {
+          (tool.server as Record<string, unknown>).headers = headers;
+        }
+      }
+      if (mcpMessages.length > 0) {
+        tool.messages = mcpMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -3469,6 +3530,333 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                                       setArMessages((prev) => prev.map((it, i) => i === idx ? { ...it, content: val } : it));
                                     }}
                                     className="border-white/[0.08] bg-background/40 text-xs"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                )}
+
+                {selected?.kind === "mcp" && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mcp-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="mcp-name"
+                          value={mcpName}
+                          onChange={(e) => setMcpName(e.target.value)}
+                          placeholder="mcp_tool"
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mcp-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="mcp-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={mcpDescription}
+                          onChange={(e) => setMcpDescription(e.target.value)}
+                          placeholder="Explique quando a IA deve chamar este servidor MCP."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">{mcpDescription.length}/1000</p>
+                      </div>
+                    </div>
+
+                    {/* Panel 2 — Server Settings */}
+                    <Accordion type="single" collapsible defaultValue="server" className="rounded-xl border border-white/[0.08] bg-background/30 backdrop-blur-xl">
+                      <AccordionItem value="server" className="border-0">
+                        <AccordionTrigger className="px-4 py-3 text-xs font-semibold uppercase tracking-wide hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                            Server Settings
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-4 px-4 pb-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="mcp-url" className="text-xs">Server URL</Label>
+                            <Input
+                              id="mcp-url"
+                              value={mcpServerUrl}
+                              onChange={(e) => setMcpServerUrl(e.target.value)}
+                              placeholder="https://api.example.com/function"
+                              className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <Label className="text-xs">Timeout</Label>
+                                <p className="text-[11px] text-muted-foreground">Server request timeout in seconds.</p>
+                              </div>
+                              <span className="rounded-md border border-white/[0.08] bg-background/40 px-2 py-0.5 font-mono text-[11px] text-foreground">
+                                {mcpTimeout} sec
+                              </span>
+                            </div>
+                            <Slider
+                              min={1}
+                              max={300}
+                              step={1}
+                              value={[mcpTimeout]}
+                              onValueChange={(v) => setMcpTimeout(v[0] ?? 20)}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">Authorization</Label>
+                              <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <Plus className="h-3 w-3" /> Add New
+                              </Button>
+                            </div>
+                            <Select value={mcpAuth} onValueChange={setMcpAuth}>
+                              <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                <SelectItem value="none">No authentication</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                              <Lock className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                              <p className="text-xs font-medium text-foreground">No custom credentials available</p>
+                              <Button size="sm" variant="outline" className="mt-3 h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <Plus className="h-3 w-3" /> Create Credential
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">HTTP Headers</Label>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setMcpHeaders((p) => [...p, { key: "", value: "" }])}
+                                className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              >
+                                <Plus className="h-3 w-3" /> Add Header
+                              </Button>
+                            </div>
+                            {mcpHeaders.length === 0 ? (
+                              <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                                <Sparkles className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                                <p className="text-xs font-medium text-foreground">No Headers Configured</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {mcpHeaders.map((h, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={h.key}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setMcpHeaders((p) => p.map((it, i) => (i === idx ? { ...it, key: val } : it)));
+                                      }}
+                                      placeholder="Header"
+                                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                    />
+                                    <Input
+                                      value={h.value}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setMcpHeaders((p) => p.map((it, i) => (i === idx ? { ...it, value: val } : it)));
+                                      }}
+                                      placeholder="Value"
+                                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setMcpHeaders((p) => p.filter((_, i) => i !== idx))}
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      aria-label="Remover header"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                            <p className="text-[11px] text-muted-foreground">
+                              Route webhook requests through static IPs to allow-list Vapi in your firewall.
+                            </p>
+                            <Switch checked={mcpStaticIp} onCheckedChange={setMcpStaticIp} />
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 p-3">
+                              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-400" />
+                              <p className="text-[11px] text-sky-100/80">
+                                Encrypted paths let you protect sensitive fields inside the request/response bodies.
+                                Use dot notation (e.g. <span className="font-mono">body.customer.email</span>).
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">Encrypted Paths</Label>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setMcpEncryptedPaths((p) => [...p, ""])}
+                                className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              >
+                                <Plus className="h-3 w-3" /> Add Path
+                              </Button>
+                            </div>
+                            {mcpEncryptedPaths.length === 0 ? (
+                              <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                                <Lock className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                                <p className="text-xs font-medium text-foreground">No Encrypted Paths</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {mcpEncryptedPaths.map((p, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={p}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setMcpEncryptedPaths((prev) => prev.map((it, i) => (i === idx ? val : it)));
+                                      }}
+                                      placeholder="body.field.path"
+                                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setMcpEncryptedPaths((prev) => prev.filter((_, i) => i !== idx))}
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      aria-label="Remover path"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+
+                    {/* Panel 3 — MCP Settings */}
+                    <Accordion type="single" collapsible defaultValue="mcp" className="rounded-xl border border-white/[0.08] bg-background/30 backdrop-blur-xl">
+                      <AccordionItem value="mcp" className="border-0">
+                        <AccordionTrigger className="px-4 py-3 text-xs font-semibold uppercase tracking-wide hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <Plug className="h-3.5 w-3.5 text-muted-foreground" />
+                            MCP Settings
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 px-4 pb-4">
+                          <Label className="text-xs">Protocol</Label>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            <button
+                              type="button"
+                              onClick={() => setMcpProtocol("shttp")}
+                              className={cn(
+                                "rounded-lg border p-3 text-left transition-all",
+                                mcpProtocol === "shttp"
+                                  ? "border-emerald-500/60 bg-emerald-500/5"
+                                  : "border-white/[0.06] bg-background/40 hover:border-white/[0.12]",
+                              )}
+                            >
+                              <p className="text-xs font-semibold text-foreground">Streamable HTTP (SHTTP)</p>
+                              <p className="mt-1 text-[11px] text-muted-foreground">Uses HTTP-based streaming for communication</p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMcpProtocol("sse")}
+                              className={cn(
+                                "rounded-lg border p-3 text-left transition-all",
+                                mcpProtocol === "sse"
+                                  ? "border-emerald-500/60 bg-emerald-500/5"
+                                  : "border-white/[0.06] bg-background/40 hover:border-white/[0.12]",
+                              )}
+                            >
+                              <p className="text-xs font-semibold text-foreground">Server-Sent Events (SSE)</p>
+                              <p className="mt-1 text-[11px] text-muted-foreground">Uses event-driven communication</p>
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Choose the communication protocol for MCP server connections. Streamable HTTP (SHTTP) is recommended for most use cases.
+                          </p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+
+                    {/* Panel 4 — Messages */}
+                    <Accordion type="single" collapsible className="rounded-xl border border-white/[0.08] bg-background/30 backdrop-blur-xl">
+                      <AccordionItem value="msgs" className="border-0">
+                        <AccordionTrigger className="px-4 py-3 text-xs font-semibold uppercase tracking-wide hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                            Messages
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-2 px-4 pb-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <Plus className="h-3 w-3" /> Add Message
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                              {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                                <DropdownMenuItem
+                                  key={t}
+                                  onClick={() => setMcpMessages((p) => [...p, { type: t, content: "" }])}
+                                >
+                                  {TRANSFER_MESSAGE_LABELS[t]}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {mcpMessages.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                              Nenhuma mensagem definida.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {mcpMessages.map((m, idx) => (
+                                <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-semibold text-foreground">
+                                      {TRANSFER_MESSAGE_LABELS[m.type]}
+                                    </span>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setMcpMessages((prev) => prev.filter((_, i) => i !== idx))}
+                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                      aria-label="Remover mensagem"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                  <Textarea
+                                    rows={2}
+                                    value={m.content}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setMcpMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
+                                    }}
+                                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                                   />
                                 </div>
                               ))}
