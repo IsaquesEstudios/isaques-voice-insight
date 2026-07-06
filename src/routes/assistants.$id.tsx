@@ -207,7 +207,13 @@ function AssistantDetailPage() {
           voiceId: typeof a?.voice?.voiceId === "string" ? a.voice.voiceId : "",
           status: typeof a.name === "string" && a.name.trim() ? "Ativo" : "Rascunho",
         });
-        setTools(Array.isArray(a?.tools) ? a.tools : []);
+        setTools(
+          Array.isArray(a?.model?.tools)
+            ? a.model.tools
+            : Array.isArray(a?.tools)
+              ? a.tools
+              : [],
+        );
       } catch (err) {
         console.error(err);
         toast.error("Não foi possível carregar o assistente.");
