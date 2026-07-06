@@ -1316,6 +1316,18 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (selected.kind === "slack") {
+      const name = slName.trim() || "slack_send_message_tool";
+      const tool: VapiTool = {
+        type: "slack.message.send",
+        name,
+      };
+      if (slDescription.trim()) tool.description = slDescription.trim();
+      if (slMessages.length > 0) {
+        tool.messages = slMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
