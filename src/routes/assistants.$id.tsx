@@ -796,6 +796,14 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [ecDescription, setEcDescription] = useState("");
   const [ecMessages, setEcMessages] = useState<EndCallMessage[]>([]);
 
+  // voicemail configuration state
+  const [vmName, setVmName] = useState("voicemail_tool");
+  const [vmDescription, setVmDescription] = useState("");
+  const [vmScriptMode, setVmScriptMode] = useState<VoicemailScriptMode>("assistant");
+  const [vmScriptContent, setVmScriptContent] = useState("");
+  const [vmBeepDetection, setVmBeepDetection] = useState(false);
+  const [vmMessages, setVmMessages] = useState<VoicemailMessage[]>([]);
+
   function resetForm() {
     setTransferNumber("");
     setFnName("");
@@ -809,6 +817,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setEcName("endCall");
     setEcDescription("");
     setEcMessages([]);
+    setVmName("voicemail_tool");
+    setVmDescription("");
+    setVmScriptMode("assistant");
+    setVmScriptContent("");
+    setVmBeepDetection(false);
+    setVmMessages([]);
   }
 
   function openDialog() {
