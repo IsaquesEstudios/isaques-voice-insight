@@ -1086,6 +1086,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
 
   function pickItem(item: CatalogItem) {
     setSelected(item);
+    // Set contextual default name for GHL variants
+    if (item.kind === "ghlCalCreate") setGhlName("ghl_calendar_create_event_tool");
+    else if (item.kind === "ghlCalCheck") setGhlName("ghl_calendar_check_availability_tool");
+    else if (item.kind === "ghlContactCreate") setGhlName("ghl_contact_create_tool");
+    else if (item.kind === "ghlContactGet") setGhlName("ghl_contact_get_tool");
     setStep("configure");
   }
 
