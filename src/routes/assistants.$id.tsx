@@ -743,7 +743,15 @@ function findCatalogItemByVapiType(type: string): CatalogItem | undefined {
         ? "gcalCreate"
         : type === "google.calendar.checkAvailability"
           ? "gcalCheck"
-          : type;
+          : type === "gohighlevel.calendar.event.create"
+            ? "ghlCalCreate"
+            : type === "gohighlevel.calendar.availability.check"
+              ? "ghlCalCheck"
+              : type === "gohighlevel.contact.create"
+                ? "ghlContactCreate"
+                : type === "gohighlevel.contact.get"
+                  ? "ghlContactGet"
+                  : type;
   for (const section of TOOL_CATALOG) {
     for (const item of section.items) {
       if (item.vapiType === normalized) return item;
