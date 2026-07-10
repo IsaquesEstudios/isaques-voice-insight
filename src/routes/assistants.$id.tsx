@@ -1071,6 +1071,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setGcCalendarId("");
     setGcTimezone("");
     setGcMessages([]);
+    setGhlName("");
+    setGhlDescription("");
+    setGhlCalendarId("");
+    setGhlMessages([]);
   }
 
   function openDialog() {
