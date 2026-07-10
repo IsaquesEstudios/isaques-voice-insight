@@ -703,6 +703,21 @@ const TOOL_CATALOG: CatalogSection[] = [
           { key: "gcalCheck", label: "Check Availability", description: "Verifica disponibilidade em um Google Calendar.", icon: CalendarCheck, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCheck", vapiType: "gcalCheck" },
         ],
       },
+      {
+        key: "ghl",
+        label: "GoHighLevel",
+        description: "Cria eventos, verifica disponibilidade e gerencia contatos no GoHighLevel.",
+        icon: Users,
+        iconColor: "text-amber-500",
+        iconBg: "bg-amber-500/10",
+        kind: "ghlParent",
+        subItems: [
+          { key: "ghlCalCreate", label: "Calendar Create Event", description: "Cria um novo evento no calendário do GHL.", icon: CalendarPlus, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCreate", vapiType: "ghlCalCreate" },
+          { key: "ghlCalCheck", label: "Calendar Check Availability", description: "Verifica disponibilidade no calendário do GHL.", icon: CalendarCheck, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCheck", vapiType: "ghlCalCheck" },
+          { key: "ghlContactCreate", label: "Contact Create", description: "Cria um novo contato no GoHighLevel.", icon: UserPlus, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactCreate", vapiType: "ghlContactCreate" },
+          { key: "ghlContactGet", label: "Contact Get", description: "Busca informações de um contato do GoHighLevel.", icon: UserRound, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactGet", vapiType: "ghlContactGet" },
+        ],
+      },
     ],
   },
 ];
