@@ -718,6 +718,7 @@ const TOOL_CATALOG: CatalogSection[] = [
           { key: "ghlContactGet", label: "Contact Get", description: "Busca informações de um contato do GoHighLevel.", icon: UserRound, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactGet", vapiType: "ghlContactGet" },
         ],
       },
+      { key: "customTool", label: "Custom Tool", description: "Ferramenta customizada via function calling.", icon: Code2, iconColor: "text-yellow-400", iconBg: "bg-yellow-400/10", kind: "function", vapiType: "function" },
     ],
   },
 ];
