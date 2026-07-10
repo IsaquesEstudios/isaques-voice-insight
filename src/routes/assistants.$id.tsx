@@ -640,12 +640,12 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "gcalCreate" | "gcalCheck" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "gcalCreate" | "gcalCheck" | "ghlCalCreate" | "ghlCalCheck" | "ghlContactCreate" | "ghlContactGet" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
 
-type CatalogKind = VapiToolType | "comingSoon" | "gcalParent";
+type CatalogKind = VapiToolType | "comingSoon" | "gcalParent" | "ghlParent";
 
 interface CatalogItem {
   key: string;
