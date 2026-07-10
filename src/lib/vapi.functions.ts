@@ -274,6 +274,35 @@ function sanitizeModelTool(tool: any): any {
     };
   }
 
+  if (
+    tool.type === "gohighlevel.calendar.event.create" ||
+    tool.type === "gohighlevel.calendar.availability.check"
+  ) {
+    return {
+      type: tool.type,
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(typeof tool.calendarId === "string" ? { calendarId: tool.calendarId } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
+  if (
+    tool.type === "gohighlevel.contact.create" ||
+    tool.type === "gohighlevel.contact.get"
+  ) {
+    return {
+      type: tool.type,
+      ...(typeof tool.name === "string" ? { name: tool.name } : {}),
+      ...(typeof tool.description === "string" ? { description: tool.description } : {}),
+      ...(Array.isArray(tool.messages) && tool.messages.length > 0
+        ? { messages: tool.messages.map(sanitizeToolMessage) }
+        : {}),
+    };
+  }
+
   return tool;
 }
 
