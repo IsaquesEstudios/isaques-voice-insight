@@ -1467,6 +1467,32 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       }
       return tool;
     }
+    if (
+      selected.kind === "ghlCalCreate" ||
+      selected.kind === "ghlCalCheck" ||
+      selected.kind === "ghlContactCreate" ||
+      selected.kind === "ghlContactGet"
+    ) {
+      const typeMap = {
+        ghlCalCreate: "gohighlevel.calendar.event.create",
+        ghlCalCheck: "gohighlevel.calendar.availability.check",
+        ghlContactCreate: "gohighlevel.contact.create",
+        ghlContactGet: "gohighlevel.contact.get",
+      } as const;
+      const isCalendar = selected.kind === "ghlCalCreate" || selected.kind === "ghlCalCheck";
+      const name = ghlName.trim() || "ghl_tool";
+      if (isCalendar && !ghlCalendarId.trim()) {
+        toast.error("Calendar ID é obrigatório para ferramentas de calendário do GoHighLevel.");
+        return null;
+      }
+      const tool: VapiTool = { type: typeMap[selected.kind as keyof typeof typeMap], name };
+      if (ghlDescription.trim()) tool.description = ghlDescription.trim();
+      if (isCalendar) tool.calendarId = ghlCalendarId.trim();
+      if (ghlMessages.length > 0) {
+        tool.messages = ghlMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
     if (selected.kind === "function") {
       const name = fnName.trim();
       if (!name || /\s/.test(name)) {
