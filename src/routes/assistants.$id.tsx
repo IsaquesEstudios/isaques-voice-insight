@@ -978,6 +978,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [gcTimezone, setGcTimezone] = useState("");
   const [gcMessages, setGcMessages] = useState<VoicemailMessage[]>([]);
 
+  // gohighlevel configuration state (shared across the 4 GHL actions)
+  const [ghlName, setGhlName] = useState("");
+  const [ghlDescription, setGhlDescription] = useState("");
+  const [ghlCalendarId, setGhlCalendarId] = useState("");
+  const [ghlMessages, setGhlMessages] = useState<VoicemailMessage[]>([]);
+
 
 
   function resetForm() {
