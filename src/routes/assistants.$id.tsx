@@ -31,6 +31,9 @@ import {
   Calendar,
   CalendarPlus,
   CalendarCheck,
+  UserPlus,
+  UserRound,
+  Users,
   Code2,
   Sparkles,
   Phone,
@@ -637,12 +640,12 @@ function LogsTab() {
 
 /* -------------------------------- Tools -------------------------------- */
 
-type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "gcalCreate" | "gcalCheck" | "function";
+type VapiToolType = "transferCall" | "endCall" | "dtmf" | "voicemail" | "sms" | "sipRequest" | "handoff" | "query" | "apiRequest" | "mcp" | "slack" | "sheets" | "gcalCreate" | "gcalCheck" | "ghlCalCreate" | "ghlCalCheck" | "ghlContactCreate" | "ghlContactGet" | "function";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiTool = Record<string, any> & { type: string };
 
-type CatalogKind = VapiToolType | "comingSoon" | "gcalParent";
+type CatalogKind = VapiToolType | "comingSoon" | "gcalParent" | "ghlParent";
 
 interface CatalogItem {
   key: string;
@@ -700,6 +703,21 @@ const TOOL_CATALOG: CatalogSection[] = [
           { key: "gcalCheck", label: "Check Availability", description: "Verifica disponibilidade em um Google Calendar.", icon: CalendarCheck, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCheck", vapiType: "gcalCheck" },
         ],
       },
+      {
+        key: "ghl",
+        label: "GoHighLevel",
+        description: "Cria eventos, verifica disponibilidade e gerencia contatos no GoHighLevel.",
+        icon: Users,
+        iconColor: "text-amber-500",
+        iconBg: "bg-amber-500/10",
+        kind: "ghlParent",
+        subItems: [
+          { key: "ghlCalCreate", label: "Calendar Create Event", description: "Cria um novo evento no calendário do GHL.", icon: CalendarPlus, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCreate", vapiType: "ghlCalCreate" },
+          { key: "ghlCalCheck", label: "Calendar Check Availability", description: "Verifica disponibilidade no calendário do GHL.", icon: CalendarCheck, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCheck", vapiType: "ghlCalCheck" },
+          { key: "ghlContactCreate", label: "Contact Create", description: "Cria um novo contato no GoHighLevel.", icon: UserPlus, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactCreate", vapiType: "ghlContactCreate" },
+          { key: "ghlContactGet", label: "Contact Get", description: "Busca informações de um contato do GoHighLevel.", icon: UserRound, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactGet", vapiType: "ghlContactGet" },
+        ],
+      },
     ],
   },
 ];
@@ -725,7 +743,15 @@ function findCatalogItemByVapiType(type: string): CatalogItem | undefined {
         ? "gcalCreate"
         : type === "google.calendar.checkAvailability"
           ? "gcalCheck"
-          : type;
+          : type === "gohighlevel.calendar.event.create"
+            ? "ghlCalCreate"
+            : type === "gohighlevel.calendar.availability.check"
+              ? "ghlCalCheck"
+              : type === "gohighlevel.contact.create"
+                ? "ghlContactCreate"
+                : type === "gohighlevel.contact.get"
+                  ? "ghlContactGet"
+                  : type;
   for (const section of TOOL_CATALOG) {
     for (const item of section.items) {
       if (item.vapiType === normalized) return item;
@@ -952,6 +978,12 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
   const [gcTimezone, setGcTimezone] = useState("");
   const [gcMessages, setGcMessages] = useState<VoicemailMessage[]>([]);
 
+  // gohighlevel configuration state (shared across the 4 GHL actions)
+  const [ghlName, setGhlName] = useState("");
+  const [ghlDescription, setGhlDescription] = useState("");
+  const [ghlCalendarId, setGhlCalendarId] = useState("");
+  const [ghlMessages, setGhlMessages] = useState<VoicemailMessage[]>([]);
+
 
 
   function resetForm() {
@@ -1039,6 +1071,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     setGcCalendarId("");
     setGcTimezone("");
     setGcMessages([]);
+    setGhlName("");
+    setGhlDescription("");
+    setGhlCalendarId("");
+    setGhlMessages([]);
   }
 
   function openDialog() {
@@ -1050,6 +1086,11 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
 
   function pickItem(item: CatalogItem) {
     setSelected(item);
+    // Set contextual default name for GHL variants
+    if (item.kind === "ghlCalCreate") setGhlName("ghl_calendar_create_event_tool");
+    else if (item.kind === "ghlCalCheck") setGhlName("ghl_calendar_check_availability_tool");
+    else if (item.kind === "ghlContactCreate") setGhlName("ghl_contact_create_tool");
+    else if (item.kind === "ghlContactGet") setGhlName("ghl_contact_get_tool");
     setStep("configure");
   }
 
@@ -1423,6 +1464,32 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       if (gcTimezone.trim()) tool.timezone = gcTimezone.trim();
       if (gcMessages.length > 0) {
         tool.messages = gcMessages.map((m) => ({ type: m.type, content: m.content }));
+      }
+      return tool;
+    }
+    if (
+      selected.kind === "ghlCalCreate" ||
+      selected.kind === "ghlCalCheck" ||
+      selected.kind === "ghlContactCreate" ||
+      selected.kind === "ghlContactGet"
+    ) {
+      const typeMap = {
+        ghlCalCreate: "gohighlevel.calendar.event.create",
+        ghlCalCheck: "gohighlevel.calendar.availability.check",
+        ghlContactCreate: "gohighlevel.contact.create",
+        ghlContactGet: "gohighlevel.contact.get",
+      } as const;
+      const isCalendar = selected.kind === "ghlCalCreate" || selected.kind === "ghlCalCheck";
+      const name = ghlName.trim() || "ghl_tool";
+      if (isCalendar && !ghlCalendarId.trim()) {
+        toast.error("Calendar ID é obrigatório para ferramentas de calendário do GoHighLevel.");
+        return null;
+      }
+      const tool: VapiTool = { type: typeMap[selected.kind as keyof typeof typeMap], name };
+      if (ghlDescription.trim()) tool.description = ghlDescription.trim();
+      if (isCalendar) tool.calendarId = ghlCalendarId.trim();
+      if (ghlMessages.length > 0) {
+        tool.messages = ghlMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
     }
@@ -4413,8 +4480,143 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                   </div>
                 )}
 
+                {(selected?.kind === "ghlCalCreate" ||
+                  selected?.kind === "ghlCalCheck" ||
+                  selected?.kind === "ghlContactCreate" ||
+                  selected?.kind === "ghlContactGet") && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ghl-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="ghl-name"
+                          value={ghlName}
+                          onChange={(e) => setGhlName(e.target.value)}
+                          placeholder={
+                            selected?.kind === "ghlCalCreate"
+                              ? "ghl_calendar_create_event_tool"
+                              : selected?.kind === "ghlCalCheck"
+                                ? "ghl_calendar_check_availability_tool"
+                                : selected?.kind === "ghlContactCreate"
+                                  ? "ghl_contact_create_tool"
+                                  : "ghl_contact_get_tool"
+                          }
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ghl-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="ghl-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={ghlDescription}
+                          onChange={(e) => setGhlDescription(e.target.value)}
+                          placeholder="Descreva quando a IA deve usar esta ferramenta do GoHighLevel."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">{ghlDescription.length}/1000</p>
+                      </div>
+                    </div>
 
+                    {/* Panel 2 — Calendar Settings (only for calendar variants) */}
+                    {(selected?.kind === "ghlCalCreate" || selected?.kind === "ghlCalCheck") && (
+                      <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                        <div className="flex items-start gap-2">
+                          <Calendar className="mt-0.5 h-3.5 w-3.5 text-orange-500" />
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Calendar Settings</h3>
+                            <p className="text-[11px] text-muted-foreground">
+                              {selected?.kind === "ghlCalCreate"
+                                ? "Configure the GoHighLevel calendar for event creation"
+                                : "Configure the GoHighLevel calendar for availability check"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ghl-cid" className="text-xs">Calendar ID *</Label>
+                          <Input
+                            id="ghl-cid"
+                            value={ghlCalendarId}
+                            onChange={(e) => setGhlCalendarId(e.target.value)}
+                            placeholder="Enter Calendar ID"
+                            className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          />
+                          <p className="text-[11px] text-muted-foreground">
+                            The ID of the GoHighLevel Calendar.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Panel 3 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Messages</h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" /> Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() => setGhlMessages((p) => [...p, { type: t, content: "" }])}
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {ghlMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {ghlMessages.map((m, idx) => (
+                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setGhlMessages((prev) => prev.filter((_, i) => i !== idx))}
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGhlMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
+                                }}
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {selected?.kind === "function" && (
                   <div className="space-y-3">
