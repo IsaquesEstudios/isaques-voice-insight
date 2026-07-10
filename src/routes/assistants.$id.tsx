@@ -4480,8 +4480,143 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                   </div>
                 )}
 
+                {(selected?.kind === "ghlCalCreate" ||
+                  selected?.kind === "ghlCalCheck" ||
+                  selected?.kind === "ghlContactCreate" ||
+                  selected?.kind === "ghlContactGet") && (
+                  <div className="space-y-4">
+                    {/* Panel 1 — Tool Settings */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ghl-name" className="text-xs">Tool Name</Label>
+                        <Input
+                          id="ghl-name"
+                          value={ghlName}
+                          onChange={(e) => setGhlName(e.target.value)}
+                          placeholder={
+                            selected?.kind === "ghlCalCreate"
+                              ? "ghl_calendar_create_event_tool"
+                              : selected?.kind === "ghlCalCheck"
+                                ? "ghl_calendar_check_availability_tool"
+                                : selected?.kind === "ghlContactCreate"
+                                  ? "ghl_contact_create_tool"
+                                  : "ghl_contact_get_tool"
+                          }
+                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ghl-desc" className="text-xs">Description</Label>
+                        <Textarea
+                          id="ghl-desc"
+                          rows={3}
+                          maxLength={1000}
+                          value={ghlDescription}
+                          onChange={(e) => setGhlDescription(e.target.value)}
+                          placeholder="Descreva quando a IA deve usar esta ferramenta do GoHighLevel."
+                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        />
+                        <p className="text-right text-[10px] text-muted-foreground">{ghlDescription.length}/1000</p>
+                      </div>
+                    </div>
 
+                    {/* Panel 2 — Calendar Settings (only for calendar variants) */}
+                    {(selected?.kind === "ghlCalCreate" || selected?.kind === "ghlCalCheck") && (
+                      <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                        <div className="flex items-start gap-2">
+                          <Calendar className="mt-0.5 h-3.5 w-3.5 text-orange-500" />
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Calendar Settings</h3>
+                            <p className="text-[11px] text-muted-foreground">
+                              {selected?.kind === "ghlCalCreate"
+                                ? "Configure the GoHighLevel calendar for event creation"
+                                : "Configure the GoHighLevel calendar for availability check"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ghl-cid" className="text-xs">Calendar ID *</Label>
+                          <Input
+                            id="ghl-cid"
+                            value={ghlCalendarId}
+                            onChange={(e) => setGhlCalendarId(e.target.value)}
+                            placeholder="Enter Calendar ID"
+                            className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          />
+                          <p className="text-[11px] text-muted-foreground">
+                            The ID of the GoHighLevel Calendar.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Panel 3 — Messages */}
+                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Messages</h3>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Plus className="h-3 w-3" /> Add Message
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
+                              <DropdownMenuItem
+                                key={t}
+                                onClick={() => setGhlMessages((p) => [...p, { type: t, content: "" }])}
+                              >
+                                {TRANSFER_MESSAGE_LABELS[t]}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {ghlMessages.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma mensagem definida.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {ghlMessages.map((m, idx) => (
+                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-foreground">
+                                  {TRANSFER_MESSAGE_LABELS[m.type]}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setGhlMessages((prev) => prev.filter((_, i) => i !== idx))}
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label="Remover mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={m.content}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGhlMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
+                                }}
+                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {selected?.kind === "function" && (
                   <div className="space-y-3">
