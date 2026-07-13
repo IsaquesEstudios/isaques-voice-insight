@@ -253,6 +253,8 @@ function TelefoniaPage() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
+  const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
+  const [assignAssistantId, setAssignAssistantId] = useState<string>("");
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
