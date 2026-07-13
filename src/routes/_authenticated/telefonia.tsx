@@ -73,6 +73,7 @@ import {
   listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
+  saveTestContact,
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
