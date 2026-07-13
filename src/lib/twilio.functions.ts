@@ -276,7 +276,9 @@ export const releaseNumber = createServerFn({ method: "POST" })
     if (fetchErr) throw new Error(fetchErr.message);
     if (!row) throw new Error("Número não encontrado.");
 
-    await twilioDelete(`/IncomingPhoneNumbers/${row.twilio_sid}.json`);
+    if (!row.twilio_sid.startsWith("byoc_")) {
+      await twilioDelete(`/IncomingPhoneNumbers/${row.twilio_sid}.json`);
+    }
 
     const { error: delErr } = await context.supabase
       .from("user_phone_numbers")
