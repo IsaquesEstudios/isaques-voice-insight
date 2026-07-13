@@ -105,18 +105,27 @@ function getKey(): string {
   return key;
 }
 
-// Stack padrão de baixo custo enviada à Vapi em toda criação.
-// Estes defaults refletem exatamente o que exibimos no painel de stats.
+// Stack padrão oficialmente recomendada pela Vapi.
+// Ref.: https://github.com/vapiai/skills/blob/HEAD/create-assistant/references/providers.md
 const DEFAULT_MODEL_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-5";
-const DEFAULT_VOICE_PROVIDER = "cartesia";
-const DEFAULT_VOICE_ID = "blake";
+const DEFAULT_MODEL = "gpt-4.1";
+const DEFAULT_VOICE_PROVIDER = "vapi";
+const DEFAULT_VOICE_ID = "Elliot";
+const DEFAULT_VOICE_VERSION = 2;
 const DEFAULT_TRANSCRIBER_BLOCK = {
   provider: "deepgram",
   model: "nova-3",
+  language: "multi",
 } as const;
 
 function buildPayload(input: AssistantInput) {
+  const voiceProvider = input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER;
+  const voiceId = input.voiceId?.trim() || DEFAULT_VOICE_ID;
+  const voice: Record<string, unknown> = { provider: voiceProvider, voiceId };
+  // A Vapi só aceita "version" quando o provider é "vapi".
+  if (voiceProvider === "vapi" && voiceId === DEFAULT_VOICE_ID) {
+    voice.version = DEFAULT_VOICE_VERSION;
+  }
   return {
     name: input.name,
     firstMessage: input.firstMessage,
@@ -126,12 +135,10 @@ function buildPayload(input: AssistantInput) {
       model: input.model?.trim() || DEFAULT_MODEL,
       messages: [{ role: "system", content: input.systemPrompt }],
     },
-    voice: {
-      provider: input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER,
-      voiceId: input.voiceId?.trim() || DEFAULT_VOICE_ID,
-    },
+    voice,
   };
 }
+
 
 async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
   const maxAttempts = 3;
