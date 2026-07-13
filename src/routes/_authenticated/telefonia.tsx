@@ -313,14 +313,46 @@ function TelefoniaPage() {
         toast.success("SMS enviado. Digite o código de 6 dígitos.");
         setOtpStep({ phoneE164: input.phoneE164, label: input.label });
         setTestContactOpen(false);
+        setTrialBlocked(false);
       } else if (r.reason === "no_credentials") {
         toast.error("Conecte sua conta Twilio primeiro.");
+      } else if (r.reason === "trial_unverified") {
+        setTrialBlocked(true);
       } else {
         toast.error(r.message ?? "Falha ao enviar SMS.");
       }
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS"),
+  });
+
+  const trustFromTwilioMutation = useMutation({
+    mutationFn: (input: { phoneE164: string; label: string }) =>
+      addVerifiedFromTwilioFn({
+        data: { phoneE164: input.phoneE164, label: input.label },
+      }),
+    onSuccess: async (res) => {
+      const r = res as
+        | { ok: true; id?: string }
+        | { ok: false; reason: string; message?: string };
+      if (r.ok) {
+        toast.success("Contato importado da Twilio como verificado.");
+        setTestContactOpen(false);
+        setTrialBlocked(false);
+        setTestContactForm({ label: "", phoneE164: "" });
+        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      } else if (r.reason === "not_verified_in_twilio") {
+        toast.error(
+          "Este número ainda não aparece como Verified Caller ID na sua conta Twilio.",
+        );
+      } else if (r.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
+      } else {
+        toast.error(r.message ?? "Falha ao importar contato.");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao importar contato"),
   });
 
   const confirmOtpMutation = useMutation({
