@@ -838,6 +838,25 @@ function AssistentesPage() {
   );
 }
 
+function StepDot({ active, label }: { active: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={
+          active
+            ? "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground"
+            : "flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.08] bg-background/40 text-[10px] font-semibold text-muted-foreground"
+        }
+      >
+        {active ? "•" : ""}
+      </span>
+      <span className={active ? "text-xs font-medium text-foreground" : "text-xs text-muted-foreground"}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function AssistantSkeleton() {
   return (
     <Card className="relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl">
