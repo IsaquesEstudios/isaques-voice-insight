@@ -1,104 +1,77 @@
 ## Objetivo
 
-Executar o plano de compra de números Twilio vinculados ao usuário logado, usando um **projeto Supabase externo** (BYO Supabase) — não o Lovable Cloud.
+Desacoplar 100% do connector Twilio compartilhado. Cada usuário passa a operar exclusivamente com **as próprias credenciais Twilio** (Account SID + Auth Token) que ele mesmo cadastra na plataforma. Nenhuma chamada à Twilio usa mais `TWILIO_API_KEY`/`LOVABLE_API_KEY` do workspace.
 
-## Como o multi-tenant funciona
+## Modelo de dados (Supabase externo)
 
-Uma única conta Twilio (compartilhada via connector do workspace) executa as compras. O “vínculo por usuário” fica no **Supabase externo**: cada linha em `user_phone_numbers` grava `auth.uid()`, e RLS garante que cada usuário só enxerga os seus números.
-
-## Passos
-
-### 1. Conectar o Supabase externo
-Você precisa fornecer três valores do seu projeto Supabase (Settings → API):
-- `SUPABASE_URL` (ex.: `https://xxxx.supabase.co`)
-- `SUPABASE_PUBLISHABLE_KEY` (a chave `anon` / publishable)
-- `SUPABASE_SERVICE_ROLE_KEY` (service_role — server-only)
-
-Também versões `VITE_*` (mesmos valores da URL e da publishable) para o cliente. Eu adiciono via `add_secret` (formulário seguro); nada é digitado no chat.
-
-Depois configuro manualmente os arquivos de integração equivalentes ao Lovable Cloud (sem usar `supabase--enable`, que provisiona um novo projeto):
-- `src/integrations/supabase/client.ts` (browser, publishable key).
-- `src/integrations/supabase/client.server.ts` (service role — só carregado dentro de handlers).
-- `src/integrations/supabase/auth-middleware.ts` (`requireSupabaseAuth` para server functions).
-- `src/integrations/supabase/auth-attacher.ts` + append no `functionMiddleware` em `src/start.ts` para anexar o bearer.
-- `src/integrations/supabase/types.ts` gerado do schema.
-
-### 2. Schema no Supabase externo
-Você roda esta migration no SQL Editor do seu Supabase (envio o SQL pronto):
+Nova tabela para guardar a credencial Twilio do usuário logado (uma por usuário):
 
 ```sql
-create table public.user_phone_numbers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  twilio_sid text not null unique,
-  phone_number text not null,
-  friendly_name text,
-  region text,
-  country_iso text,
-  capabilities jsonb default '{}'::jsonb,
-  monthly_cost text,
-  provider text not null default 'twilio',
-  assistant text,
-  health text not null default 'Seguro',
-  calls_today int not null default 0,
-  answer_rate int not null default 0,
-  created_at timestamptz not null default now()
+create table public.user_twilio_credentials (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  account_sid text not null,
+  auth_token text not null,
+  friendly_label text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
-grant select, insert, update, delete on public.user_phone_numbers to authenticated;
-grant all on public.user_phone_numbers to service_role;
+grant select, insert, update, delete on public.user_twilio_credentials to authenticated;
+grant all on public.user_twilio_credentials to service_role;
 
-alter table public.user_phone_numbers enable row level security;
+alter table public.user_twilio_credentials enable row level security;
 
-create policy "own select" on public.user_phone_numbers for select
+create policy "own row select" on public.user_twilio_credentials for select
   to authenticated using (auth.uid() = user_id);
-create policy "own insert" on public.user_phone_numbers for insert
+create policy "own row insert" on public.user_twilio_credentials for insert
   to authenticated with check (auth.uid() = user_id);
-create policy "own update" on public.user_phone_numbers for update
+create policy "own row update" on public.user_twilio_credentials for update
   to authenticated using (auth.uid() = user_id);
-create policy "own delete" on public.user_phone_numbers for delete
+create policy "own row delete" on public.user_twilio_credentials for delete
   to authenticated using (auth.uid() = user_id);
 ```
 
-Sem tabela `profiles` neste momento — só `auth.users.id` já basta.
+Observação de segurança: `auth_token` fica em texto plano na tabela (RLS restringe leitura ao próprio dono). Mantemos este trade-off agora para simplicidade — evolução futura: mover para cofre criptografado.
 
-### 3. Auth (e-mail + senha) e rota protegida
-- Nova rota pública `src/routes/auth.tsx` com formulários de sign-in e sign-up usando `supabase.auth.signInWithPassword` / `signUp`.
-- Layout protegido `src/routes/_authenticated/route.tsx` (`ssr: false`) que redireciona para `/auth` quando `getUser()` falha.
-- Mover `src/routes/telefonia.tsx` → `src/routes/_authenticated/telefonia.tsx` (design intacto).
-- Wiring no `__root.tsx`: `supabase.auth.onAuthStateChange` chamando `router.invalidate()` em `SIGNED_IN/OUT/USER_UPDATED` e `queryClient.invalidateQueries()` quando não é sign-out.
-- Um botão de sign-out no topbar seguindo o padrão “cancel + clear + signOut + navigate('/auth', replace)”.
+## Mudanças no backend (`src/lib/twilio.functions.ts`)
 
-### 4. Vincular a conexão Twilio ao projeto
-- Rodar o `connect` do connector Twilio (a conexão “Isaques's Twilio” já existe no workspace, mas ainda não está vinculada a este projeto) para injetar `TWILIO_API_KEY` + `LOVABLE_API_KEY` no runtime do servidor.
-- Todas as chamadas passam por `https://connector-gateway.lovable.dev/twilio/...`, nunca do cliente.
+- Remover `GATEWAY`, `twilioHeaders`, e todo uso de `LOVABLE_API_KEY` / `TWILIO_API_KEY`.
+- Novo helper interno que chama diretamente `https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/...` usando **HTTP Basic Auth** com o `account_sid` + `auth_token` do usuário logado.
+- Todas as server functions autenticadas passam a:
+  1. Carregar as credenciais do usuário via `context.supabase.from('user_twilio_credentials')`.
+  2. Retornar `{ ok: false, reason: "no_credentials" }` se não houver — o front abre o modal “Conectar Twilio”.
+  3. Fazer a chamada Twilio direto com Basic Auth.
+- Ajustes específicos:
+  - `searchAvailableNumbers`, `purchaseNumber`, `releaseNumber`, `createTwilioAddress`, e a busca de bundle regulatório (v2 Numbering) passam a usar o novo helper.
+  - `connectExternalNumber` (BYOC) deixa de ser o único ponto de entrada Twilio: a aba **Twilio** do modal atual passa a **cadastrar/atualizar as credenciais em `user_twilio_credentials`**. Números concretos são adquiridos via `purchaseNumber` como sempre. A aba **SIP Trunk** permanece salvando linhas com `twilio_sid = byoc_...` em `user_phone_numbers`.
+  - Nova server function `saveTwilioCredentials({ accountSid, authToken })` — faz um `GET /Accounts/{sid}.json` como validação antes de salvar (upsert).
+  - Nova server function `getTwilioConnection()` retornando `{ connected: boolean, accountSid?: string }` (nunca devolve o token).
+  - Nova server function `disconnectTwilio()` — deleta a linha de credenciais.
 
-### 5. Server functions em `src/lib/twilio.functions.ts`
-Todas com `createServerFn` + `.middleware([requireSupabaseAuth])`:
-- `searchAvailableNumbers({ country, areaCode })` → `GET /AvailablePhoneNumbers/{country}/Local.json?AreaCode=...`.
-- `purchaseNumber({ phoneNumber })` → `POST /IncomingPhoneNumbers.json` (form-urlencoded). Ao sucesso, `context.supabase.from('user_phone_numbers').insert({...})` com `user_id: context.userId` e `twilio_sid` retornado.
-- `listMyNumbers()` → `SELECT * FROM user_phone_numbers` (RLS filtra por `auth.uid()`).
-- `releaseNumber({ id })` → busca o `twilio_sid` do próprio usuário, `DELETE /IncomingPhoneNumbers/{sid}.json`, depois `DELETE` da linha.
+## Mudanças no frontend (`src/routes/_authenticated/telefonia.tsx`)
 
-Erros da Twilio (código + mensagem) são retornados intactos para o toast.
+- Ao abrir a tela, chamar `getTwilioConnection`. Se `connected === false`, deixar KPIs zerados e mostrar um estado vazio com CTA "Conectar Twilio" que abre o mesmo modal atual.
+- Modal “Conectar Número de Telefonia”:
+  - Aba **Twilio** deixa de exigir “Número de Telefone Adquirido” — passa a ser apenas **Account SID + Auth Token** (com botão de olho para revelar) e um botão "Conectar Twilio" que chama `saveTwilioCredentials`. Sucesso → toast + fecha modal + habilita compra.
+  - Aba **SIP Trunk** intacta.
+- Fluxo de compra: mantém o botão “Adquirir número”, mas só é habilitado quando `connected === true`. Toda a busca + compra usa `searchAvailableNumbers` / `purchaseNumber`, que agora respondem com **os números da conta Twilio do próprio usuário**.
+- Adicionar em algum ponto da UI (menu do topo do card ou um novo botão “Twilio conectado: AC1234…”) um "Desconectar Twilio" com `AlertDialog` chamando `disconnectTwilio`.
+- Coluna Provedor da tabela: números vindos de `purchaseNumber` passam a exibir “Twilio (Sua conta)”.
 
-### 6. `_authenticated/telefonia.tsx`
-- Substituir `initialNumbers` mock por `useQuery(['my-numbers'], listMyNumbers)` + skeleton (o desenho glass permanece).
-- `handleSearch` chama `searchAvailableNumbers`; `handleBuy` chama `purchaseNumber` e faz `invalidateQueries(['my-numbers'])`.
-- KPIs derivados da query.
-- Menu `MoreVertical` ganha ação “Liberar número” com `AlertDialog` chamando `releaseNumber`.
+## O que sai do projeto
 
-### 7. Verificação
-- Criar dois usuários; cada um compra um número e vê só os seus na tabela.
-- Query direta no Supabase confirmando `user_id` correto.
-- Forçar erro Twilio (área inválida) e conferir que a mensagem do provider aparece no toast.
+- Nenhuma referência a `LOVABLE_API_KEY` ou `TWILIO_API_KEY` no runtime dessa página/funcões.
+- `standard_connectors--disconnect` do connector Twilio (informo o `connection_id` durante a execução para desvincular do projeto).
 
-## O que NÃO muda
-- Layout/glass da página de Telefonia permanece igual.
-- Somente `src/routes/telefonia.tsx` (movida para `_authenticated/`), `src/routes/__root.tsx` (auth listener + sign-out) e arquivos novos (integração Supabase, `auth.tsx`, `_authenticated/route.tsx`, `twilio.functions.ts`) são tocados.
+## Requisitos do usuário
 
-## Requisitos do usuário antes de eu implementar
-1. Confirmar que quer avançar com este plano.
-2. Ter em mãos, do projeto Supabase externo: URL, `anon` key e `service_role` key (vou abrir formulário seguro do `add_secret` para cada um — não cole no chat).
-3. Autorização para vincular a conexão “Isaques's Twilio” a este projeto (rodo o `connect`).
-4. Após a implementação, você roda o SQL da seção 2 no SQL Editor do seu Supabase.
+1. Confirmar este plano.
+2. Rodar o SQL da tabela `user_twilio_credentials` no SQL Editor do Supabase externo.
+3. Ter em mãos `Account SID` e `Auth Token` da sua Twilio para conectar após o deploy (não precisa enviar no chat — a tela pede).
+
+## Verificação
+
+- Sem credenciais: tela mostra estado “Twilio não conectado”; busca/compra bloqueadas.
+- Com credenciais de usuário A: A vê apenas números de A; usuário B (sem credenciais ou com outras credenciais) não enxerga nada de A.
+- Desconectar Twilio: números salvos localmente permanecem na tabela `user_phone_numbers`, mas novas buscas/compras ficam bloqueadas até reconectar.
+- Erros Twilio (SID inválido, token inválido, 401) são exibidos no toast com a mensagem original do provider.
