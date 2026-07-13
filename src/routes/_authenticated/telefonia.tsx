@@ -126,6 +126,8 @@ function TelefoniaPage() {
   const saveCredsFn = useServerFn(saveTwilioCredentials);
   const getConnFn = useServerFn(getTwilioConnection);
   const disconnectFn = useServerFn(disconnectTwilio);
+  const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
+  const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
