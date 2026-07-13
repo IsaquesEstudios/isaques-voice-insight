@@ -424,9 +424,15 @@ function AssistantDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+              </TabsContent>
 
-              {/* Coluna Direita — Modelo & Voz */}
+              <TabsContent value="model" className="mt-0">
+            <div className="grid grid-cols-1 gap-4">
+              {/* Modelo & Voz */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+                <CardContent className="space-y-5 p-6">
+
                 <CardContent className="space-y-5 p-6">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Modelo & Voz</h2>
