@@ -151,6 +151,9 @@ function TelefoniaPage() {
   const [pendingBuy, setPendingBuy] = useState<AvailableNumber | null>(null);
   const [addressOpen, setAddressOpen] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [bundleOpen, setBundleOpen] = useState(false);
+  const [bundleSid, setBundleSid] = useState("");
+  const [savingBundle, setSavingBundle] = useState(false);
   const [addr, setAddr] = useState({
     customerName: "",
     street: "",
@@ -182,19 +185,42 @@ function TelefoniaPage() {
     }
   };
 
-  const handleBuy = async (n: AvailableNumber) => {
+  const handleBuy = async (n: AvailableNumber, regulatoryBundleSid?: string) => {
     setBuyingId(n.id);
     try {
-      await buyFn({
+      const response = await buyFn({
         data: {
           phoneNumber: n.phoneNumber,
           countryIso: n.countryIso,
           region: n.region,
+          bundleSid: regulatoryBundleSid,
         },
       });
+      if (!response.ok) {
+        if (response.reason === "address_required") {
+          setPendingBuy(n);
+          setAddressOpen(true);
+          toast.message("Cadastre um endereço regulatório para concluir a compra.");
+          return;
+        }
+        if (response.reason === "bundle_required") {
+          setPendingBuy(n);
+          setBundleOpen(true);
+          if (regulatoryBundleSid) {
+            toast.error(response.message);
+          } else {
+            toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
+          }
+          return;
+        }
+      }
       toast.success(`Número ${n.phoneNumber} adquirido e vinculado à sua conta!`);
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
+      setAddressOpen(false);
+      setBundleOpen(false);
+      setPendingBuy(null);
+      setBundleSid("");
       resetModal();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha ao adquirir número";
@@ -202,6 +228,10 @@ function TelefoniaPage() {
         setPendingBuy(n);
         setAddressOpen(true);
         toast.message("Cadastre um endereço regulatório para concluir a compra.");
+      } else if (/Regulatory Bundle|Bundle required|21649/i.test(msg)) {
+        setPendingBuy(n);
+        setBundleOpen(true);
+        toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
       } else {
         toast.error(msg);
       }
@@ -234,6 +264,16 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao cadastrar endereço");
     } finally {
       setSavingAddress(false);
+    }
+  };
+
+  const handleSaveBundle = async () => {
+    if (!pendingBuy || !bundleSid.trim()) return;
+    setSavingBundle(true);
+    try {
+      await handleBuy(pendingBuy, bundleSid.trim());
+    } finally {
+      setSavingBundle(false);
     }
   };
 
@@ -659,6 +699,47 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={bundleOpen}
+        onOpenChange={(o) => {
+          setBundleOpen(o);
+          if (!o) setSavingBundle(false);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Informar Regulatory Bundle</DialogTitle>
+            <DialogDescription>
+              A Twilio exige um Bundle aprovado para comprar números locais em {pendingBuy?.countryIso}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+              Use um Bundle com status <span className="font-medium text-foreground">twilio-approved</span>,
+              país {pendingBuy?.countryIso} e tipo <span className="font-medium text-foreground">local</span>.
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Bundle SID</Label>
+              <Input
+                value={bundleSid}
+                onChange={(e) => setBundleSid(e.target.value.trim())}
+                placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setBundleOpen(false)} disabled={savingBundle}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveBundle} disabled={savingBundle || !bundleSid.trim()}>
+              {savingBundle ? "Comprando…" : "Salvar e comprar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
         <DialogContent className="max-w-lg">
