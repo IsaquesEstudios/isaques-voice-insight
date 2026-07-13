@@ -295,7 +295,7 @@ function TelefoniaPage() {
                 setOpen(true);
               }}
             >
-              <Plus className="h-4 w-4" /> Adquirir número
+              <Plus className="h-4 w-4" /> Conectar Número
             </Button>
           </div>
         </div>
