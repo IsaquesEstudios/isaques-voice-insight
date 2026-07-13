@@ -235,6 +235,8 @@ function TelefoniaPage() {
       });
       toast.success("Conta Twilio conectada com sucesso!");
       await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
+      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
+      await queryClient.invalidateQueries({ queryKey: ["twilio-trunks-live"] });
       setOpen(false);
       resetModal();
     } catch (err) {
