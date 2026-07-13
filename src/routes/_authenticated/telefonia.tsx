@@ -685,7 +685,48 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={confirmDisconnect}
+        onOpenChange={(o) => {
+          if (!o) setConfirmDisconnect(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desconectar conta Twilio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Suas credenciais Twilio serão removidas deste app. Os números já
+              cadastrados continuam listados, mas novas buscas e compras ficarão
+              bloqueadas até você reconectar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={disconnectMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                disconnectMutation.mutate();
+              }}
+              disabled={disconnectMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {disconnectMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Desconectando...
+                </>
+              ) : (
+                "Desconectar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardShell>
+
 
   );
 }
