@@ -462,13 +462,19 @@ function TelefoniaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full space-y-1.5 sm:w-32">
-              <Label className="text-xs text-muted-foreground">Código de Área</Label>
+            <div className="w-full space-y-1.5 sm:w-40">
+              <Label className="text-xs text-muted-foreground">
+                {areaCodeConfig[country]?.label ?? "Código de Área"}
+              </Label>
               <Input
                 inputMode="numeric"
-                placeholder="opcional"
+                maxLength={areaCodeConfig[country]?.maxLength ?? 5}
+                placeholder={areaCodeConfig[country]?.placeholder ?? "opcional"}
                 value={area}
-                onChange={(e) => setArea(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => {
+                  const max = areaCodeConfig[country]?.maxLength ?? 5;
+                  setArea(e.target.value.replace(/\D/g, "").slice(0, max));
+                }}
                 className="bg-background/50"
               />
             </div>
