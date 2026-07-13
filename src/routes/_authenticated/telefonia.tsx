@@ -280,6 +280,7 @@ function TelefoniaPage() {
   // SMS OTP verification step
   const [otpStep, setOtpStep] = useState<null | { phoneE164: string; label: string }>(null);
   const [otpCode, setOtpCode] = useState("");
+  const [trialBlocked, setTrialBlocked] = useState(false);
   // Per-row call controls (origin number + assistant)
   const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
