@@ -750,26 +750,44 @@ function AssistentesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Voz</Label>
-                  <Select
-                    value={form.voiceId}
-                    onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                    disabled={form.loadingInitial}
-                  >
-                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
-                        <SelectItem key={v} value={v}>
-                          {v}
-                        </SelectItem>
-                      ))}
-                      {form.voiceId &&
-                        !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
-                          <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                        )}
-                    </SelectContent>
-                  </Select>
+                  {(VOICE_OPTIONS[form.voiceProvider] ?? []).length === 0 ? (
+                    <>
+                      <Input
+                        value={form.voiceId}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, voiceId: e.target.value }))
+                        }
+                        placeholder="Cole o voiceId da sua conta (BYOK)"
+                        disabled={form.loadingInitial}
+                        className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Para {form.voiceProvider}, o voiceId deve vir da sua conta
+                        sincronizada na Vapi (Integrations).
+                      </p>
+                    </>
+                  ) : (
+                    <Select
+                      value={form.voiceId}
+                      onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                      disabled={form.loadingInitial}
+                    >
+                      <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
+                          <SelectItem key={v} value={v}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                        {form.voiceId &&
+                          !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
+                            <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                          )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
             )}
