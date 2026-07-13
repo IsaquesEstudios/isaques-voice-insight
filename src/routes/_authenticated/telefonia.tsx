@@ -1063,19 +1063,19 @@ function TelefoniaPage() {
               </Button>
               <Button
                 onClick={() =>
-                  startVerificationMutation.mutate({
+                  sendOtpMutation.mutate({
                     phoneE164: testContactForm.phoneE164.trim(),
-                    friendlyName: testContactForm.label.trim(),
+                    label: testContactForm.label.trim(),
                   })
                 }
                 disabled={
-                  startVerificationMutation.isPending ||
+                  sendOtpMutation.isPending ||
                   !testContactForm.label.trim() ||
                   !testContactForm.phoneE164.trim() ||
                   !isTwilioConnected
                 }
               >
-                {startVerificationMutation.isPending && (
+                {sendOtpMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Enviar SMS de verificação
@@ -1086,44 +1086,72 @@ function TelefoniaPage() {
       </Dialog>
 
       <Dialog
-        open={pendingVerification !== null}
+        open={otpStep !== null}
         onOpenChange={(o) => {
           if (!o) {
-            setPendingVerification(null);
-            queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
+            setOtpStep(null);
+            setOtpCode("");
           }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>Digite este código no telefone</DialogTitle>
+            <DialogTitle>Digite o código recebido por SMS</DialogTitle>
             <DialogDescription>
-              A Twilio está ligando para <b>{pendingVerification?.phone}</b>. Ao atender,
-              digite o código abaixo no teclado do celular para concluir a verificação.
+              Enviamos um SMS para <b>{otpStep?.phoneE164}</b>. Digite o código
+              de 6 dígitos abaixo para concluir a verificação.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Código de verificação
-              </p>
-              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.5em] text-primary">
-                {pendingVerification?.validationCode}
-              </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="otp-code" className="text-xs">Código de 6 dígitos</Label>
+              <Input
+                id="otp-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                className="text-center font-mono text-2xl tracking-[0.4em]"
+              />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-between gap-2 pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (!otpStep) return;
+                  sendOtpMutation.mutate({
+                    phoneE164: otpStep.phoneE164,
+                    label: otpStep.label,
+                  });
+                }}
+                disabled={sendOtpMutation.isPending}
+              >
+                Reenviar SMS
+              </Button>
               <Button
                 onClick={() => {
-                  setPendingVerification(null);
-                  queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
+                  if (!otpStep) return;
+                  confirmOtpMutation.mutate({
+                    phoneE164: otpStep.phoneE164,
+                    code: otpCode.trim(),
+                    label: otpStep.label,
+                  });
                 }}
+                disabled={
+                  confirmOtpMutation.isPending || otpCode.trim().length < 4
+                }
               >
-                Já verifiquei
+                {confirmOtpMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Verificar
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
 
 
 
