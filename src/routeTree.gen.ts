@@ -9,19 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TelefoniaRouteImport } from './routes/telefonia'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AssistentesRouteImport } from './routes/assistentes'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistantsIdRouteImport } from './routes/assistants.$id'
+import { Route as AuthenticatedTelefoniaRouteImport } from './routes/_authenticated/telefonia'
 
-const TelefoniaRoute = TelefoniaRouteImport.update({
-  id: '/telefonia',
-  path: '/telefonia',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const HistoricoRoute = HistoricoRouteImport.update({
   id: '/historico',
   path: '/historico',
@@ -37,9 +34,18 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssistentesRoute = AssistentesRouteImport.update({
   id: '/assistentes',
   path: '/assistentes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -52,33 +58,42 @@ const AssistantsIdRoute = AssistantsIdRouteImport.update({
   path: '/assistants/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTelefoniaRoute = AuthenticatedTelefoniaRouteImport.update({
+  id: '/telefonia',
+  path: '/telefonia',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistentes': typeof AssistentesRoute
+  '/auth': typeof AuthRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
-  '/telefonia': typeof TelefoniaRoute
+  '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AssistantsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistentes': typeof AssistentesRoute
+  '/auth': typeof AuthRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
-  '/telefonia': typeof TelefoniaRoute
+  '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AssistantsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/assistentes': typeof AssistentesRoute
+  '/auth': typeof AuthRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
-  '/telefonia': typeof TelefoniaRoute
+  '/_authenticated/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AssistantsIdRoute
 }
 export interface FileRouteTypes {
@@ -86,6 +101,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/assistentes'
+    | '/auth'
     | '/configuracoes'
     | '/crm'
     | '/historico'
@@ -95,6 +111,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/assistentes'
+    | '/auth'
     | '/configuracoes'
     | '/crm'
     | '/historico'
@@ -103,33 +120,29 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/assistentes'
+    | '/auth'
     | '/configuracoes'
     | '/crm'
     | '/historico'
-    | '/telefonia'
+    | '/_authenticated/telefonia'
     | '/assistants/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AssistentesRoute: typeof AssistentesRoute
+  AuthRoute: typeof AuthRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   CrmRoute: typeof CrmRoute
   HistoricoRoute: typeof HistoricoRoute
-  TelefoniaRoute: typeof TelefoniaRoute
   AssistantsIdRoute: typeof AssistantsIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/telefonia': {
-      id: '/telefonia'
-      path: '/telefonia'
-      fullPath: '/telefonia'
-      preLoaderRoute: typeof TelefoniaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/historico': {
       id: '/historico'
       path: '/historico'
@@ -151,11 +164,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assistentes': {
       id: '/assistentes'
       path: '/assistentes'
       fullPath: '/assistentes'
       preLoaderRoute: typeof AssistentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -172,16 +199,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssistantsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/telefonia': {
+      id: '/_authenticated/telefonia'
+      path: '/telefonia'
+      fullPath: '/telefonia'
+      preLoaderRoute: typeof AuthenticatedTelefoniaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedTelefoniaRoute: typeof AuthenticatedTelefoniaRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedTelefoniaRoute: AuthenticatedTelefoniaRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AssistentesRoute: AssistentesRoute,
+  AuthRoute: AuthRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   CrmRoute: CrmRoute,
   HistoricoRoute: HistoricoRoute,
-  TelefoniaRoute: TelefoniaRoute,
   AssistantsIdRoute: AssistantsIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Plus,
   PhoneCall,
@@ -14,6 +16,8 @@ import {
   MessageSquare,
   Loader2,
   Inbox,
+  LogOut,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,6 +31,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,8 +65,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { getSupabaseBrowser } from "@/integrations/supabase/client";
+import {
+  listMyNumbers,
+  purchaseNumber,
+  releaseNumber,
+  searchAvailableNumbers,
+} from "@/lib/twilio.functions";
 
-export const Route = createFileRoute("/telefonia")({
+export const Route = createFileRoute("/_authenticated/telefonia")({
   head: () => ({
     meta: [{ title: "Telefonia & Números — Isaques Estúdios | AI Voice" }],
   }),
@@ -56,23 +83,15 @@ export const Route = createFileRoute("/telefonia")({
 type Health = "Seguro" | "Descanso" | "Risco";
 
 interface NumberRow {
-  number: string;
-  region: string;
-  provider: "Twilio" | "Vonage";
-  assistant: string;
-  callsToday: number;
-  answerRate: number;
+  id: string;
+  phone_number: string;
+  region: string | null;
+  provider: string;
+  assistant: string | null;
+  calls_today: number;
+  answer_rate: number;
   health: Health;
 }
-
-const initialNumbers: NumberRow[] = [
-  { number: "+55 11 4200-1101", region: "São Paulo / SP", provider: "Twilio", assistant: "Sofia • SDR", callsToday: 214, answerRate: 88, health: "Seguro" },
-  { number: "+55 21 4200-2244", region: "Rio de Janeiro / RJ", provider: "Twilio", assistant: "Ricardo • Cobrança", callsToday: 178, answerRate: 62, health: "Descanso" },
-  { number: "+55 31 4200-3378", region: "Belo Horizonte / MG", provider: "Vonage", assistant: "Marina • Agendamentos", callsToday: 90, answerRate: 91, health: "Seguro" },
-  { number: "+55 41 4200-4487", region: "Curitiba / PR", provider: "Twilio", assistant: "Bianca • Recepção", callsToday: 322, answerRate: 79, health: "Seguro" },
-  { number: "+55 51 4200-5591", region: "Porto Alegre / RS", provider: "Vonage", assistant: "Ricardo • Cobrança", callsToday: 41, answerRate: 24, health: "Risco" },
-  { number: "+55 11 4200-6620", region: "São Paulo / SP", provider: "Twilio", assistant: "—", callsToday: 0, answerRate: 0, health: "Descanso" },
-];
 
 const healthStyles: Record<Health, string> = {
   Seguro: "bg-success/15 text-success",
@@ -87,44 +106,39 @@ const routes = [
   { name: "Rota Sandbox", numbers: 2, load: 12, status: "Pausado" },
 ];
 
-const countryConfig: Record<string, { dial: string; label: string; regionLabel: (area: string) => string }> = {
-  BR: { dial: "+55", label: "Brasil (+55)", regionLabel: (a) => `DDD ${a} / BR` },
-  US: { dial: "+1", label: "EUA (+1)", regionLabel: (a) => `Area ${a} / US` },
-  CA: { dial: "+1", label: "Canadá (+1)", regionLabel: (a) => `Area ${a} / CA` },
-};
-
 interface AvailableNumber {
   id: string;
-  number: string;
+  phoneNumber: string;
   region: string;
+  countryIso: string;
   voice: boolean;
   sms: boolean;
-  monthlyCost: string;
-}
-
-async function mockSearchNumbers(country: string, area: string): Promise<AvailableNumber[]> {
-  await new Promise((r) => setTimeout(r, 1000));
-  const cfg = countryConfig[country];
-  const dial = cfg.dial;
-  const suffixes = ["9832-1401", "9744-2258", "9612-8877"];
-  return suffixes.map((suf, i) => ({
-    id: `${country}-${area}-${i}`,
-    number: `${dial} ${area} ${suf}`,
-    region: cfg.regionLabel(area),
-    voice: true,
-    sms: i !== 1,
-    monthlyCost: "$1.00/mês",
-  }));
+  mms: boolean;
 }
 
 function TelefoniaPage() {
-  const [numbers, setNumbers] = useState<NumberRow[]>(initialNumbers);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const listFn = useServerFn(listMyNumbers);
+  const searchFn = useServerFn(searchAvailableNumbers);
+  const buyFn = useServerFn(purchaseNumber);
+  const releaseFn = useServerFn(releaseNumber);
+
+  const numbersQuery = useQuery({
+    queryKey: ["my-numbers"],
+    queryFn: () => listFn(),
+  });
+
+  const numbers = (numbersQuery.data ?? []) as NumberRow[];
+
   const [open, setOpen] = useState(false);
   const [country, setCountry] = useState("BR");
   const [area, setArea] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<AvailableNumber[] | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
 
   const resetModal = () => {
     setCountry("BR");
@@ -135,15 +149,15 @@ function TelefoniaPage() {
   };
 
   const handleSearch = async () => {
-    if (!area.trim()) {
-      toast.error("Informe um código de área.");
-      return;
-    }
     setSearching(true);
     setResults(null);
     try {
-      const data = await mockSearchNumbers(country, area.trim());
-      setResults(data);
+      const rows = await searchFn({
+        data: { country, areaCode: area.trim() || undefined },
+      });
+      setResults(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na busca");
     } finally {
       setSearching(false);
     }
@@ -152,27 +166,69 @@ function TelefoniaPage() {
   const handleBuy = async (n: AvailableNumber) => {
     setBuyingId(n.id);
     try {
-      // Simula POST /api/twilio/buy-number
-      await new Promise((r) => setTimeout(r, 1200));
-      const newRow: NumberRow = {
-        number: n.number,
-        region: n.region,
-        provider: "Twilio",
-        assistant: "—",
-        callsToday: 0,
-        answerRate: 0,
-        health: "Seguro",
-      };
-      setNumbers((prev) => [newRow, ...prev]);
-      toast.success(`Número ${n.number} adquirido e vinculado à sua conta!`);
+      await buyFn({
+        data: {
+          phoneNumber: n.phoneNumber,
+          countryIso: n.countryIso,
+          region: n.region,
+        },
+      });
+      toast.success(`Número ${n.phoneNumber} adquirido e vinculado à sua conta!`);
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
-    } catch {
-      toast.error("Falha ao adquirir número. Tente novamente.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao adquirir número");
     } finally {
       setBuyingId(null);
     }
   };
+
+  const releaseMutation = useMutation({
+    mutationFn: (id: string) => releaseFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Número liberado da sua conta.");
+      queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setReleaseTarget(null);
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
+  });
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseBrowser();
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  };
+
+  const kpis = [
+    {
+      label: "Números ativos",
+      value: String(numbers.length),
+      icon: PhoneCall,
+      tone: "text-primary",
+    },
+    {
+      label: "Seguros",
+      value: String(numbers.filter((n) => n.health === "Seguro").length),
+      icon: ShieldCheck,
+      tone: "text-success",
+    },
+    {
+      label: "Em descanso",
+      value: String(numbers.filter((n) => n.health === "Descanso").length),
+      icon: Signal,
+      tone: "text-chart-3",
+    },
+    {
+      label: "Risco de spam",
+      value: String(numbers.filter((n) => n.health === "Risco").length),
+      icon: AlertTriangle,
+      tone: "text-destructive",
+    },
+  ];
 
   return (
     <DashboardShell>
@@ -187,6 +243,13 @@ function TelefoniaPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-4 w-4" /> Sair
+            </Button>
             <Button variant="outline" className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
               <Globe2 className="h-4 w-4" /> Nova Rota
             </Button>
@@ -203,12 +266,7 @@ function TelefoniaPage() {
         </div>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[
-            { label: "Números ativos", value: String(numbers.length), icon: PhoneCall, tone: "text-primary" },
-            { label: "Seguros", value: String(numbers.filter((n) => n.health === "Seguro").length), icon: ShieldCheck, tone: "text-success" },
-            { label: "Em descanso", value: String(numbers.filter((n) => n.health === "Descanso").length), icon: Signal, tone: "text-chart-3" },
-            { label: "Risco de spam", value: String(numbers.filter((n) => n.health === "Risco").length), icon: AlertTriangle, tone: "text-destructive" },
-          ].map((k) => (
+          {kpis.map((k) => (
             <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
               <CardContent className="flex items-center justify-between p-4">
                 <div>
@@ -243,39 +301,79 @@ function TelefoniaPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {numbers.map((n) => (
-                      <TableRow
-                        key={n.number}
-                        className="border-border/50 transition-colors hover:bg-primary/5"
-                      >
-                        <TableCell className="px-6">
-                          <p className="font-mono text-xs font-medium text-foreground">{n.number}</p>
-                          <p className="text-[10px] text-muted-foreground">{n.provider}</p>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{n.region}</TableCell>
-                        <TableCell className="text-xs text-foreground">{n.assistant}</TableCell>
-                        <TableCell className="text-xs">{n.callsToday}</TableCell>
-                        <TableCell className="text-xs">
-                          {n.answerRate > 0 ? `${n.answerRate}%` : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                              healthStyles[n.health],
-                            )}
-                          >
-                            <Circle className="h-1.5 w-1.5 fill-current" />
-                            {n.health}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-6 text-right">
-                          <Button size="icon" variant="ghost" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
+                    {numbersQuery.isLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <TableRow key={i} className="border-border/50">
+                          <TableCell className="px-6">
+                            <div className="h-3 w-32 animate-pulse rounded bg-white/10" />
+                          </TableCell>
+                          <TableCell colSpan={6}>
+                            <div className="h-3 w-full animate-pulse rounded bg-white/5" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : numbers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                          Nenhum número ainda. Clique em <b>Adquirir número</b> para começar.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      numbers.map((n) => (
+                        <TableRow
+                          key={n.id}
+                          className="border-border/50 transition-colors hover:bg-primary/5"
+                        >
+                          <TableCell className="px-6">
+                            <p className="font-mono text-xs font-medium text-foreground">
+                              {n.phone_number}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground capitalize">
+                              {n.provider}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {n.region ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-foreground">
+                            {n.assistant ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-xs">{n.calls_today}</TableCell>
+                          <TableCell className="text-xs">
+                            {n.answer_rate > 0 ? `${n.answer_rate}%` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                healthStyles[n.health],
+                              )}
+                            >
+                              <Circle className="h-1.5 w-1.5 fill-current" />
+                              {n.health}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-6 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => setReleaseTarget(n)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Liberar número
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -353,6 +451,7 @@ function TelefoniaPage() {
                   <SelectItem value="BR">Brasil (+55)</SelectItem>
                   <SelectItem value="US">EUA (+1)</SelectItem>
                   <SelectItem value="CA">Canadá (+1)</SelectItem>
+                  <SelectItem value="GB">Reino Unido (+44)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -360,7 +459,7 @@ function TelefoniaPage() {
               <Label className="text-xs text-muted-foreground">Código de Área</Label>
               <Input
                 inputMode="numeric"
-                placeholder="Ex: 11"
+                placeholder="opcional"
                 value={area}
                 onChange={(e) => setArea(e.target.value.replace(/\D/g, ""))}
                 className="bg-background/50"
@@ -418,7 +517,7 @@ function TelefoniaPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-sm font-semibold text-foreground">
-                        {n.number}
+                        {n.phoneNumber}
                       </p>
                       <p className="text-[11px] text-muted-foreground">{n.region}</p>
                     </div>
@@ -439,9 +538,6 @@ function TelefoniaPage() {
                           <MessageSquare className="h-3 w-3" />
                         </span>
                       )}
-                    </div>
-                    <div className="w-20 text-right text-xs font-mono text-muted-foreground">
-                      {n.monthlyCost}
                     </div>
                     <Button
                       size="sm"
@@ -465,6 +561,45 @@ function TelefoniaPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={releaseTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setReleaseTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Liberar este número?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação libera <span className="font-mono">{releaseTarget?.phone_number}</span> na
+              Twilio e remove o vínculo com sua conta. Não é possível desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={releaseMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (releaseTarget) releaseMutation.mutate(releaseTarget.id);
+              }}
+              disabled={releaseMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {releaseMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Liberando...
+                </>
+              ) : (
+                "Liberar número"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardShell>
   );
 }
