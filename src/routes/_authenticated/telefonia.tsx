@@ -62,7 +62,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  addTestContact,
+  checkVerifyOtp,
   connectExternalNumber,
   disconnectTwilio,
   getTwilioConnection,
@@ -71,11 +71,10 @@ import {
   listTwilioNumbers,
   listTwilioTrunks,
   makeTestCall,
-  refreshContactVerification,
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
-  startContactVerification,
+  sendVerifyOtp,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
