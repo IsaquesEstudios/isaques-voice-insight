@@ -1003,9 +1003,8 @@ function TelefoniaPage() {
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              A Twilio irá <b>ligar</b> para o número e mostrar um código de 6 dígitos
-              nesta tela. Atenda a ligação e digite o código no teclado do seu celular
-              para verificar.
+              A Twilio irá enviar um <b>SMS</b> com um código de 6 dígitos para o
+              número informado. Digite o código recebido para concluir a verificação.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1052,7 +1051,7 @@ function TelefoniaPage() {
                 {startVerificationMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Verificar por chamada
+                Enviar SMS de verificação
               </Button>
             </div>
           </div>
