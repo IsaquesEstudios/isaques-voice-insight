@@ -64,20 +64,19 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  checkVerifyOtp,
   connectExternalNumber,
+  deleteVerifiedCallerId,
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
-  listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
-  makeTestCall,
+  listVerifiedCallerIds,
   releaseNumber,
-  removeTestContact,
   saveTwilioCredentials,
-  sendVerifyOtp,
+  startCallerIdVerification,
 } from "@/lib/twilio.functions";
+
 import {
   attachAssistantToNumber,
   createOutboundTestCall,
@@ -165,11 +164,10 @@ function TelefoniaPage() {
   const disconnectFn = useServerFn(disconnectTwilio);
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
-  const listTestContactsFn = useServerFn(listTestContacts);
-  const removeTestContactFn = useServerFn(removeTestContact);
-  const makeTestCallFn = useServerFn(makeTestCall);
-  const sendOtpFn = useServerFn(sendVerifyOtp);
-  const checkOtpFn = useServerFn(checkVerifyOtp);
+  const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
+  const startCallerIdVerificationFn = useServerFn(startCallerIdVerification);
+  const deleteVerifiedCallerIdFn = useServerFn(deleteVerifiedCallerId);
+
 
 
   const numbersQuery = useQuery({
@@ -274,142 +272,97 @@ function TelefoniaPage() {
   const [connecting, setConnecting] = useState(false);
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
-  const [testCallFrom, setTestCallFrom] = useState<string>("");
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  // Two-step new-contact flow: "form" → "code"
-  const [contactStep, setContactStep] = useState<"form" | "code">("form");
-  const [otpCode, setOtpCode] = useState("");
-  // Verify existing (already-saved) contact via SMS
-  const [verifyExisting, setVerifyExisting] = useState<{
-    id: string;
-    label: string;
+  // Verification step: after POST /OutgoingCallerIds, Twilio calls the phone
+  // and returns a validation_code the user must type into the keypad.
+  const [pendingVerification, setPendingVerification] = useState<{
     phone: string;
+    validationCode: string;
   } | null>(null);
-  const [verifyOtp, setVerifyOtp] = useState("");
+  // Per-row call controls (origin number + assistant)
+  const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
+  const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
 
-  // Quick outbound test-call state
   const outboundCallFn = useServerFn(createOutboundTestCall);
-  const [quickCellphone, setQuickCellphone] = useState("");
-  const [quickFromId, setQuickFromId] = useState<string>("");
-  const [quickAssistantId, setQuickAssistantId] = useState<string>("");
-  const quickCallMutation = useMutation({
-    mutationFn: (input: {
-      assistantId: string;
-      phoneNumberId?: string;
-      fromNumberE164?: string;
-      customerNumber: string;
-    }) => outboundCallFn({ data: input }),
-    onSuccess: () => {
-      toast.success(
-        "Chamada iniciada! Atenda seu celular. Como é uma conta teste da Twilio, pressione qualquer tecla quando for solicitado para ouvir a IA.",
-      );
-      setQuickCellphone("");
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada.");
-    },
-  });
 
   const testContactsQuery = useQuery({
-    queryKey: ["test-contacts"],
-    queryFn: () => listTestContactsFn(),
+    queryKey: ["verified-caller-ids"],
+    queryFn: () => listVerifiedCallerIdsFn(),
   });
   const testContacts = (testContactsQuery.data ?? []) as Array<{
-    id: string;
-    label: string;
-    phone_e164: string;
-    verified: boolean | null;
-    created_at: string;
+    sid: string;
+    phone_number: string;
+    friendly_name: string;
   }>;
 
-  const sendOtpMutation = useMutation({
-    mutationFn: (phoneE164: string) =>
-      sendOtpFn({ data: { phoneE164, channel: "sms" } }),
-    onSuccess: (res) => {
-      if ("ok" in res && res.ok) {
-        toast.success("Código enviado por SMS.");
-      } else if ("reason" in res && res.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      } else if ("reason" in res && res.reason === "twilio_error") {
-        toast.error(("message" in res && res.message) || "Falha ao enviar SMS.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS"),
-  });
-
-  const checkOtpMutation = useMutation({
-    mutationFn: (input: {
-      phoneE164: string;
-      code: string;
-      contactId?: string;
-      label?: string;
-    }) => checkOtpFn({ data: input }),
+  const startVerificationMutation = useMutation({
+    mutationFn: (input: { phoneE164: string; friendlyName: string }) =>
+      startCallerIdVerificationFn({ data: input }),
     onSuccess: async (res) => {
-      if ("ok" in res && res.ok) {
-        toast.success("Número verificado!");
-        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      if (res.ok) {
+        toast.success("Twilio está ligando para o número. Atenda e digite o código.");
+        setPendingVerification({
+          phone: res.phoneNumber,
+          validationCode: res.validationCode,
+        });
         setTestContactOpen(false);
         setTestContactForm({ label: "", phoneE164: "" });
-        setContactStep("form");
-        setOtpCode("");
-        setVerifyExisting(null);
-        setVerifyOtp("");
-      } else if ("reason" in res && res.reason === "invalid_code") {
-        toast.error("Código inválido. Confira o SMS e tente novamente.");
-      } else if ("reason" in res && res.reason === "expired") {
-        toast.error("Código expirado. Reenvie um novo SMS.");
-      } else if ("reason" in res && res.reason === "no_credentials") {
+        // Poll for the number to appear in the verified list.
+        setTimeout(
+          () => queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] }),
+          15000,
+        );
+      } else if (res.reason === "no_credentials") {
         toast.error("Conecte sua conta Twilio primeiro.");
-      } else if ("reason" in res && res.reason === "twilio_error") {
-        toast.error(("message" in res && res.message) || "Falha na verificação.");
+      } else {
+        toast.error(res.message ?? "Falha ao iniciar verificação.");
       }
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao verificar código"),
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação"),
   });
 
   const removeTestContactMutation = useMutation({
-    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
+    mutationFn: (sid: string) => deleteVerifiedCallerIdFn({ data: { sid } }),
     onSuccess: async () => {
       toast.success("Contato removido.");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      await queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
   });
 
-
   const testCallMutation = useMutation({
-    mutationFn: (contact: { id: string; phone_e164: string }) => {
-      setCallingContactId(contact.id);
-      const rawFrom = testCallFrom || numbers[0]?.phone_number || "";
-      const fromNumber = rawFrom.startsWith("+")
-        ? rawFrom.replace(/[^\d+]/g, "")
-        : `+${rawFrom.replace(/\D/g, "")}`;
-      if (!/^\+[1-9]\d{1,14}$/.test(fromNumber)) {
+    mutationFn: (contact: { sid: string; phone_number: string }) => {
+      setCallingContactId(contact.sid);
+      const assistantId = rowCallAssistant[contact.sid];
+      const fromNumberE164 = rowCallFrom[contact.sid];
+      if (!assistantId) {
         setCallingContactId(null);
-        return Promise.reject(
-          new Error("Selecione um número Twilio válido (E.164) para originar a chamada."),
-        );
+        return Promise.reject(new Error("Selecione uma assistente."));
       }
-      return makeTestCallFn({
-        data: { fromNumber, toNumber: contact.phone_e164 },
+      if (!fromNumberE164) {
+        setCallingContactId(null);
+        return Promise.reject(new Error("Selecione o número de origem."));
+      }
+      return outboundCallFn({
+        data: {
+          assistantId,
+          fromNumberE164,
+          customerNumber: contact.phone_number,
+        },
       });
     },
-    onSuccess: (res) => {
-      if ("ok" in res && res.ok) {
-        toast.success("Chamada iniciada. Aguarde o telefone tocar.");
-      } else if ("reason" in res && res.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio antes de testar.");
-      } else if ("reason" in res && res.reason === "unverified_number") {
-        toast.error(res.message ?? "Número não verificado no Twilio (trial).");
-      }
-    },
+    onSuccess: () =>
+      toast.success(
+        "Chamada iniciada! Atenda o celular e, se solicitado, pressione qualquer tecla.",
+      ),
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada"),
     onSettled: () => setCallingContactId(null),
   });
+
+
 
 
 
@@ -660,92 +613,8 @@ function TelefoniaPage() {
           ))}
         </section>
 
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              Teste Rápido por Telefone
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Ligue para o seu celular a partir de um dos seus números — a
-              assistente selecionada atende.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Seu número de celular</Label>
-                <Input
-                  placeholder="+5511999999999"
-                  value={quickCellphone}
-                  onChange={(e) => setQuickCellphone(e.target.value)}
-                  className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Número de origem</Label>
-                <Select value={quickFromId} onValueChange={setQuickFromId}>
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue placeholder="Selecione um número" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {numbers.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">
-                        Nenhum número disponível. Conecte um número em "Adquirir número".
-                      </div>
-                    ) : (
-                      numbers.map((n) => (
-                        <SelectItem key={n.phone_number} value={n.phone_number}>
-                          {n.phone_number}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Assistente</Label>
-                <Select
-                  value={quickAssistantId}
-                  onValueChange={setQuickAssistantId}
-                >
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue placeholder="Selecione uma assistente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(assistantsQuery.data ?? []).map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name ?? "Sem nome"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                className="gap-2 shadow-glow"
-                disabled={
-                  quickCallMutation.isPending ||
-                  !quickCellphone ||
-                  !quickFromId ||
-                  !quickAssistantId
-                }
-                onClick={() =>
-                  quickCallMutation.mutate({
-                    assistantId: quickAssistantId,
-                    fromNumberE164: quickFromId,
-                    customerNumber: quickCellphone.trim(),
-                  })
-                }
-              >
-                {quickCallMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <PhoneCall className="h-4 w-4" />
-                )}
-                Ligar para meu celular
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
+
 
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -994,23 +863,6 @@ function TelefoniaPage() {
               </Alert>
             )}
 
-            {numbers.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Label className="text-xs text-muted-foreground">Ligar a partir de:</Label>
-                <select
-                  value={testCallFrom || numbers[0]?.phone_number || ""}
-                  onChange={(e) => setTestCallFrom(e.target.value)}
-                  className="h-8 rounded-md border border-white/[0.08] bg-background/60 px-2 text-xs text-foreground"
-                >
-                  {numbers.map((n) => (
-                    <option key={n.id} value={n.phone_number}>
-                      {n.phone_number}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {testContactsQuery.isLoading ? (
               Array.from({ length: 2 }).map((_, i) => (
                 <div
@@ -1023,84 +875,118 @@ function TelefoniaPage() {
                 Nenhum contato de teste ainda. Clique em <b>Novo contato</b> para começar.
               </p>
             ) : (
-              testContacts.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {c.label}
-                      </p>
-                      {c.verified ? (
-                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                          Verificado
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
-                          Não verificado
-                        </span>
-                      )}
+              testContacts.map((c) => {
+                const from = rowCallFrom[c.sid] ?? numbers[0]?.phone_number ?? "";
+                const assistantId = rowCallAssistant[c.sid] ?? "";
+                return (
+                  <div
+                    key={c.sid}
+                    className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {c.friendly_name}
+                          </p>
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                            Verificado
+                          </span>
+                        </div>
+                        <p className="truncate font-mono text-xs text-muted-foreground">
+                          {c.phone_number}
+                        </p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeTestContactMutation.mutate(c.sid)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {c.phone_e164}
-                    </p>
+
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Número de origem
+                        </Label>
+                        <Select
+                          value={from}
+                          onValueChange={(v) =>
+                            setRowCallFrom((prev) => ({ ...prev, [c.sid]: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione um número" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {numbers.length === 0 ? (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">
+                                Conecte um número em "Conectar Número".
+                              </div>
+                            ) : (
+                              numbers.map((n) => (
+                                <SelectItem key={n.phone_number} value={n.phone_number}>
+                                  {n.phone_number}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Assistente
+                        </Label>
+                        <Select
+                          value={assistantId}
+                          onValueChange={(v) =>
+                            setRowCallAssistant((prev) => ({ ...prev, [c.sid]: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione uma assistente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(assistantsQuery.data ?? []).map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name ?? "Sem nome"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 shadow-glow"
+                        disabled={
+                          !isTwilioConnected ||
+                          !from ||
+                          !assistantId ||
+                          callingContactId === c.sid
+                        }
+                        onClick={() =>
+                          testCallMutation.mutate({
+                            sid: c.sid,
+                            phone_number: c.phone_number,
+                          })
+                        }
+                      >
+                        {callingContactId === c.sid ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <PhoneCall className="h-3.5 w-3.5" />
+                        )}
+                        Ligar
+                      </Button>
+                    </div>
                   </div>
-                  {!c.verified && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!isTwilioConnected || sendOtpMutation.isPending}
-                      onClick={() => {
-                        setVerifyExisting({
-                          id: c.id,
-                          label: c.label,
-                          phone: c.phone_e164,
-                        });
-                        setVerifyOtp("");
-                        sendOtpMutation.mutate(c.phone_e164);
-                      }}
-                      className="gap-1.5"
-                    >
-                      {sendOtpMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : null}
-                      Verificar via SMS
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={
-                      !isTwilioConnected ||
-                      numbers.length === 0 ||
-                      callingContactId === c.id ||
-                      !c.verified
-                    }
-                    onClick={() =>
-                      testCallMutation.mutate({ id: c.id, phone_e164: c.phone_e164 })
-                    }
-                    className="gap-1.5"
-                  >
-                    {callingContactId === c.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <PhoneCall className="h-3.5 w-3.5" />
-                    )}
-                    Testar chamada
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => removeTestContactMutation.mutate(c.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
+                );
+              })
             )}
+
           </CardContent>
         </Card>
       </div>
@@ -1110,198 +996,110 @@ function TelefoniaPage() {
         open={testContactOpen}
         onOpenChange={(o) => {
           setTestContactOpen(o);
-          if (!o) {
-            setTestContactForm({ label: "", phoneE164: "" });
-            setContactStep("form");
-            setOtpCode("");
-          }
+          if (!o) setTestContactForm({ label: "", phoneE164: "" });
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {contactStep === "form" ? "Novo contato de teste" : "Confirme o código"}
-            </DialogTitle>
+            <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              {contactStep === "form"
-                ? "Cadastre um número que receberá as chamadas de teste. Formato E.164 (ex: +5511999998888)."
-                : `Enviamos um SMS com um código de 6 dígitos para ${testContactForm.phoneE164}. Digite-o abaixo para concluir o cadastro.`}
+              A Twilio irá <b>ligar</b> para o número e mostrar um código de 6 dígitos
+              nesta tela. Atenda a ligação e digite o código no teclado do seu celular
+              para verificar.
             </DialogDescription>
           </DialogHeader>
-
-          {contactStep === "form" ? (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
-                <Input
-                  id="tc-label"
-                  placeholder="Ex: Meu celular"
-                  value={testContactForm.label}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tc-phone" className="text-xs">Número (E.164)</Label>
-                <Input
-                  id="tc-phone"
-                  placeholder="+5511999998888"
-                  value={testContactForm.phoneE164}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={async () => {
-                    const phone = testContactForm.phoneE164.trim();
-                    const res = await sendOtpMutation.mutateAsync(phone);
-                    if ("ok" in res && res.ok) {
-                      setContactStep("code");
-                      setOtpCode("");
-                    }
-                  }}
-                  disabled={
-                    sendOtpMutation.isPending ||
-                    !testContactForm.label.trim() ||
-                    !testContactForm.phoneE164.trim() ||
-                    !isTwilioConnected
-                  }
-                >
-                  {sendOtpMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Próximo
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="tc-otp" className="text-xs">Código SMS</Label>
-                <Input
-                  id="tc-otp"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="123456"
-                  maxLength={10}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  className="text-center font-mono text-2xl tracking-[0.4em]"
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                  onClick={() =>
-                    sendOtpMutation.mutate(testContactForm.phoneE164.trim())
-                  }
-                  disabled={sendOtpMutation.isPending}
-                >
-                  Reenviar código
-                </button>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => setContactStep("form")}
-                >
-                  ← Voltar
-                </button>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() =>
-                    checkOtpMutation.mutate({
-                      phoneE164: testContactForm.phoneE164.trim(),
-                      code: otpCode.trim(),
-                      label: testContactForm.label.trim(),
-                    })
-                  }
-                  disabled={checkOtpMutation.isPending || otpCode.trim().length < 4}
-                >
-                  {checkOtpMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Confirmar e salvar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={verifyExisting !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setVerifyExisting(null);
-            setVerifyOtp("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
-          <DialogHeader>
-            <DialogTitle>Verificar número</DialogTitle>
-            <DialogDescription>
-              Enviamos um SMS com o código para <b>{verifyExisting?.phone}</b>. Digite-o
-              abaixo para verificar este contato.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="123456"
-              maxLength={10}
-              value={verifyOtp}
-              onChange={(e) => setVerifyOtp(e.target.value.replace(/\D/g, ""))}
-              className="text-center font-mono text-2xl tracking-[0.4em]"
-            />
-            <div className="flex items-center justify-between text-xs">
-              <button
-                type="button"
-                className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                onClick={() =>
-                  verifyExisting && sendOtpMutation.mutate(verifyExisting.phone)
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
+              <Input
+                id="tc-label"
+                placeholder="Ex: Meu celular"
+                value={testContactForm.label}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
                 }
-                disabled={sendOtpMutation.isPending}
-              >
-                Reenviar código
-              </button>
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tc-phone" className="text-xs">Número (E.164)</Label>
+              <Input
+                id="tc-phone"
+                placeholder="+5511999998888"
+                value={testContactForm.phoneE164}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                }
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setVerifyExisting(null)}>
-                Fechar
+              <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
+                Cancelar
               </Button>
               <Button
                 onClick={() =>
-                  verifyExisting &&
-                  checkOtpMutation.mutate({
-                    phoneE164: verifyExisting.phone,
-                    code: verifyOtp.trim(),
-                    contactId: verifyExisting.id,
+                  startVerificationMutation.mutate({
+                    phoneE164: testContactForm.phoneE164.trim(),
+                    friendlyName: testContactForm.label.trim(),
                   })
                 }
-                disabled={checkOtpMutation.isPending || verifyOtp.trim().length < 4}
+                disabled={
+                  startVerificationMutation.isPending ||
+                  !testContactForm.label.trim() ||
+                  !testContactForm.phoneE164.trim() ||
+                  !isTwilioConnected
+                }
               >
-                {checkOtpMutation.isPending && (
+                {startVerificationMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Confirmar
+                Verificar por chamada
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={pendingVerification !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPendingVerification(null);
+            queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
+          }
+        }}
+      >
+        <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle>Digite este código no telefone</DialogTitle>
+            <DialogDescription>
+              A Twilio está ligando para <b>{pendingVerification?.phone}</b>. Ao atender,
+              digite o código abaixo no teclado do celular para concluir a verificação.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Código de verificação
+              </p>
+              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.5em] text-primary">
+                {pendingVerification?.validationCode}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                onClick={() => {
+                  setPendingVerification(null);
+                  queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
+                }}
+              >
+                Já verifiquei
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
 
 
       <Dialog

@@ -721,6 +721,71 @@ export const removeTestContact = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ---------- verified caller ids (Twilio-native, authoritative) ----------
+
+// Lists numbers registered in the user's Twilio account as verified caller IDs
+// (Console → Phone Numbers → Verified Caller IDs). Source of truth: Twilio API.
+export const listVerifiedCallerIds = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return [] as Array<{ sid: string; phone_number: string; friendly_name: string }>;
+    const res = (await twilioAccountGet(creds, "/OutgoingCallerIds.json", {
+      PageSize: "100",
+    })) as {
+      outgoing_caller_ids?: Array<{ sid: string; phone_number: string; friendly_name: string }>;
+    };
+    return (res.outgoing_caller_ids ?? []).map((r) => ({
+      sid: r.sid,
+      phone_number: r.phone_number,
+      friendly_name: r.friendly_name,
+    }));
+  });
+
+// Starts verification: Twilio places a call to `phoneE164` and returns a 6-digit
+// validation_code. The user must answer and type the code on their phone keypad.
+// Works on trial accounts (this is Twilio's own trial verification mechanism).
+export const startCallerIdVerification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        phoneE164: e164,
+        friendlyName: z.string().trim().min(1).max(64),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+    try {
+      const res = (await twilioAccountPost(creds, "/OutgoingCallerIds.json", {
+        PhoneNumber: data.phoneE164,
+        FriendlyName: data.friendlyName,
+      })) as { validation_code: string; call_sid: string; phone_number: string };
+      return {
+        ok: true as const,
+        validationCode: res.validation_code,
+        callSid: res.call_sid,
+        phoneNumber: res.phone_number,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, reason: "twilio_error" as const, message: msg };
+    }
+  });
+
+export const deleteVerifiedCallerId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ sid: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+    await twilioAccountDelete(creds, `/OutgoingCallerIds/${data.sid}.json`);
+    return { ok: true as const };
+  });
+
+
 export const makeTestCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
