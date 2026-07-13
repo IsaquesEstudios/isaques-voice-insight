@@ -64,6 +64,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
+  addVerifiedFromTwilio,
   checkVerifyOtp,
   connectExternalNumber,
   disconnectTwilio,
@@ -169,6 +170,7 @@ function TelefoniaPage() {
   const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
   const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
   const removeTestContactFn = useServerFn(removeTestContact);
+  const addVerifiedFromTwilioFn = useServerFn(addVerifiedFromTwilio);
 
 
 
@@ -278,6 +280,7 @@ function TelefoniaPage() {
   // SMS OTP verification step
   const [otpStep, setOtpStep] = useState<null | { phoneE164: string; label: string }>(null);
   const [otpCode, setOtpCode] = useState("");
+  const [trialBlocked, setTrialBlocked] = useState(false);
   // Per-row call controls (origin number + assistant)
   const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
@@ -310,14 +313,46 @@ function TelefoniaPage() {
         toast.success("SMS enviado. Digite o código de 6 dígitos.");
         setOtpStep({ phoneE164: input.phoneE164, label: input.label });
         setTestContactOpen(false);
+        setTrialBlocked(false);
       } else if (r.reason === "no_credentials") {
         toast.error("Conecte sua conta Twilio primeiro.");
+      } else if (r.reason === "trial_unverified") {
+        setTrialBlocked(true);
       } else {
         toast.error(r.message ?? "Falha ao enviar SMS.");
       }
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS"),
+  });
+
+  const trustFromTwilioMutation = useMutation({
+    mutationFn: (input: { phoneE164: string; label: string }) =>
+      addVerifiedFromTwilioFn({
+        data: { phoneE164: input.phoneE164, label: input.label },
+      }),
+    onSuccess: async (res) => {
+      const r = res as
+        | { ok: true; id?: string }
+        | { ok: false; reason: string; message?: string };
+      if (r.ok) {
+        toast.success("Contato importado da Twilio como verificado.");
+        setTestContactOpen(false);
+        setTrialBlocked(false);
+        setTestContactForm({ label: "", phoneE164: "" });
+        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      } else if (r.reason === "not_verified_in_twilio") {
+        toast.error(
+          "Este número ainda não aparece como Verified Caller ID na sua conta Twilio.",
+        );
+      } else if (r.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
+      } else {
+        toast.error(r.message ?? "Falha ao importar contato.");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao importar contato"),
   });
 
   const confirmOtpMutation = useMutation({
@@ -1023,7 +1058,10 @@ function TelefoniaPage() {
         open={testContactOpen}
         onOpenChange={(o) => {
           setTestContactOpen(o);
-          if (!o) setTestContactForm({ label: "", phoneE164: "" });
+          if (!o) {
+            setTestContactForm({ label: "", phoneE164: "" });
+            setTrialBlocked(false);
+          }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
@@ -1057,33 +1095,73 @@ function TelefoniaPage() {
                 }
               />
             </div>
+            {trialBlocked && (
+              <Alert className="border-amber-500/40 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <AlertDescription className="text-xs text-amber-100/90 space-y-2">
+                  <p>
+                    Sua conta Twilio está em modo <b>trial</b> e não pode enviar SMS
+                    para números não verificados (erro 21608). Para prosseguir,
+                    verifique este número na Twilio Console e depois clique em
+                    "Já verifiquei".
+                  </p>
+                  <a
+                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 underline text-amber-200 hover:text-amber-100"
+                  >
+                    Abrir Twilio Verified Caller IDs
+                    <Link2 className="h-3 w-3" />
+                  </a>
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
                 Cancelar
               </Button>
-              <Button
-                onClick={() =>
-                  sendOtpMutation.mutate({
-                    phoneE164: testContactForm.phoneE164.trim(),
-                    label: testContactForm.label.trim(),
-                  })
-                }
-                disabled={
-                  sendOtpMutation.isPending ||
-                  !testContactForm.label.trim() ||
-                  !testContactForm.phoneE164.trim() ||
-                  !isTwilioConnected
-                }
-              >
-                {sendOtpMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Enviar SMS de verificação
-              </Button>
+              {trialBlocked ? (
+                <Button
+                  onClick={() =>
+                    trustFromTwilioMutation.mutate({
+                      phoneE164: testContactForm.phoneE164.trim(),
+                      label: testContactForm.label.trim(),
+                    })
+                  }
+                  disabled={trustFromTwilioMutation.isPending}
+                >
+                  {trustFromTwilioMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Já verifiquei no Twilio Console
+                </Button>
+              ) : (
+                <Button
+                  onClick={() =>
+                    sendOtpMutation.mutate({
+                      phoneE164: testContactForm.phoneE164.trim(),
+                      label: testContactForm.label.trim(),
+                    })
+                  }
+                  disabled={
+                    sendOtpMutation.isPending ||
+                    !testContactForm.label.trim() ||
+                    !testContactForm.phoneE164.trim() ||
+                    !isTwilioConnected
+                  }
+                >
+                  {sendOtpMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Enviar SMS de verificação
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
 
       <Dialog
         open={otpStep !== null}

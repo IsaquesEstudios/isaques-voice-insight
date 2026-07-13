@@ -639,9 +639,66 @@ export const sendVerifyOtp = createServerFn({ method: "POST" })
       return { ok: true as const, channel: data.channel };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 60200 invalid parameter, 60203 max send attempts, 60212 max attempts reached
+      // Twilio 21608: trial accounts cannot send messages to unverified numbers.
+      // The user must first add the number as a Verified Caller ID in the Twilio Console.
+      if (/"code"\s*:\s*21608/.test(msg) || /unverified/i.test(msg)) {
+        return {
+          ok: false as const,
+          reason: "trial_unverified" as const,
+          message: msg,
+        };
+      }
       return { ok: false as const, reason: "twilio_error" as const, message: msg };
     }
+  });
+
+// Adds a contact as verified if (and only if) the number is already present in the
+// Twilio account's Verified Caller IDs. This is the trial-account escape hatch:
+// the user verifies the number in the Twilio Console UI, then we trust it.
+export const addVerifiedFromTwilio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        label: z.string().trim().min(1).max(80),
+        phoneE164: e164,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
+    let verifiedNumbers: string[] = [];
+    try {
+      const res = (await twilioAccountGet(creds, "/OutgoingCallerIds.json", {
+        PageSize: "1000",
+      })) as { outgoing_caller_ids?: Array<{ phone_number: string }> };
+      verifiedNumbers = (res.outgoing_caller_ids ?? []).map((n) => n.phone_number);
+    } catch (err) {
+      return {
+        ok: false as const,
+        reason: "twilio_error" as const,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    if (!verifiedNumbers.includes(data.phoneE164)) {
+      return { ok: false as const, reason: "not_verified_in_twilio" as const };
+    }
+
+    const { data: row, error } = await context.supabase
+      .from("user_test_contacts")
+      .insert({
+        user_id: context.userId,
+        label: data.label,
+        phone_e164: data.phoneE164,
+        verified: true,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true as const, id: row?.id as string | undefined };
   });
 
 // Checks the OTP. If contactId is provided, updates that row to verified=true.
