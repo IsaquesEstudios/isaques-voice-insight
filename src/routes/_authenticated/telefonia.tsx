@@ -18,7 +18,9 @@ import {
   Copy,
   Check,
   Link2,
+  ChevronsUpDown,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -89,7 +91,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
 import { Bot } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
   head: () => ({
@@ -661,34 +674,43 @@ function TelefoniaPage() {
                             {n.region ?? "—"}
                           </TableCell>
                           <TableCell className="text-xs text-foreground">
-                            {n.assistant ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
-                                onClick={() => {
-                                  setAssignTarget(n);
-                                  setAssignAssistantId(
-                                    assistantByPhone.get(n.phone_number) ?? "",
-                                  );
-                                }}
-                              >
-                                <Bot className="h-3 w-3" />
-                                {n.assistant}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
-                                onClick={() => {
-                                  setAssignTarget(n);
-                                  setAssignAssistantId("");
-                                }}
-                              >
-                                <Plus className="h-3 w-3" />
-                                Atribuir atendente
-                              </button>
-                            )}
+                            <AssistantCombobox
+                              phoneNumberE164={n.phone_number}
+                              phoneLabel={n.phone_number}
+                              currentAssistantId={
+                                assistantByPhone.get(n.phone_number) ?? null
+                              }
+                              currentAssistantName={n.assistant}
+                              assistants={assistantsQuery.data ?? []}
+                              isLoading={assistantsQuery.isLoading}
+                              onAttach={(assistantId, assistantName) =>
+                                attachAssistantMutation.mutate(
+                                  {
+                                    phoneNumberE164: n.phone_number,
+                                    assistantId,
+                                    name: n.phone_number,
+                                  },
+                                  {
+                                    onSuccess: () =>
+                                      toast.success(
+                                        `Número roteado com sucesso para o assistente ${assistantName}`,
+                                      ),
+                                  },
+                                )
+                              }
+                              onDetach={() =>
+                                detachAssistantMutation.mutate(n.phone_number)
+                              }
+                              isPending={
+                                (attachAssistantMutation.isPending &&
+                                  attachAssistantMutation.variables?.phoneNumberE164 ===
+                                    n.phone_number) ||
+                                (detachAssistantMutation.isPending &&
+                                  detachAssistantMutation.variables === n.phone_number)
+                              }
+                            />
                           </TableCell>
+
 
                           <TableCell className="text-xs">{n.calls_today}</TableCell>
                           <TableCell className="text-xs">
@@ -1476,5 +1498,105 @@ function TelefoniaPage() {
 
 
 
+  );
+}
+
+interface AssistantComboboxProps {
+  phoneNumberE164: string;
+  phoneLabel: string;
+  currentAssistantId: string | null;
+  currentAssistantName: string | null;
+  assistants: Array<{ id: string; name?: string | null }>;
+  isLoading: boolean;
+  isPending: boolean;
+  onAttach: (assistantId: string, assistantName: string) => void;
+  onDetach: () => void;
+}
+
+function AssistantCombobox({
+  currentAssistantId,
+  currentAssistantName,
+  assistants,
+  isLoading,
+  isPending,
+  onAttach,
+  onDetach,
+}: AssistantComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const hasAssistant = Boolean(currentAssistantId);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={isPending}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-60",
+            hasAssistant
+              ? "bg-primary/10 text-primary hover:bg-primary/20"
+              : "border border-dashed border-emerald-500/30 text-emerald-400/90 hover:border-emerald-500/60 hover:text-emerald-300",
+          )}
+        >
+          {isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : hasAssistant ? (
+            <Bot className="h-3 w-3" />
+          ) : (
+            <Plus className="h-3 w-3" />
+          )}
+          <span className="truncate max-w-[140px]">
+            {hasAssistant ? currentAssistantName ?? "Assistente" : "Vincular Assistente"}
+          </span>
+          <ChevronsUpDown className="h-3 w-3 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-0">
+        <Command>
+          <CommandInput placeholder="Buscar assistente..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>
+              {isLoading ? "Carregando..." : "Nenhum assistente encontrado."}
+            </CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__none__"
+                onSelect={() => {
+                  setOpen(false);
+                  if (hasAssistant) onDetach();
+                }}
+                className="text-xs"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Nenhum (Desvincular)
+                {!hasAssistant ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
+              </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup heading="Assistentes">
+              {assistants.map((a) => {
+                const name = a.name ?? "Sem nome";
+                const isCurrent = a.id === currentAssistantId;
+                return (
+                  <CommandItem
+                    key={a.id}
+                    value={`${name} ${a.id}`}
+                    onSelect={() => {
+                      setOpen(false);
+                      if (!isCurrent) onAttach(a.id, name);
+                    }}
+                    className="text-xs"
+                  >
+                    <Bot className="mr-2 h-3.5 w-3.5" />
+                    <span className="truncate">{name}</span>
+                    {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
