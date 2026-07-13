@@ -63,8 +63,11 @@ import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
   connectExternalNumber,
+  disconnectTwilio,
+  getTwilioConnection,
   listMyNumbers,
   releaseNumber,
+  saveTwilioCredentials,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
