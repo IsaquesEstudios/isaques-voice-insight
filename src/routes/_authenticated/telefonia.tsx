@@ -1379,7 +1379,101 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={assignTarget !== null}
+        onOpenChange={(v) => {
+          if (!v) {
+            setAssignTarget(null);
+            setAssignAssistantId("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Atribuir atendente ao número</DialogTitle>
+            <DialogDescription>
+              {assignTarget ? (
+                <>
+                  Escolha qual atendente virtual atenderá as chamadas recebidas em{" "}
+                  <span className="font-mono text-foreground">
+                    {assignTarget.phone_number}
+                  </span>
+                  .
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label className="text-xs">Atendente</Label>
+            <Select
+              value={assignAssistantId}
+              onValueChange={setAssignAssistantId}
+              disabled={assistantsQuery.isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    assistantsQuery.isLoading
+                      ? "Carregando atendentes…"
+                      : "Selecione uma atendente"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {(assistantsQuery.data ?? []).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name ?? "Sem nome"}
+                    {a.model?.model ? (
+                      <span className="ml-2 text-[10px] text-muted-foreground">
+                        {a.model.provider}/{a.model.model}
+                      </span>
+                    ) : null}
+                  </SelectItem>
+                ))}
+                {(assistantsQuery.data ?? []).length === 0 && !assistantsQuery.isLoading ? (
+                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                    Nenhuma atendente encontrada. Crie uma em Assistentes Virtuais.
+                  </div>
+                ) : null}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAssignTarget(null);
+                setAssignAssistantId("");
+              }}
+              disabled={attachAssistantMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!assignTarget || !assignAssistantId) return;
+                attachAssistantMutation.mutate({
+                  phoneNumberE164: assignTarget.phone_number,
+                  assistantId: assignAssistantId,
+                  name: assignTarget.phone_number,
+                });
+              }}
+              disabled={!assignAssistantId || attachAssistantMutation.isPending}
+              className="gap-2"
+            >
+              {attachAssistantMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="h-4 w-4" />
+              )}
+              Vincular
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
+
 
 
   );
