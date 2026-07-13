@@ -122,151 +122,99 @@ function TelefoniaPage() {
   const queryClient = useQueryClient();
 
   const listFn = useServerFn(listMyNumbers);
-  const searchFn = useServerFn(searchAvailableNumbers);
-  const buyFn = useServerFn(purchaseNumber);
   const releaseFn = useServerFn(releaseNumber);
-  const createAddressFn = useServerFn(createTwilioAddress);
+  const connectFn = useServerFn(connectExternalNumber);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
     queryFn: () => listFn(),
   });
 
+  const userQuery = useQuery({
+    queryKey: ["auth-user-id"],
+    queryFn: async () => {
+      const { data } = await getSupabaseBrowser().auth.getUser();
+      return data.user?.id ?? "";
+    },
+  });
+
   const numbers = (numbersQuery.data ?? []) as NumberRow[];
 
   const [open, setOpen] = useState(false);
-  const [country, setCountry] = useState("BR");
-  const [area, setArea] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<AvailableNumber[] | null>(null);
-  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"twilio" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
-  const [pendingBuy, setPendingBuy] = useState<AvailableNumber | null>(null);
-  const [addressOpen, setAddressOpen] = useState(false);
-  const [savingAddress, setSavingAddress] = useState(false);
-  const [bundleOpen, setBundleOpen] = useState(false);
-  const [bundleSid, setBundleSid] = useState("");
-  const [savingBundle, setSavingBundle] = useState(false);
-  const [addr, setAddr] = useState({
-    customerName: "",
-    street: "",
-    city: "",
-    region: "",
-    postalCode: "",
+  const [copied, setCopied] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  const [twilioForm, setTwilioForm] = useState({
+    accountSid: "",
+    authToken: "",
+    phoneNumber: "",
   });
+  const [sipForm, setSipForm] = useState({ routeName: "" });
+
+  const sipUri = useMemo(() => {
+    const slug = (userQuery.data ?? "anon").replace(/-/g, "").slice(0, 12);
+    return `sip:${slug}@sip.vapi.ai`;
+  }, [userQuery.data]);
 
   const resetModal = () => {
-    setCountry("BR");
-    setArea("");
-    setResults(null);
-    setSearching(false);
-    setBuyingId(null);
+    setTab("twilio");
+    setTwilioForm({ accountSid: "", authToken: "", phoneNumber: "" });
+    setSipForm({ routeName: "" });
+    setCopied(false);
   };
 
-  const handleSearch = async () => {
-    setSearching(true);
-    setResults(null);
+  const handleCopySip = async () => {
     try {
-      const rows = await searchFn({
-        data: { country, areaCode: area.trim() || undefined },
-      });
-      setResults(rows);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na busca");
-    } finally {
-      setSearching(false);
+      await navigator.clipboard.writeText(sipUri);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
     }
   };
 
-  const handleBuy = async (n: AvailableNumber, regulatoryBundleSid?: string) => {
-    setBuyingId(n.id);
+  const handleConnectTwilio = async () => {
+    setConnecting(true);
     try {
-      const response = await buyFn({
+      await connectFn({
         data: {
-          phoneNumber: n.phoneNumber,
-          countryIso: n.countryIso,
-          region: n.region,
-          bundleSid: regulatoryBundleSid,
+          mode: "twilio",
+          accountSid: twilioForm.accountSid.trim(),
+          authToken: twilioForm.authToken.trim(),
+          phoneNumber: twilioForm.phoneNumber.trim(),
         },
       });
-      if (!response.ok) {
-        if (response.reason === "address_required") {
-          setPendingBuy(n);
-          setAddressOpen(true);
-          toast.message("Cadastre um endereço regulatório para concluir a compra.");
-          return;
-        }
-        if (response.reason === "bundle_required") {
-          setPendingBuy(n);
-          setBundleOpen(true);
-          if (regulatoryBundleSid) {
-            toast.error(response.message);
-          } else {
-            toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
-          }
-          return;
-        }
-      }
-      toast.success(`Número ${n.phoneNumber} adquirido e vinculado à sua conta!`);
+      toast.success("Telefonia conectada com sucesso!");
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
-      setAddressOpen(false);
-      setBundleOpen(false);
-      setPendingBuy(null);
-      setBundleSid("");
       resetModal();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha ao adquirir número";
-      if (/Endere[çc]o regulat[oó]rio|AddressSid|21631/i.test(msg)) {
-        setPendingBuy(n);
-        setAddressOpen(true);
-        toast.message("Cadastre um endereço regulatório para concluir a compra.");
-      } else if (/Regulatory Bundle|Bundle required|21649/i.test(msg)) {
-        setPendingBuy(n);
-        setBundleOpen(true);
-        toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
-      } else {
-        toast.error(msg);
-      }
+      toast.error(err instanceof Error ? err.message : "Falha ao conectar Twilio");
     } finally {
-      setBuyingId(null);
+      setConnecting(false);
     }
   };
 
-  const handleSaveAddress = async () => {
-    if (!pendingBuy) return;
-    setSavingAddress(true);
+  const handleConnectSip = async () => {
+    setConnecting(true);
     try {
-      await createAddressFn({
+      await connectFn({
         data: {
-          customerName: addr.customerName,
-          street: addr.street,
-          city: addr.city,
-          region: addr.region,
-          postalCode: addr.postalCode,
-          isoCountry: pendingBuy.countryIso,
-          friendlyName: `Address ${pendingBuy.countryIso}`,
+          mode: "sip",
+          routeName: sipForm.routeName.trim(),
+          sipUri,
         },
       });
-      toast.success("Endereço cadastrado. Concluindo compra…");
-      setAddressOpen(false);
-      const target = pendingBuy;
-      setPendingBuy(null);
-      await handleBuy(target);
+      toast.success("Telefonia conectada com sucesso!");
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setOpen(false);
+      resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar endereço");
+      toast.error(err instanceof Error ? err.message : "Falha ao gerar rota SIP");
     } finally {
-      setSavingAddress(false);
-    }
-  };
-
-  const handleSaveBundle = async () => {
-    if (!pendingBuy || !bundleSid.trim()) return;
-    setSavingBundle(true);
-    try {
-      await handleBuy(pendingBuy, bundleSid.trim());
-    } finally {
-      setSavingBundle(false);
+      setConnecting(false);
     }
   };
 
@@ -280,6 +228,7 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
   });
+
 
   const handleSignOut = async () => {
     const supabase = getSupabaseBrowser();
