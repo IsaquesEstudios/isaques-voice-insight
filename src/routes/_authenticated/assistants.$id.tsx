@@ -433,7 +433,6 @@ function AssistantDetailPage() {
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-5 p-6">
 
-                <CardContent className="space-y-5 p-6">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Modelo & Voz</h2>
                     <p className="text-xs text-muted-foreground">
