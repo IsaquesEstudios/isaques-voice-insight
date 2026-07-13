@@ -16,6 +16,23 @@ export function initSupabaseBrowser(url: string, anonKey: string): SupabaseClien
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
+    global: {
+      fetch: async (input, init) => {
+        const res = await fetch(input, init);
+        if (res.status === 401 || res.status === 403) {
+          try {
+            const txt = await res.clone().text();
+            if (/JWT issued at future|JWT expired|invalid JWT/i.test(txt)) {
+              if (_client) await _client.auth.signOut().catch(() => {});
+              if (typeof window !== "undefined") window.location.assign("/auth");
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        return res;
+      },
+    },
   });
   return _client;
 }
