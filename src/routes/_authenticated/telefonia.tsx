@@ -357,6 +357,19 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao importar contato"),
   });
 
+  const saveContactMutation = useMutation({
+    mutationFn: (input: { phoneE164: string; label: string }) =>
+      saveTestContactFn({ data: { phoneE164: input.phoneE164, label: input.label } }),
+    onSuccess: async () => {
+      toast.success("Contato de teste salvo.");
+      setTestContactOpen(false);
+      setTrialBlocked(false);
+      setTestContactForm({ label: "", phoneE164: "" });
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao salvar contato"),
+
   const confirmOtpMutation = useMutation({
     mutationFn: (input: { phoneE164: string; code: string; label: string }) =>
       checkVerifyOtpFn({
