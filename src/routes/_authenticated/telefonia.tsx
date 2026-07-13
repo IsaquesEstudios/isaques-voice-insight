@@ -757,20 +757,55 @@ function TelefoniaPage() {
                   className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {c.label}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {c.label}
+                      </p>
+                      {c.verified ? (
+                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                          Verificado
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                          Não verificado
+                        </span>
+                      )}
+                    </div>
                     <p className="truncate font-mono text-xs text-muted-foreground">
                       {c.phone_e164}
                     </p>
                   </div>
+                  {!c.verified && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        !isTwilioConnected ||
+                        startVerificationMutation.isPending
+                      }
+                      onClick={() =>
+                        startVerificationMutation.mutate({
+                          id: c.id,
+                          label: c.label,
+                          phone: c.phone_e164,
+                        })
+                      }
+                      className="gap-1.5"
+                    >
+                      {startVerificationMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      Verificar via SMS/chamada
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={
                       !isTwilioConnected ||
                       numbers.length === 0 ||
-                      callingContactId === c.id
+                      callingContactId === c.id ||
+                      !c.verified
                     }
                     onClick={() =>
                       testCallMutation.mutate({ id: c.id, phone_e164: c.phone_e164 })
