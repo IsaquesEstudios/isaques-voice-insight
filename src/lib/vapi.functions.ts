@@ -1,4 +1,79 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+// --- Ownership helpers -----------------------------------------------------
+// Assistants live in a single Vapi account, so per-user scoping is enforced
+// via a Supabase table `user_assistants` that maps vapi_assistant_id -> user_id.
+async function listOwnedIds(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("user_assistants")
+    .select("vapi_assistant_id")
+    .eq("user_id", userId);
+  if (error) {
+    console.error("user_assistants select error", error);
+    throw new Error("Falha ao carregar assistentes do usuário.");
+  }
+  return new Set((data ?? []).map((r) => r.vapi_assistant_id as string));
+}
+
+async function assertOwnership(
+  supabase: SupabaseClient,
+  userId: string,
+  assistantId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("user_assistants")
+    .select("vapi_assistant_id")
+    .eq("user_id", userId)
+    .eq("vapi_assistant_id", assistantId)
+    .maybeSingle();
+  if (error) {
+    console.error("user_assistants ownership check error", error);
+    throw new Error("Falha ao validar permissão.");
+  }
+  if (!data) {
+    throw new Response("Forbidden: assistente não pertence ao usuário", {
+      status: 403,
+    });
+  }
+}
+
+async function recordOwnership(
+  supabase: SupabaseClient,
+  userId: string,
+  assistantId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("user_assistants")
+    .insert({ user_id: userId, vapi_assistant_id: assistantId });
+  if (error) {
+    console.error("user_assistants insert error", error);
+    // Best-effort rollback: remove orphan assistant from Vapi.
+    try {
+      await vapiFetch(`/assistant/${assistantId}`, { method: "DELETE" });
+    } catch (e) {
+      console.error("orphan cleanup failed", e);
+    }
+    throw new Error("Falha ao vincular assistente ao usuário.");
+  }
+}
+
+async function removeOwnership(
+  supabase: SupabaseClient,
+  userId: string,
+  assistantId: string,
+): Promise<void> {
+  await supabase
+    .from("user_assistants")
+    .delete()
+    .eq("user_id", userId)
+    .eq("vapi_assistant_id", assistantId);
+}
+
 
 export interface VapiAssistantDTO {
   id: string;
