@@ -49,13 +49,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -67,11 +62,9 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  createTwilioAddress,
+  connectExternalNumber,
   listMyNumbers,
-  purchaseNumber,
   releaseNumber,
-  searchAvailableNumbers,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
