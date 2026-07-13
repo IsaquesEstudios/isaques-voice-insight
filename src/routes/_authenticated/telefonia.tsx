@@ -147,9 +147,47 @@ function TelefoniaPage() {
     },
   });
 
-  const numbers = (numbersQuery.data ?? []) as NumberRow[];
   const twilioConn = twilioConnQuery.data;
   const isTwilioConnected = twilioConn?.connected === true;
+
+  const twilioNumbersQuery = useQuery({
+    queryKey: ["twilio-numbers-live"],
+    queryFn: () => listTwilioNumbersFn(),
+    enabled: isTwilioConnected,
+  });
+  const twilioTrunksQuery = useQuery({
+    queryKey: ["twilio-trunks-live"],
+    queryFn: () => listTwilioTrunksFn(),
+    enabled: isTwilioConnected,
+  });
+
+  const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
+  const liveTwilio =
+    twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
+      ? twilioNumbersQuery.data.numbers
+      : [];
+  const liveTrunks =
+    twilioTrunksQuery.data && "ok" in twilioTrunksQuery.data && twilioTrunksQuery.data.ok
+      ? twilioTrunksQuery.data.trunks
+      : [];
+
+  // Merge: Twilio live numbers are the source of truth for connected accounts;
+  // fall back to local rows (e.g. SIP BYOC) when no Twilio credentials.
+  const numbers: NumberRow[] = isTwilioConnected
+    ? liveTwilio.map((n) => {
+        const local = localNumbers.find((l) => l.phone_number === n.phoneNumber);
+        return {
+          id: local?.id ?? n.sid,
+          phone_number: n.phoneNumber,
+          region: local?.region ?? null,
+          provider: "Twilio (Sua conta)",
+          assistant: local?.assistant ?? null,
+          calls_today: local?.calls_today ?? 0,
+          answer_rate: local?.answer_rate ?? 0,
+          health: "Seguro" as Health,
+        };
+      })
+    : localNumbers;
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
