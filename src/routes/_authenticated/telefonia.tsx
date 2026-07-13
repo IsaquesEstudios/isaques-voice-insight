@@ -67,6 +67,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
+  createTwilioAddress,
   listMyNumbers,
   purchaseNumber,
   releaseNumber,
@@ -131,6 +132,7 @@ function TelefoniaPage() {
   const searchFn = useServerFn(searchAvailableNumbers);
   const buyFn = useServerFn(purchaseNumber);
   const releaseFn = useServerFn(releaseNumber);
+  const createAddressFn = useServerFn(createTwilioAddress);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
@@ -146,6 +148,16 @@ function TelefoniaPage() {
   const [results, setResults] = useState<AvailableNumber[] | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
+  const [pendingBuy, setPendingBuy] = useState<AvailableNumber | null>(null);
+  const [addressOpen, setAddressOpen] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [addr, setAddr] = useState({
+    customerName: "",
+    street: "",
+    city: "",
+    region: "",
+    postalCode: "",
+  });
 
   const resetModal = () => {
     setCountry("BR");
@@ -185,9 +197,43 @@ function TelefoniaPage() {
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao adquirir número");
+      const msg = err instanceof Error ? err.message : "Falha ao adquirir número";
+      if (/Endere[çc]o regulat[oó]rio|AddressSid|21631/i.test(msg)) {
+        setPendingBuy(n);
+        setAddressOpen(true);
+        toast.message("Cadastre um endereço regulatório para concluir a compra.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setBuyingId(null);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    if (!pendingBuy) return;
+    setSavingAddress(true);
+    try {
+      await createAddressFn({
+        data: {
+          customerName: addr.customerName,
+          street: addr.street,
+          city: addr.city,
+          region: addr.region,
+          postalCode: addr.postalCode,
+          isoCountry: pendingBuy.countryIso,
+          friendlyName: `Address ${pendingBuy.countryIso}`,
+        },
+      });
+      toast.success("Endereço cadastrado. Concluindo compra…");
+      setAddressOpen(false);
+      const target = pendingBuy;
+      setPendingBuy(null);
+      await handleBuy(target);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar endereço");
+    } finally {
+      setSavingAddress(false);
     }
   };
 
@@ -613,6 +659,75 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Cadastrar endereço regulatório</DialogTitle>
+            <DialogDescription>
+              A Twilio exige um endereço em {pendingBuy?.countryIso} para vincular a este número.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label>Nome completo / Razão social</Label>
+              <Input
+                value={addr.customerName}
+                onChange={(e) => setAddr({ ...addr, customerName: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Rua e número</Label>
+              <Input
+                value={addr.street}
+                onChange={(e) => setAddr({ ...addr, street: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Cidade</Label>
+                <Input
+                  value={addr.city}
+                  onChange={(e) => setAddr({ ...addr, city: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Estado / Região</Label>
+                <Input
+                  value={addr.region}
+                  onChange={(e) => setAddr({ ...addr, region: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>CEP / Postal Code</Label>
+              <Input
+                value={addr.postalCode}
+                onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setAddressOpen(false)} disabled={savingAddress}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveAddress}
+              disabled={
+                savingAddress ||
+                !addr.customerName ||
+                !addr.street ||
+                !addr.city ||
+                !addr.region ||
+                !addr.postalCode
+              }
+            >
+              {savingAddress ? "Salvando…" : "Salvar e comprar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
+
   );
 }
