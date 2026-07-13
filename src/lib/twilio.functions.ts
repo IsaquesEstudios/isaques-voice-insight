@@ -10,6 +10,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const TWILIO_API = "https://api.twilio.com/2010-04-01";
 const TWILIO_NUMBERING = "https://numbers.twilio.com";
+const TWILIO_VERIFY = "https://verify.twilio.com/v2";
 
 type Creds = { accountSid: string; authToken: string };
 
