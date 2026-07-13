@@ -661,8 +661,35 @@ function TelefoniaPage() {
                             {n.region ?? "—"}
                           </TableCell>
                           <TableCell className="text-xs text-foreground">
-                            {n.assistant ?? "—"}
+                            {n.assistant ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                                onClick={() => {
+                                  setAssignTarget(n);
+                                  setAssignAssistantId(
+                                    assistantByPhone.get(n.phone_number) ?? "",
+                                  );
+                                }}
+                              >
+                                <Bot className="h-3 w-3" />
+                                {n.assistant}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+                                onClick={() => {
+                                  setAssignTarget(n);
+                                  setAssignAssistantId("");
+                                }}
+                              >
+                                <Plus className="h-3 w-3" />
+                                Atribuir atendente
+                              </button>
+                            )}
                           </TableCell>
+
                           <TableCell className="text-xs">{n.calls_today}</TableCell>
                           <TableCell className="text-xs">
                             {n.answer_rate > 0 ? `${n.answer_rate}%` : "—"}
