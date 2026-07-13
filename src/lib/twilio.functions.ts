@@ -232,3 +232,37 @@ export const releaseNumber = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+// ---------- address (regulatory) ----------
+
+export const createTwilioAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        customerName: z.string().min(2),
+        street: z.string().min(2),
+        city: z.string().min(1),
+        region: z.string().min(1),
+        postalCode: z.string().min(2),
+        isoCountry: z.string().length(2),
+        friendlyName: z.string().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const form: Record<string, string> = {
+      CustomerName: data.customerName,
+      Street: data.street,
+      City: data.city,
+      Region: data.region,
+      PostalCode: data.postalCode,
+      IsoCountry: data.isoCountry.toUpperCase(),
+    };
+    if (data.friendlyName) form.FriendlyName = data.friendlyName;
+    const json = (await twilioPost("/Addresses.json", form)) as {
+      sid: string;
+      iso_country: string;
+    };
+    return { sid: json.sid, isoCountry: json.iso_country };
+  });
