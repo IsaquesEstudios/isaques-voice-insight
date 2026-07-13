@@ -617,6 +617,10 @@ export interface VapiPhoneNumberDTO {
   assistantId?: string | null;
 }
 
+type AttachAssistantResult =
+  | { ok: true; vapiNumberId: string; assistantId: string }
+  | { ok: false; reason: "already_in_use" | "twilio_not_connected"; message: string };
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiPhoneNumberRaw = Record<string, any> & { id: string };
 
@@ -664,7 +668,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
       return input;
     },
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<AttachAssistantResult> => {
     // Ownership: the assistant must belong to the current user.
     await assertOwnership(context.supabase, context.userId, data.assistantId);
 
@@ -701,9 +705,11 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
     } else {
       const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
       if (!creds) {
-        throw new Error(
-          "Conecte sua conta Twilio antes de vincular uma atendente a este número.",
-        );
+        return {
+          ok: false,
+          reason: "twilio_not_connected",
+          message: "Conecte sua conta Twilio antes de vincular uma atendente a este número.",
+        };
       }
       const safeName = (data.name ?? data.phoneNumberE164)
         .replace(/[^a-zA-Z0-9 _-]/g, "")
@@ -723,9 +729,11 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (/already in use by another org/i.test(msg)) {
-          throw new Error(
-            `O número ${data.phoneNumberE164} já está vinculado a outra organização Vapi. Remova-o de lá (Vapi Dashboard → Phone Numbers) antes de importá-lo aqui.`,
-          );
+          return {
+            ok: false,
+            reason: "already_in_use",
+            message: `O número ${data.phoneNumberE164} já está vinculado a outra organização Vapi. Remova-o de lá (Vapi Dashboard → Phone Numbers) antes de importá-lo aqui.`,
+          };
         }
         throw err;
       }
