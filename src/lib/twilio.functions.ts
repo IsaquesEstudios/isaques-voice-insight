@@ -76,7 +76,17 @@ export const searchAvailableNumbers = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const query: Record<string, string> = { PageSize: "10" };
-    if (data.areaCode) query.AreaCode = data.areaCode;
+    // Twilio's AreaCode filter is a positive integer and only valid for US/CA.
+    // For other countries, use Contains (digit-only substring match) instead.
+    const digits = (data.areaCode ?? "").replace(/\D/g, "");
+    if (digits) {
+      const country = data.country.toUpperCase();
+      if ((country === "US" || country === "CA") && digits.length <= 3) {
+        query.AreaCode = digits;
+      } else {
+        query.Contains = digits;
+      }
+    }
     const json = await twilioGet(
       `/AvailablePhoneNumbers/${data.country}/Local.json`,
       query,
