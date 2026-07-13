@@ -770,23 +770,22 @@ function TelefoniaPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={
-                        !isTwilioConnected ||
-                        startVerificationMutation.isPending
-                      }
-                      onClick={() =>
-                        startVerificationMutation.mutate({
+                      disabled={!isTwilioConnected || sendOtpMutation.isPending}
+                      onClick={() => {
+                        setVerifyExisting({
                           id: c.id,
                           label: c.label,
                           phone: c.phone_e164,
-                        })
-                      }
+                        });
+                        setVerifyOtp("");
+                        sendOtpMutation.mutate(c.phone_e164);
+                      }}
                       className="gap-1.5"
                     >
-                      {startVerificationMutation.isPending ? (
+                      {sendOtpMutation.isPending ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : null}
-                      Verificar via SMS/chamada
+                      Verificar via SMS
                     </Button>
                   )}
                   <Button
