@@ -669,14 +669,25 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
     await assertOwnership(context.supabase, context.userId, data.assistantId);
 
     // Find existing Vapi phone-number entry (if any) for this E.164.
-    // Vapi's /phone-number rejects unknown query params (e.g. `page`),
-    // so we fetch a single large page with `limit` only.
-    const list = (await vapiFetch(`/phone-number?limit=1000`, {
-      method: "GET",
-    })) as VapiPhoneNumberRaw[] | null;
-    const existing: VapiPhoneNumberRaw | undefined = Array.isArray(list)
-      ? list.find((n) => (n.number as string | undefined) === data.phoneNumberE164)
-      : undefined;
+    // Vapi's /phone-number caps `limit` at 100 and rejects unknown params
+    // like `page` — paginate with cursor (`createdAtLt` = last item's createdAt).
+    let existing: VapiPhoneNumberRaw | undefined;
+    let cursor: string | undefined;
+    for (let i = 0; i < 20; i++) {
+      const qs = new URLSearchParams({ limit: "100" });
+      if (cursor) qs.set("createdAtLt", cursor);
+      const chunk = (await vapiFetch(`/phone-number?${qs.toString()}`, {
+        method: "GET",
+      })) as (VapiPhoneNumberRaw & { createdAt?: string })[] | null;
+      if (!Array.isArray(chunk) || chunk.length === 0) break;
+      existing = chunk.find(
+        (n) => (n.number as string | undefined) === data.phoneNumberE164,
+      );
+      if (existing || chunk.length < 100) break;
+      cursor = chunk[chunk.length - 1]?.createdAt;
+      if (!cursor) break;
+    }
+
 
 
 
