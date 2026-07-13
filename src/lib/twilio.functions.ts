@@ -122,12 +122,14 @@ export const purchaseNumber = createServerFn({ method: "POST" })
         friendlyName: z.string().optional(),
         countryIso: z.string().optional(),
         region: z.string().optional(),
+          bundleSid: z.string().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const form: Record<string, string> = { PhoneNumber: data.phoneNumber };
     if (data.friendlyName) form.FriendlyName = data.friendlyName;
+    if (data.bundleSid?.trim()) form.BundleSid = data.bundleSid.trim();
 
     type PurchaseResult = {
       sid: string;
@@ -139,6 +141,12 @@ export const purchaseNumber = createServerFn({ method: "POST" })
       twilioPost("/IncomingPhoneNumbers.json", f) as Promise<PurchaseResult>;
 
     const iso = (data.countryIso || "").toUpperCase();
+
+    const bundleRequiredMessage = form.BundleSid
+      ? `O Regulatory Bundle informado não foi aceito pela Twilio para ${iso} (LOCAL). Confirme se o Bundle SID está aprovado (status "twilio-approved") e se é compatível com ${iso}/LOCAL.`
+      : `Este país (${iso}) exige um Regulatory Bundle aprovado pela Twilio (status "twilio-approved") vinculado ao número. Informe um Bundle SID aprovado para ${iso} (LOCAL) ou crie/envie um Bundle em https://console.twilio.com/us1/develop/phone-numbers/regulatory-compliance/bundles e aguarde a aprovação.`;
+
+    const addressRequiredMessage = `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}. Cadastre o endereço para concluir a compra.`;
 
     const attachAddressForCountry = async () => {
       const addr = (await twilioGet("/Addresses.json", { PageSize: "50" })) as {
@@ -181,22 +189,33 @@ export const purchaseNumber = createServerFn({ method: "POST" })
       if (!needsAddress && !needsBundle) throw err;
 
       const gotAddress = needsAddress ? await attachAddressForCountry() : true;
-      const gotBundle = needsBundle ? await attachBundleForCountry() : true;
+      const gotBundle = needsBundle
+        ? form.BundleSid
+          ? true
+          : await attachBundleForCountry()
+        : true;
       // Bundle-required countries usually also need an Address — attach opportunistically.
       if (needsBundle && !form.AddressSid) await attachAddressForCountry();
 
       if (needsAddress && !gotAddress) {
-        throw new Error(
-          `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}. Cadastre em https://console.twilio.com/us1/develop/phone-numbers/manage/regulatory-compliance/addresses e tente novamente.`,
-        );
+        return { ok: false, reason: "address_required", message: addressRequiredMessage };
       }
       if (needsBundle && !gotBundle) {
-        throw new Error(
-          `Este país (${iso}) exige um Regulatory Bundle aprovado pela Twilio (status "twilio-approved") vinculado ao número, e nenhum foi encontrado para ${iso} (LOCAL). Crie e envie um Bundle em https://console.twilio.com/us1/develop/phone-numbers/regulatory-compliance/bundles, aguarde a aprovação e tente novamente.`,
-        );
+        return { ok: false, reason: "bundle_required", message: bundleRequiredMessage };
       }
 
-      json = await attemptPurchase(form);
+      try {
+        json = await attemptPurchase(form);
+      } catch (retryErr) {
+        const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+        if (retryMsg.includes('"code":21649') || retryMsg.includes("Bundle required")) {
+          return { ok: false, reason: "bundle_required", message: bundleRequiredMessage };
+        }
+        if (retryMsg.includes('"code":21631') || retryMsg.includes("AddressSid")) {
+          return { ok: false, reason: "address_required", message: addressRequiredMessage };
+        }
+        throw retryErr;
+      }
     }
 
 
@@ -225,7 +244,7 @@ export const purchaseNumber = createServerFn({ method: "POST" })
       throw new Error(`DB insert failed: ${error.message}`);
     }
 
-    return { sid: json.sid, phoneNumber: json.phone_number };
+    return { ok: true, sid: json.sid, phoneNumber: json.phone_number };
   });
 
 // ---------- list ----------
