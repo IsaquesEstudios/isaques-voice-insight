@@ -172,6 +172,7 @@ function TelefoniaPage() {
   const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
   const removeTestContactFn = useServerFn(removeTestContact);
   const addVerifiedFromTwilioFn = useServerFn(addVerifiedFromTwilio);
+  const saveTestContactFn = useServerFn(saveTestContact);
 
 
 
