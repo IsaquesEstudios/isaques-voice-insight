@@ -902,32 +902,32 @@ function TelefoniaPage() {
               </p>
             ) : (
               testContacts.map((c) => {
-                const from = rowCallFrom[c.sid] ?? numbers[0]?.phone_number ?? "";
-                const assistantId = rowCallAssistant[c.sid] ?? "";
+                const from = rowCallFrom[c.id] ?? numbers[0]?.phone_number ?? "";
+                const assistantId = rowCallAssistant[c.id] ?? "";
                 return (
                   <div
-                    key={c.sid}
+                    key={c.id}
                     className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
                   >
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-foreground">
-                            {c.friendly_name}
+                            {c.label}
                           </p>
                           <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
                             Verificado
                           </span>
                         </div>
                         <p className="truncate font-mono text-xs text-muted-foreground">
-                          {c.phone_number}
+                          {c.phone_e164}
                         </p>
                       </div>
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => removeTestContactMutation.mutate(c.sid)}
+                        onClick={() => removeTestContactMutation.mutate(c.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -941,7 +941,7 @@ function TelefoniaPage() {
                         <Select
                           value={from}
                           onValueChange={(v) =>
-                            setRowCallFrom((prev) => ({ ...prev, [c.sid]: v }))
+                            setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
                           }
                         >
                           <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
@@ -969,7 +969,7 @@ function TelefoniaPage() {
                         <Select
                           value={assistantId}
                           onValueChange={(v) =>
-                            setRowCallAssistant((prev) => ({ ...prev, [c.sid]: v }))
+                            setRowCallAssistant((prev) => ({ ...prev, [c.id]: v }))
                           }
                         >
                           <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
@@ -991,16 +991,16 @@ function TelefoniaPage() {
                           !isTwilioConnected ||
                           !from ||
                           !assistantId ||
-                          callingContactId === c.sid
+                          callingContactId === c.id
                         }
                         onClick={() =>
                           testCallMutation.mutate({
-                            sid: c.sid,
-                            phone_number: c.phone_number,
+                            id: c.id,
+                            phone_e164: c.phone_e164,
                           })
                         }
                       >
-                        {callingContactId === c.sid ? (
+                        {callingContactId === c.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <PhoneCall className="h-3.5 w-3.5" />
@@ -1012,6 +1012,7 @@ function TelefoniaPage() {
                 );
               })
             )}
+
 
           </CardContent>
         </Card>
