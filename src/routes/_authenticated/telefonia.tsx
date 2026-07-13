@@ -138,6 +138,9 @@ function TelefoniaPage() {
   const addTestContactFn = useServerFn(addTestContact);
   const removeTestContactFn = useServerFn(removeTestContact);
   const makeTestCallFn = useServerFn(makeTestCall);
+  const startVerificationFn = useServerFn(startContactVerification);
+  const refreshVerificationFn = useServerFn(refreshContactVerification);
+
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
