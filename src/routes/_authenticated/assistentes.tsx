@@ -126,6 +126,7 @@ interface FormState {
   mode: "create" | "edit";
   editingId: string | null;
   loadingInitial: boolean;
+  step: 1 | 2;
   name: string;
   firstMessage: string;
   systemPrompt: string;
@@ -162,6 +163,7 @@ const emptyForm: FormState = {
   mode: "create",
   editingId: null,
   loadingInitial: false,
+  step: 1,
   name: "",
   firstMessage: "",
   systemPrompt: "",
@@ -170,6 +172,7 @@ const emptyForm: FormState = {
   voiceProvider: DEFAULT_VOICE_PROVIDER,
   voiceId: DEFAULT_VOICE_ID,
 };
+
 
 function AssistentesPage() {
   const fetchAssistants = useServerFn(listVapiAssistants);
