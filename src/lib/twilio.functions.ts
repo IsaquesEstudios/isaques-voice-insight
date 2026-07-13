@@ -333,6 +333,87 @@ export const listMyNumbers = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+// ---------- list from Twilio (live) ----------
+
+export const listTwilioNumbers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+    const json = (await twilioAccountGet(creds, "/IncomingPhoneNumbers.json", {
+      PageSize: "200",
+    })) as {
+      incoming_phone_numbers?: Array<{
+        sid: string;
+        phone_number: string;
+        friendly_name?: string;
+        trunk_sid?: string | null;
+        capabilities?: { voice?: boolean; SMS?: boolean; MMS?: boolean };
+        origin?: string;
+        status?: string;
+      }>;
+    };
+    const rows = json.incoming_phone_numbers ?? [];
+    return {
+      ok: true as const,
+      numbers: rows.map((r) => ({
+        sid: r.sid,
+        phoneNumber: r.phone_number,
+        friendlyName: r.friendly_name ?? null,
+        trunkSid: r.trunk_sid ?? null,
+        voice: !!r.capabilities?.voice,
+        sms: !!r.capabilities?.SMS,
+        mms: !!r.capabilities?.MMS,
+        status: r.status ?? null,
+      })),
+    };
+  });
+
+export const listTwilioTrunks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+    const res = await fetch("https://trunking.twilio.com/v1/Trunks?PageSize=50", {
+      headers: { Authorization: basicAuth(creds) },
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Twilio ${res.status}: ${text}`);
+    const body = (text ? JSON.parse(text) : {}) as {
+      trunks?: Array<{
+        sid: string;
+        friendly_name: string;
+        domain_name?: string;
+        disaster_recovery_url?: string | null;
+        secure?: boolean;
+      }>;
+    };
+    const trunks = body.trunks ?? [];
+    const counts: Record<string, number> = {};
+    try {
+      const nums = (await twilioAccountGet(creds, "/IncomingPhoneNumbers.json", {
+        PageSize: "200",
+      })) as {
+        incoming_phone_numbers?: Array<{ trunk_sid?: string | null }>;
+      };
+      for (const n of nums.incoming_phone_numbers ?? []) {
+        if (n.trunk_sid) counts[n.trunk_sid] = (counts[n.trunk_sid] ?? 0) + 1;
+      }
+    } catch {
+      /* best-effort */
+    }
+    return {
+      ok: true as const,
+      trunks: trunks.map((t) => ({
+        sid: t.sid,
+        friendlyName: t.friendly_name,
+        domainName: t.domain_name ?? null,
+        numbersCount: counts[t.sid] ?? 0,
+        status: "Ativo" as const,
+      })),
+    };
+  });
+
 // ---------- release ----------
 
 export const releaseNumber = createServerFn({ method: "POST" })

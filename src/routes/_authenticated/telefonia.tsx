@@ -66,6 +66,8 @@ import {
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
+  listTwilioNumbers,
+  listTwilioTrunks,
   releaseNumber,
   saveTwilioCredentials,
 } from "@/lib/twilio.functions";
@@ -96,12 +98,6 @@ const healthStyles: Record<Health, string> = {
   Risco: "bg-destructive/15 text-destructive",
 };
 
-const routes = [
-  { name: "Rota Comercial SP", numbers: 8, load: 74, status: "Ativo" },
-  { name: "Rota Cobrança Nacional", numbers: 12, load: 58, status: "Ativo" },
-  { name: "Rota Recepção 24/7", numbers: 4, load: 92, status: "Ativo" },
-  { name: "Rota Sandbox", numbers: 2, load: 12, status: "Pausado" },
-];
 
 const areaCodeConfig: Record<string, { maxLength: number; placeholder: string; label: string }> = {
   BR: { maxLength: 2, placeholder: "11", label: "DDD (2 dígitos)" },
@@ -130,6 +126,8 @@ function TelefoniaPage() {
   const saveCredsFn = useServerFn(saveTwilioCredentials);
   const getConnFn = useServerFn(getTwilioConnection);
   const disconnectFn = useServerFn(disconnectTwilio);
+  const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
+  const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
@@ -149,9 +147,47 @@ function TelefoniaPage() {
     },
   });
 
-  const numbers = (numbersQuery.data ?? []) as NumberRow[];
   const twilioConn = twilioConnQuery.data;
   const isTwilioConnected = twilioConn?.connected === true;
+
+  const twilioNumbersQuery = useQuery({
+    queryKey: ["twilio-numbers-live"],
+    queryFn: () => listTwilioNumbersFn(),
+    enabled: isTwilioConnected,
+  });
+  const twilioTrunksQuery = useQuery({
+    queryKey: ["twilio-trunks-live"],
+    queryFn: () => listTwilioTrunksFn(),
+    enabled: isTwilioConnected,
+  });
+
+  const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
+  const liveTwilio =
+    twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
+      ? twilioNumbersQuery.data.numbers
+      : [];
+  const liveTrunks =
+    twilioTrunksQuery.data && "ok" in twilioTrunksQuery.data && twilioTrunksQuery.data.ok
+      ? twilioTrunksQuery.data.trunks
+      : [];
+
+  // Merge: Twilio live numbers are the source of truth for connected accounts;
+  // fall back to local rows (e.g. SIP BYOC) when no Twilio credentials.
+  const numbers: NumberRow[] = isTwilioConnected
+    ? liveTwilio.map((n) => {
+        const local = localNumbers.find((l) => l.phone_number === n.phoneNumber);
+        return {
+          id: local?.id ?? n.sid,
+          phone_number: n.phoneNumber,
+          region: local?.region ?? null,
+          provider: "Twilio (Sua conta)",
+          assistant: local?.assistant ?? null,
+          calls_today: local?.calls_today ?? 0,
+          answer_rate: local?.answer_rate ?? 0,
+          health: "Seguro" as Health,
+        };
+      })
+    : localNumbers;
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
@@ -199,6 +235,8 @@ function TelefoniaPage() {
       });
       toast.success("Conta Twilio conectada com sucesso!");
       await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
+      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
+      await queryClient.invalidateQueries({ queryKey: ["twilio-trunks-live"] });
       setOpen(false);
       resetModal();
     } catch (err) {
@@ -244,6 +282,7 @@ function TelefoniaPage() {
     onSuccess: () => {
       toast.success("Número liberado da sua conta.");
       queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
       setReleaseTarget(null);
     },
     onError: (err) =>
@@ -382,7 +421,7 @@ function TelefoniaPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {numbersQuery.isLoading ? (
+                    {numbersQuery.isLoading || (isTwilioConnected && twilioNumbersQuery.isLoading) ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i} className="border-border/50">
                           <TableCell className="px-6">
@@ -463,48 +502,73 @@ function TelefoniaPage() {
 
           <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Rotas ativas</CardTitle>
+              <CardTitle className="text-base font-semibold">
+                Rotas ativas (Twilio Trunks)
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {routes.map((r) => (
-                <div
-                  key={r.name}
-                  className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">{r.name}</p>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                        r.status === "Ativo"
-                          ? "bg-success/15 text-success"
-                          : "bg-muted text-muted-foreground",
-                      )}
+              {!isTwilioConnected ? (
+                <p className="text-xs text-muted-foreground">
+                  Conecte sua conta Twilio para listar suas Elastic SIP Trunks.
+                </p>
+              ) : twilioTrunksQuery.isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-16 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+                  />
+                ))
+              ) : liveTrunks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum trunk encontrado na sua conta Twilio.
+                </p>
+              ) : (
+                liveTrunks.map((r) => {
+                  const load = Math.min(100, r.numbersCount * 10);
+                  return (
+                    <div
+                      key={r.sid}
+                      className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
                     >
-                      {r.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {r.numbers} números vinculados
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
-                      <div
-                        className={cn(
-                          "h-full rounded-full",
-                          r.load > 85 ? "bg-destructive" : r.load > 60 ? "bg-chart-3" : "bg-primary",
-                        )}
-                        style={{ width: `${r.load}%` }}
-                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-foreground">
+                          {r.friendlyName}
+                        </p>
+                        <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                          {r.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {r.numbersCount} números vinculados
+                        {r.domainName ? ` • ${r.domainName}` : ""}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
+                          <div
+                            className={cn(
+                              "h-full rounded-full",
+                              load > 85
+                                ? "bg-destructive"
+                                : load > 60
+                                  ? "bg-chart-3"
+                                  : "bg-primary",
+                            )}
+                            style={{ width: `${load}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          {load}%
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[11px] font-mono text-muted-foreground">{r.load}%</span>
-                  </div>
-                </div>
-              ))}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
 
       <Dialog
         open={open}
