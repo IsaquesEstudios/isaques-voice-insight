@@ -203,6 +203,71 @@ function TelefoniaPage() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [testContactOpen, setTestContactOpen] = useState(false);
+  const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
+  const [testCallFrom, setTestCallFrom] = useState<string>("");
+  const [callingContactId, setCallingContactId] = useState<string | null>(null);
+
+  const testContactsQuery = useQuery({
+    queryKey: ["test-contacts"],
+    queryFn: () => listTestContactsFn(),
+  });
+  const testContacts = (testContactsQuery.data ?? []) as Array<{
+    id: string;
+    label: string;
+    phone_e164: string;
+    created_at: string;
+  }>;
+
+  const addTestContactMutation = useMutation({
+    mutationFn: () =>
+      addTestContactFn({
+        data: {
+          label: testContactForm.label.trim(),
+          phoneE164: testContactForm.phoneE164.trim(),
+        },
+      }),
+    onSuccess: async () => {
+      toast.success("Contato de teste adicionado.");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      setTestContactOpen(false);
+      setTestContactForm({ label: "", phoneE164: "" });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao adicionar contato"),
+  });
+
+  const removeTestContactMutation = useMutation({
+    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
+    onSuccess: async () => {
+      toast.success("Contato removido.");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
+  });
+
+  const testCallMutation = useMutation({
+    mutationFn: (contact: { id: string; phone_e164: string }) => {
+      setCallingContactId(contact.id);
+      return makeTestCallFn({
+        data: { fromNumber: testCallFrom, toNumber: contact.phone_e164 },
+      });
+    },
+    onSuccess: (res) => {
+      if ("ok" in res && res.ok) {
+        toast.success("Chamada iniciada. Aguarde o telefone tocar.");
+      } else if ("reason" in res && res.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio antes de testar.");
+      } else if ("reason" in res && res.reason === "unverified_number") {
+        toast.error(res.message ?? "Número não verificado no Twilio (trial).");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada"),
+    onSettled: () => setCallingContactId(null),
+  });
+
 
   const [twilioForm, setTwilioForm] = useState({
     accountSid: "",
