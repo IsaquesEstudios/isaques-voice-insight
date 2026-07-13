@@ -522,10 +522,18 @@ export const connectExternalNumber = createServerFn({ method: "POST" })
 
 // ---------- test contacts ----------
 
-const e164 = z
-  .string()
-  .trim()
-  .regex(/^\+[1-9]\d{7,14}$/, "Número deve estar em formato E.164 (ex: +5511999998888)");
+const e164 = z.preprocess(
+  (v) => {
+    if (typeof v !== "string") return v;
+    const t = v.trim();
+    if (!t) return t;
+    if (t.startsWith("+")) return "+" + t.slice(1).replace(/\D/g, "");
+    return "+" + t.replace(/\D/g, "");
+  },
+  z
+    .string()
+    .regex(/^\+[1-9]\d{7,14}$/, "Número deve estar em formato E.164 (ex: +5511999998888)"),
+);
 
 export const listTestContacts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -549,13 +557,90 @@ export const addTestContact = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("user_test_contacts").insert({
-      user_id: context.userId,
-      label: data.label,
-      phone_e164: data.phoneE164,
-    });
+    const { data: row, error } = await context.supabase
+      .from("user_test_contacts")
+      .insert({
+        user_id: context.userId,
+        label: data.label,
+        phone_e164: data.phoneE164,
+        verified: false,
+      })
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, id: row?.id as string | undefined };
+  });
+
+export const startContactVerification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
+    const { data: row, error } = await context.supabase
+      .from("user_test_contacts")
+      .select("id, label, phone_e164")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Contato não encontrado.");
+
+    try {
+      const json = (await twilioAccountPost(creds, "/OutgoingCallerIds.json", {
+        PhoneNumber: row.phone_e164 as string,
+        FriendlyName: (row.label as string) || (row.phone_e164 as string),
+      })) as { validation_code: string; call_sid: string };
+      return {
+        ok: true as const,
+        validationCode: json.validation_code,
+        callSid: json.call_sid,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Already verified on Twilio side — sync DB and report success.
+      if (
+        msg.includes('"code":21450') ||
+        msg.includes("already verified") ||
+        msg.includes("Phone number is already verified")
+      ) {
+        await context.supabase
+          .from("user_test_contacts")
+          .update({ verified: true })
+          .eq("id", data.id);
+        return { ok: true as const, alreadyVerified: true as const };
+      }
+      throw err;
+    }
+  });
+
+export const refreshContactVerification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
+    const { data: row, error } = await context.supabase
+      .from("user_test_contacts")
+      .select("id, phone_e164")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Contato não encontrado.");
+
+    const json = (await twilioAccountGet(creds, "/OutgoingCallerIds.json", {
+      PhoneNumber: row.phone_e164 as string,
+      PageSize: "5",
+    })) as { outgoing_caller_ids?: Array<{ sid: string; phone_number: string }> };
+    const verified = (json.outgoing_caller_ids ?? []).length > 0;
+    if (verified) {
+      await context.supabase
+        .from("user_test_contacts")
+        .update({ verified: true })
+        .eq("id", data.id);
+    }
+    return { ok: true as const, verified };
   });
 
 export const removeTestContact = createServerFn({ method: "POST" })
