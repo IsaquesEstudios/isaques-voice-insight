@@ -13,6 +13,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
+import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -107,6 +109,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
   }),
+  loader: async () => {
+    const cfg = await getPublicSupabaseConfig();
+    // Initialize on the server so SSR-rendered code can call getSupabaseBrowser().
+    initSupabaseBrowser(cfg.url, cfg.anonKey);
+    return { supabase: cfg };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -127,9 +135,27 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { supabase: cfg } = Route.useLoaderData();
+  const router = useRouter();
+
+  // Initialize the browser Supabase client as early as possible.
+  initSupabaseBrowser(cfg.url, cfg.anonKey);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") {
+        return;
+      }
+      router.invalidate();
+      if (event !== "SIGNED_OUT") {
+        queryClient.invalidateQueries();
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
