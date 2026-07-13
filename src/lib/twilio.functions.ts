@@ -129,12 +129,41 @@ export const purchaseNumber = createServerFn({ method: "POST" })
     const form: Record<string, string> = { PhoneNumber: data.phoneNumber };
     if (data.friendlyName) form.FriendlyName = data.friendlyName;
 
-    const json = (await twilioPost("/IncomingPhoneNumbers.json", form)) as {
+    type PurchaseResult = {
       sid: string;
       phone_number: string;
       friendly_name?: string;
       capabilities?: { voice?: boolean; SMS?: boolean; MMS?: boolean };
     };
+    const attemptPurchase = (f: Record<string, string>) =>
+      twilioPost("/IncomingPhoneNumbers.json", f) as Promise<PurchaseResult>;
+
+    let json: PurchaseResult;
+    try {
+      json = await attemptPurchase(form);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 21631 => Phone Number Requires an Address but 'AddressSid' was empty.
+      if (msg.includes('"code":21631') || msg.includes("AddressSid")) {
+        const iso = (data.countryIso || "").toUpperCase();
+        const addr = (await twilioGet("/Addresses.json", { PageSize: "50" })) as {
+          addresses?: Array<{ sid: string; iso_country: string }>;
+        };
+        const match = (addr.addresses ?? []).find(
+          (a) => a.iso_country?.toUpperCase() === iso,
+        );
+        if (!match) {
+          throw new Error(
+            `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}. Cadastre em https://console.twilio.com/us1/develop/phone-numbers/manage/regulatory-compliance/addresses e tente novamente.`,
+          );
+        }
+        form.AddressSid = match.sid;
+        json = await attemptPurchase(form);
+      } else {
+        throw err;
+      }
+    }
+
 
     const { error } = await context.supabase
       .from("user_phone_numbers")
