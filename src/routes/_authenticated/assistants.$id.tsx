@@ -450,9 +450,72 @@ function AssistantDetailPage() {
 
                   <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
                     <div>
+                      <h3 className="text-sm font-semibold text-foreground">Modelo de IA</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Escolha o provedor e o modelo LLM usado pelo agente.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Provedor do Modelo</Label>
+                        <Select
+                          value={form.modelProvider}
+                          onValueChange={(v) =>
+                            setForm((f) => ({
+                              ...f,
+                              modelProvider: v,
+                              model: MODELS_BY_PROVIDER[v]?.[0]?.value ?? "",
+                            }))
+                          }
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {MODEL_PROVIDERS.map((p) => (
+                              <SelectItem key={p.value} value={p.value}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Modelo</Label>
+                        <Select
+                          value={form.model}
+                          onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {modelOptions.map((m) => (
+                              <SelectItem key={m.value} value={m.value}>
+                                {m.label}
+                              </SelectItem>
+                            ))}
+                            {!modelOptions.some((m) => m.value === form.model) &&
+                              form.model && (
+                                <SelectItem value={form.model}>{form.model}</SelectItem>
+                              )}
+                          </SelectContent>
+                        </Select>
+                        <CostHint
+                          costPerMin={getModelCost(form.modelProvider, form.model)}
+                          tooltip="Custo estimado do LLM por minuto de conversa."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
+                    <div>
                       <h3 className="text-sm font-semibold text-foreground">Voz</h3>
                       <p className="text-xs text-muted-foreground">
-                        A única configuração editável — escolha o timbre do agente.
+                        Escolha o timbre do agente.
                       </p>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -510,6 +573,7 @@ function AssistantDetailPage() {
                       </div>
                     </div>
                   </div>
+
                 </CardContent>
               </Card>
             </div>
