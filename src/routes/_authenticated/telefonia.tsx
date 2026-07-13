@@ -64,6 +64,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
+  addVerifiedFromTwilio,
   checkVerifyOtp,
   connectExternalNumber,
   disconnectTwilio,
