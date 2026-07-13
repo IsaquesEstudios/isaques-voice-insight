@@ -469,6 +469,32 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
   });
 
+  const attachAssistantMutation = useMutation({
+    mutationFn: (input: { phoneNumberE164: string; assistantId: string; name?: string }) =>
+      attachAssistantFn({ data: input }),
+    onSuccess: async () => {
+      toast.success("Atendente vinculada ao número.");
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setAssignTarget(null);
+      setAssignAssistantId("");
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao vincular atendente"),
+  });
+
+  const detachAssistantMutation = useMutation({
+    mutationFn: (phoneNumberE164: string) =>
+      detachAssistantFn({ data: { phoneNumberE164 } }),
+    onSuccess: async () => {
+      toast.success("Atendente removida do número.");
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao remover atendente"),
+  });
+
 
 
 
