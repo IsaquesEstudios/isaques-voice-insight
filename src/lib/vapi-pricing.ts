@@ -31,53 +31,55 @@ export interface VoiceSpec {
   humanness: number | null; // 1–5
 }
 
-// Transcriber padrão da Vapi (Deepgram Nova 2).
+// Transcriber padrão da Vapi (Deepgram Nova 3 General).
 export const DEFAULT_TRANSCRIBER: TranscriberSpec = {
   provider: "Deepgram",
-  label: "Nova 2",
-  model: "nova-2",
+  label: "Nova 3 General",
+  model: "nova-3",
   costPerMin: 0.01,
-  latencyMs: 260,
-  accuracyWer: 3.3,
+  latencyMs: 300,
+  accuracyWer: 2.7,
 };
 
 export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
   openai: {
-    "gpt-4o": { costPerMin: 0.06, latencyMs: 700, intelligence: 5 },
-    "gpt-4o-mini": { costPerMin: 0.006, latencyMs: 550, intelligence: 4 },
-    "gpt-4": { costPerMin: 0.18, latencyMs: 900, intelligence: 5 },
-    "gpt-3.5-turbo": { costPerMin: 0.01, latencyMs: 530, intelligence: 4 },
+    "gpt-5": { costPerMin: 0.01, latencyMs: 550, intelligence: 17 },
+    "gpt-4o": { costPerMin: 0.06, latencyMs: 700, intelligence: 15 },
+    "gpt-4o-mini": { costPerMin: 0.006, latencyMs: 550, intelligence: 12 },
+    "gpt-4": { costPerMin: 0.18, latencyMs: 900, intelligence: 15 },
+    "gpt-3.5-turbo": { costPerMin: 0.01, latencyMs: 530, intelligence: 10 },
   },
   anthropic: {
-    "claude-3-5-sonnet-20241022": { costPerMin: 0.09, latencyMs: 780, intelligence: 5 },
-    "claude-3-haiku-20240307": { costPerMin: 0.008, latencyMs: 560, intelligence: 3 },
+    "claude-3-5-sonnet-20241022": { costPerMin: 0.09, latencyMs: 780, intelligence: 15 },
+    "claude-3-haiku-20240307": { costPerMin: 0.008, latencyMs: 560, intelligence: 9 },
   },
   google: {
-    "gemini-1.5-pro": { costPerMin: 0.05, latencyMs: 720, intelligence: 4 },
-    "gemini-1.5-flash": { costPerMin: 0.004, latencyMs: 480, intelligence: 3 },
+    "gemini-1.5-pro": { costPerMin: 0.05, latencyMs: 720, intelligence: 13 },
+    "gemini-1.5-flash": { costPerMin: 0.004, latencyMs: 480, intelligence: 9 },
   },
   groq: {
-    "llama-3.1-70b-versatile": { costPerMin: 0.01, latencyMs: 380, intelligence: 4 },
-    "mixtral-8x7b-32768": { costPerMin: 0.008, latencyMs: 360, intelligence: 3 },
+    "llama-3.1-70b-versatile": { costPerMin: 0.01, latencyMs: 380, intelligence: 12 },
+    "mixtral-8x7b-32768": { costPerMin: 0.008, latencyMs: 360, intelligence: 9 },
   },
 };
 
 export const VOICE_SPECS: Record<string, Record<string, VoiceSpec>> = {
+  cartesia: {
+    _default: { costPerMin: 0.022, latencyMs: 300, humanness: 69 },
+    blake: { costPerMin: 0.022, latencyMs: 300, humanness: 69 },
+  },
   "11labs": {
     _default: { costPerMin: 0.036, latencyMs: 1200, humanness: null },
     burt: { costPerMin: 0.036, latencyMs: 1200, humanness: null },
-    rachel: { costPerMin: 0.036, latencyMs: 1150, humanness: 4 },
-    adam: { costPerMin: 0.036, latencyMs: 1180, humanness: 4 },
-    domi: { costPerMin: 0.036, latencyMs: 1160, humanness: 4 },
-  },
-  cartesia: {
-    _default: { costPerMin: 0.02, latencyMs: 400, humanness: 4 },
+    rachel: { costPerMin: 0.036, latencyMs: 1150, humanness: 65 },
+    adam: { costPerMin: 0.036, latencyMs: 1180, humanness: 62 },
+    domi: { costPerMin: 0.036, latencyMs: 1160, humanness: 63 },
   },
   openai: {
-    _default: { costPerMin: 0.015, latencyMs: 600, humanness: 3 },
+    _default: { costPerMin: 0.015, latencyMs: 600, humanness: 50 },
   },
   azure: {
-    _default: { costPerMin: 0.016, latencyMs: 500, humanness: 3 },
+    _default: { costPerMin: 0.016, latencyMs: 500, humanness: 48 },
   },
 };
 

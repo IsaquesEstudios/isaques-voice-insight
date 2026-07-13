@@ -128,6 +128,7 @@ const MODEL_PROVIDERS = [
 
 const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   openai: [
+    { value: "gpt-5", label: "GPT 5" },
     { value: "gpt-4o", label: "gpt-4o" },
     { value: "gpt-4o-mini", label: "gpt-4o-mini" },
     { value: "gpt-4", label: "gpt-4" },
@@ -148,22 +149,23 @@ const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
 };
 
 const VOICE_PROVIDERS = [
-  { value: "11labs", label: "ElevenLabs" },
   { value: "cartesia", label: "Cartesia" },
+  { value: "11labs", label: "ElevenLabs" },
   { value: "openai", label: "OpenAI" },
   { value: "azure", label: "Azure" },
 ];
 
 const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
+  cartesia: [
+    { value: "blake", label: "Blake — helpful agent" },
+    { value: "sonic-english", label: "Sonic English" },
+    { value: "sonic-multilingual", label: "Sonic Multilingual" },
+  ],
   "11labs": [
     { value: "burt", label: "Burt" },
     { value: "rachel", label: "Rachel" },
     { value: "adam", label: "Adam" },
     { value: "domi", label: "Domi" },
-  ],
-  cartesia: [
-    { value: "sonic-english", label: "Sonic English" },
-    { value: "sonic-multilingual", label: "Sonic Multilingual" },
   ],
   openai: [
     { value: "alloy", label: "Alloy" },
