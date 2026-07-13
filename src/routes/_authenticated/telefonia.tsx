@@ -1058,7 +1058,10 @@ function TelefoniaPage() {
         open={testContactOpen}
         onOpenChange={(o) => {
           setTestContactOpen(o);
-          if (!o) setTestContactForm({ label: "", phoneE164: "" });
+          if (!o) {
+            setTestContactForm({ label: "", phoneE164: "" });
+            setTrialBlocked(false);
+          }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
