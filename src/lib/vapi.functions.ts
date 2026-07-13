@@ -518,6 +518,9 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       typeof data.systemPrompt === "string" ||
       Array.isArray(data.tools);
 
+    // Sempre padroniza o transcriber na Vapi ao salvar.
+    body.transcriber = { ...DEFAULT_TRANSCRIBER_BLOCK };
+
     if (needsModelPatch) {
       const current = (await vapiFetch(`/assistant/${data.id}`, {
         method: "GET",
