@@ -1,77 +1,45 @@
-## Objetivo
+# Assistentes vinculados ao usuário
 
-Desacoplar 100% do connector Twilio compartilhado. Cada usuário passa a operar exclusivamente com **as próprias credenciais Twilio** (Account SID + Auth Token) que ele mesmo cadastra na plataforma. Nenhuma chamada à Twilio usa mais `TWILIO_API_KEY`/`LOVABLE_API_KEY` do workspace.
+A Vapi não tem conceito de "usuário final" — todas as assistentes ficam na sua conta única. A forma correta é manter a Vapi como está (usando sua `VAPI_PRIVATE_KEY`) e criar uma tabela de propriedade no Supabase que mapeia `vapi_assistant_id → user_id`. Toda listagem/edição/exclusão é filtrada por essa tabela.
 
-## Modelo de dados (Supabase externo)
+## O que muda
 
-Nova tabela para guardar a credencial Twilio do usuário logado (uma por usuário):
-
-```sql
-create table public.user_twilio_credentials (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  account_sid text not null,
-  auth_token text not null,
-  friendly_label text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-grant select, insert, update, delete on public.user_twilio_credentials to authenticated;
-grant all on public.user_twilio_credentials to service_role;
-
-alter table public.user_twilio_credentials enable row level security;
-
-create policy "own row select" on public.user_twilio_credentials for select
-  to authenticated using (auth.uid() = user_id);
-create policy "own row insert" on public.user_twilio_credentials for insert
-  to authenticated with check (auth.uid() = user_id);
-create policy "own row update" on public.user_twilio_credentials for update
-  to authenticated using (auth.uid() = user_id);
-create policy "own row delete" on public.user_twilio_credentials for delete
-  to authenticated using (auth.uid() = user_id);
+### 1. Banco (Supabase)
+Nova tabela `user_assistants`:
 ```
+id uuid PK
+user_id uuid  (auth.users)
+vapi_assistant_id text UNIQUE
+created_at timestamptz
+```
+- RLS: cada usuário só vê/insere/deleta linhas onde `user_id = auth.uid()`.
+- Índice em `(user_id)`.
 
-Observação de segurança: `auth_token` fica em texto plano na tabela (RLS restringe leitura ao próprio dono). Mantemos este trade-off agora para simplicidade — evolução futura: mover para cofre criptografado.
+### 2. Rotas protegidas
+Mover para o layout autenticado (mesmo padrão de `/telefonia`):
+- `src/routes/assistentes.tsx` → `src/routes/_authenticated/assistentes.tsx`
+- `src/routes/assistants.$id.tsx` → `src/routes/_authenticated/assistants.$id.tsx`
 
-## Mudanças no backend (`src/lib/twilio.functions.ts`)
+Sem login → redireciona para `/auth`.
 
-- Remover `GATEWAY`, `twilioHeaders`, e todo uso de `LOVABLE_API_KEY` / `TWILIO_API_KEY`.
-- Novo helper interno que chama diretamente `https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/...` usando **HTTP Basic Auth** com o `account_sid` + `auth_token` do usuário logado.
-- Todas as server functions autenticadas passam a:
-  1. Carregar as credenciais do usuário via `context.supabase.from('user_twilio_credentials')`.
-  2. Retornar `{ ok: false, reason: "no_credentials" }` se não houver — o front abre o modal “Conectar Twilio”.
-  3. Fazer a chamada Twilio direto com Basic Auth.
-- Ajustes específicos:
-  - `searchAvailableNumbers`, `purchaseNumber`, `releaseNumber`, `createTwilioAddress`, e a busca de bundle regulatório (v2 Numbering) passam a usar o novo helper.
-  - `connectExternalNumber` (BYOC) deixa de ser o único ponto de entrada Twilio: a aba **Twilio** do modal atual passa a **cadastrar/atualizar as credenciais em `user_twilio_credentials`**. Números concretos são adquiridos via `purchaseNumber` como sempre. A aba **SIP Trunk** permanece salvando linhas com `twilio_sid = byoc_...` em `user_phone_numbers`.
-  - Nova server function `saveTwilioCredentials({ accountSid, authToken })` — faz um `GET /Accounts/{sid}.json` como validação antes de salvar (upsert).
-  - Nova server function `getTwilioConnection()` retornando `{ connected: boolean, accountSid?: string }` (nunca devolve o token).
-  - Nova server function `disconnectTwilio()` — deleta a linha de credenciais.
+### 3. Server functions (`src/lib/vapi.functions.ts`)
+Adicionar `requireSupabaseAuth` em todas as funções e cruzar Vapi com a tabela `user_assistants`:
 
-## Mudanças no frontend (`src/routes/_authenticated/telefonia.tsx`)
+- `listVapiAssistants`: busca `vapi_assistant_id` do usuário na tabela → busca `/assistant` na Vapi → devolve só os que pertencem ao usuário.
+- `createVapiAssistant` / `duplicateVapiAssistant`: cria na Vapi, depois insere `(user_id, vapi_assistant_id)` na tabela. Se o insert falhar, deleta o assistente órfão na Vapi.
+- `getVapiAssistant` / `updateVapiAssistant` / `saveVapiAssistantConfig` / `deleteVapiAssistant`: antes de qualquer chamada Vapi, valida que existe linha `(user_id, vapi_assistant_id)`. Se não, retorna 403.
 
-- Ao abrir a tela, chamar `getTwilioConnection`. Se `connected === false`, deixar KPIs zerados e mostrar um estado vazio com CTA "Conectar Twilio" que abre o mesmo modal atual.
-- Modal “Conectar Número de Telefonia”:
-  - Aba **Twilio** deixa de exigir “Número de Telefone Adquirido” — passa a ser apenas **Account SID + Auth Token** (com botão de olho para revelar) e um botão "Conectar Twilio" que chama `saveTwilioCredentials`. Sucesso → toast + fecha modal + habilita compra.
-  - Aba **SIP Trunk** intacta.
-- Fluxo de compra: mantém o botão “Adquirir número”, mas só é habilitado quando `connected === true`. Toda a busca + compra usa `searchAvailableNumbers` / `purchaseNumber`, que agora respondem com **os números da conta Twilio do próprio usuário**.
-- Adicionar em algum ponto da UI (menu do topo do card ou um novo botão “Twilio conectado: AC1234…”) um "Desconectar Twilio" com `AlertDialog` chamando `disconnectTwilio`.
-- Coluna Provedor da tabela: números vindos de `purchaseNumber` passam a exibir “Twilio (Sua conta)”.
+### 4. UI
+Nenhuma mudança visual. Só invalida queries no login/logout (já feito no `__root.tsx`).
 
-## O que sai do projeto
+## Migração de dados existentes
+Assistentes criadas antes desta mudança não têm dono. Duas opções (me diga qual):
+- **(A)** Ignorar: viram invisíveis para todos e permanecem só na sua conta Vapi.
+- **(B)** Atribuir todas as assistentes atualmente na Vapi ao seu usuário (o admin). Executo uma vez após o deploy.
 
-- Nenhuma referência a `LOVABLE_API_KEY` ou `TWILIO_API_KEY` no runtime dessa página/funcões.
-- `standard_connectors--disconnect` do connector Twilio (informo o `connection_id` durante a execução para desvincular do projeto).
+## Detalhes técnicos
+- A chave `VAPI_PRIVATE_KEY` continua exclusivamente no servidor — o front nunca vê.
+- A validação de posse acontece no handler antes de qualquer `fetch` para Vapi, então nem GET vaza para outro usuário.
+- Ao deletar um usuário no Supabase, o `ON DELETE CASCADE` remove as linhas de `user_assistants` (mas o assistente na Vapi fica; posso adicionar limpeza posterior se quiser).
 
-## Requisitos do usuário
-
-1. Confirmar este plano.
-2. Rodar o SQL da tabela `user_twilio_credentials` no SQL Editor do Supabase externo.
-3. Ter em mãos `Account SID` e `Auth Token` da sua Twilio para conectar após o deploy (não precisa enviar no chat — a tela pede).
-
-## Verificação
-
-- Sem credenciais: tela mostra estado “Twilio não conectado”; busca/compra bloqueadas.
-- Com credenciais de usuário A: A vê apenas números de A; usuário B (sem credenciais ou com outras credenciais) não enxerga nada de A.
-- Desconectar Twilio: números salvos localmente permanecem na tabela `user_phone_numbers`, mas novas buscas/compras ficam bloqueadas até reconectar.
-- Erros Twilio (SID inválido, token inválido, 401) são exibidos no toast com a mensagem original do provider.
+Confirma o plano e escolhe A ou B para a migração?
