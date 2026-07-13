@@ -168,7 +168,7 @@ async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
   throw new Error(
     lastStatus >= 500 && lastStatus < 600
       ? `A API da Vapi está temporariamente indisponível (${lastStatus}). Tente novamente em instantes.`
-      : `Vapi ${init.method ?? "GET"} ${path} retornou ${lastStatus}`,
+      : `Vapi ${init.method ?? "GET"} ${path} retornou ${lastStatus}: ${lastBody?.slice(0, 500) ?? ""}`,
   );
 }
 
