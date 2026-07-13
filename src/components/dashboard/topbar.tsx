@@ -1,4 +1,7 @@
 import { Bell, CreditCard, LogOut, Search, Settings, UserRound } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +14,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getSupabaseBrowser } from "@/integrations/supabase/client";
 
 export function Topbar() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  async function handleSignOut() {
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      const supabase = getSupabaseBrowser();
+      await supabase.auth.signOut();
+      toast.success("Você saiu da conta.");
+      navigate({ to: "/auth", replace: true });
+    } catch (err) {
+      toast.error("Falha ao sair. Tente novamente.");
+      console.error(err);
+    }
+  }
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl md:px-6">
       <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
@@ -50,17 +71,29 @@ export function Topbar() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <UserRound className="mr-2 h-4 w-4" /> Perfil
+            <DropdownMenuItem asChild>
+              <Link to="/configuracoes" className="cursor-pointer">
+                <UserRound className="mr-2 h-4 w-4" /> Perfil
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CreditCard className="mr-2 h-4 w-4" /> Faturamento
+            <DropdownMenuItem asChild>
+              <Link to="/configuracoes" className="cursor-pointer">
+                <CreditCard className="mr-2 h-4 w-4" /> Faturamento
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" /> Configurações
+            <DropdownMenuItem asChild>
+              <Link to="/configuracoes" className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" /> Configurações
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleSignOut();
+              }}
+              className="cursor-pointer text-destructive focus:text-destructive"
+            >
               <LogOut className="mr-2 h-4 w-4" /> Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
