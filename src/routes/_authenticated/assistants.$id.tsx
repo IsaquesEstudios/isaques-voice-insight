@@ -569,26 +569,44 @@ function AssistantDetailPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Voz / Voice ID</Label>
-                        <Select
-                          value={form.voiceId}
-                          onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                          disabled={isLoading}
-                        >
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                            {voiceOptions.map((v) => (
-                              <SelectItem key={v.value} value={v.value}>
-                                {v.label}
-                              </SelectItem>
-                            ))}
-                            {!voiceOptions.some((v) => v.value === form.voiceId) &&
-                              form.voiceId && (
-                                <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                              )}
-                          </SelectContent>
-                        </Select>
+                        {voiceOptions.length === 0 ? (
+                          <>
+                            <Input
+                              value={form.voiceId}
+                              onChange={(e) =>
+                                setForm((f) => ({ ...f, voiceId: e.target.value }))
+                              }
+                              placeholder="Cole o voiceId da sua conta (BYOK)"
+                              disabled={isLoading}
+                              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Para {form.voiceProvider}, o voiceId deve vir da sua conta
+                              sincronizada na Vapi (Integrations).
+                            </p>
+                          </>
+                        ) : (
+                          <Select
+                            value={form.voiceId}
+                            onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                              {voiceOptions.map((v) => (
+                                <SelectItem key={v.value} value={v.value}>
+                                  {v.label}
+                                </SelectItem>
+                              ))}
+                              {!voiceOptions.some((v) => v.value === form.voiceId) &&
+                                form.voiceId && (
+                                  <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                                )}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <CostHint
                           costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
                           tooltip="Custo estimado de TTS por minuto de voz sintetizada."
