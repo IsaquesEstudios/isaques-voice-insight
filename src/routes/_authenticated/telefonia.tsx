@@ -138,6 +138,10 @@ interface AvailableNumber {
 function TelefoniaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const listAssistantsFn = useServerFn(listVapiAssistants);
+  const listVapiPhoneNumbersFn = useServerFn(listVapiPhoneNumbers);
+  const attachAssistantFn = useServerFn(attachAssistantToNumber);
+  const detachAssistantFn = useServerFn(detachAssistantFromNumber);
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
