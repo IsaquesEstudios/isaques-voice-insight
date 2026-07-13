@@ -1,47 +1,57 @@
-// Server functions for Twilio number search/purchase/release, backed by the
-// Lovable connector gateway. All routes require an authenticated user; each
-// purchased number is persisted with the buyer's user_id so RLS scopes the
-// list to that user only.
+// All Twilio operations are executed with the credentials the current user
+// stored in `user_twilio_credentials` — the platform never uses a shared
+// Twilio account. RLS scopes both credentials and purchased numbers to
+// `auth.uid()`.
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const GATEWAY = "https://connector-gateway.lovable.dev/twilio";
+const TWILIO_API = "https://api.twilio.com/2010-04-01";
+const TWILIO_NUMBERING = "https://numbers.twilio.com";
 
-function twilioHeaders() {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const twilioKey = process.env.TWILIO_API_KEY;
-  if (!lovableKey) throw new Error("LOVABLE_API_KEY not configured");
-  if (!twilioKey)
-    throw new Error(
-      "TWILIO_API_KEY not configured — link the Twilio connector to this project",
-    );
-  return {
-    Authorization: `Bearer ${lovableKey}`,
-    "X-Connection-Api-Key": twilioKey,
-  };
+type Creds = { accountSid: string; authToken: string };
+
+function basicAuth(c: Creds) {
+  return `Basic ${btoa(`${c.accountSid}:${c.authToken}`)}`;
 }
 
-async function twilioGet(path: string, query?: Record<string, string>) {
-  const url = new URL(`${GATEWAY}${path}`);
-  if (query) {
-    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-  }
-  const res = await fetch(url.toString(), { headers: twilioHeaders() });
+type SupabaseCtx = { supabase: { from: (t: string) => any } };
+
+async function loadCreds(context: SupabaseCtx & { userId: string }): Promise<Creds | null> {
+  const { data, error } = await context.supabase
+    .from("user_twilio_credentials")
+    .select("account_sid, auth_token")
+    .eq("user_id", context.userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { accountSid: data.account_sid as string, authToken: data.auth_token as string };
+}
+
+async function twilioAccountGet(
+  creds: Creds,
+  path: string,
+  query?: Record<string, string>,
+) {
+  const url = new URL(`${TWILIO_API}/Accounts/${creds.accountSid}${path}`);
+  if (query) for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
+  const res = await fetch(url.toString(), { headers: { Authorization: basicAuth(creds) } });
   const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Twilio ${res.status}: ${text}`);
-  }
+  if (!res.ok) throw new Error(`Twilio ${res.status}: ${text}`);
   return text ? JSON.parse(text) : {};
 }
 
-async function twilioPost(path: string, form: Record<string, string>) {
-  const res = await fetch(`${GATEWAY}${path}`, {
+async function twilioAccountPost(
+  creds: Creds,
+  path: string,
+  form: Record<string, string>,
+) {
+  const res = await fetch(`${TWILIO_API}/Accounts/${creds.accountSid}${path}`, {
     method: "POST",
     headers: {
-      ...twilioHeaders(),
+      Authorization: basicAuth(creds),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(form).toString(),
@@ -51,16 +61,89 @@ async function twilioPost(path: string, form: Record<string, string>) {
   return text ? JSON.parse(text) : {};
 }
 
-async function twilioDelete(path: string) {
-  const res = await fetch(`${GATEWAY}${path}`, {
+async function twilioAccountDelete(creds: Creds, path: string) {
+  const res = await fetch(`${TWILIO_API}/Accounts/${creds.accountSid}${path}`, {
     method: "DELETE",
-    headers: twilioHeaders(),
+    headers: { Authorization: basicAuth(creds) },
   });
   if (!res.ok && res.status !== 404) {
     const text = await res.text();
     throw new Error(`Twilio ${res.status}: ${text}`);
   }
 }
+
+// ---------- credentials ----------
+
+export const saveTwilioCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        accountSid: z
+          .string()
+          .trim()
+          .regex(/^AC[a-zA-Z0-9]{10,}$/, "Account SID inválido"),
+        authToken: z.string().trim().min(8, "Auth Token inválido"),
+        friendlyLabel: z.string().trim().max(80).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const creds: Creds = { accountSid: data.accountSid, authToken: data.authToken };
+    // Validate by fetching the account itself.
+    try {
+      await twilioAccountGet(creds, ".json");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        msg.includes("401")
+          ? "Credenciais Twilio inválidas (401). Confira Account SID e Auth Token."
+          : msg,
+      );
+    }
+
+    const { error } = await context.supabase.from("user_twilio_credentials").upsert(
+      {
+        user_id: context.userId,
+        account_sid: data.accountSid,
+        auth_token: data.authToken,
+        friendly_label: data.friendlyLabel ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw new Error(`DB upsert failed: ${error.message}`);
+    return { ok: true, accountSid: data.accountSid };
+  });
+
+export const getTwilioConnection = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_twilio_credentials")
+      .select("account_sid, friendly_label, updated_at")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return { connected: false as const };
+    return {
+      connected: true as const,
+      accountSid: data.account_sid as string,
+      friendlyLabel: (data.friendly_label as string | null) ?? null,
+      updatedAt: data.updated_at as string,
+    };
+  });
+
+export const disconnectTwilio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase
+      .from("user_twilio_credentials")
+      .delete()
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
 // ---------- search ----------
 
@@ -74,10 +157,11 @@ export const searchAvailableNumbers = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
     const query: Record<string, string> = { PageSize: "10" };
-    // Twilio's AreaCode filter is a positive integer and only valid for US/CA.
-    // For other countries, use Contains (digit-only substring match) instead.
     const digits = (data.areaCode ?? "").replace(/\D/g, "");
     if (digits) {
       const country = data.country.toUpperCase();
@@ -87,7 +171,8 @@ export const searchAvailableNumbers = createServerFn({ method: "POST" })
         query.Contains = digits;
       }
     }
-    const json = await twilioGet(
+    const json = await twilioAccountGet(
+      creds,
       `/AvailablePhoneNumbers/${data.country}/Local.json`,
       query,
     );
@@ -99,16 +184,20 @@ export const searchAvailableNumbers = createServerFn({ method: "POST" })
       iso_country?: string;
       capabilities?: { voice?: boolean; SMS?: boolean; MMS?: boolean };
     }>;
-    return rows.map((r) => ({
-      id: r.phone_number,
-      phoneNumber: r.phone_number,
-      friendlyName: r.friendly_name,
-      region: [r.locality, r.region].filter(Boolean).join(" / ") || r.iso_country || "",
-      countryIso: r.iso_country ?? data.country,
-      voice: !!r.capabilities?.voice,
-      sms: !!r.capabilities?.SMS,
-      mms: !!r.capabilities?.MMS,
-    }));
+    return {
+      ok: true as const,
+      results: rows.map((r) => ({
+        id: r.phone_number,
+        phoneNumber: r.phone_number,
+        friendlyName: r.friendly_name,
+        region:
+          [r.locality, r.region].filter(Boolean).join(" / ") || r.iso_country || "",
+        countryIso: r.iso_country ?? data.country,
+        voice: !!r.capabilities?.voice,
+        sms: !!r.capabilities?.SMS,
+        mms: !!r.capabilities?.MMS,
+      })),
+    };
   });
 
 // ---------- purchase ----------
@@ -122,14 +211,19 @@ export const purchaseNumber = createServerFn({ method: "POST" })
         friendlyName: z.string().optional(),
         countryIso: z.string().optional(),
         region: z.string().optional(),
-          bundleSid: z.string().optional(),
+        bundleSid: z.string().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
     const form: Record<string, string> = { PhoneNumber: data.phoneNumber };
     if (data.friendlyName) form.FriendlyName = data.friendlyName;
     if (data.bundleSid?.trim()) form.BundleSid = data.bundleSid.trim();
+
+    const iso = (data.countryIso || "").toUpperCase();
 
     type PurchaseResult = {
       sid: string;
@@ -137,19 +231,16 @@ export const purchaseNumber = createServerFn({ method: "POST" })
       friendly_name?: string;
       capabilities?: { voice?: boolean; SMS?: boolean; MMS?: boolean };
     };
-    const attemptPurchase = (f: Record<string, string>) =>
-      twilioPost("/IncomingPhoneNumbers.json", f) as Promise<PurchaseResult>;
-
-    const iso = (data.countryIso || "").toUpperCase();
+    const attempt = (f: Record<string, string>) =>
+      twilioAccountPost(creds, "/IncomingPhoneNumbers.json", f) as Promise<PurchaseResult>;
 
     const bundleRequiredMessage = form.BundleSid
-      ? `O Regulatory Bundle informado não foi aceito pela Twilio para ${iso} (LOCAL). Confirme se o Bundle SID está aprovado (status "twilio-approved") e se é compatível com ${iso}/LOCAL.`
-      : `Este país (${iso}) exige um Regulatory Bundle aprovado pela Twilio (status "twilio-approved") vinculado ao número. Informe um Bundle SID aprovado para ${iso} (LOCAL) ou crie/envie um Bundle em https://console.twilio.com/us1/develop/phone-numbers/regulatory-compliance/bundles e aguarde a aprovação.`;
+      ? `O Regulatory Bundle informado não foi aceito pela Twilio para ${iso} (LOCAL). Confirme se o Bundle SID está aprovado ("twilio-approved") e é compatível com ${iso}/LOCAL.`
+      : `Este país (${iso}) exige um Regulatory Bundle aprovado pela Twilio vinculado ao número. Informe um Bundle SID aprovado ou crie um em https://console.twilio.com/us1/develop/phone-numbers/regulatory-compliance/bundles.`;
+    const addressRequiredMessage = `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}.`;
 
-    const addressRequiredMessage = `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}. Cadastre o endereço para concluir a compra.`;
-
-    const attachAddressForCountry = async () => {
-      const addr = (await twilioGet("/Addresses.json", { PageSize: "50" })) as {
+    const attachAddress = async () => {
+      const addr = (await twilioAccountGet(creds, "/Addresses.json", { PageSize: "50" })) as {
         addresses?: Array<{ sid: string; iso_country: string }>;
       };
       const match = (addr.addresses ?? []).find(
@@ -159,17 +250,10 @@ export const purchaseNumber = createServerFn({ method: "POST" })
       return !!match;
     };
 
-    const attachBundleForCountry = async () => {
-      // Numbering (regulatory) bundles live on the Numbers API, not the Core API.
-      const gw = "https://connector-gateway.lovable.dev/twilio";
+    const attachBundle = async () => {
       const res = await fetch(
-        `${gw}/v2/RegulatoryCompliance/Bundles?Status=twilio-approved&IsoCountry=${iso}&NumberType=local&PageSize=50`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.LOVABLE_API_KEY!}`,
-            "X-Connection-Api-Key": process.env.TWILIO_API_KEY!,
-          },
-        },
+        `${TWILIO_NUMBERING}/v2/RegulatoryCompliance/Bundles?Status=twilio-approved&IsoCountry=${iso}&NumberType=local&PageSize=50`,
+        { headers: { Authorization: basicAuth(creds) } },
       );
       if (!res.ok) return false;
       const body = (await res.json()) as { results?: Array<{ sid: string }> };
@@ -180,71 +264,60 @@ export const purchaseNumber = createServerFn({ method: "POST" })
 
     let json: PurchaseResult;
     try {
-      json = await attemptPurchase(form);
+      json = await attempt(form);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const needsAddress = msg.includes('"code":21631') || msg.includes("AddressSid");
       const needsBundle = msg.includes('"code":21649') || msg.includes("Bundle required");
-
       if (!needsAddress && !needsBundle) throw err;
 
-      const gotAddress = needsAddress ? await attachAddressForCountry() : true;
+      const gotAddress = needsAddress ? await attachAddress() : true;
       const gotBundle = needsBundle
         ? form.BundleSid
           ? true
-          : await attachBundleForCountry()
+          : await attachBundle()
         : true;
-      // Bundle-required countries usually also need an Address — attach opportunistically.
-      if (needsBundle && !form.AddressSid) await attachAddressForCountry();
+      if (needsBundle && !form.AddressSid) await attachAddress();
 
-      if (needsAddress && !gotAddress) {
-        return { ok: false, reason: "address_required", message: addressRequiredMessage };
-      }
-      if (needsBundle && !gotBundle) {
-        return { ok: false, reason: "bundle_required", message: bundleRequiredMessage };
-      }
+      if (needsAddress && !gotAddress)
+        return { ok: false as const, reason: "address_required" as const, message: addressRequiredMessage };
+      if (needsBundle && !gotBundle)
+        return { ok: false as const, reason: "bundle_required" as const, message: bundleRequiredMessage };
 
       try {
-        json = await attemptPurchase(form);
+        json = await attempt(form);
       } catch (retryErr) {
         const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-        if (retryMsg.includes('"code":21649') || retryMsg.includes("Bundle required")) {
-          return { ok: false, reason: "bundle_required", message: bundleRequiredMessage };
-        }
-        if (retryMsg.includes('"code":21631') || retryMsg.includes("AddressSid")) {
-          return { ok: false, reason: "address_required", message: addressRequiredMessage };
-        }
+        if (retryMsg.includes('"code":21649') || retryMsg.includes("Bundle required"))
+          return { ok: false as const, reason: "bundle_required" as const, message: bundleRequiredMessage };
+        if (retryMsg.includes('"code":21631') || retryMsg.includes("AddressSid"))
+          return { ok: false as const, reason: "address_required" as const, message: addressRequiredMessage };
         throw retryErr;
       }
     }
 
-
-    const { error } = await context.supabase
-      .from("user_phone_numbers")
-      .insert({
-        user_id: context.userId,
-        twilio_sid: json.sid,
-        phone_number: json.phone_number,
-        friendly_name: json.friendly_name ?? null,
-        region: data.region ?? null,
-        country_iso: data.countryIso ?? null,
-        capabilities: json.capabilities ?? {},
-        monthly_cost: "$1.00/mês",
-        provider: "twilio",
-      });
+    const { error } = await context.supabase.from("user_phone_numbers").insert({
+      user_id: context.userId,
+      twilio_sid: json.sid,
+      phone_number: json.phone_number,
+      friendly_name: json.friendly_name ?? null,
+      region: data.region ?? null,
+      country_iso: data.countryIso ?? null,
+      capabilities: json.capabilities ?? {},
+      monthly_cost: "$1.00/mês",
+      provider: "Twilio (Sua conta)",
+    });
 
     if (error) {
-      // Compensating rollback: release the Twilio number so we don't leave
-      // an orphan the user is billed for but doesn't own in our DB.
       try {
-        await twilioDelete(`/IncomingPhoneNumbers/${json.sid}.json`);
+        await twilioAccountDelete(creds, `/IncomingPhoneNumbers/${json.sid}.json`);
       } catch {
         /* best-effort */
       }
       throw new Error(`DB insert failed: ${error.message}`);
     }
 
-    return { ok: true, sid: json.sid, phoneNumber: json.phone_number };
+    return { ok: true as const, sid: json.sid, phoneNumber: json.phone_number };
   });
 
 // ---------- list ----------
@@ -266,7 +339,6 @@ export const releaseNumber = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    // Fetch the row (RLS scopes to this user).
     const { data: row, error: fetchErr } = await context.supabase
       .from("user_phone_numbers")
       .select("id, twilio_sid")
@@ -276,8 +348,19 @@ export const releaseNumber = createServerFn({ method: "POST" })
     if (fetchErr) throw new Error(fetchErr.message);
     if (!row) throw new Error("Número não encontrado.");
 
-    if (!row.twilio_sid.startsWith("byoc_")) {
-      await twilioDelete(`/IncomingPhoneNumbers/${row.twilio_sid}.json`);
+    const sid = row.twilio_sid as string;
+    if (!sid.startsWith("byoc_")) {
+      const creds = await loadCreds(context);
+      if (creds) {
+        try {
+          await twilioAccountDelete(creds, `/IncomingPhoneNumbers/${sid}.json`);
+        } catch (err) {
+          // If credentials no longer match this SID (e.g. user rotated Twilio
+          // account), still allow deleting the local row so it doesn't get stuck.
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!msg.includes("404")) throw err;
+        }
+      }
     }
 
     const { error: delErr } = await context.supabase
@@ -289,7 +372,7 @@ export const releaseNumber = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- address (regulatory) ----------
+// ---------- regulatory address ----------
 
 export const createTwilioAddress = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -306,7 +389,10 @@ export const createTwilioAddress = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
     const form: Record<string, string> = {
       CustomerName: data.customerName,
       Street: data.street,
@@ -316,65 +402,39 @@ export const createTwilioAddress = createServerFn({ method: "POST" })
       IsoCountry: data.isoCountry.toUpperCase(),
     };
     if (data.friendlyName) form.FriendlyName = data.friendlyName;
-    const json = (await twilioPost("/Addresses.json", form)) as {
+    const json = (await twilioAccountPost(creds, "/Addresses.json", form)) as {
       sid: string;
       iso_country: string;
     };
-    return { sid: json.sid, isoCountry: json.iso_country };
+    return { ok: true as const, sid: json.sid, isoCountry: json.iso_country };
   });
 
-// ---------- BYOC: Bring Your Own Carrier (Twilio own account or external SIP) ----------
+// ---------- SIP Trunk (external) ----------
 
 export const connectExternalNumber = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z
-      .discriminatedUnion("mode", [
-        z.object({
-          mode: z.literal("twilio"),
-          accountSid: z.string().trim().regex(/^AC[a-zA-Z0-9]{10,}$/, "Account SID inválido"),
-          authToken: z.string().trim().min(8, "Auth Token inválido"),
-          phoneNumber: z.string().trim().min(4),
-        }),
-        z.object({
-          mode: z.literal("sip"),
-          routeName: z.string().trim().min(2).max(80),
-          sipUri: z.string().trim().min(4),
-        }),
-      ])
+      .object({
+        routeName: z.string().trim().min(2).max(80),
+        sipUri: z.string().trim().min(4),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const syntheticSid = `byoc_${crypto.randomUUID()}`;
-
-    const capabilities: Record<string, unknown> =
-      data.mode === "twilio"
-        ? {
-            byoc: true,
-            account_sid: data.accountSid,
-            // Auth token stored here to keep the flow self-contained. For
-            // production traffic, move to an encrypted secrets table.
-            auth_token: data.authToken,
-          }
-        : { byoc: true, sip_uri: data.sipUri, route: data.routeName };
-
     const row = {
       user_id: context.userId,
       twilio_sid: syntheticSid,
-      phone_number: data.mode === "twilio" ? data.phoneNumber : data.sipUri,
-      friendly_name:
-        data.mode === "twilio"
-          ? `Twilio BYOC ${data.accountSid.slice(0, 8)}…`
-          : data.routeName,
+      phone_number: data.sipUri,
+      friendly_name: data.routeName,
       region: null,
       country_iso: null,
-      capabilities,
+      capabilities: { byoc: true, sip_uri: data.sipUri, route: data.routeName },
       monthly_cost: null,
-      provider: data.mode === "twilio" ? "Twilio (Conta Própria)" : "SIP (Externo)",
+      provider: "SIP (Externo)",
     };
-
     const { error } = await context.supabase.from("user_phone_numbers").insert(row);
     if (error) throw new Error(`DB insert failed: ${error.message}`);
     return { ok: true };
   });
-

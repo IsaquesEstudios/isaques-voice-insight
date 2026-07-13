@@ -63,8 +63,11 @@ import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
   connectExternalNumber,
+  disconnectTwilio,
+  getTwilioConnection,
   listMyNumbers,
   releaseNumber,
+  saveTwilioCredentials,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
@@ -123,11 +126,19 @@ function TelefoniaPage() {
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
-  const connectFn = useServerFn(connectExternalNumber);
+  const connectSipFn = useServerFn(connectExternalNumber);
+  const saveCredsFn = useServerFn(saveTwilioCredentials);
+  const getConnFn = useServerFn(getTwilioConnection);
+  const disconnectFn = useServerFn(disconnectTwilio);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
     queryFn: () => listFn(),
+  });
+
+  const twilioConnQuery = useQuery({
+    queryKey: ["twilio-connection"],
+    queryFn: () => getConnFn(),
   });
 
   const userQuery = useQuery({
@@ -139,17 +150,19 @@ function TelefoniaPage() {
   });
 
   const numbers = (numbersQuery.data ?? []) as NumberRow[];
+  const twilioConn = twilioConnQuery.data;
+  const isTwilioConnected = twilioConn?.connected === true;
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
   const [twilioForm, setTwilioForm] = useState({
     accountSid: "",
     authToken: "",
-    phoneNumber: "",
   });
   const [sipForm, setSipForm] = useState({ routeName: "" });
 
@@ -160,7 +173,7 @@ function TelefoniaPage() {
 
   const resetModal = () => {
     setTab("twilio");
-    setTwilioForm({ accountSid: "", authToken: "", phoneNumber: "" });
+    setTwilioForm({ accountSid: "", authToken: "" });
     setSipForm({ routeName: "" });
     setCopied(false);
   };
@@ -178,16 +191,14 @@ function TelefoniaPage() {
   const handleConnectTwilio = async () => {
     setConnecting(true);
     try {
-      await connectFn({
+      await saveCredsFn({
         data: {
-          mode: "twilio",
           accountSid: twilioForm.accountSid.trim(),
           authToken: twilioForm.authToken.trim(),
-          phoneNumber: twilioForm.phoneNumber.trim(),
         },
       });
-      toast.success("Telefonia conectada com sucesso!");
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      toast.success("Conta Twilio conectada com sucesso!");
+      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
       setOpen(false);
       resetModal();
     } catch (err) {
@@ -200,14 +211,13 @@ function TelefoniaPage() {
   const handleConnectSip = async () => {
     setConnecting(true);
     try {
-      await connectFn({
+      await connectSipFn({
         data: {
-          mode: "sip",
           routeName: sipForm.routeName.trim(),
           sipUri,
         },
       });
-      toast.success("Telefonia conectada com sucesso!");
+      toast.success("Rota SIP conectada com sucesso!");
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
@@ -217,6 +227,17 @@ function TelefoniaPage() {
       setConnecting(false);
     }
   };
+
+  const disconnectMutation = useMutation({
+    mutationFn: () => disconnectFn(),
+    onSuccess: async () => {
+      toast.success("Conta Twilio desconectada.");
+      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
+      setConfirmDisconnect(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Twilio"),
+  });
 
   const releaseMutation = useMutation({
     mutationFn: (id: string) => releaseFn({ data: { id } }),
@@ -228,6 +249,8 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
   });
+
+
 
 
   const handleSignOut = async () => {
@@ -277,7 +300,29 @@ function TelefoniaPage() {
               Gestão de rotas, DIDs e políticas anti-spam.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isTwilioConnected && twilioConn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-success/40 bg-success/10 text-success hover:bg-success/15 hover:text-success"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Twilio: {twilioConn.accountSid.slice(0, 8)}…
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setConfirmDisconnect(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Desconectar Twilio
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
             <Button
               variant="outline"
               className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
@@ -298,6 +343,7 @@ function TelefoniaPage() {
               <Plus className="h-4 w-4" /> Conectar Número
             </Button>
           </div>
+
         </div>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -517,16 +563,6 @@ function TelefoniaPage() {
                     }
                   />
                 </div>
-                <div className="grid gap-1.5">
-                  <Label>Número de Telefone Adquirido</Label>
-                  <Input
-                    placeholder="+55 11 9999-9999"
-                    value={twilioForm.phoneNumber}
-                    onChange={(e) =>
-                      setTwilioForm({ ...twilioForm, phoneNumber: e.target.value })
-                    }
-                  />
-                </div>
               </div>
 
               <div className="flex justify-end">
@@ -535,11 +571,11 @@ function TelefoniaPage() {
                   disabled={
                     connecting ||
                     !/^AC[a-zA-Z0-9]{10,}$/.test(twilioForm.accountSid) ||
-                    twilioForm.authToken.length < 8 ||
-                    twilioForm.phoneNumber.trim().length < 4
+                    twilioForm.authToken.length < 8
                   }
                   className="gap-2"
                 >
+
                   {connecting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
@@ -649,7 +685,48 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={confirmDisconnect}
+        onOpenChange={(o) => {
+          if (!o) setConfirmDisconnect(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desconectar conta Twilio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Suas credenciais Twilio serão removidas deste app. Os números já
+              cadastrados continuam listados, mas novas buscas e compras ficarão
+              bloqueadas até você reconectar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={disconnectMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                disconnectMutation.mutate();
+              }}
+              disabled={disconnectMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {disconnectMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Desconectando...
+                </>
+              ) : (
+                "Desconectar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardShell>
+
 
   );
 }
