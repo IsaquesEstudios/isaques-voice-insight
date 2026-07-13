@@ -73,6 +73,49 @@ async function twilioAccountDelete(creds: Creds, path: string) {
   }
 }
 
+async function twilioVerifyPost(
+  creds: Creds,
+  path: string,
+  form: Record<string, string>,
+) {
+  const res = await fetch(`${TWILIO_VERIFY}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: basicAuth(creds),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(form).toString(),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Twilio Verify ${res.status}: ${text}`);
+  return text ? JSON.parse(text) : {};
+}
+
+async function twilioVerifyGet(creds: Creds, path: string) {
+  const res = await fetch(`${TWILIO_VERIFY}${path}`, {
+    headers: { Authorization: basicAuth(creds) },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Twilio Verify ${res.status}: ${text}`);
+  return text ? JSON.parse(text) : {};
+}
+
+// Finds or creates a Verify Service named "Lovable Verify" for the user's Twilio account.
+async function ensureVerifyService(creds: Creds): Promise<string> {
+  const list = (await twilioVerifyGet(creds, "/Services?PageSize=50")) as {
+    services?: Array<{ sid: string; friendly_name: string }>;
+  };
+  const found = (list.services ?? []).find(
+    (s) => s.friendly_name === "Lovable Verify",
+  );
+  if (found) return found.sid;
+  const created = (await twilioVerifyPost(creds, "/Services", {
+    FriendlyName: "Lovable Verify",
+    CodeLength: "6",
+  })) as { sid: string };
+  return created.sid;
+}
+
 // ---------- credentials ----------
 
 export const saveTwilioCredentials = createServerFn({ method: "POST" })
