@@ -714,6 +714,27 @@ function TelefoniaPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
+                                  onClick={() => {
+                                    setAssignTarget(n);
+                                    setAssignAssistantId(
+                                      assistantByPhone.get(n.phone_number) ?? "",
+                                    );
+                                  }}
+                                >
+                                  <Bot className="mr-2 h-4 w-4" />
+                                  {n.assistant ? "Alterar atendente" : "Atribuir atendente"}
+                                </DropdownMenuItem>
+                                {n.assistant ? (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      detachAssistantMutation.mutate(n.phone_number)
+                                    }
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remover atendente
+                                  </DropdownMenuItem>
+                                ) : null}
+                                <DropdownMenuItem
                                   onClick={() => setReleaseTarget(n)}
                                   className="text-destructive focus:text-destructive"
                                 >
@@ -721,6 +742,7 @@ function TelefoniaPage() {
                                   Liberar número
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
+
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
