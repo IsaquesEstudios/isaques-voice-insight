@@ -151,6 +151,9 @@ function TelefoniaPage() {
   const [pendingBuy, setPendingBuy] = useState<AvailableNumber | null>(null);
   const [addressOpen, setAddressOpen] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [bundleOpen, setBundleOpen] = useState(false);
+  const [bundleSid, setBundleSid] = useState("");
+  const [savingBundle, setSavingBundle] = useState(false);
   const [addr, setAddr] = useState({
     customerName: "",
     street: "",
@@ -182,19 +185,42 @@ function TelefoniaPage() {
     }
   };
 
-  const handleBuy = async (n: AvailableNumber) => {
+  const handleBuy = async (n: AvailableNumber, regulatoryBundleSid?: string) => {
     setBuyingId(n.id);
     try {
-      await buyFn({
+      const response = await buyFn({
         data: {
           phoneNumber: n.phoneNumber,
           countryIso: n.countryIso,
           region: n.region,
+          bundleSid: regulatoryBundleSid,
         },
       });
+      if (!response.ok) {
+        if (response.reason === "address_required") {
+          setPendingBuy(n);
+          setAddressOpen(true);
+          toast.message("Cadastre um endereço regulatório para concluir a compra.");
+          return;
+        }
+        if (response.reason === "bundle_required") {
+          setPendingBuy(n);
+          setBundleOpen(true);
+          if (regulatoryBundleSid) {
+            toast.error(response.message);
+          } else {
+            toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
+          }
+          return;
+        }
+      }
       toast.success(`Número ${n.phoneNumber} adquirido e vinculado à sua conta!`);
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
+      setAddressOpen(false);
+      setBundleOpen(false);
+      setPendingBuy(null);
+      setBundleSid("");
       resetModal();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha ao adquirir número";
@@ -202,6 +228,10 @@ function TelefoniaPage() {
         setPendingBuy(n);
         setAddressOpen(true);
         toast.message("Cadastre um endereço regulatório para concluir a compra.");
+      } else if (/Regulatory Bundle|Bundle required|21649/i.test(msg)) {
+        setPendingBuy(n);
+        setBundleOpen(true);
+        toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
       } else {
         toast.error(msg);
       }
@@ -234,6 +264,16 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao cadastrar endereço");
     } finally {
       setSavingAddress(false);
+    }
+  };
+
+  const handleSaveBundle = async () => {
+    if (!pendingBuy || !bundleSid.trim()) return;
+    setSavingBundle(true);
+    try {
+      await handleBuy(pendingBuy, bundleSid.trim());
+    } finally {
+      setSavingBundle(false);
     }
   };
 
