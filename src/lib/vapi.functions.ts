@@ -693,16 +693,27 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
       const safeName = (data.name ?? data.phoneNumberE164)
         .replace(/[^a-zA-Z0-9 _-]/g, "")
         .slice(0, 40) || "Twilio number";
-      const created = (await vapiFetch("/phone-number", {
-        method: "POST",
-        body: JSON.stringify({
-          provider: "twilio",
-          number: data.phoneNumberE164,
-          twilioAccountSid: creds.accountSid,
-          twilioAuthToken: creds.authToken,
-          name: safeName,
-        }),
-      })) as VapiPhoneNumberRaw;
+      let created: VapiPhoneNumberRaw;
+      try {
+        created = (await vapiFetch("/phone-number", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: "twilio",
+            number: data.phoneNumberE164,
+            twilioAccountSid: creds.accountSid,
+            twilioAuthToken: creds.authToken,
+            name: safeName,
+          }),
+        })) as VapiPhoneNumberRaw;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/already in use by another org/i.test(msg)) {
+          throw new Error(
+            `O número ${data.phoneNumberE164} já está vinculado a outra organização Vapi. Remova-o de lá (Vapi Dashboard → Phone Numbers) antes de importá-lo aqui.`,
+          );
+        }
+        throw err;
+      }
       // Then attach assistant via PATCH (avoids some 400s on create).
       await vapiFetch(`/phone-number/${created.id}`, {
         method: "PATCH",
@@ -710,6 +721,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
       });
       vapiNumberId = created.id;
     }
+
 
     // Best-effort mirror to Supabase (schema-tolerant — columns may not exist).
     try {
