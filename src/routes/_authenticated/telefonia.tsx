@@ -148,6 +148,16 @@ function TelefoniaPage() {
   const [results, setResults] = useState<AvailableNumber[] | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
+  const [pendingBuy, setPendingBuy] = useState<AvailableNumber | null>(null);
+  const [addressOpen, setAddressOpen] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [addr, setAddr] = useState({
+    customerName: "",
+    street: "",
+    city: "",
+    region: "",
+    postalCode: "",
+  });
 
   const resetModal = () => {
     setCountry("BR");
