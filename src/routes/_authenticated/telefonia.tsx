@@ -190,6 +190,31 @@ function TelefoniaPage() {
     enabled: isTwilioConnected,
   });
 
+  const assistantsQuery = useQuery({
+    queryKey: ["vapi-assistants"],
+    queryFn: () => listAssistantsFn(),
+  });
+  const vapiPhoneNumbersQuery = useQuery({
+    queryKey: ["vapi-phone-numbers"],
+    queryFn: () => listVapiPhoneNumbersFn(),
+  });
+
+  const assistantById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of assistantsQuery.data ?? []) {
+      map.set(a.id, a.name ?? "Sem nome");
+    }
+    return map;
+  }, [assistantsQuery.data]);
+
+  const assistantByPhone = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const n of vapiPhoneNumbersQuery.data ?? []) {
+      if (n.number && n.assistantId) map.set(n.number, n.assistantId);
+    }
+    return map;
+  }, [vapiPhoneNumbersQuery.data]);
+
   const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
   const liveTwilio =
     twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
@@ -205,18 +230,25 @@ function TelefoniaPage() {
   const numbers: NumberRow[] = isTwilioConnected
     ? liveTwilio.map((n) => {
         const local = localNumbers.find((l) => l.phone_number === n.phoneNumber);
+        const assistantId = assistantByPhone.get(n.phoneNumber);
+        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
         return {
           id: local?.id ?? n.sid,
           phone_number: n.phoneNumber,
           region: local?.region ?? null,
           provider: "Twilio (Sua conta)",
-          assistant: local?.assistant ?? null,
+          assistant: assistantName ?? local?.assistant ?? null,
           calls_today: local?.calls_today ?? 0,
           answer_rate: local?.answer_rate ?? 0,
           health: "Seguro" as Health,
         };
       })
-    : localNumbers;
+    : localNumbers.map((n) => {
+        const assistantId = assistantByPhone.get(n.phone_number);
+        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
+        return { ...n, assistant: assistantName ?? n.assistant };
+      });
+
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
