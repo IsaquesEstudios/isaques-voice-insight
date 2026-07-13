@@ -132,6 +132,7 @@ function TelefoniaPage() {
   const searchFn = useServerFn(searchAvailableNumbers);
   const buyFn = useServerFn(purchaseNumber);
   const releaseFn = useServerFn(releaseNumber);
+  const createAddressFn = useServerFn(createTwilioAddress);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
