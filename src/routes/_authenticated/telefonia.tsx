@@ -62,7 +62,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  addTestContact,
+  checkVerifyOtp,
   connectExternalNumber,
   disconnectTwilio,
   getTwilioConnection,
@@ -71,11 +71,10 @@ import {
   listTwilioNumbers,
   listTwilioTrunks,
   makeTestCall,
-  refreshContactVerification,
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
-  startContactVerification,
+  sendVerifyOtp,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
@@ -135,11 +134,10 @@ function TelefoniaPage() {
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
-  const addTestContactFn = useServerFn(addTestContact);
   const removeTestContactFn = useServerFn(removeTestContact);
   const makeTestCallFn = useServerFn(makeTestCall);
-  const startVerificationFn = useServerFn(startContactVerification);
-  const refreshVerificationFn = useServerFn(refreshContactVerification);
+  const sendOtpFn = useServerFn(sendVerifyOtp);
+  const checkOtpFn = useServerFn(checkVerifyOtp);
 
 
   const numbersQuery = useQuery({
@@ -212,12 +210,16 @@ function TelefoniaPage() {
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
   const [testCallFrom, setTestCallFrom] = useState<string>("");
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  const [verifyState, setVerifyState] = useState<{
-    contactId: string;
+  // Two-step new-contact flow: "form" → "code"
+  const [contactStep, setContactStep] = useState<"form" | "code">("form");
+  const [otpCode, setOtpCode] = useState("");
+  // Verify existing (already-saved) contact via SMS
+  const [verifyExisting, setVerifyExisting] = useState<{
+    id: string;
     label: string;
     phone: string;
-    code: string | null;
   } | null>(null);
+  const [verifyOtp, setVerifyOtp] = useState("");
 
   const testContactsQuery = useQuery({
     queryKey: ["test-contacts"],
@@ -231,22 +233,51 @@ function TelefoniaPage() {
     created_at: string;
   }>;
 
-  const addTestContactMutation = useMutation({
-    mutationFn: () =>
-      addTestContactFn({
-        data: {
-          label: testContactForm.label.trim(),
-          phoneE164: testContactForm.phoneE164.trim(),
-        },
-      }),
-    onSuccess: async () => {
-      toast.success("Contato adicionado. Verifique o número para poder receber ligações.");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      setTestContactOpen(false);
-      setTestContactForm({ label: "", phoneE164: "" });
+  const sendOtpMutation = useMutation({
+    mutationFn: (phoneE164: string) =>
+      sendOtpFn({ data: { phoneE164, channel: "sms" } }),
+    onSuccess: (res) => {
+      if ("ok" in res && res.ok) {
+        toast.success("Código enviado por SMS.");
+      } else if ("reason" in res && res.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
+      } else if ("reason" in res && res.reason === "twilio_error") {
+        toast.error(("message" in res && res.message) || "Falha ao enviar SMS.");
+      }
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao adicionar contato"),
+      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS"),
+  });
+
+  const checkOtpMutation = useMutation({
+    mutationFn: (input: {
+      phoneE164: string;
+      code: string;
+      contactId?: string;
+      label?: string;
+    }) => checkOtpFn({ data: input }),
+    onSuccess: async (res) => {
+      if ("ok" in res && res.ok) {
+        toast.success("Número verificado!");
+        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+        setTestContactOpen(false);
+        setTestContactForm({ label: "", phoneE164: "" });
+        setContactStep("form");
+        setOtpCode("");
+        setVerifyExisting(null);
+        setVerifyOtp("");
+      } else if ("reason" in res && res.reason === "invalid_code") {
+        toast.error("Código inválido. Confira o SMS e tente novamente.");
+      } else if ("reason" in res && res.reason === "expired") {
+        toast.error("Código expirado. Reenvie um novo SMS.");
+      } else if ("reason" in res && res.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
+      } else if ("reason" in res && res.reason === "twilio_error") {
+        toast.error(("message" in res && res.message) || "Falha na verificação.");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao verificar código"),
   });
 
   const removeTestContactMutation = useMutation({
@@ -259,46 +290,6 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
   });
 
-  const startVerificationMutation = useMutation({
-    mutationFn: (c: { id: string; label: string; phone: string }) =>
-      startVerificationFn({ data: { id: c.id } }).then((r) => ({ ...r, _c: c })),
-    onSuccess: async (res) => {
-      if ("ok" in res && res.ok) {
-        if ("alreadyVerified" in res && res.alreadyVerified) {
-          toast.success("Número já estava verificado no Twilio.");
-          await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-          return;
-        }
-        setVerifyState({
-          contactId: res._c.id,
-          label: res._c.label,
-          phone: res._c.phone,
-          code: (res as { validationCode?: string }).validationCode ?? null,
-        });
-      } else if ("reason" in res && res.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação"),
-  });
-
-  const refreshVerificationMutation = useMutation({
-    mutationFn: (id: string) => refreshVerificationFn({ data: { id } }),
-    onSuccess: async (res) => {
-      if ("ok" in res && res.ok) {
-        if (res.verified) {
-          toast.success("Número verificado com sucesso!");
-          setVerifyState(null);
-          await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-        } else {
-          toast.info("Ainda não verificado. Complete a chamada e tente novamente.");
-        }
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao consultar status"),
-  });
 
   const testCallMutation = useMutation({
     mutationFn: (contact: { id: string; phone_e164: string }) => {
@@ -779,23 +770,22 @@ function TelefoniaPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={
-                        !isTwilioConnected ||
-                        startVerificationMutation.isPending
-                      }
-                      onClick={() =>
-                        startVerificationMutation.mutate({
+                      disabled={!isTwilioConnected || sendOtpMutation.isPending}
+                      onClick={() => {
+                        setVerifyExisting({
                           id: c.id,
                           label: c.label,
                           phone: c.phone_e164,
-                        })
-                      }
+                        });
+                        setVerifyOtp("");
+                        sendOtpMutation.mutate(c.phone_e164);
+                      }}
                       className="gap-1.5"
                     >
-                      {startVerificationMutation.isPending ? (
+                      {sendOtpMutation.isPending ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : null}
-                      Verificar via SMS/chamada
+                      Verificar via SMS
                     </Button>
                   )}
                   <Button
@@ -839,112 +829,199 @@ function TelefoniaPage() {
         open={testContactOpen}
         onOpenChange={(o) => {
           setTestContactOpen(o);
-          if (!o) setTestContactForm({ label: "", phoneE164: "" });
+          if (!o) {
+            setTestContactForm({ label: "", phoneE164: "" });
+            setContactStep("form");
+            setOtpCode("");
+          }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>Novo contato de teste</DialogTitle>
+            <DialogTitle>
+              {contactStep === "form" ? "Novo contato de teste" : "Confirme o código"}
+            </DialogTitle>
             <DialogDescription>
-              Cadastre um número que receberá as chamadas de teste. Use formato E.164
-              internacional (ex: +5511999998888).
+              {contactStep === "form"
+                ? "Cadastre um número que receberá as chamadas de teste. Formato E.164 (ex: +5511999998888)."
+                : `Enviamos um SMS com um código de 6 dígitos para ${testContactForm.phoneE164}. Digite-o abaixo para concluir o cadastro.`}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="tc-label" className="text-xs">
-                Identificação
-              </Label>
-              <Input
-                id="tc-label"
-                placeholder="Ex: Meu celular"
-                value={testContactForm.label}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                }
-              />
+
+          {contactStep === "form" ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
+                <Input
+                  id="tc-label"
+                  placeholder="Ex: Meu celular"
+                  value={testContactForm.label}
+                  onChange={(e) =>
+                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tc-phone" className="text-xs">Número (E.164)</Label>
+                <Input
+                  id="tc-phone"
+                  placeholder="+5511999998888"
+                  value={testContactForm.phoneE164}
+                  onChange={(e) =>
+                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const phone = testContactForm.phoneE164.trim();
+                    const res = await sendOtpMutation.mutateAsync(phone);
+                    if ("ok" in res && res.ok) {
+                      setContactStep("code");
+                      setOtpCode("");
+                    }
+                  }}
+                  disabled={
+                    sendOtpMutation.isPending ||
+                    !testContactForm.label.trim() ||
+                    !testContactForm.phoneE164.trim() ||
+                    !isTwilioConnected
+                  }
+                >
+                  {sendOtpMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Próximo
+                </Button>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tc-phone" className="text-xs">
-                Número (E.164)
-              </Label>
-              <Input
-                id="tc-phone"
-                placeholder="+5511999998888"
-                value={testContactForm.phoneE164}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                }
-              />
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="tc-otp" className="text-xs">Código SMS</Label>
+                <Input
+                  id="tc-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  maxLength={10}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  className="text-center font-mono text-2xl tracking-[0.4em]"
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  onClick={() =>
+                    sendOtpMutation.mutate(testContactForm.phoneE164.trim())
+                  }
+                  disabled={sendOtpMutation.isPending}
+                >
+                  Reenviar código
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => setContactStep("form")}
+                >
+                  ← Voltar
+                </button>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() =>
+                    checkOtpMutation.mutate({
+                      phoneE164: testContactForm.phoneE164.trim(),
+                      code: otpCode.trim(),
+                      label: testContactForm.label.trim(),
+                    })
+                  }
+                  disabled={checkOtpMutation.isPending || otpCode.trim().length < 4}
+                >
+                  {checkOtpMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Confirmar e salvar
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => addTestContactMutation.mutate()}
-                disabled={
-                  addTestContactMutation.isPending ||
-                  !testContactForm.label.trim() ||
-                  !testContactForm.phoneE164.trim()
-                }
-              >
-                {addTestContactMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Salvar
-              </Button>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
       <Dialog
-        open={verifyState !== null}
+        open={verifyExisting !== null}
         onOpenChange={(o) => {
-          if (!o) setVerifyState(null);
+          if (!o) {
+            setVerifyExisting(null);
+            setVerifyOtp("");
+          }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>Verificar número</DialogTitle>
             <DialogDescription>
-              O Twilio vai ligar para <b>{verifyState?.phone}</b> em instantes. Atenda e
-              digite o código abaixo no teclado do telefone quando solicitado.
+              Enviamos um SMS com o código para <b>{verifyExisting?.phone}</b>. Digite-o
+              abaixo para verificar este contato.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                Código de verificação
-              </p>
-              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.4em] text-primary">
-                {verifyState?.code ?? "----"}
-              </p>
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              maxLength={10}
+              value={verifyOtp}
+              onChange={(e) => setVerifyOtp(e.target.value.replace(/\D/g, ""))}
+              className="text-center font-mono text-2xl tracking-[0.4em]"
+            />
+            <div className="flex items-center justify-between text-xs">
+              <button
+                type="button"
+                className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                onClick={() =>
+                  verifyExisting && sendOtpMutation.mutate(verifyExisting.phone)
+                }
+                disabled={sendOtpMutation.isPending}
+              >
+                Reenviar código
+              </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Depois de digitar o código no telefone, clique em <b>Já verifiquei</b>{" "}
-              para confirmar o status na sua conta Twilio.
-            </p>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setVerifyState(null)}>
+              <Button variant="ghost" onClick={() => setVerifyExisting(null)}>
                 Fechar
               </Button>
               <Button
                 onClick={() =>
-                  verifyState && refreshVerificationMutation.mutate(verifyState.contactId)
+                  verifyExisting &&
+                  checkOtpMutation.mutate({
+                    phoneE164: verifyExisting.phone,
+                    code: verifyOtp.trim(),
+                    contactId: verifyExisting.id,
+                  })
                 }
-                disabled={refreshVerificationMutation.isPending}
+                disabled={checkOtpMutation.isPending || verifyOtp.trim().length < 4}
               >
-                {refreshVerificationMutation.isPending && (
+                {checkOtpMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Já verifiquei
+                Confirmar
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
 
       <Dialog
         open={open}
