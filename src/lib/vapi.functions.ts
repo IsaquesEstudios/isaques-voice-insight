@@ -669,21 +669,15 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
     await assertOwnership(context.supabase, context.userId, data.assistantId);
 
     // Find existing Vapi phone-number entry (if any) for this E.164.
-    // Vapi paginates /phone-number (default ~100). Walk pages until we find
-    // it or the list ends — otherwise import fails with "already in use".
-    let existing: VapiPhoneNumberRaw | undefined;
-    const pageSize = 100;
-    for (let page = 1; page <= 20; page++) {
-      const chunk = (await vapiFetch(
-        `/phone-number?limit=${pageSize}&page=${page}`,
-        { method: "GET" },
-      )) as VapiPhoneNumberRaw[] | null;
-      if (!Array.isArray(chunk) || chunk.length === 0) break;
-      existing = chunk.find(
-        (n) => (n.number as string | undefined) === data.phoneNumberE164,
-      );
-      if (existing || chunk.length < pageSize) break;
-    }
+    // Vapi's /phone-number rejects unknown query params (e.g. `page`),
+    // so we fetch a single large page with `limit` only.
+    const list = (await vapiFetch(`/phone-number?limit=1000`, {
+      method: "GET",
+    })) as VapiPhoneNumberRaw[] | null;
+    const existing: VapiPhoneNumberRaw | undefined = Array.isArray(list)
+      ? list.find((n) => (n.number as string | undefined) === data.phoneNumberE164)
+      : undefined;
+
 
 
     let vapiNumberId: string;
