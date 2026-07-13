@@ -66,6 +66,8 @@ import {
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
+  listTwilioNumbers,
+  listTwilioTrunks,
   releaseNumber,
   saveTwilioCredentials,
 } from "@/lib/twilio.functions";
