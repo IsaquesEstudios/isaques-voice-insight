@@ -134,11 +134,10 @@ function TelefoniaPage() {
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
-  const addTestContactFn = useServerFn(addTestContact);
   const removeTestContactFn = useServerFn(removeTestContact);
   const makeTestCallFn = useServerFn(makeTestCall);
-  const startVerificationFn = useServerFn(startContactVerification);
-  const refreshVerificationFn = useServerFn(refreshContactVerification);
+  const sendOtpFn = useServerFn(sendVerifyOtp);
+  const checkOtpFn = useServerFn(checkVerifyOtp);
 
 
   const numbersQuery = useQuery({
