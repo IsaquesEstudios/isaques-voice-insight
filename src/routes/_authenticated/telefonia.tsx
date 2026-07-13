@@ -126,11 +126,19 @@ function TelefoniaPage() {
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
-  const connectFn = useServerFn(connectExternalNumber);
+  const connectSipFn = useServerFn(connectExternalNumber);
+  const saveCredsFn = useServerFn(saveTwilioCredentials);
+  const getConnFn = useServerFn(getTwilioConnection);
+  const disconnectFn = useServerFn(disconnectTwilio);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
     queryFn: () => listFn(),
+  });
+
+  const twilioConnQuery = useQuery({
+    queryKey: ["twilio-connection"],
+    queryFn: () => getConnFn(),
   });
 
   const userQuery = useQuery({
@@ -142,17 +150,19 @@ function TelefoniaPage() {
   });
 
   const numbers = (numbersQuery.data ?? []) as NumberRow[];
+  const twilioConn = twilioConnQuery.data;
+  const isTwilioConnected = twilioConn?.connected === true;
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
   const [twilioForm, setTwilioForm] = useState({
     accountSid: "",
     authToken: "",
-    phoneNumber: "",
   });
   const [sipForm, setSipForm] = useState({ routeName: "" });
 
@@ -163,7 +173,7 @@ function TelefoniaPage() {
 
   const resetModal = () => {
     setTab("twilio");
-    setTwilioForm({ accountSid: "", authToken: "", phoneNumber: "" });
+    setTwilioForm({ accountSid: "", authToken: "" });
     setSipForm({ routeName: "" });
     setCopied(false);
   };
@@ -181,16 +191,14 @@ function TelefoniaPage() {
   const handleConnectTwilio = async () => {
     setConnecting(true);
     try {
-      await connectFn({
+      await saveCredsFn({
         data: {
-          mode: "twilio",
           accountSid: twilioForm.accountSid.trim(),
           authToken: twilioForm.authToken.trim(),
-          phoneNumber: twilioForm.phoneNumber.trim(),
         },
       });
-      toast.success("Telefonia conectada com sucesso!");
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      toast.success("Conta Twilio conectada com sucesso!");
+      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
       setOpen(false);
       resetModal();
     } catch (err) {
@@ -203,14 +211,13 @@ function TelefoniaPage() {
   const handleConnectSip = async () => {
     setConnecting(true);
     try {
-      await connectFn({
+      await connectSipFn({
         data: {
-          mode: "sip",
           routeName: sipForm.routeName.trim(),
           sipUri,
         },
       });
-      toast.success("Telefonia conectada com sucesso!");
+      toast.success("Rota SIP conectada com sucesso!");
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
@@ -220,6 +227,17 @@ function TelefoniaPage() {
       setConnecting(false);
     }
   };
+
+  const disconnectMutation = useMutation({
+    mutationFn: () => disconnectFn(),
+    onSuccess: async () => {
+      toast.success("Conta Twilio desconectada.");
+      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
+      setConfirmDisconnect(false);
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Twilio"),
+  });
 
   const releaseMutation = useMutation({
     mutationFn: (id: string) => releaseFn({ data: { id } }),
@@ -231,6 +249,8 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
   });
+
+
 
 
   const handleSignOut = async () => {
