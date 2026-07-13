@@ -294,8 +294,18 @@ function TelefoniaPage() {
   const testCallMutation = useMutation({
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
+      const rawFrom = testCallFrom || numbers[0]?.phone_number || "";
+      const fromNumber = rawFrom.startsWith("+")
+        ? rawFrom.replace(/[^\d+]/g, "")
+        : `+${rawFrom.replace(/\D/g, "")}`;
+      if (!/^\+[1-9]\d{1,14}$/.test(fromNumber)) {
+        setCallingContactId(null);
+        return Promise.reject(
+          new Error("Selecione um número Twilio válido (E.164) para originar a chamada."),
+        );
+      }
       return makeTestCallFn({
-        data: { fromNumber: testCallFrom, toNumber: contact.phone_e164 },
+        data: { fromNumber, toNumber: contact.phone_e164 },
       });
     },
     onSuccess: (res) => {
