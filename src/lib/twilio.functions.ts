@@ -276,7 +276,9 @@ export const releaseNumber = createServerFn({ method: "POST" })
     if (fetchErr) throw new Error(fetchErr.message);
     if (!row) throw new Error("Número não encontrado.");
 
-    await twilioDelete(`/IncomingPhoneNumbers/${row.twilio_sid}.json`);
+    if (!row.twilio_sid.startsWith("byoc_")) {
+      await twilioDelete(`/IncomingPhoneNumbers/${row.twilio_sid}.json`);
+    }
 
     const { error: delErr } = await context.supabase
       .from("user_phone_numbers")
@@ -320,3 +322,59 @@ export const createTwilioAddress = createServerFn({ method: "POST" })
     };
     return { sid: json.sid, isoCountry: json.iso_country };
   });
+
+// ---------- BYOC: Bring Your Own Carrier (Twilio own account or external SIP) ----------
+
+export const connectExternalNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .discriminatedUnion("mode", [
+        z.object({
+          mode: z.literal("twilio"),
+          accountSid: z.string().trim().regex(/^AC[a-zA-Z0-9]{10,}$/, "Account SID inválido"),
+          authToken: z.string().trim().min(8, "Auth Token inválido"),
+          phoneNumber: z.string().trim().min(4),
+        }),
+        z.object({
+          mode: z.literal("sip"),
+          routeName: z.string().trim().min(2).max(80),
+          sipUri: z.string().trim().min(4),
+        }),
+      ])
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const syntheticSid = `byoc_${crypto.randomUUID()}`;
+
+    const capabilities: Record<string, unknown> =
+      data.mode === "twilio"
+        ? {
+            byoc: true,
+            account_sid: data.accountSid,
+            // Auth token stored here to keep the flow self-contained. For
+            // production traffic, move to an encrypted secrets table.
+            auth_token: data.authToken,
+          }
+        : { byoc: true, sip_uri: data.sipUri, route: data.routeName };
+
+    const row = {
+      user_id: context.userId,
+      twilio_sid: syntheticSid,
+      phone_number: data.mode === "twilio" ? data.phoneNumber : data.sipUri,
+      friendly_name:
+        data.mode === "twilio"
+          ? `Twilio BYOC ${data.accountSid.slice(0, 8)}…`
+          : data.routeName,
+      region: null,
+      country_iso: null,
+      capabilities,
+      monthly_cost: null,
+      provider: data.mode === "twilio" ? "Twilio (Conta Própria)" : "SIP (Externo)",
+    };
+
+    const { error } = await context.supabase.from("user_phone_numbers").insert(row);
+    if (error) throw new Error(`DB insert failed: ${error.message}`);
+    return { ok: true };
+  });
+

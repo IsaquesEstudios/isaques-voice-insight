@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -11,13 +11,13 @@ import {
   MoreVertical,
   Circle,
   Signal,
-  Search,
-  Phone,
-  MessageSquare,
   Loader2,
-  Inbox,
   LogOut,
   Trash2,
+  Info,
+  Copy,
+  Check,
+  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,13 +49,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -67,11 +62,9 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  createTwilioAddress,
+  connectExternalNumber,
   listMyNumbers,
-  purchaseNumber,
   releaseNumber,
-  searchAvailableNumbers,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
@@ -129,151 +122,99 @@ function TelefoniaPage() {
   const queryClient = useQueryClient();
 
   const listFn = useServerFn(listMyNumbers);
-  const searchFn = useServerFn(searchAvailableNumbers);
-  const buyFn = useServerFn(purchaseNumber);
   const releaseFn = useServerFn(releaseNumber);
-  const createAddressFn = useServerFn(createTwilioAddress);
+  const connectFn = useServerFn(connectExternalNumber);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
     queryFn: () => listFn(),
   });
 
+  const userQuery = useQuery({
+    queryKey: ["auth-user-id"],
+    queryFn: async () => {
+      const { data } = await getSupabaseBrowser().auth.getUser();
+      return data.user?.id ?? "";
+    },
+  });
+
   const numbers = (numbersQuery.data ?? []) as NumberRow[];
 
   const [open, setOpen] = useState(false);
-  const [country, setCountry] = useState("BR");
-  const [area, setArea] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<AvailableNumber[] | null>(null);
-  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"twilio" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
-  const [pendingBuy, setPendingBuy] = useState<AvailableNumber | null>(null);
-  const [addressOpen, setAddressOpen] = useState(false);
-  const [savingAddress, setSavingAddress] = useState(false);
-  const [bundleOpen, setBundleOpen] = useState(false);
-  const [bundleSid, setBundleSid] = useState("");
-  const [savingBundle, setSavingBundle] = useState(false);
-  const [addr, setAddr] = useState({
-    customerName: "",
-    street: "",
-    city: "",
-    region: "",
-    postalCode: "",
+  const [copied, setCopied] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  const [twilioForm, setTwilioForm] = useState({
+    accountSid: "",
+    authToken: "",
+    phoneNumber: "",
   });
+  const [sipForm, setSipForm] = useState({ routeName: "" });
+
+  const sipUri = useMemo(() => {
+    const slug = (userQuery.data ?? "anon").replace(/-/g, "").slice(0, 12);
+    return `sip:${slug}@sip.vapi.ai`;
+  }, [userQuery.data]);
 
   const resetModal = () => {
-    setCountry("BR");
-    setArea("");
-    setResults(null);
-    setSearching(false);
-    setBuyingId(null);
+    setTab("twilio");
+    setTwilioForm({ accountSid: "", authToken: "", phoneNumber: "" });
+    setSipForm({ routeName: "" });
+    setCopied(false);
   };
 
-  const handleSearch = async () => {
-    setSearching(true);
-    setResults(null);
+  const handleCopySip = async () => {
     try {
-      const rows = await searchFn({
-        data: { country, areaCode: area.trim() || undefined },
-      });
-      setResults(rows);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na busca");
-    } finally {
-      setSearching(false);
+      await navigator.clipboard.writeText(sipUri);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
     }
   };
 
-  const handleBuy = async (n: AvailableNumber, regulatoryBundleSid?: string) => {
-    setBuyingId(n.id);
+  const handleConnectTwilio = async () => {
+    setConnecting(true);
     try {
-      const response = await buyFn({
+      await connectFn({
         data: {
-          phoneNumber: n.phoneNumber,
-          countryIso: n.countryIso,
-          region: n.region,
-          bundleSid: regulatoryBundleSid,
+          mode: "twilio",
+          accountSid: twilioForm.accountSid.trim(),
+          authToken: twilioForm.authToken.trim(),
+          phoneNumber: twilioForm.phoneNumber.trim(),
         },
       });
-      if (!response.ok) {
-        if (response.reason === "address_required") {
-          setPendingBuy(n);
-          setAddressOpen(true);
-          toast.message("Cadastre um endereço regulatório para concluir a compra.");
-          return;
-        }
-        if (response.reason === "bundle_required") {
-          setPendingBuy(n);
-          setBundleOpen(true);
-          if (regulatoryBundleSid) {
-            toast.error(response.message);
-          } else {
-            toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
-          }
-          return;
-        }
-      }
-      toast.success(`Número ${n.phoneNumber} adquirido e vinculado à sua conta!`);
+      toast.success("Telefonia conectada com sucesso!");
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
-      setAddressOpen(false);
-      setBundleOpen(false);
-      setPendingBuy(null);
-      setBundleSid("");
       resetModal();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha ao adquirir número";
-      if (/Endere[çc]o regulat[oó]rio|AddressSid|21631/i.test(msg)) {
-        setPendingBuy(n);
-        setAddressOpen(true);
-        toast.message("Cadastre um endereço regulatório para concluir a compra.");
-      } else if (/Regulatory Bundle|Bundle required|21649/i.test(msg)) {
-        setPendingBuy(n);
-        setBundleOpen(true);
-        toast.message("Informe um Regulatory Bundle aprovado para concluir a compra.");
-      } else {
-        toast.error(msg);
-      }
+      toast.error(err instanceof Error ? err.message : "Falha ao conectar Twilio");
     } finally {
-      setBuyingId(null);
+      setConnecting(false);
     }
   };
 
-  const handleSaveAddress = async () => {
-    if (!pendingBuy) return;
-    setSavingAddress(true);
+  const handleConnectSip = async () => {
+    setConnecting(true);
     try {
-      await createAddressFn({
+      await connectFn({
         data: {
-          customerName: addr.customerName,
-          street: addr.street,
-          city: addr.city,
-          region: addr.region,
-          postalCode: addr.postalCode,
-          isoCountry: pendingBuy.countryIso,
-          friendlyName: `Address ${pendingBuy.countryIso}`,
+          mode: "sip",
+          routeName: sipForm.routeName.trim(),
+          sipUri,
         },
       });
-      toast.success("Endereço cadastrado. Concluindo compra…");
-      setAddressOpen(false);
-      const target = pendingBuy;
-      setPendingBuy(null);
-      await handleBuy(target);
+      toast.success("Telefonia conectada com sucesso!");
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setOpen(false);
+      resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar endereço");
+      toast.error(err instanceof Error ? err.message : "Falha ao gerar rota SIP");
     } finally {
-      setSavingAddress(false);
-    }
-  };
-
-  const handleSaveBundle = async () => {
-    if (!pendingBuy || !bundleSid.trim()) return;
-    setSavingBundle(true);
-    try {
-      await handleBuy(pendingBuy, bundleSid.trim());
-    } finally {
-      setSavingBundle(false);
+      setConnecting(false);
     }
   };
 
@@ -287,6 +228,7 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
   });
+
 
   const handleSignOut = async () => {
     const supabase = getSupabaseBrowser();
@@ -353,7 +295,7 @@ function TelefoniaPage() {
                 setOpen(true);
               }}
             >
-              <Plus className="h-4 w-4" /> Adquirir número
+              <Plus className="h-4 w-4" /> Conectar Número
             </Button>
           </div>
         </div>
@@ -525,139 +467,147 @@ function TelefoniaPage() {
           if (!o) resetModal();
         }}
       >
-        <DialogContent className="max-w-2xl border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+        <DialogContent className="max-w-xl border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>Adquirir Novo Número</DialogTitle>
+            <DialogTitle>Conectar Número de Telefonia</DialogTitle>
             <DialogDescription>
-              Pesquise a disponibilidade na rede da Twilio por país e código de área.
+              Para garantir a conformidade com as regras locais (Anatel/Regulamentação),
+              utilize os dados da sua própria operadora. Nós cuidamos da inteligência artificial.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-1.5">
-              <Label className="text-xs text-muted-foreground">País</Label>
-              <Select value={country} onValueChange={(v) => { setCountry(v); setArea(""); }}>
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BR">Brasil (+55)</SelectItem>
-                  <SelectItem value="US">EUA (+1)</SelectItem>
-                  <SelectItem value="CA">Canadá (+1)</SelectItem>
-                  <SelectItem value="GB">Reino Unido (+44)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full space-y-1.5 sm:w-40">
-              <Label className="text-xs text-muted-foreground">
-                {areaCodeConfig[country]?.label ?? "Código de Área"}
-              </Label>
-              <Input
-                inputMode="numeric"
-                maxLength={areaCodeConfig[country]?.maxLength ?? 5}
-                placeholder={areaCodeConfig[country]?.placeholder ?? "opcional"}
-                value={area}
-                onChange={(e) => {
-                  const max = areaCodeConfig[country]?.maxLength ?? 5;
-                  setArea(e.target.value.replace(/\D/g, "").slice(0, max));
-                }}
-                className="bg-background/50"
-              />
-            </div>
-            <Button
-              onClick={handleSearch}
-              disabled={searching}
-              className="gap-2 sm:w-auto"
-            >
-              {searching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              Buscar Números
-            </Button>
-          </div>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "twilio" | "sip")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="twilio">Twilio</TabsTrigger>
+              <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
+            </TabsList>
 
-          <div className="min-h-[220px] rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
-            {searching ? (
-              <div className="space-y-2 p-3">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-white/[0.03] p-3"
-                  >
-                    <div className="space-y-2">
-                      <div className="h-3 w-40 animate-pulse rounded bg-white/10" />
-                      <div className="h-2 w-24 animate-pulse rounded bg-white/5" />
-                    </div>
-                    <div className="h-8 w-24 animate-pulse rounded bg-white/10" />
-                  </div>
-                ))}
-              </div>
-            ) : results === null ? (
-              <div className="flex h-[220px] flex-col items-center justify-center text-center">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-white/[0.04] text-muted-foreground">
-                  <Inbox className="h-5 w-5" />
+            <TabsContent value="twilio" className="mt-4 space-y-4">
+              <Alert className="border-primary/30 bg-primary/10 text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Conecte sua conta Twilio. Os custos de telefonia e a titularidade dos
+                  números serão gerenciados diretamente no seu painel da Twilio.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Twilio Account SID</Label>
+                  <Input
+                    placeholder="AC..."
+                    value={twilioForm.accountSid}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    onChange={(e) =>
+                      setTwilioForm({ ...twilioForm, accountSid: e.target.value.trim() })
+                    }
+                  />
                 </div>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Preencha os filtros acima para buscar números disponíveis
-                </p>
+                <div className="grid gap-1.5">
+                  <Label>Twilio Auth Token</Label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••••••••••"
+                    value={twilioForm.authToken}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    onChange={(e) =>
+                      setTwilioForm({ ...twilioForm, authToken: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Número de Telefone Adquirido</Label>
+                  <Input
+                    placeholder="+55 11 9999-9999"
+                    value={twilioForm.phoneNumber}
+                    onChange={(e) =>
+                      setTwilioForm({ ...twilioForm, phoneNumber: e.target.value })
+                    }
+                  />
+                </div>
               </div>
-            ) : results.length === 0 ? (
-              <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
-                Nenhum número disponível para esses filtros.
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleConnectTwilio}
+                  disabled={
+                    connecting ||
+                    !/^AC[a-zA-Z0-9]{10,}$/.test(twilioForm.accountSid) ||
+                    twilioForm.authToken.length < 8 ||
+                    twilioForm.phoneNumber.trim().length < 4
+                  }
+                  className="gap-2"
+                >
+                  {connecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                  Conectar Twilio
+                </Button>
               </div>
-            ) : (
-              <div className="divide-y divide-white/[0.04]">
-                {results.map((n) => (
-                  <div
-                    key={n.id}
-                    className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-white/[0.03]"
+            </TabsContent>
+
+            <TabsContent value="sip" className="mt-4 space-y-4">
+              <Alert className="border-primary/30 bg-primary/10 text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Aponte o tráfego da sua operadora atual (Zenvia, Vonage, PABX) para
+                  o nosso SIP URI.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Seu SIP URI de Destino
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={sipUri} className="font-mono text-xs" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopySip}
+                    className="shrink-0"
+                    aria-label="Copiar SIP URI"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-mono text-sm font-semibold text-foreground">
-                        {n.phoneNumber}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">{n.region}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      {n.voice && (
-                        <span
-                          title="Voz"
-                          className="grid h-6 w-6 place-items-center rounded-md bg-white/[0.05]"
-                        >
-                          <Phone className="h-3 w-3" />
-                        </span>
-                      )}
-                      {n.sms && (
-                        <span
-                          title="SMS"
-                          className="grid h-6 w-6 place-items-center rounded-md bg-white/[0.05]"
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleBuy(n)}
-                      disabled={buyingId !== null}
-                      className="gap-1.5 bg-success text-success-foreground hover:bg-success/90"
-                    >
-                      {buyingId === n.id ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Processando...
-                        </>
-                      ) : (
-                        "Comprar"
-                      )}
-                    </Button>
-                  </div>
-                ))}
+                    {copied ? (
+                      <Check className="h-4 w-4 text-success" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="grid gap-1.5">
+                <Label>Nome da Rota</Label>
+                <Input
+                  placeholder="Ex: Central de Vendas SP"
+                  value={sipForm.routeName}
+                  maxLength={80}
+                  onChange={(e) => setSipForm({ routeName: e.target.value })}
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleConnectSip}
+                  disabled={connecting || sipForm.routeName.trim().length < 2}
+                  className="gap-2"
+                >
+                  {connecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                  Gerar SIP URI
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -671,8 +621,8 @@ function TelefoniaPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Liberar este número?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação libera <span className="font-mono">{releaseTarget?.phone_number}</span> na
-              Twilio e remove o vínculo com sua conta. Não é possível desfazer.
+              Esta ação remove <span className="font-mono">{releaseTarget?.phone_number}</span> da
+              sua conta. Não é possível desfazer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -699,115 +649,6 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog
-        open={bundleOpen}
-        onOpenChange={(o) => {
-          setBundleOpen(o);
-          if (!o) setSavingBundle(false);
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Informar Regulatory Bundle</DialogTitle>
-            <DialogDescription>
-              A Twilio exige um Bundle aprovado para comprar números locais em {pendingBuy?.countryIso}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-              Use um Bundle com status <span className="font-medium text-foreground">twilio-approved</span>,
-              país {pendingBuy?.countryIso} e tipo <span className="font-medium text-foreground">local</span>.
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Bundle SID</Label>
-              <Input
-                value={bundleSid}
-                onChange={(e) => setBundleSid(e.target.value.trim())}
-                placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                autoCapitalize="none"
-                spellCheck={false}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setBundleOpen(false)} disabled={savingBundle}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveBundle} disabled={savingBundle || !bundleSid.trim()}>
-              {savingBundle ? "Comprando…" : "Salvar e comprar"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Cadastrar endereço regulatório</DialogTitle>
-            <DialogDescription>
-              A Twilio exige um endereço em {pendingBuy?.countryIso} para vincular a este número.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="grid gap-1.5">
-              <Label>Nome completo / Razão social</Label>
-              <Input
-                value={addr.customerName}
-                onChange={(e) => setAddr({ ...addr, customerName: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Rua e número</Label>
-              <Input
-                value={addr.street}
-                onChange={(e) => setAddr({ ...addr, street: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label>Cidade</Label>
-                <Input
-                  value={addr.city}
-                  onChange={(e) => setAddr({ ...addr, city: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Estado / Região</Label>
-                <Input
-                  value={addr.region}
-                  onChange={(e) => setAddr({ ...addr, region: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-1.5">
-              <Label>CEP / Postal Code</Label>
-              <Input
-                value={addr.postalCode}
-                onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setAddressOpen(false)} disabled={savingAddress}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveAddress}
-              disabled={
-                savingAddress ||
-                !addr.customerName ||
-                !addr.street ||
-                !addr.city ||
-                !addr.region ||
-                !addr.postalCode
-              }
-            >
-              {savingAddress ? "Salvando…" : "Salvar e comprar"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </DashboardShell>
 
   );
