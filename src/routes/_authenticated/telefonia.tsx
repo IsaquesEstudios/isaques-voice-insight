@@ -76,6 +76,20 @@ import {
   saveTwilioCredentials,
   sendVerifyOtp,
 } from "@/lib/twilio.functions";
+import {
+  attachAssistantToNumber,
+  detachAssistantFromNumber,
+  listVapiAssistants,
+  listVapiPhoneNumbers,
+} from "@/lib/vapi.functions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Bot } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
   head: () => ({
