@@ -282,6 +282,7 @@ function TelefoniaPage() {
     onSuccess: () => {
       toast.success("Número liberado da sua conta.");
       queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
       setReleaseTarget(null);
     },
     onError: (err) =>
