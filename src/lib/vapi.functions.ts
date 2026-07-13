@@ -93,6 +93,10 @@ export interface AssistantInput {
   name: string;
   firstMessage: string;
   systemPrompt: string;
+  modelProvider?: string;
+  model?: string;
+  voiceProvider?: string;
+  voiceId?: string;
 }
 
 function getKey(): string {
@@ -106,11 +110,14 @@ function buildPayload(input: AssistantInput) {
     name: input.name,
     firstMessage: input.firstMessage,
     model: {
-      provider: "openai",
-      model: "gpt-3.5-turbo",
+      provider: input.modelProvider?.trim() || "openai",
+      model: input.model?.trim() || "gpt-3.5-turbo",
       messages: [{ role: "system", content: input.systemPrompt }],
     },
-    voice: { provider: "11labs", voiceId: "burt" },
+    voice: {
+      provider: input.voiceProvider?.trim() || "11labs",
+      voiceId: input.voiceId?.trim() || "burt",
+    },
   };
 }
 
@@ -425,6 +432,10 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
       name: input.name.trim(),
       firstMessage: input.firstMessage ?? "",
       systemPrompt: input.systemPrompt ?? "",
+      modelProvider: input.modelProvider,
+      model: input.model,
+      voiceProvider: input.voiceProvider,
+      voiceId: input.voiceId,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
@@ -446,6 +457,10 @@ export const updateVapiAssistant = createServerFn({ method: "POST" })
       name: input.name.trim(),
       firstMessage: input.firstMessage ?? "",
       systemPrompt: input.systemPrompt ?? "",
+      modelProvider: input.modelProvider,
+      model: input.model,
+      voiceProvider: input.voiceProvider,
+      voiceId: input.voiceId,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {

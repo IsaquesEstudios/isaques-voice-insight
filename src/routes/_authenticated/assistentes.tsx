@@ -51,6 +51,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   listVapiAssistants,
   getVapiAssistant,
   createVapiAssistant,
@@ -122,7 +129,33 @@ interface FormState {
   name: string;
   firstMessage: string;
   systemPrompt: string;
+  modelProvider: string;
+  model: string;
+  voiceProvider: string;
+  voiceId: string;
 }
+
+const DEFAULT_MODEL_PROVIDER = "openai";
+const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_VOICE_PROVIDER = "11labs";
+const DEFAULT_VOICE_ID = "burt";
+const DEFAULT_FIRST_MESSAGE = "Olá! Como posso te ajudar hoje?";
+const DEFAULT_SYSTEM_PROMPT =
+  "Você é um assistente de voz cordial e objetivo. Fale em português do Brasil, com respostas curtas e naturais.";
+
+const MODEL_OPTIONS: Record<string, string[]> = {
+  openai: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
+  anthropic: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+  google: ["gemini-1.5-pro", "gemini-1.5-flash"],
+  groq: ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+};
+
+const VOICE_OPTIONS: Record<string, string[]> = {
+  "11labs": ["burt", "sarah", "adam", "rachel"],
+  openai: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
+  playht: ["jennifer", "melissa", "will"],
+  deepgram: ["aura-asteria-en", "aura-luna-en"],
+};
 
 const emptyForm: FormState = {
   open: false,
@@ -132,6 +165,10 @@ const emptyForm: FormState = {
   name: "",
   firstMessage: "",
   systemPrompt: "",
+  modelProvider: DEFAULT_MODEL_PROVIDER,
+  model: DEFAULT_MODEL,
+  voiceProvider: DEFAULT_VOICE_PROVIDER,
+  voiceId: DEFAULT_VOICE_ID,
 };
 
 function AssistentesPage() {
@@ -190,11 +227,18 @@ function AssistentesPage() {
     : 0;
 
   function openCreate() {
-    setForm({ ...emptyForm, open: true, mode: "create" });
+    setForm({
+      ...emptyForm,
+      open: true,
+      mode: "create",
+      firstMessage: DEFAULT_FIRST_MESSAGE,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    });
   }
 
   async function openEdit(a: VapiAssistant) {
     setForm({
+      ...emptyForm,
       open: true,
       mode: "edit",
       editingId: a.id,
@@ -202,6 +246,10 @@ function AssistentesPage() {
       name: a.name ?? "",
       firstMessage: a.firstMessage ?? "",
       systemPrompt: "",
+      modelProvider: a.model?.provider ?? DEFAULT_MODEL_PROVIDER,
+      model: a.model?.model ?? DEFAULT_MODEL,
+      voiceProvider: a.voice?.provider ?? DEFAULT_VOICE_PROVIDER,
+      voiceId: a.voice?.voiceId ?? DEFAULT_VOICE_ID,
     });
     try {
       const full = await fetchAssistant({ data: { id: a.id } });
@@ -215,6 +263,10 @@ function AssistentesPage() {
         firstMessage:
           typeof full.firstMessage === "string" ? full.firstMessage : prev.firstMessage,
         systemPrompt,
+        modelProvider: full?.model?.provider ?? prev.modelProvider,
+        model: full?.model?.model ?? prev.model,
+        voiceProvider: full?.voice?.provider ?? prev.voiceProvider,
+        voiceId: full?.voice?.voiceId ?? prev.voiceId,
         loadingInitial: false,
       }));
     } catch (err) {
@@ -232,24 +284,20 @@ function AssistentesPage() {
     }
     setIsSubmitting(true);
     try {
+      const payload = {
+        name: form.name,
+        firstMessage: form.firstMessage,
+        systemPrompt: form.systemPrompt,
+        modelProvider: form.modelProvider,
+        model: form.model,
+        voiceProvider: form.voiceProvider,
+        voiceId: form.voiceId,
+      };
       if (form.mode === "create") {
-        await createAssistant({
-          data: {
-            name: form.name,
-            firstMessage: form.firstMessage,
-            systemPrompt: form.systemPrompt,
-          },
-        });
+        await createAssistant({ data: payload });
         toast.success("Assistente criado com sucesso.");
       } else if (form.editingId) {
-        await updateAssistant({
-          data: {
-            id: form.editingId,
-            name: form.name,
-            firstMessage: form.firstMessage,
-            systemPrompt: form.systemPrompt,
-          },
-        });
+        await updateAssistant({ data: { id: form.editingId, ...payload } });
         toast.success("Assistente atualizado.");
       }
       setForm(emptyForm);
@@ -568,6 +616,104 @@ function AssistentesPage() {
                 disabled={form.loadingInitial}
                 className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Provedor do Modelo</Label>
+                <Select
+                  value={form.modelProvider}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      modelProvider: v,
+                      model: MODEL_OPTIONS[v]?.[0] ?? "",
+                    }))
+                  }
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(MODEL_OPTIONS).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Modelo de IA</Label>
+                <Select
+                  value={form.model}
+                  onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(MODEL_OPTIONS[form.modelProvider] ?? []).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                    {form.model &&
+                      !(MODEL_OPTIONS[form.modelProvider] ?? []).includes(form.model) && (
+                        <SelectItem value={form.model}>{form.model}</SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Provedor de Voz</Label>
+                <Select
+                  value={form.voiceProvider}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      voiceProvider: v,
+                      voiceId: VOICE_OPTIONS[v]?.[0] ?? "",
+                    }))
+                  }
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(VOICE_OPTIONS).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Voz</Label>
+                <Select
+                  value={form.voiceId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                    {form.voiceId &&
+                      !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
+                        <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="assistant-prompt">System Prompt / Instruções</Label>
