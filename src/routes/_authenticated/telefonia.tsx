@@ -300,7 +300,29 @@ function TelefoniaPage() {
               Gestão de rotas, DIDs e políticas anti-spam.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isTwilioConnected && twilioConn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-success/40 bg-success/10 text-success hover:bg-success/15 hover:text-success"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Twilio: {twilioConn.accountSid.slice(0, 8)}…
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setConfirmDisconnect(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Desconectar Twilio
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
             <Button
               variant="outline"
               className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
@@ -321,6 +343,7 @@ function TelefoniaPage() {
               <Plus className="h-4 w-4" /> Conectar Número
             </Button>
           </div>
+
         </div>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
