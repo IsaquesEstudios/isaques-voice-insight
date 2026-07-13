@@ -210,12 +210,16 @@ function TelefoniaPage() {
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
   const [testCallFrom, setTestCallFrom] = useState<string>("");
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  const [verifyState, setVerifyState] = useState<{
-    contactId: string;
+  // Two-step new-contact flow: "form" → "code"
+  const [contactStep, setContactStep] = useState<"form" | "code">("form");
+  const [otpCode, setOtpCode] = useState("");
+  // Verify existing (already-saved) contact via SMS
+  const [verifyExisting, setVerifyExisting] = useState<{
+    id: string;
     label: string;
     phone: string;
-    code: string | null;
   } | null>(null);
+  const [verifyOtp, setVerifyOtp] = useState("");
 
   const testContactsQuery = useQuery({
     queryKey: ["test-contacts"],
@@ -229,22 +233,51 @@ function TelefoniaPage() {
     created_at: string;
   }>;
 
-  const addTestContactMutation = useMutation({
-    mutationFn: () =>
-      addTestContactFn({
-        data: {
-          label: testContactForm.label.trim(),
-          phoneE164: testContactForm.phoneE164.trim(),
-        },
-      }),
-    onSuccess: async () => {
-      toast.success("Contato adicionado. Verifique o número para poder receber ligações.");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      setTestContactOpen(false);
-      setTestContactForm({ label: "", phoneE164: "" });
+  const sendOtpMutation = useMutation({
+    mutationFn: (phoneE164: string) =>
+      sendOtpFn({ data: { phoneE164, channel: "sms" } }),
+    onSuccess: (res) => {
+      if ("ok" in res && res.ok) {
+        toast.success("Código enviado por SMS.");
+      } else if ("reason" in res && res.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
+      } else if ("reason" in res && res.reason === "twilio_error") {
+        toast.error(("message" in res && res.message) || "Falha ao enviar SMS.");
+      }
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao adicionar contato"),
+      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS"),
+  });
+
+  const checkOtpMutation = useMutation({
+    mutationFn: (input: {
+      phoneE164: string;
+      code: string;
+      contactId?: string;
+      label?: string;
+    }) => checkOtpFn({ data: input }),
+    onSuccess: async (res) => {
+      if ("ok" in res && res.ok) {
+        toast.success("Número verificado!");
+        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+        setTestContactOpen(false);
+        setTestContactForm({ label: "", phoneE164: "" });
+        setContactStep("form");
+        setOtpCode("");
+        setVerifyExisting(null);
+        setVerifyOtp("");
+      } else if ("reason" in res && res.reason === "invalid_code") {
+        toast.error("Código inválido. Confira o SMS e tente novamente.");
+      } else if ("reason" in res && res.reason === "expired") {
+        toast.error("Código expirado. Reenvie um novo SMS.");
+      } else if ("reason" in res && res.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
+      } else if ("reason" in res && res.reason === "twilio_error") {
+        toast.error(("message" in res && res.message) || "Falha na verificação.");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao verificar código"),
   });
 
   const removeTestContactMutation = useMutation({
@@ -257,46 +290,6 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
   });
 
-  const startVerificationMutation = useMutation({
-    mutationFn: (c: { id: string; label: string; phone: string }) =>
-      startVerificationFn({ data: { id: c.id } }).then((r) => ({ ...r, _c: c })),
-    onSuccess: async (res) => {
-      if ("ok" in res && res.ok) {
-        if ("alreadyVerified" in res && res.alreadyVerified) {
-          toast.success("Número já estava verificado no Twilio.");
-          await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-          return;
-        }
-        setVerifyState({
-          contactId: res._c.id,
-          label: res._c.label,
-          phone: res._c.phone,
-          code: (res as { validationCode?: string }).validationCode ?? null,
-        });
-      } else if ("reason" in res && res.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação"),
-  });
-
-  const refreshVerificationMutation = useMutation({
-    mutationFn: (id: string) => refreshVerificationFn({ data: { id } }),
-    onSuccess: async (res) => {
-      if ("ok" in res && res.ok) {
-        if (res.verified) {
-          toast.success("Número verificado com sucesso!");
-          setVerifyState(null);
-          await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-        } else {
-          toast.info("Ainda não verificado. Complete a chamada e tente novamente.");
-        }
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao consultar status"),
-  });
 
   const testCallMutation = useMutation({
     mutationFn: (contact: { id: string; phone_e164: string }) => {
