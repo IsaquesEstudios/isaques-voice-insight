@@ -1050,137 +1050,119 @@ function TelefoniaPage() {
           setTestContactOpen(o);
           if (!o) {
             setTestContactForm({ label: "", phoneE164: "" });
-            setTrialBlocked(false);
+            setVerifyStep(null);
           }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>Novo contato de teste</DialogTitle>
+            <DialogTitle>
+              {verifyStep ? "Verificando número na Twilio" : "Novo contato de teste"}
+            </DialogTitle>
             <DialogDescription>
-              Registre um número para usar como destino de ligações de teste
-              feitas pela sua assistente.
+              {verifyStep
+                ? "A Twilio está ligando para o número. Atenda e digite o código no teclado do telefone."
+                : "Registre um número para usar como destino de ligações de teste. A Twilio vai ligar para confirmar a posse (mesmo fluxo do Verified Caller IDs no console)."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
-              <Input
-                id="tc-label"
-                placeholder="Ex: Meu celular"
-                value={testContactForm.label}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tc-phone" className="text-xs">Número (E.164)</Label>
-              <Input
-                id="tc-phone"
-                placeholder="+5511999998888"
-                value={testContactForm.phoneE164}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                }
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={() =>
-                  saveContactMutation.mutate({
-                    phoneE164: testContactForm.phoneE164.trim(),
-                    label: testContactForm.label.trim(),
-                  })
-                }
-                disabled={
-                  saveContactMutation.isPending ||
-                  !testContactForm.label.trim() ||
-                  !testContactForm.phoneE164.trim()
-                }
-              >
-                {saveContactMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Salvar contato
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
 
-      </Dialog>
-
-
-
-      <Dialog
-        open={otpStep !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setOtpStep(null);
-            setOtpCode("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
-          <DialogHeader>
-            <DialogTitle>Digite o código recebido por SMS</DialogTitle>
-            <DialogDescription>
-              Enviamos um SMS para <b>{otpStep?.phoneE164}</b>. Digite o código
-              de 6 dígitos abaixo para concluir a verificação.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="otp-code" className="text-xs">Código de 6 dígitos</Label>
-              <Input
-                id="otp-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="000000"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                className="text-center font-mono text-2xl tracking-[0.4em]"
-              />
+          {!verifyStep ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
+                <Input
+                  id="tc-label"
+                  placeholder="Ex: Meu celular"
+                  value={testContactForm.label}
+                  onChange={(e) =>
+                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tc-phone" className="text-xs">Número (E.164)</Label>
+                <Input
+                  id="tc-phone"
+                  placeholder="+5511999998888"
+                  value={testContactForm.phoneE164}
+                  onChange={(e) =>
+                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() =>
+                    startVerifyMutation.mutate({
+                      phoneE164: testContactForm.phoneE164.trim(),
+                      label: testContactForm.label.trim(),
+                    })
+                  }
+                  disabled={
+                    startVerifyMutation.isPending ||
+                    !testContactForm.label.trim() ||
+                    !testContactForm.phoneE164.trim()
+                  }
+                >
+                  {startVerifyMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Iniciar verificação por chamada
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-between gap-2 pt-2">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  if (!otpStep) return;
-                  sendOtpMutation.mutate({
-                    phoneE164: otpStep.phoneE164,
-                    label: otpStep.label,
-                  });
-                }}
-                disabled={sendOtpMutation.isPending}
-              >
-                Reenviar SMS
-              </Button>
-              <Button
-                onClick={() => {
-                  if (!otpStep) return;
-                  confirmOtpMutation.mutate({
-                    phoneE164: otpStep.phoneE164,
-                    code: otpCode.trim(),
-                    label: otpStep.label,
-                  });
-                }}
-                disabled={
-                  confirmOtpMutation.isPending || otpCode.trim().length < 4
-                }
-              >
-                {confirmOtpMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Verificar
-              </Button>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-4 text-center">
+                <div className="text-xs text-muted-foreground">
+                  Ligação para <b>{verifyStep.phoneE164}</b>
+                </div>
+                <div className="mt-2 font-mono text-4xl tracking-[0.35em]">
+                  {verifyStep.validationCode}
+                </div>
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Atenda e digite este código no teclado do telefone.
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Aguardando confirmação da Twilio…
+              </div>
+              <div className="flex justify-between gap-2 pt-1">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setVerifyStep(null);
+                    setTestContactOpen(false);
+                    setTestContactForm({ label: "", phoneE164: "" });
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    startVerifyMutation.mutate({
+                      phoneE164: verifyStep.phoneE164,
+                      label: verifyStep.label,
+                    })
+                  }
+                  disabled={startVerifyMutation.isPending}
+                >
+                  {startVerifyMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Ligar novamente
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
+
 
 
 
