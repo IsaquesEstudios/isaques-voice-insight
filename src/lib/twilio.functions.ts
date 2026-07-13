@@ -519,3 +519,97 @@ export const connectExternalNumber = createServerFn({ method: "POST" })
     if (error) throw new Error(`DB insert failed: ${error.message}`);
     return { ok: true };
   });
+
+// ---------- test contacts ----------
+
+const e164 = z
+  .string()
+  .trim()
+  .regex(/^\+[1-9]\d{7,14}$/, "Número deve estar em formato E.164 (ex: +5511999998888)");
+
+export const listTestContacts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_test_contacts")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const addTestContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        label: z.string().trim().min(1).max(80),
+        phoneE164: e164,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("user_test_contacts").insert({
+      user_id: context.userId,
+      label: data.label,
+      phone_e164: data.phoneE164,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const removeTestContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("user_test_contacts")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const makeTestCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        fromNumber: e164,
+        toNumber: e164,
+        message: z.string().trim().max(500).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+
+    const say =
+      data.message?.trim() ||
+      "Olá! Esta é uma chamada de teste da sua assistente virtual. Se você está ouvindo esta mensagem, a integração está funcionando corretamente.";
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say language="pt-BR" voice="Polly.Camila">${say
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")}</Say></Response>`;
+
+    try {
+      const json = (await twilioAccountPost(creds, "/Calls.json", {
+        To: data.toNumber,
+        From: data.fromNumber,
+        Twiml: twiml,
+      })) as { sid: string; status: string };
+      return { ok: true as const, sid: json.sid, status: json.status };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('"code":21219') || msg.includes("unverified")) {
+        return {
+          ok: false as const,
+          reason: "unverified_number" as const,
+          message:
+            "Sua conta Twilio está em modo trial. Verifique o número de destino em Console Twilio → Phone Numbers → Verified Caller IDs antes de testar.",
+        };
+      }
+      throw err;
+    }
+  });
