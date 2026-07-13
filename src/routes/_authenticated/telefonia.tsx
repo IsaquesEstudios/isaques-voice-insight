@@ -540,16 +540,6 @@ function TelefoniaPage() {
                     }
                   />
                 </div>
-                <div className="grid gap-1.5">
-                  <Label>Número de Telefone Adquirido</Label>
-                  <Input
-                    placeholder="+55 11 9999-9999"
-                    value={twilioForm.phoneNumber}
-                    onChange={(e) =>
-                      setTwilioForm({ ...twilioForm, phoneNumber: e.target.value })
-                    }
-                  />
-                </div>
               </div>
 
               <div className="flex justify-end">
@@ -558,11 +548,11 @@ function TelefoniaPage() {
                   disabled={
                     connecting ||
                     !/^AC[a-zA-Z0-9]{10,}$/.test(twilioForm.accountSid) ||
-                    twilioForm.authToken.length < 8 ||
-                    twilioForm.phoneNumber.trim().length < 4
+                    twilioForm.authToken.length < 8
                   }
                   className="gap-2"
                 >
+
                   {connecting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
