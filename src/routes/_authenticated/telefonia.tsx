@@ -450,7 +450,7 @@ function TelefoniaPage() {
           <div className="flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:flex-row sm:items-end">
             <div className="flex-1 space-y-1.5">
               <Label className="text-xs text-muted-foreground">País</Label>
-              <Select value={country} onValueChange={setCountry}>
+              <Select value={country} onValueChange={(v) => { setCountry(v); setArea(""); }}>
                 <SelectTrigger className="bg-background/50">
                   <SelectValue />
                 </SelectTrigger>
