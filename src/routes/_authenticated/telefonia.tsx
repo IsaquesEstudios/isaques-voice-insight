@@ -73,6 +73,7 @@ import {
   listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
+  saveTestContact,
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
@@ -171,6 +172,7 @@ function TelefoniaPage() {
   const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
   const removeTestContactFn = useServerFn(removeTestContact);
   const addVerifiedFromTwilioFn = useServerFn(addVerifiedFromTwilio);
+  const saveTestContactFn = useServerFn(saveTestContact);
 
 
 
@@ -354,6 +356,22 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao importar contato"),
   });
+
+  const saveContactMutation = useMutation({
+    mutationFn: (input: { phoneE164: string; label: string }) =>
+      saveTestContactFn({ data: { phoneE164: input.phoneE164, label: input.label } }),
+    onSuccess: async () => {
+      toast.success("Contato de teste salvo.");
+      setTestContactOpen(false);
+      setTrialBlocked(false);
+      setTestContactForm({ label: "", phoneE164: "" });
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao salvar contato"),
+  });
+
+
 
   const confirmOtpMutation = useMutation({
     mutationFn: (input: { phoneE164: string; code: string; label: string }) =>
@@ -1068,35 +1086,11 @@ function TelefoniaPage() {
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              Para receber ligações da sua assistente, o número precisa estar
-              verificado na sua conta Twilio. Verifique-o na Twilio Console e
-              depois importe aqui.
+              Registre um número para usar como destino de ligações de teste
+              feitas pela sua assistente.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Alert className="border-primary/30 bg-primary/5">
-              <Info className="h-4 w-4 text-primary" />
-              <AlertDescription className="text-xs space-y-2">
-                <p className="font-medium">Como verificar na Twilio:</p>
-                <ol className="list-decimal pl-4 space-y-1 text-muted-foreground">
-                  <li>Abra o painel de Verified Caller IDs da Twilio.</li>
-                  <li>
-                    Clique em <b>Add a new Caller ID</b> e informe o número.
-                    A Twilio ligará ou enviará um código para validá-lo.
-                  </li>
-                  <li>Após verificado, volte aqui e clique em <b>Importar</b>.</li>
-                </ol>
-                <a
-                  href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 underline text-primary hover:opacity-80"
-                >
-                  Abrir Twilio Verified Caller IDs
-                  <Link2 className="h-3 w-3" />
-                </a>
-              </AlertDescription>
-            </Alert>
             <div className="space-y-1.5">
               <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
               <Input
@@ -1125,26 +1119,26 @@ function TelefoniaPage() {
               </Button>
               <Button
                 onClick={() =>
-                  trustFromTwilioMutation.mutate({
+                  saveContactMutation.mutate({
                     phoneE164: testContactForm.phoneE164.trim(),
                     label: testContactForm.label.trim(),
                   })
                 }
                 disabled={
-                  trustFromTwilioMutation.isPending ||
+                  saveContactMutation.isPending ||
                   !testContactForm.label.trim() ||
-                  !testContactForm.phoneE164.trim() ||
-                  !isTwilioConnected
+                  !testContactForm.phoneE164.trim()
                 }
               >
-                {trustFromTwilioMutation.isPending && (
+                {saveContactMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Importar número verificado
+                Salvar contato
               </Button>
             </div>
           </div>
         </DialogContent>
+
       </Dialog>
 
 
