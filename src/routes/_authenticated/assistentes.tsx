@@ -617,7 +617,6 @@ function AssistentesPage() {
                 className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
               />
             </div>
-            <div className="space-y-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Provedor do Modelo</Label>
