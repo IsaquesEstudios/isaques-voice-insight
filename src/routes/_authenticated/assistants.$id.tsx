@@ -437,8 +437,9 @@ function AssistantDetailPage() {
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Stack padrão</h2>
                     <p className="text-xs text-muted-foreground">
-                      Transcriber e modelo são padronizados para o menor custo. Ajuste apenas a voz do agente.
+                      Transcriber padronizado para o menor custo. Ajuste o modelo de IA e a voz do agente.
                     </p>
+
                   </div>
 
                   <VapiStatsPanel
