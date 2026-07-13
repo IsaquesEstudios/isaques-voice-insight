@@ -483,10 +483,27 @@ function TelefoniaPage() {
   });
 
   const attachAssistantMutation = useMutation({
-    mutationFn: (input: { phoneNumberE164: string; assistantId: string; name?: string }) =>
-      attachAssistantFn({ data: input }),
-    onSuccess: async () => {
-      toast.success("Atendente vinculada ao número.");
+    mutationFn: (input: {
+      phoneNumberE164: string;
+      assistantId: string;
+      name?: string;
+      assistantName?: string;
+    }) =>
+      attachAssistantFn({
+        data: {
+          phoneNumberE164: input.phoneNumberE164,
+          assistantId: input.assistantId,
+          name: input.name,
+        },
+      }),
+    onSuccess: async (res, variables) => {
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(
+        `Número roteado com sucesso para o assistente ${variables.assistantName ?? "selecionado"}`,
+      );
       await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setAssignTarget(null);
@@ -684,19 +701,12 @@ function TelefoniaPage() {
                               assistants={assistantsQuery.data ?? []}
                               isLoading={assistantsQuery.isLoading}
                               onAttach={(assistantId, assistantName) =>
-                                attachAssistantMutation.mutate(
-                                  {
-                                    phoneNumberE164: n.phone_number,
-                                    assistantId,
-                                    name: n.phone_number,
-                                  },
-                                  {
-                                    onSuccess: () =>
-                                      toast.success(
-                                        `Número roteado com sucesso para o assistente ${assistantName}`,
-                                      ),
-                                  },
-                                )
+                                attachAssistantMutation.mutate({
+                                  phoneNumberE164: n.phone_number,
+                                  assistantId,
+                                  name: n.phone_number,
+                                  assistantName,
+                                })
                               }
                               onDetach={() =>
                                 detachAssistantMutation.mutate(n.phone_number)
@@ -1479,6 +1489,8 @@ function TelefoniaPage() {
                   phoneNumberE164: assignTarget.phone_number,
                   assistantId: assignAssistantId,
                   name: assignTarget.phone_number,
+                  assistantName:
+                    assistantById.get(assignAssistantId) ?? "selecionado",
                 });
               }}
               disabled={!assignAssistantId || attachAssistantMutation.isPending}
