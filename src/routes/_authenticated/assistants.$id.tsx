@@ -567,7 +567,10 @@ function AssistantDetailPage() {
                 </CardContent>
               </Card>
             </div>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
+
 
           <TabsContent value="logs" className="mt-0">
             <LogsTab />
