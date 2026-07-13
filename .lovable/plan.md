@@ -1,47 +1,37 @@
-## Objetivo
-Permitir que cada número da página `/telefonia` tenha uma **atendente (assistente virtual do Vapi) responsável**, para que ligações recebidas nesse número sejam atendidas por ela.
 
-## Como vai funcionar (usuário)
-1. Na tabela "Meus números", cada linha ganha um botão "Atribuir atendente" (ou o próprio nome da atendente, clicável) na coluna **Atendente**.
-2. Ao clicar, abre um modal com combobox listando as assistentes da conta (via `listAssistants` já existente).
-3. Escolher uma atendente → salva o vínculo, importa o número no Vapi (se ainda não importado) e liga a assistente a ele. Toast de sucesso e refresh automático da lista.
-4. Também é possível trocar a atendente ou "Remover atendente" pelo mesmo modal.
-5. A coluna "Atendente" passa a mostrar o nome real (não só um id) e a origem do vínculo (Vapi).
+## O que muda
 
-## Arquitetura técnica
+Substituir o fluxo atual (SMS OTP / salvar direto / importar) da seção **Contatos de teste** pelo mesmo mecanismo que o Twilio Console usa em "Verify your first Caller ID":
 
-### Backend — Vapi Phone Numbers API
-Adicionar em `src/lib/vapi.functions.ts` (todas com `requireSupabaseAuth`):
+1. Você digita **nome + número (E.164)** e clica em "Iniciar verificação".
+2. A Twilio liga imediatamente para esse número (via `POST /OutgoingCallerIds.json` na sua conta Twilio conectada) e devolve um código de 6 dígitos.
+3. Mostramos o código em destaque no modal com a instrução: "Atenda a ligação e digite este código no teclado do telefone."
+4. Enquanto o modal está aberto, fazemos polling do endpoint `/OutgoingCallerIds.json` a cada 3s.
+5. Assim que o número aparecer lá (= Twilio confirmou), gravamos automaticamente em `user_test_contacts` como `verified: true` e fechamos o modal — o contato já aparece na lista pronto para "Ligar".
 
-- `listVapiPhoneNumbers()` → `GET /phone-number` (retorna os números já importados no Vapi da conta).
-- `attachAssistantToNumber({ phoneNumberE164, twilioSid, assistantId })`:
-  - Procura o número em `listVapiPhoneNumbers` pelo `number` em E.164.
-  - Se **não existir**: `POST /phone-number` com `{ provider: "twilio", number, twilioAccountSid, twilioAuthToken, assistantId, name }` usando as credenciais Twilio do usuário lidas de `user_twilio_credentials` (mesma tabela já usada por `twilio.functions.ts`).
-  - Se **existir**: `PATCH /phone-number/{id}` com `{ assistantId }`.
-- `detachAssistantFromNumber({ phoneNumberE164 })` → `PATCH /phone-number/{id}` com `{ assistantId: null }`.
+O restante da UI da seção (lista de contatos, seletor de número de origem, seletor de assistente, botão "Ligar") não é tocado.
 
-Espelhar o vínculo no Supabase para exibição rápida: adicionar coluna `assistant_id uuid null` (Vapi assistant id, texto) em `user_phone_numbers` — via migration — e atualizar `listUserPhoneNumbers` / `connectExternalNumber` para retornar/preservar esse campo.
+## Escopo dos arquivos
 
-### Frontend — `src/routes/_authenticated/telefonia.tsx`
-- Novo estado `assignTarget: UserPhoneNumber | null` e `AssignAssistantDialog`.
-- Dentro do dialog: `useQuery(["assistants"], listAssistants)` para popular um `<Select>` com nome + provider + voice.
-- Mutation `attachAssistantMutation` → chama `attachAssistantToNumber` e faz `queryClient.invalidateQueries(["user-phone-numbers"])`.
-- Coluna **Atendente** (linha 586): mostrar nome da atendente (lookup via mapa `assistants`), com botão "Atribuir/Alterar". No `DropdownMenu` da linha, adicionar itens "Atribuir atendente" e "Remover atendente".
+Apenas **`src/routes/_authenticated/telefonia.tsx`** — nenhuma outra tela ou arquivo é alterado.
 
-### Migration
-```sql
-ALTER TABLE public.user_phone_numbers
-  ADD COLUMN IF NOT EXISTS assistant_id text,
-  ADD COLUMN IF NOT EXISTS vapi_phone_number_id text;
-```
-Sem mudanças de RLS (já escopadas por `user_id`).
+O backend não precisa de mudanças: `startCallerIdVerification`, `listVerifiedCallerIds` e `saveTestContact` já existem em `src/lib/twilio.functions.ts`.
 
-## Escopo fora
-- Não altero fluxo de compra/conexão de números existente.
-- Não altero a página `/assistants`.
-- Sem inbound webhook próprio — o Vapi cuida de atender via a assistente vinculada.
+## Detalhes técnicos
 
-## Arquivos afetados
-- `src/lib/vapi.functions.ts` (novas funções)
-- `src/routes/_authenticated/telefonia.tsx` (UI/mutations)
-- Nova migration para colunas em `user_phone_numbers`
+- **Imports**: adicionar `startCallerIdVerification, listVerifiedCallerIds` e remover `sendVerifyOtp, checkVerifyOtp, addVerifiedFromTwilio` (deixam de ser usados). `saveTestContact` fica.
+- **Estado**: remover `otpStep`, `otpCode`, `trialBlocked`. Adicionar `verifyStep: { phoneE164; label; validationCode; sid? } | null`.
+- **Mutations**: substituir `sendOtpMutation`, `confirmOtpMutation`, `trustFromTwilioMutation` por uma única `startVerifyMutation` que chama `startCallerIdVerification`. `saveContactMutation` permanece — passa a ser disparada automaticamente pelo efeito de polling.
+- **Polling**: `useQuery(["verified-caller-ids"], listVerifiedCallerIds, { enabled: !!verifyStep, refetchInterval: 3000 })` + `useEffect` que, quando `phoneE164` aparece na lista, chama `saveContactMutation` e limpa `verifyStep`.
+- **Erros da Twilio**:
+  - `10002` (conta trial não permite verificação por chamada): mostrar alerta explicando o motivo — sem tentar SMS (contas trial também bloqueiam SMS para números não verificados).
+  - Outros: toast com a mensagem retornada.
+- **Modal**: dois estados internos —
+  - Sem `verifyStep`: form (identificação + número) + botão "Iniciar verificação por chamada".
+  - Com `verifyStep`: bloco grande com o `validationCode` em fonte mono + texto "A Twilio está ligando para {phoneE164}. Atenda e digite este código no teclado." + botão "Cancelar" e um spinner "Aguardando confirmação…".
+- **Remover** o segundo `<Dialog>` de "Digite o código recebido por SMS" (linhas ~1146–1211).
+
+## Observações
+
+- O fluxo é idêntico ao do console Twilio — funciona para qualquer conta que consiga usar "Verify a Caller ID" no console. Contas trial da Twilio geralmente **bloqueiam** esse endpoint via API (erro 10002); nesse caso o alerta orienta a verificar pelo próprio console (a lista continua sendo lida da mesma API, então o número aparecerá aqui automaticamente após a verificação manual).
+- Nada muda no comportamento do botão "Ligar" nem nos seletores de origem/assistente.
