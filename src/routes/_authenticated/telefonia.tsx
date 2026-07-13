@@ -106,6 +106,13 @@ const routes = [
   { name: "Rota Sandbox", numbers: 2, load: 12, status: "Pausado" },
 ];
 
+const areaCodeConfig: Record<string, { maxLength: number; placeholder: string; label: string }> = {
+  BR: { maxLength: 2, placeholder: "11", label: "DDD (2 dígitos)" },
+  US: { maxLength: 3, placeholder: "415", label: "Area Code (3 dígitos)" },
+  CA: { maxLength: 3, placeholder: "416", label: "Area Code (3 dígitos)" },
+  GB: { maxLength: 5, placeholder: "20", label: "STD Code (até 5 dígitos)" },
+};
+
 interface AvailableNumber {
   id: string;
   phoneNumber: string;
@@ -443,7 +450,7 @@ function TelefoniaPage() {
           <div className="flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:flex-row sm:items-end">
             <div className="flex-1 space-y-1.5">
               <Label className="text-xs text-muted-foreground">País</Label>
-              <Select value={country} onValueChange={setCountry}>
+              <Select value={country} onValueChange={(v) => { setCountry(v); setArea(""); }}>
                 <SelectTrigger className="bg-background/50">
                   <SelectValue />
                 </SelectTrigger>
@@ -455,13 +462,19 @@ function TelefoniaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full space-y-1.5 sm:w-32">
-              <Label className="text-xs text-muted-foreground">Código de Área</Label>
+            <div className="w-full space-y-1.5 sm:w-40">
+              <Label className="text-xs text-muted-foreground">
+                {areaCodeConfig[country]?.label ?? "Código de Área"}
+              </Label>
               <Input
                 inputMode="numeric"
-                placeholder="opcional"
+                maxLength={areaCodeConfig[country]?.maxLength ?? 5}
+                placeholder={areaCodeConfig[country]?.placeholder ?? "opcional"}
                 value={area}
-                onChange={(e) => setArea(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => {
+                  const max = areaCodeConfig[country]?.maxLength ?? 5;
+                  setArea(e.target.value.replace(/\D/g, "").slice(0, max));
+                }}
                 className="bg-background/50"
               />
             </div>
