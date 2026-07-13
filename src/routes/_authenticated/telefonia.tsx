@@ -659,6 +659,88 @@ function TelefoniaPage() {
           ))}
         </section>
 
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">
+              Teste Rápido por Telefone
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ligue para o seu celular a partir de um dos seus números — a
+              assistente selecionada atende.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Seu número de celular</Label>
+                <Input
+                  placeholder="+5511999999999"
+                  value={quickCellphone}
+                  onChange={(e) => setQuickCellphone(e.target.value)}
+                  className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Número de origem</Label>
+                <Select value={quickFromId} onValueChange={setQuickFromId}>
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue placeholder="Selecione um número" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(vapiPhoneNumbersQuery.data ?? []).map((n) => (
+                      <SelectItem key={n.id} value={n.id}>
+                        {n.number ?? n.name ?? n.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Assistente</Label>
+                <Select
+                  value={quickAssistantId}
+                  onValueChange={setQuickAssistantId}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue placeholder="Selecione uma assistente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(assistantsQuery.data ?? []).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name ?? "Sem nome"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="gap-2 shadow-glow"
+                disabled={
+                  quickCallMutation.isPending ||
+                  !quickCellphone ||
+                  !quickFromId ||
+                  !quickAssistantId
+                }
+                onClick={() =>
+                  quickCallMutation.mutate({
+                    assistantId: quickAssistantId,
+                    phoneNumberId: quickFromId,
+                    customerNumber: quickCellphone.trim(),
+                  })
+                }
+              >
+                {quickCallMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PhoneCall className="h-4 w-4" />
+                )}
+                Ligar para meu celular
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl lg:col-span-2">
             <CardHeader className="pb-3">
