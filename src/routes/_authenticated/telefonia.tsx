@@ -287,6 +287,28 @@ function TelefoniaPage() {
   } | null>(null);
   const [verifyOtp, setVerifyOtp] = useState("");
 
+  // Quick outbound test-call state
+  const outboundCallFn = useServerFn(createOutboundTestCall);
+  const [quickCellphone, setQuickCellphone] = useState("");
+  const [quickFromId, setQuickFromId] = useState<string>("");
+  const [quickAssistantId, setQuickAssistantId] = useState<string>("");
+  const quickCallMutation = useMutation({
+    mutationFn: (input: {
+      assistantId: string;
+      phoneNumberId: string;
+      customerNumber: string;
+    }) => outboundCallFn({ data: input }),
+    onSuccess: () => {
+      toast.success(
+        "Chamada iniciada! Atenda seu celular. Como é uma conta teste da Twilio, pressione qualquer tecla quando for solicitado para ouvir a IA.",
+      );
+      setQuickCellphone("");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada.");
+    },
+  });
+
   const testContactsQuery = useQuery({
     queryKey: ["test-contacts"],
     queryFn: () => listTestContactsFn(),
