@@ -137,26 +137,55 @@ interface FormState {
 }
 
 const DEFAULT_MODEL_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-5";
-const DEFAULT_VOICE_PROVIDER = "cartesia";
-const DEFAULT_VOICE_ID = "blake";
+const DEFAULT_MODEL = "gpt-4.1";
+const DEFAULT_VOICE_PROVIDER = "vapi";
+const DEFAULT_VOICE_ID = "Elliot";
 const DEFAULT_FIRST_MESSAGE = "Olá! Como posso te ajudar hoje?";
 const DEFAULT_SYSTEM_PROMPT =
   "Você é um assistente de voz cordial e objetivo. Fale em português do Brasil, com respostas curtas e naturais.";
 
+// Somente provedores/modelos listados em docs.vapi.ai/providers/model/*
 const MODEL_OPTIONS: Record<string, string[]> = {
-  openai: ["gpt-5", "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
-  anthropic: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
-  google: ["gemini-1.5-pro", "gemini-1.5-flash"],
-  groq: ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+  openai: ["gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini", "o3-mini"],
+  anthropic: [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
+  ],
+  google: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+  xai: ["grok-2"],
 };
 
+// vapi/openai/deepgram têm voiceIds fixos documentados em docs.vapi.ai/providers/voice/*.
+// 11labs/cartesia/playht/azure exigem voiceIds da conta do usuário (BYOK) — não hardcodamos.
 const VOICE_OPTIONS: Record<string, string[]> = {
-  cartesia: ["blake", "sonic-english", "sonic-multilingual"],
-  "11labs": ["burt", "sarah", "adam", "rachel"],
+  vapi: [
+    "Elliot",
+    "Savannah",
+    "Rohan",
+    "Emma",
+    "Clara",
+    "Nico",
+    "Kai",
+    "Sagar",
+    "Godfrey",
+    "Neil",
+    "Layla",
+    "Sid",
+    "Naina",
+  ],
   openai: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
-  playht: ["jennifer", "melissa", "will"],
-  deepgram: ["aura-asteria-en", "aura-luna-en"],
+  deepgram: [
+    "aura-2-thalia-en",
+    "aura-2-orion-en",
+    "aura-2-luna-en",
+    "aura-2-asteria-en",
+  ],
+  "11labs": [],
+  cartesia: [],
+  playht: [],
+  azure: [],
 };
 
 const emptyForm: FormState = {
@@ -721,26 +750,44 @@ function AssistentesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Voz</Label>
-                  <Select
-                    value={form.voiceId}
-                    onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                    disabled={form.loadingInitial}
-                  >
-                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
-                        <SelectItem key={v} value={v}>
-                          {v}
-                        </SelectItem>
-                      ))}
-                      {form.voiceId &&
-                        !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
-                          <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                        )}
-                    </SelectContent>
-                  </Select>
+                  {(VOICE_OPTIONS[form.voiceProvider] ?? []).length === 0 ? (
+                    <>
+                      <Input
+                        value={form.voiceId}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, voiceId: e.target.value }))
+                        }
+                        placeholder="Cole o voiceId da sua conta (BYOK)"
+                        disabled={form.loadingInitial}
+                        className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Para {form.voiceProvider}, o voiceId deve vir da sua conta
+                        sincronizada na Vapi (Integrations).
+                      </p>
+                    </>
+                  ) : (
+                    <Select
+                      value={form.voiceId}
+                      onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                      disabled={form.loadingInitial}
+                    >
+                      <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
+                          <SelectItem key={v} value={v}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                        {form.voiceId &&
+                          !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
+                            <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                          )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
             )}

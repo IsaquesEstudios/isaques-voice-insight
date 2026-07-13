@@ -119,64 +119,86 @@ export const Route = createFileRoute("/_authenticated/assistants/$id")({
   component: AssistantDetailPage,
 });
 
+// Provedores/modelos/vozes só com IDs documentados em docs.vapi.ai/providers/*
 const MODEL_PROVIDERS = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
   { value: "google", label: "Google" },
   { value: "groq", label: "Groq" },
+  { value: "xai", label: "xAI" },
 ];
 
 const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   openai: [
-    { value: "gpt-5", label: "GPT 5" },
-    { value: "gpt-4o", label: "gpt-4o" },
-    { value: "gpt-4o-mini", label: "gpt-4o-mini" },
-    { value: "gpt-4", label: "gpt-4" },
-    { value: "gpt-3.5-turbo", label: "gpt-3.5-turbo" },
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini" },
+    { value: "o3-mini", label: "o3-mini" },
   ],
   anthropic: [
-    { value: "claude-3-5-sonnet-20241022", label: "claude-3.5-sonnet" },
-    { value: "claude-3-haiku-20240307", label: "claude-3-haiku" },
+    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+    { value: "claude-3-opus-20240229", label: "Claude 3 Opus" },
   ],
   google: [
-    { value: "gemini-1.5-pro", label: "gemini-1.5-pro" },
-    { value: "gemini-1.5-flash", label: "gemini-1.5-flash" },
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
   ],
   groq: [
-    { value: "llama-3.1-70b-versatile", label: "llama-3.1-70b" },
-    { value: "mixtral-8x7b-32768", label: "mixtral-8x7b" },
+    { value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B" },
+    { value: "llama-3.1-8b-instant", label: "Llama 3.1 8B" },
   ],
+  xai: [{ value: "grok-2", label: "Grok 2" }],
 };
 
 const VOICE_PROVIDERS = [
-  { value: "cartesia", label: "Cartesia" },
-  { value: "11labs", label: "ElevenLabs" },
+  { value: "vapi", label: "Vapi Voices" },
   { value: "openai", label: "OpenAI" },
-  { value: "azure", label: "Azure" },
+  { value: "deepgram", label: "Deepgram (Aura 2)" },
+  { value: "11labs", label: "ElevenLabs (BYOK)" },
+  { value: "cartesia", label: "Cartesia (BYOK)" },
+  { value: "playht", label: "PlayHT (BYOK)" },
+  { value: "azure", label: "Azure (BYOK)" },
 ];
 
+// Vapi Voices ativas — https://docs.vapi.ai/providers/voice/vapi-voices
+// OpenAI/Deepgram: IDs fixos e documentados. BYOK: voiceIds vêm da dashboard do usuário.
 const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
-  cartesia: [
-    { value: "blake", label: "Blake — helpful agent" },
-    { value: "sonic-english", label: "Sonic English" },
-    { value: "sonic-multilingual", label: "Sonic Multilingual" },
-  ],
-  "11labs": [
-    { value: "burt", label: "Burt" },
-    { value: "rachel", label: "Rachel" },
-    { value: "adam", label: "Adam" },
-    { value: "domi", label: "Domi" },
+  vapi: [
+    { value: "Elliot", label: "Elliot V2 — Male, Canadian" },
+    { value: "Savannah", label: "Savannah V2 — Female, Southern US" },
+    { value: "Rohan", label: "Rohan — Male, Indian American" },
+    { value: "Emma", label: "Emma V2 — Female, Asian American" },
+    { value: "Clara", label: "Clara V2 — Female, American" },
+    { value: "Nico", label: "Nico V2 — Male, American" },
+    { value: "Kai", label: "Kai V2 — Male, American" },
+    { value: "Sagar", label: "Sagar V2 — Male, Indian American" },
+    { value: "Godfrey", label: "Godfrey V2 — Male, American" },
+    { value: "Neil", label: "Neil V2 — Male, Indian American" },
+    { value: "Layla", label: "Layla V2 — Female, American" },
+    { value: "Sid", label: "Sid V2 — Male, American" },
+    { value: "Naina", label: "Naina V2 — Female, Indian American" },
   ],
   openai: [
     { value: "alloy", label: "Alloy" },
     { value: "echo", label: "Echo" },
+    { value: "fable", label: "Fable" },
+    { value: "onyx", label: "Onyx" },
     { value: "nova", label: "Nova" },
     { value: "shimmer", label: "Shimmer" },
   ],
-  azure: [
-    { value: "en-US-JennyNeural", label: "Jenny (EN-US)" },
-    { value: "pt-BR-FranciscaNeural", label: "Francisca (PT-BR)" },
+  deepgram: [
+    { value: "aura-2-thalia-en", label: "Aura 2 · Thalia (EN)" },
+    { value: "aura-2-orion-en", label: "Aura 2 · Orion (EN)" },
+    { value: "aura-2-luna-en", label: "Aura 2 · Luna (EN)" },
+    { value: "aura-2-asteria-en", label: "Aura 2 · Asteria (EN)" },
   ],
+  "11labs": [],
+  cartesia: [],
+  playht: [],
+  azure: [],
 };
 
 interface FormState {
@@ -547,26 +569,44 @@ function AssistantDetailPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Voz / Voice ID</Label>
-                        <Select
-                          value={form.voiceId}
-                          onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                          disabled={isLoading}
-                        >
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                            {voiceOptions.map((v) => (
-                              <SelectItem key={v.value} value={v.value}>
-                                {v.label}
-                              </SelectItem>
-                            ))}
-                            {!voiceOptions.some((v) => v.value === form.voiceId) &&
-                              form.voiceId && (
-                                <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                              )}
-                          </SelectContent>
-                        </Select>
+                        {voiceOptions.length === 0 ? (
+                          <>
+                            <Input
+                              value={form.voiceId}
+                              onChange={(e) =>
+                                setForm((f) => ({ ...f, voiceId: e.target.value }))
+                              }
+                              placeholder="Cole o voiceId da sua conta (BYOK)"
+                              disabled={isLoading}
+                              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Para {form.voiceProvider}, o voiceId deve vir da sua conta
+                              sincronizada na Vapi (Integrations).
+                            </p>
+                          </>
+                        ) : (
+                          <Select
+                            value={form.voiceId}
+                            onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                              {voiceOptions.map((v) => (
+                                <SelectItem key={v.value} value={v.value}>
+                                  {v.label}
+                                </SelectItem>
+                              ))}
+                              {!voiceOptions.some((v) => v.value === form.voiceId) &&
+                                form.voiceId && (
+                                  <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                                )}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <CostHint
                           costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
                           tooltip="Custo estimado de TTS por minuto de voz sintetizada."
