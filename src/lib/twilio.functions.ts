@@ -345,36 +345,31 @@ export const connectExternalNumber = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const syntheticSid = `byoc_${crypto.randomUUID()}`;
 
-    const row =
+    const capabilities: Record<string, unknown> =
       data.mode === "twilio"
         ? {
-            user_id: context.userId,
-            twilio_sid: syntheticSid,
-            phone_number: data.phoneNumber,
-            friendly_name: `Twilio BYOC ${data.accountSid.slice(0, 8)}…`,
-            region: null,
-            country_iso: null,
-            capabilities: {
-              byoc: true,
-              account_sid: data.accountSid,
-              // Auth token stored here to keep the flow self-contained. For
-              // production traffic, move to an encrypted secrets table.
-              auth_token: data.authToken,
-            },
-            monthly_cost: null,
-            provider: "Twilio (Conta Própria)",
+            byoc: true,
+            account_sid: data.accountSid,
+            // Auth token stored here to keep the flow self-contained. For
+            // production traffic, move to an encrypted secrets table.
+            auth_token: data.authToken,
           }
-        : {
-            user_id: context.userId,
-            twilio_sid: syntheticSid,
-            phone_number: data.sipUri,
-            friendly_name: data.routeName,
-            region: null,
-            country_iso: null,
-            capabilities: { byoc: true, sip_uri: data.sipUri, route: data.routeName },
-            monthly_cost: null,
-            provider: "SIP (Externo)",
-          };
+        : { byoc: true, sip_uri: data.sipUri, route: data.routeName };
+
+    const row = {
+      user_id: context.userId,
+      twilio_sid: syntheticSid,
+      phone_number: data.mode === "twilio" ? data.phoneNumber : data.sipUri,
+      friendly_name:
+        data.mode === "twilio"
+          ? `Twilio BYOC ${data.accountSid.slice(0, 8)}…`
+          : data.routeName,
+      region: null,
+      country_iso: null,
+      capabilities,
+      monthly_cost: null,
+      provider: data.mode === "twilio" ? "Twilio (Conta Própria)" : "SIP (Externo)",
+    };
 
     const { error } = await context.supabase.from("user_phone_numbers").insert(row);
     if (error) throw new Error(`DB insert failed: ${error.message}`);
