@@ -138,30 +138,65 @@ export const purchaseNumber = createServerFn({ method: "POST" })
     const attemptPurchase = (f: Record<string, string>) =>
       twilioPost("/IncomingPhoneNumbers.json", f) as Promise<PurchaseResult>;
 
+    const iso = (data.countryIso || "").toUpperCase();
+
+    const attachAddressForCountry = async () => {
+      const addr = (await twilioGet("/Addresses.json", { PageSize: "50" })) as {
+        addresses?: Array<{ sid: string; iso_country: string }>;
+      };
+      const match = (addr.addresses ?? []).find(
+        (a) => a.iso_country?.toUpperCase() === iso,
+      );
+      if (match) form.AddressSid = match.sid;
+      return !!match;
+    };
+
+    const attachBundleForCountry = async () => {
+      // Numbering (regulatory) bundles live on the Numbers API, not the Core API.
+      const gw = "https://connector-gateway.lovable.dev/twilio";
+      const res = await fetch(
+        `${gw}/v2/RegulatoryCompliance/Bundles?Status=twilio-approved&IsoCountry=${iso}&NumberType=local&PageSize=50`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.LOVABLE_API_KEY!}`,
+            "X-Connection-Api-Key": process.env.TWILIO_API_KEY!,
+          },
+        },
+      );
+      if (!res.ok) return false;
+      const body = (await res.json()) as { results?: Array<{ sid: string }> };
+      const bundle = body.results?.[0];
+      if (bundle) form.BundleSid = bundle.sid;
+      return !!bundle;
+    };
+
     let json: PurchaseResult;
     try {
       json = await attemptPurchase(form);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 21631 => Phone Number Requires an Address but 'AddressSid' was empty.
-      if (msg.includes('"code":21631') || msg.includes("AddressSid")) {
-        const iso = (data.countryIso || "").toUpperCase();
-        const addr = (await twilioGet("/Addresses.json", { PageSize: "50" })) as {
-          addresses?: Array<{ sid: string; iso_country: string }>;
-        };
-        const match = (addr.addresses ?? []).find(
-          (a) => a.iso_country?.toUpperCase() === iso,
+      const needsAddress = msg.includes('"code":21631') || msg.includes("AddressSid");
+      const needsBundle = msg.includes('"code":21649') || msg.includes("Bundle required");
+
+      if (!needsAddress && !needsBundle) throw err;
+
+      const gotAddress = needsAddress ? await attachAddressForCountry() : true;
+      const gotBundle = needsBundle ? await attachBundleForCountry() : true;
+      // Bundle-required countries usually also need an Address — attach opportunistically.
+      if (needsBundle && !form.AddressSid) await attachAddressForCountry();
+
+      if (needsAddress && !gotAddress) {
+        throw new Error(
+          `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}. Cadastre em https://console.twilio.com/us1/develop/phone-numbers/manage/regulatory-compliance/addresses e tente novamente.`,
         );
-        if (!match) {
-          throw new Error(
-            `Este país (${iso}) exige um Endereço regulatório vinculado ao número, e nenhum Address foi encontrado na sua conta Twilio para ${iso}. Cadastre em https://console.twilio.com/us1/develop/phone-numbers/manage/regulatory-compliance/addresses e tente novamente.`,
-          );
-        }
-        form.AddressSid = match.sid;
-        json = await attemptPurchase(form);
-      } else {
-        throw err;
       }
+      if (needsBundle && !gotBundle) {
+        throw new Error(
+          `Este país (${iso}) exige um Regulatory Bundle aprovado pela Twilio (status "twilio-approved") vinculado ao número, e nenhum foi encontrado para ${iso} (LOCAL). Crie e envie um Bundle em https://console.twilio.com/us1/develop/phone-numbers/regulatory-compliance/bundles, aguarde a aprovação e tente novamente.`,
+        );
+      }
+
+      json = await attemptPurchase(form);
     }
 
 
