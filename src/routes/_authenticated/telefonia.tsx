@@ -369,6 +369,9 @@ function TelefoniaPage() {
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao salvar contato"),
+  });
+
+
 
   const confirmOtpMutation = useMutation({
     mutationFn: (input: { phoneE164: string; code: string; label: string }) =>
