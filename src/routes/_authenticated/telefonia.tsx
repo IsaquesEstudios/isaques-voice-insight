@@ -76,6 +76,20 @@ import {
   saveTwilioCredentials,
   sendVerifyOtp,
 } from "@/lib/twilio.functions";
+import {
+  attachAssistantToNumber,
+  detachAssistantFromNumber,
+  listVapiAssistants,
+  listVapiPhoneNumbers,
+} from "@/lib/vapi.functions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Bot } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
   head: () => ({
@@ -124,6 +138,10 @@ interface AvailableNumber {
 function TelefoniaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const listAssistantsFn = useServerFn(listVapiAssistants);
+  const listVapiPhoneNumbersFn = useServerFn(listVapiPhoneNumbers);
+  const attachAssistantFn = useServerFn(attachAssistantToNumber);
+  const detachAssistantFn = useServerFn(detachAssistantFromNumber);
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
@@ -172,6 +190,31 @@ function TelefoniaPage() {
     enabled: isTwilioConnected,
   });
 
+  const assistantsQuery = useQuery({
+    queryKey: ["vapi-assistants"],
+    queryFn: () => listAssistantsFn(),
+  });
+  const vapiPhoneNumbersQuery = useQuery({
+    queryKey: ["vapi-phone-numbers"],
+    queryFn: () => listVapiPhoneNumbersFn(),
+  });
+
+  const assistantById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of assistantsQuery.data ?? []) {
+      map.set(a.id, a.name ?? "Sem nome");
+    }
+    return map;
+  }, [assistantsQuery.data]);
+
+  const assistantByPhone = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const n of vapiPhoneNumbersQuery.data ?? []) {
+      if (n.number && n.assistantId) map.set(n.number, n.assistantId);
+    }
+    return map;
+  }, [vapiPhoneNumbersQuery.data]);
+
   const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
   const liveTwilio =
     twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
@@ -187,22 +230,31 @@ function TelefoniaPage() {
   const numbers: NumberRow[] = isTwilioConnected
     ? liveTwilio.map((n) => {
         const local = localNumbers.find((l) => l.phone_number === n.phoneNumber);
+        const assistantId = assistantByPhone.get(n.phoneNumber);
+        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
         return {
           id: local?.id ?? n.sid,
           phone_number: n.phoneNumber,
           region: local?.region ?? null,
           provider: "Twilio (Sua conta)",
-          assistant: local?.assistant ?? null,
+          assistant: assistantName ?? local?.assistant ?? null,
           calls_today: local?.calls_today ?? 0,
           answer_rate: local?.answer_rate ?? 0,
           health: "Seguro" as Health,
         };
       })
-    : localNumbers;
+    : localNumbers.map((n) => {
+        const assistantId = assistantByPhone.get(n.phone_number);
+        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
+        return { ...n, assistant: assistantName ?? n.assistant };
+      });
+
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"twilio" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
+  const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
+  const [assignAssistantId, setAssignAssistantId] = useState<string>("");
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -417,6 +469,32 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
   });
 
+  const attachAssistantMutation = useMutation({
+    mutationFn: (input: { phoneNumberE164: string; assistantId: string; name?: string }) =>
+      attachAssistantFn({ data: input }),
+    onSuccess: async () => {
+      toast.success("Atendente vinculada ao número.");
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setAssignTarget(null);
+      setAssignAssistantId("");
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao vincular atendente"),
+  });
+
+  const detachAssistantMutation = useMutation({
+    mutationFn: (phoneNumberE164: string) =>
+      detachAssistantFn({ data: { phoneNumberE164 } }),
+    onSuccess: async () => {
+      toast.success("Atendente removida do número.");
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao remover atendente"),
+  });
+
 
 
 
@@ -583,8 +661,35 @@ function TelefoniaPage() {
                             {n.region ?? "—"}
                           </TableCell>
                           <TableCell className="text-xs text-foreground">
-                            {n.assistant ?? "—"}
+                            {n.assistant ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                                onClick={() => {
+                                  setAssignTarget(n);
+                                  setAssignAssistantId(
+                                    assistantByPhone.get(n.phone_number) ?? "",
+                                  );
+                                }}
+                              >
+                                <Bot className="h-3 w-3" />
+                                {n.assistant}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+                                onClick={() => {
+                                  setAssignTarget(n);
+                                  setAssignAssistantId("");
+                                }}
+                              >
+                                <Plus className="h-3 w-3" />
+                                Atribuir atendente
+                              </button>
+                            )}
                           </TableCell>
+
                           <TableCell className="text-xs">{n.calls_today}</TableCell>
                           <TableCell className="text-xs">
                             {n.answer_rate > 0 ? `${n.answer_rate}%` : "—"}
@@ -609,6 +714,27 @@ function TelefoniaPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
+                                  onClick={() => {
+                                    setAssignTarget(n);
+                                    setAssignAssistantId(
+                                      assistantByPhone.get(n.phone_number) ?? "",
+                                    );
+                                  }}
+                                >
+                                  <Bot className="mr-2 h-4 w-4" />
+                                  {n.assistant ? "Alterar atendente" : "Atribuir atendente"}
+                                </DropdownMenuItem>
+                                {n.assistant ? (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      detachAssistantMutation.mutate(n.phone_number)
+                                    }
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remover atendente
+                                  </DropdownMenuItem>
+                                ) : null}
+                                <DropdownMenuItem
                                   onClick={() => setReleaseTarget(n)}
                                   className="text-destructive focus:text-destructive"
                                 >
@@ -616,6 +742,7 @@ function TelefoniaPage() {
                                   Liberar número
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
+
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
@@ -1252,7 +1379,101 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={assignTarget !== null}
+        onOpenChange={(v) => {
+          if (!v) {
+            setAssignTarget(null);
+            setAssignAssistantId("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Atribuir atendente ao número</DialogTitle>
+            <DialogDescription>
+              {assignTarget ? (
+                <>
+                  Escolha qual atendente virtual atenderá as chamadas recebidas em{" "}
+                  <span className="font-mono text-foreground">
+                    {assignTarget.phone_number}
+                  </span>
+                  .
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label className="text-xs">Atendente</Label>
+            <Select
+              value={assignAssistantId}
+              onValueChange={setAssignAssistantId}
+              disabled={assistantsQuery.isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    assistantsQuery.isLoading
+                      ? "Carregando atendentes…"
+                      : "Selecione uma atendente"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {(assistantsQuery.data ?? []).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name ?? "Sem nome"}
+                    {a.model?.model ? (
+                      <span className="ml-2 text-[10px] text-muted-foreground">
+                        {a.model.provider}/{a.model.model}
+                      </span>
+                    ) : null}
+                  </SelectItem>
+                ))}
+                {(assistantsQuery.data ?? []).length === 0 && !assistantsQuery.isLoading ? (
+                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                    Nenhuma atendente encontrada. Crie uma em Assistentes Virtuais.
+                  </div>
+                ) : null}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAssignTarget(null);
+                setAssignAssistantId("");
+              }}
+              disabled={attachAssistantMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!assignTarget || !assignAssistantId) return;
+                attachAssistantMutation.mutate({
+                  phoneNumberE164: assignTarget.phone_number,
+                  assistantId: assignAssistantId,
+                  name: assignTarget.phone_number,
+                });
+              }}
+              disabled={!assignAssistantId || attachAssistantMutation.isPending}
+              className="gap-2"
+            >
+              {attachAssistantMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="h-4 w-4" />
+              )}
+              Vincular
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
+
 
 
   );

@@ -1,41 +1,47 @@
 ## Objetivo
+Permitir que cada número da página `/telefonia` tenha uma **atendente (assistente virtual do Vapi) responsável**, para que ligações recebidas nesse número sejam atendidas por ela.
 
-Mostrar, ao lado dos selects de **Modelo** e **Voz** na aba Assistente (`/assistants/:id`), uma previsão de custo por minuto baseada na tabela pública de preços da Vapi, atualizando em tempo real conforme o usuário troca a IA. O total combinado (LLM + TTS + STT + Vapi platform fee) aparece como um pequeno resumo abaixo, ajudando a escolher a opção mais econômica.
+## Como vai funcionar (usuário)
+1. Na tabela "Meus números", cada linha ganha um botão "Atribuir atendente" (ou o próprio nome da atendente, clicável) na coluna **Atendente**.
+2. Ao clicar, abre um modal com combobox listando as assistentes da conta (via `listAssistants` já existente).
+3. Escolher uma atendente → salva o vínculo, importa o número no Vapi (se ainda não importado) e liga a assistente a ele. Toast de sucesso e refresh automático da lista.
+4. Também é possível trocar a atendente ou "Remover atendente" pelo mesmo modal.
+5. A coluna "Atendente" passa a mostrar o nome real (não só um id) e a origem do vínculo (Vapi).
 
-Escopo restrito à tela de detalhes do assistente — nenhum outro arquivo é tocado.
+## Arquitetura técnica
 
-## O que será feito
+### Backend — Vapi Phone Numbers API
+Adicionar em `src/lib/vapi.functions.ts` (todas com `requireSupabaseAuth`):
 
-1. **Novo arquivo `src/lib/vapi-pricing.ts`** (client-side, estático)
-   - Tabela `MODEL_PRICING` com custo em USD/min por `provider/model` para os modelos já listados em `MODEL_OPTIONS` (OpenAI gpt-4o, gpt-4o-mini, gpt-3.5-turbo; Anthropic claude-3.5-sonnet/haiku; Google gemini; Groq).
-   - Tabela `VOICE_PRICING` com custo USD/min por `provider/voiceId` (11labs, PlayHT, Deepgram, etc.).
-   - Constantes fixas: `STT_COST_PER_MIN` (Deepgram Nova padrão Vapi) e `VAPI_PLATFORM_FEE_PER_MIN` (0.05).
-   - Helpers `getModelCost(provider, model)`, `getVoiceCost(provider, voiceId)`, `formatUSD(n)`.
-   - Valores baseados na página pública de pricing da Vapi; comentário no topo com data e link para revisão.
+- `listVapiPhoneNumbers()` → `GET /phone-number` (retorna os números já importados no Vapi da conta).
+- `attachAssistantToNumber({ phoneNumberE164, twilioSid, assistantId })`:
+  - Procura o número em `listVapiPhoneNumbers` pelo `number` em E.164.
+  - Se **não existir**: `POST /phone-number` com `{ provider: "twilio", number, twilioAccountSid, twilioAuthToken, assistantId, name }` usando as credenciais Twilio do usuário lidas de `user_twilio_credentials` (mesma tabela já usada por `twilio.functions.ts`).
+  - Se **existir**: `PATCH /phone-number/{id}` com `{ assistantId }`.
+- `detachAssistantFromNumber({ phoneNumberE164 })` → `PATCH /phone-number/{id}` com `{ assistantId: null }`.
 
-2. **Novo componente `src/components/assistants/cost-hint.tsx`**
-   - Chip inline compacto: ícone + `~ $0.XX/min` + tooltip explicando a origem do valor.
-   - Props: `label` (ex: "Modelo"), `costPerMin`, `breakdown?` (para o total).
-   - Estilo alinhado ao design atual (glass, muted-foreground, `text-xs`).
+Espelhar o vínculo no Supabase para exibição rápida: adicionar coluna `assistant_id uuid null` (Vapi assistant id, texto) em `user_phone_numbers` — via migration — e atualizar `listUserPhoneNumbers` / `connectExternalNumber` para retornar/preservar esse campo.
 
-3. **Edição em `src/routes/_authenticated/assistants.$id.tsx`** (única alteração de tela)
-   - Importa os helpers e o `CostHint`.
-   - Abaixo do `Select` de **Modelo** (dentro da aba Assistente) renderiza `<CostHint costPerMin={getModelCost(modelProvider, model)} />`.
-   - Abaixo do `Select` de **Voz** renderiza `<CostHint costPerMin={getVoiceCost(voiceProvider, voiceId)} />`.
-   - Ao final do bloco de configuração (ou logo abaixo dos dois selects), um resumo pequeno:
-     `Custo estimado total: ~$X.XX/min` com breakdown em tooltip (LLM + TTS + STT + Vapi).
-   - Se o par provider/model não estiver na tabela, mostra `—` e tooltip "Preço não catalogado".
+### Frontend — `src/routes/_authenticated/telefonia.tsx`
+- Novo estado `assignTarget: UserPhoneNumber | null` e `AssignAssistantDialog`.
+- Dentro do dialog: `useQuery(["assistants"], listAssistants)` para popular um `<Select>` com nome + provider + voice.
+- Mutation `attachAssistantMutation` → chama `attachAssistantToNumber` e faz `queryClient.invalidateQueries(["user-phone-numbers"])`.
+- Coluna **Atendente** (linha 586): mostrar nome da atendente (lookup via mapa `assistants`), com botão "Atribuir/Alterar". No `DropdownMenu` da linha, adicionar itens "Atribuir atendente" e "Remover atendente".
 
-## Detalhes técnicos
+### Migration
+```sql
+ALTER TABLE public.user_phone_numbers
+  ADD COLUMN IF NOT EXISTS assistant_id text,
+  ADD COLUMN IF NOT EXISTS vapi_phone_number_id text;
+```
+Sem mudanças de RLS (já escopadas por `user_id`).
 
-- 100% frontend/presentation, sem alterações no server ou em `vapi.functions.ts`.
-- Nenhuma nova rota, migration ou secret.
-- Nenhum request adicional — cálculo local e instantâneo.
-- Formato do valor: USD com 3 casas quando < $0.10, senão 2 casas (`$0.006/min`, `$0.18/min`).
-- Comentário no `vapi-pricing.ts` avisa que os valores devem ser revisados periodicamente contra a página oficial da Vapi.
+## Escopo fora
+- Não altero fluxo de compra/conexão de números existente.
+- Não altero a página `/assistants`.
+- Sem inbound webhook próprio — o Vapi cuida de atender via a assistente vinculada.
 
-## Fora do escopo (não faremos agora)
-
-- Buscar custo real das últimas chamadas via `/call` (fica para uma segunda etapa se você quiser).
-- Card de custo na lista de assistentes ou página dedicada de comparação.
-- Conversão USD→BRL.
+## Arquivos afetados
+- `src/lib/vapi.functions.ts` (novas funções)
+- `src/routes/_authenticated/telefonia.tsx` (UI/mutations)
+- Nova migration para colunas em `user_phone_numbers`
