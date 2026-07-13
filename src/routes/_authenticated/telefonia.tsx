@@ -863,23 +863,6 @@ function TelefoniaPage() {
               </Alert>
             )}
 
-            {numbers.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Label className="text-xs text-muted-foreground">Ligar a partir de:</Label>
-                <select
-                  value={testCallFrom || numbers[0]?.phone_number || ""}
-                  onChange={(e) => setTestCallFrom(e.target.value)}
-                  className="h-8 rounded-md border border-white/[0.08] bg-background/60 px-2 text-xs text-foreground"
-                >
-                  {numbers.map((n) => (
-                    <option key={n.id} value={n.phone_number}>
-                      {n.phone_number}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {testContactsQuery.isLoading ? (
               Array.from({ length: 2 }).map((_, i) => (
                 <div
@@ -892,84 +875,118 @@ function TelefoniaPage() {
                 Nenhum contato de teste ainda. Clique em <b>Novo contato</b> para começar.
               </p>
             ) : (
-              testContacts.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {c.label}
-                      </p>
-                      {c.verified ? (
-                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                          Verificado
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
-                          Não verificado
-                        </span>
-                      )}
+              testContacts.map((c) => {
+                const from = rowCallFrom[c.sid] ?? numbers[0]?.phone_number ?? "";
+                const assistantId = rowCallAssistant[c.sid] ?? "";
+                return (
+                  <div
+                    key={c.sid}
+                    className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {c.friendly_name}
+                          </p>
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                            Verificado
+                          </span>
+                        </div>
+                        <p className="truncate font-mono text-xs text-muted-foreground">
+                          {c.phone_number}
+                        </p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeTestContactMutation.mutate(c.sid)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {c.phone_e164}
-                    </p>
+
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Número de origem
+                        </Label>
+                        <Select
+                          value={from}
+                          onValueChange={(v) =>
+                            setRowCallFrom((prev) => ({ ...prev, [c.sid]: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione um número" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {numbers.length === 0 ? (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">
+                                Conecte um número em "Conectar Número".
+                              </div>
+                            ) : (
+                              numbers.map((n) => (
+                                <SelectItem key={n.phone_number} value={n.phone_number}>
+                                  {n.phone_number}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Assistente
+                        </Label>
+                        <Select
+                          value={assistantId}
+                          onValueChange={(v) =>
+                            setRowCallAssistant((prev) => ({ ...prev, [c.sid]: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione uma assistente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(assistantsQuery.data ?? []).map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name ?? "Sem nome"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 shadow-glow"
+                        disabled={
+                          !isTwilioConnected ||
+                          !from ||
+                          !assistantId ||
+                          callingContactId === c.sid
+                        }
+                        onClick={() =>
+                          testCallMutation.mutate({
+                            sid: c.sid,
+                            phone_number: c.phone_number,
+                          })
+                        }
+                      >
+                        {callingContactId === c.sid ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <PhoneCall className="h-3.5 w-3.5" />
+                        )}
+                        Ligar
+                      </Button>
+                    </div>
                   </div>
-                  {!c.verified && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!isTwilioConnected || sendOtpMutation.isPending}
-                      onClick={() => {
-                        setVerifyExisting({
-                          id: c.id,
-                          label: c.label,
-                          phone: c.phone_e164,
-                        });
-                        setVerifyOtp("");
-                        sendOtpMutation.mutate(c.phone_e164);
-                      }}
-                      className="gap-1.5"
-                    >
-                      {sendOtpMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : null}
-                      Verificar via SMS
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={
-                      !isTwilioConnected ||
-                      numbers.length === 0 ||
-                      callingContactId === c.id ||
-                      !c.verified
-                    }
-                    onClick={() =>
-                      testCallMutation.mutate({ id: c.id, phone_e164: c.phone_e164 })
-                    }
-                    className="gap-1.5"
-                  >
-                    {callingContactId === c.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <PhoneCall className="h-3.5 w-3.5" />
-                    )}
-                    Testar chamada
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => removeTestContactMutation.mutate(c.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
+                );
+              })
             )}
+
           </CardContent>
         </Card>
       </div>
