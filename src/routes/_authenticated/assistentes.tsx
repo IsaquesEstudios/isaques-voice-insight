@@ -618,6 +618,105 @@ function AssistentesPage() {
               />
             </div>
             <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Provedor do Modelo</Label>
+                <Select
+                  value={form.modelProvider}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      modelProvider: v,
+                      model: MODEL_OPTIONS[v]?.[0] ?? "",
+                    }))
+                  }
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(MODEL_OPTIONS).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Modelo de IA</Label>
+                <Select
+                  value={form.model}
+                  onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(MODEL_OPTIONS[form.modelProvider] ?? []).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                    {form.model &&
+                      !(MODEL_OPTIONS[form.modelProvider] ?? []).includes(form.model) && (
+                        <SelectItem value={form.model}>{form.model}</SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Provedor de Voz</Label>
+                <Select
+                  value={form.voiceProvider}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      voiceProvider: v,
+                      voiceId: VOICE_OPTIONS[v]?.[0] ?? "",
+                    }))
+                  }
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(VOICE_OPTIONS).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Voz</Label>
+                <Select
+                  value={form.voiceId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                  disabled={form.loadingInitial}
+                >
+                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                    {form.voiceId &&
+                      !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
+                        <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="assistant-prompt">System Prompt / Instruções</Label>
               <Textarea
                 id="assistant-prompt"
