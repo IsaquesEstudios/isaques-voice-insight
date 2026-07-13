@@ -71,9 +71,11 @@ import {
   listTwilioNumbers,
   listTwilioTrunks,
   makeTestCall,
+  refreshContactVerification,
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
+  startContactVerification,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
