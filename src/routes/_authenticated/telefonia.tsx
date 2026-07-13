@@ -277,10 +277,12 @@ function TelefoniaPage() {
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  // SMS OTP verification step
-  const [otpStep, setOtpStep] = useState<null | { phoneE164: string; label: string }>(null);
-  const [otpCode, setOtpCode] = useState("");
-  const [trialBlocked, setTrialBlocked] = useState(false);
+  // Twilio "Verify a Caller ID" flow: Twilio places a call to the number
+  // with a 6-digit code the user types on the keypad.
+  const [verifyStep, setVerifyStep] = useState<
+    | null
+    | { phoneE164: string; label: string; validationCode: string }
+  >(null);
   // Per-row call controls (origin number + assistant)
   const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
@@ -300,68 +302,13 @@ function TelefoniaPage() {
     verified: boolean;
   }>;
 
-  const sendOtpMutation = useMutation({
-    mutationFn: (input: { phoneE164: string; label: string }) =>
-      sendVerifyOtpFn({ data: { phoneE164: input.phoneE164, channel: "sms" } }).then(
-        (res) => ({ res, input }),
-      ),
-    onSuccess: ({ res, input }) => {
-      const r = res as
-        | { ok: true; channel: string }
-        | { ok: false; reason: string; message?: string };
-      if (r.ok) {
-        toast.success("SMS enviado. Digite o código de 6 dígitos.");
-        setOtpStep({ phoneE164: input.phoneE164, label: input.label });
-        setTestContactOpen(false);
-        setTrialBlocked(false);
-      } else if (r.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      } else if (r.reason === "trial_unverified") {
-        setTrialBlocked(true);
-      } else {
-        toast.error(r.message ?? "Falha ao enviar SMS.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS"),
-  });
-
-  const trustFromTwilioMutation = useMutation({
-    mutationFn: (input: { phoneE164: string; label: string }) =>
-      addVerifiedFromTwilioFn({
-        data: { phoneE164: input.phoneE164, label: input.label },
-      }),
-    onSuccess: async (res) => {
-      const r = res as
-        | { ok: true; id?: string }
-        | { ok: false; reason: string; message?: string };
-      if (r.ok) {
-        toast.success("Contato importado da Twilio como verificado.");
-        setTestContactOpen(false);
-        setTrialBlocked(false);
-        setTestContactForm({ label: "", phoneE164: "" });
-        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      } else if (r.reason === "not_verified_in_twilio") {
-        toast.error(
-          "Este número ainda não aparece como Verified Caller ID na sua conta Twilio.",
-        );
-      } else if (r.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      } else {
-        toast.error(r.message ?? "Falha ao importar contato.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao importar contato"),
-  });
-
   const saveContactMutation = useMutation({
     mutationFn: (input: { phoneE164: string; label: string }) =>
       saveTestContactFn({ data: { phoneE164: input.phoneE164, label: input.label } }),
     onSuccess: async () => {
-      toast.success("Contato de teste salvo.");
+      toast.success("Contato de teste verificado e salvo.");
       setTestContactOpen(false);
-      setTrialBlocked(false);
+      setVerifyStep(null);
       setTestContactForm({ label: "", phoneE164: "" });
       await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
     },
@@ -369,34 +316,61 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao salvar contato"),
   });
 
-
-
-  const confirmOtpMutation = useMutation({
-    mutationFn: (input: { phoneE164: string; code: string; label: string }) =>
-      checkVerifyOtpFn({
-        data: { phoneE164: input.phoneE164, code: input.code, label: input.label },
-      }),
-    onSuccess: async (res) => {
+  const startVerifyMutation = useMutation({
+    mutationFn: (input: { phoneE164: string; label: string }) =>
+      startCallerIdVerificationFn({
+        data: { phoneE164: input.phoneE164, friendlyName: input.label },
+      }).then((res) => ({ res, input })),
+    onSuccess: ({ res, input }) => {
       const r = res as
-        | { ok: true; id: string }
+        | { ok: true; validationCode: string }
         | { ok: false; reason: string; message?: string };
       if (r.ok) {
-        toast.success("Contato verificado!");
-        setOtpStep(null);
-        setOtpCode("");
-        setTestContactForm({ label: "", phoneE164: "" });
-        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      } else if (r.reason === "invalid_code") {
-        toast.error("Código inválido. Tente novamente.");
-      } else if (r.reason === "expired") {
-        toast.error("Código expirado. Envie um novo SMS.");
+        setVerifyStep({
+          phoneE164: input.phoneE164,
+          label: input.label,
+          validationCode: r.validationCode,
+        });
+        toast.success("A Twilio está ligando para o número.");
+      } else if (r.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio primeiro.");
       } else {
-        toast.error(r.message ?? "Falha ao verificar código.");
+        const msg = r.message ?? "Falha ao iniciar verificação.";
+        if (/10002/.test(msg)) {
+          toast.error(
+            "Sua conta Twilio está em trial e não permite verificação por chamada via API. Verifique o número diretamente no Twilio Console → Verified Caller IDs; ele aparecerá aqui automaticamente.",
+            { duration: 8000 },
+          );
+        } else {
+          toast.error(msg);
+        }
       }
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao verificar código"),
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação"),
   });
+
+  // Poll Twilio verified caller IDs while awaiting the user to enter the
+  // validation code on the keypad. When the number appears, auto-save.
+  const verifiedIdsQuery = useQuery({
+    queryKey: ["verified-caller-ids"],
+    queryFn: () => listVerifiedCallerIdsFn(),
+    enabled: !!verifyStep,
+    refetchInterval: verifyStep ? 3000 : false,
+  });
+
+  useEffect(() => {
+    if (!verifyStep) return;
+    const list = (verifiedIdsQuery.data ?? []) as Array<{ phone_number: string }>;
+    const found = list.some((n) => n.phone_number === verifyStep.phoneE164);
+    if (found && !saveContactMutation.isPending) {
+      saveContactMutation.mutate({
+        phoneE164: verifyStep.phoneE164,
+        label: verifyStep.label,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifiedIdsQuery.data, verifyStep]);
 
   const removeTestContactMutation = useMutation({
     mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
