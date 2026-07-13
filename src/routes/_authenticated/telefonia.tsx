@@ -1068,11 +1068,35 @@ function TelefoniaPage() {
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              A Twilio irá enviar um <b>SMS</b> com um código de 6 dígitos para o
-              número informado. Digite o código recebido para concluir a verificação.
+              Para receber ligações da sua assistente, o número precisa estar
+              verificado na sua conta Twilio. Verifique-o na Twilio Console e
+              depois importe aqui.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <Alert className="border-primary/30 bg-primary/5">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-xs space-y-2">
+                <p className="font-medium">Como verificar na Twilio:</p>
+                <ol className="list-decimal pl-4 space-y-1 text-muted-foreground">
+                  <li>Abra o painel de Verified Caller IDs da Twilio.</li>
+                  <li>
+                    Clique em <b>Add a new Caller ID</b> e informe o número.
+                    A Twilio ligará ou enviará um código para validá-lo.
+                  </li>
+                  <li>Após verificado, volte aqui e clique em <b>Importar</b>.</li>
+                </ol>
+                <a
+                  href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 underline text-primary hover:opacity-80"
+                >
+                  Abrir Twilio Verified Caller IDs
+                  <Link2 className="h-3 w-3" />
+                </a>
+              </AlertDescription>
+            </Alert>
             <div className="space-y-1.5">
               <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
               <Input
@@ -1095,72 +1119,34 @@ function TelefoniaPage() {
                 }
               />
             </div>
-            {trialBlocked && (
-              <Alert className="border-amber-500/40 bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4 text-amber-400" />
-                <AlertDescription className="text-xs text-amber-100/90 space-y-2">
-                  <p>
-                    Sua conta Twilio está em modo <b>trial</b> e não pode enviar SMS
-                    para números não verificados (erro 21608). Para prosseguir,
-                    verifique este número na Twilio Console e depois clique em
-                    "Já verifiquei".
-                  </p>
-                  <a
-                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 underline text-amber-200 hover:text-amber-100"
-                  >
-                    Abrir Twilio Verified Caller IDs
-                    <Link2 className="h-3 w-3" />
-                  </a>
-                </AlertDescription>
-              </Alert>
-            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
                 Cancelar
               </Button>
-              {trialBlocked ? (
-                <Button
-                  onClick={() =>
-                    trustFromTwilioMutation.mutate({
-                      phoneE164: testContactForm.phoneE164.trim(),
-                      label: testContactForm.label.trim(),
-                    })
-                  }
-                  disabled={trustFromTwilioMutation.isPending}
-                >
-                  {trustFromTwilioMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Já verifiquei no Twilio Console
-                </Button>
-              ) : (
-                <Button
-                  onClick={() =>
-                    sendOtpMutation.mutate({
-                      phoneE164: testContactForm.phoneE164.trim(),
-                      label: testContactForm.label.trim(),
-                    })
-                  }
-                  disabled={
-                    sendOtpMutation.isPending ||
-                    !testContactForm.label.trim() ||
-                    !testContactForm.phoneE164.trim() ||
-                    !isTwilioConnected
-                  }
-                >
-                  {sendOtpMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Enviar SMS de verificação
-                </Button>
-              )}
+              <Button
+                onClick={() =>
+                  trustFromTwilioMutation.mutate({
+                    phoneE164: testContactForm.phoneE164.trim(),
+                    label: testContactForm.label.trim(),
+                  })
+                }
+                disabled={
+                  trustFromTwilioMutation.isPending ||
+                  !testContactForm.label.trim() ||
+                  !testContactForm.phoneE164.trim() ||
+                  !isTwilioConnected
+                }
+              >
+                {trustFromTwilioMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Importar número verificado
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
 
 
       <Dialog
