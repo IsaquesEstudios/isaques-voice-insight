@@ -899,8 +899,52 @@ function TelefoniaPage() {
         </DialogContent>
       </Dialog>
 
-
-
+      <Dialog
+        open={verifyState !== null}
+        onOpenChange={(o) => {
+          if (!o) setVerifyState(null);
+        }}
+      >
+        <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle>Verificar número</DialogTitle>
+            <DialogDescription>
+              O Twilio vai ligar para <b>{verifyState?.phone}</b> em instantes. Atenda e
+              digite o código abaixo no teclado do telefone quando solicitado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                Código de verificação
+              </p>
+              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.4em] text-primary">
+                {verifyState?.code ?? "----"}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Depois de digitar o código no telefone, clique em <b>Já verifiquei</b>{" "}
+              para confirmar o status na sua conta Twilio.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setVerifyState(null)}>
+                Fechar
+              </Button>
+              <Button
+                onClick={() =>
+                  verifyState && refreshVerificationMutation.mutate(verifyState.contactId)
+                }
+                disabled={refreshVerificationMutation.isPending}
+              >
+                {refreshVerificationMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Já verifiquei
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={open}
