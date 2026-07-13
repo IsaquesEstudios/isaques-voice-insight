@@ -106,6 +106,13 @@ const routes = [
   { name: "Rota Sandbox", numbers: 2, load: 12, status: "Pausado" },
 ];
 
+const areaCodeConfig: Record<string, { maxLength: number; placeholder: string; label: string }> = {
+  BR: { maxLength: 2, placeholder: "11", label: "DDD (2 dígitos)" },
+  US: { maxLength: 3, placeholder: "415", label: "Area Code (3 dígitos)" },
+  CA: { maxLength: 3, placeholder: "416", label: "Area Code (3 dígitos)" },
+  GB: { maxLength: 5, placeholder: "20", label: "STD Code (até 5 dígitos)" },
+};
+
 interface AvailableNumber {
   id: string;
   phoneNumber: string;
