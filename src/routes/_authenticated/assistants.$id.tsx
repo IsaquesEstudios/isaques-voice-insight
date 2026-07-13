@@ -429,144 +429,87 @@ function AssistantDetailPage() {
 
               <TabsContent value="model" className="mt-0">
             <div className="grid grid-cols-1 gap-4">
-              {/* Modelo & Voz — preset-driven */}
-              {(() => {
-                const PRESETS: Array<{
-                  id: string;
-                  label: string;
-                  modelProvider: string;
-                  model: string;
-                }> = [
-                  { id: "balanced", label: "Balanced", modelProvider: "openai", model: "gpt-4o-mini" },
-                  { id: "high", label: "High Intelligence", modelProvider: "openai", model: "gpt-4o" },
-                  { id: "fast", label: "Ultra Fast", modelProvider: "groq", model: "llama-3.1-70b-versatile" },
-                  { id: "saver", label: "Cost Saver", modelProvider: "google", model: "gemini-1.5-flash" },
-                ];
-                const activePreset =
-                  PRESETS.find(
-                    (p) => p.modelProvider === form.modelProvider && p.model === form.model,
-                  )?.id ?? "customized";
-                const applyPreset = (p: (typeof PRESETS)[number]) =>
-                  setForm((f) => ({ ...f, modelProvider: p.modelProvider, model: p.model }));
-                return (
-                  <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-                    <CardContent className="space-y-5 p-6">
-                      <div>
-                        <h2 className="text-sm font-semibold text-foreground">Model Presets</h2>
-                        <p className="text-xs text-muted-foreground">
-                          Combinações pré-definidas de transcriber + modelo. Escolha uma e ajuste apenas a voz.
-                        </p>
-                      </div>
+              {/* Stack padrão de baixo custo — apenas voz é editável */}
+              <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+                <CardContent className="space-y-5 p-6">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Stack padrão</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Transcriber e modelo são padronizados para o menor custo. Ajuste apenas a voz do agente.
+                    </p>
+                  </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        {PRESETS.map((p) => {
-                          const active = activePreset === p.id;
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              disabled={isLoading}
-                              onClick={() => applyPreset(p)}
-                              className={
-                                "rounded-lg border px-3 py-1.5 text-xs font-medium backdrop-blur-xl transition " +
-                                (active
-                                  ? "border-primary/60 bg-primary/20 text-foreground"
-                                  : "border-white/[0.08] bg-background/40 text-muted-foreground hover:text-foreground")
-                              }
-                            >
-                              {p.label}
-                            </button>
-                          );
-                        })}
-                        <span
-                          className={
-                            "rounded-lg border px-3 py-1.5 text-xs font-medium " +
-                            (activePreset === "customized"
-                              ? "border-primary/60 bg-primary/20 text-foreground"
-                              : "border-white/[0.08] bg-background/40 text-muted-foreground")
+                  <VapiStatsPanel
+                    modelProvider={form.modelProvider}
+                    model={form.model}
+                    voiceProvider={form.voiceProvider}
+                    voiceId={form.voiceId}
+                  />
+
+                  <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Voz</h3>
+                      <p className="text-xs text-muted-foreground">
+                        A única configuração editável — escolha o timbre do agente.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Provedor de Voz</Label>
+                        <Select
+                          value={form.voiceProvider}
+                          onValueChange={(v) =>
+                            setForm((f) => ({
+                              ...f,
+                              voiceProvider: v,
+                              voiceId: VOICES_BY_PROVIDER[v]?.[0]?.value ?? "",
+                            }))
                           }
+                          disabled={isLoading}
                         >
-                          Customized
-                        </span>
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {VOICE_PROVIDERS.map((p) => (
+                              <SelectItem key={p.value} value={p.value}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-
-                      <VapiStatsPanel
-                        modelProvider={form.modelProvider}
-                        model={form.model}
-                        voiceProvider={form.voiceProvider}
-                        voiceId={form.voiceId}
-                      />
-
-                      <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
-                        <div>
-                          <h3 className="text-sm font-semibold text-foreground">Voz</h3>
-                          <p className="text-xs text-muted-foreground">
-                            A única configuração editável — escolha o timbre do agente.
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Provedor de Voz</Label>
-                            <Select
-                              value={form.voiceProvider}
-                              onValueChange={(v) =>
-                                setForm((f) => ({
-                                  ...f,
-                                  voiceProvider: v,
-                                  voiceId: VOICES_BY_PROVIDER[v]?.[0]?.value ?? "",
-                                }))
-                              }
-                              disabled={isLoading}
-                            >
-                              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                                <SelectValue placeholder="Selecione..." />
-                              </SelectTrigger>
-                              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                                {VOICE_PROVIDERS.map((p) => (
-                                  <SelectItem key={p.value} value={p.value}>
-                                    {p.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Voz / Voice ID</Label>
-                            <Select
-                              value={form.voiceId}
-                              onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                              disabled={isLoading}
-                            >
-                              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                                <SelectValue placeholder="Selecione..." />
-                              </SelectTrigger>
-                              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                                {voiceOptions.map((v) => (
-                                  <SelectItem key={v.value} value={v.value}>
-                                    {v.label}
-                                  </SelectItem>
-                                ))}
-                                {!voiceOptions.some((v) => v.value === form.voiceId) &&
-                                  form.voiceId && (
-                                    <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                                  )}
-                              </SelectContent>
-                            </Select>
-                            <CostHint
-                              costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
-                              tooltip="Custo estimado de TTS por minuto de voz sintetizada."
-                            />
-                          </div>
-                        </div>
+                      <div className="space-y-2">
+                        <Label>Voz / Voice ID</Label>
+                        <Select
+                          value={form.voiceId}
+                          onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            {voiceOptions.map((v) => (
+                              <SelectItem key={v.value} value={v.value}>
+                                {v.label}
+                              </SelectItem>
+                            ))}
+                            {!voiceOptions.some((v) => v.value === form.voiceId) &&
+                              form.voiceId && (
+                                <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                              )}
+                          </SelectContent>
+                        </Select>
+                        <CostHint
+                          costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
+                          tooltip="Custo estimado de TTS por minuto de voz sintetizada."
+                        />
                       </div>
-
-                      <div className="rounded-xl border border-white/[0.06] bg-background/40 p-4 text-xs text-muted-foreground backdrop-blur-xl">
-                        Modelo e transcriber são definidos pelo preset. Para alterar, escolha outro preset acima.
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
               </TabsContent>
             </Tabs>
