@@ -98,12 +98,6 @@ const healthStyles: Record<Health, string> = {
   Risco: "bg-destructive/15 text-destructive",
 };
 
-const routes = [
-  { name: "Rota Comercial SP", numbers: 8, load: 74, status: "Ativo" },
-  { name: "Rota Cobrança Nacional", numbers: 12, load: 58, status: "Ativo" },
-  { name: "Rota Recepção 24/7", numbers: 4, load: 92, status: "Ativo" },
-  { name: "Rota Sandbox", numbers: 2, load: 12, status: "Pausado" },
-];
 
 const areaCodeConfig: Record<string, { maxLength: number; placeholder: string; label: string }> = {
   BR: { maxLength: 2, placeholder: "11", label: "DDD (2 dígitos)" },
