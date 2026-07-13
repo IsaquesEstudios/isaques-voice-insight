@@ -110,6 +110,7 @@ import {
   VAPI_PLATFORM_FEE_PER_MIN,
 } from "@/lib/vapi-pricing";
 import { CostHint, CostSummary } from "@/components/assistants/cost-hint";
+import { VapiStatsPanel } from "@/components/assistants/vapi-stats-panel";
 
 export const Route = createFileRoute("/_authenticated/assistants/$id")({
   head: () => ({
@@ -528,11 +529,11 @@ function AssistantDetailPage() {
                     </div>
                   </div>
 
-                  <CostSummary
-                    llm={getModelCost(form.modelProvider, form.model)}
-                    tts={getVoiceCost(form.voiceProvider, form.voiceId)}
-                    stt={STT_COST_PER_MIN}
-                    platform={VAPI_PLATFORM_FEE_PER_MIN}
+                  <VapiStatsPanel
+                    modelProvider={form.modelProvider}
+                    model={form.model}
+                    voiceProvider={form.voiceProvider}
+                    voiceId={form.voiceId}
                   />
 
                   <div className="rounded-xl border border-white/[0.06] bg-background/40 p-4 text-xs text-muted-foreground backdrop-blur-xl">
