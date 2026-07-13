@@ -105,18 +105,30 @@ function getKey(): string {
   return key;
 }
 
+// Stack padrão de baixo custo enviada à Vapi em toda criação.
+// Estes defaults refletem exatamente o que exibimos no painel de stats.
+const DEFAULT_MODEL_PROVIDER = "openai";
+const DEFAULT_MODEL = "gpt-5";
+const DEFAULT_VOICE_PROVIDER = "cartesia";
+const DEFAULT_VOICE_ID = "blake";
+const DEFAULT_TRANSCRIBER_BLOCK = {
+  provider: "deepgram",
+  model: "nova-3",
+} as const;
+
 function buildPayload(input: AssistantInput) {
   return {
     name: input.name,
     firstMessage: input.firstMessage,
+    transcriber: { ...DEFAULT_TRANSCRIBER_BLOCK },
     model: {
-      provider: input.modelProvider?.trim() || "openai",
-      model: input.model?.trim() || "gpt-3.5-turbo",
+      provider: input.modelProvider?.trim() || DEFAULT_MODEL_PROVIDER,
+      model: input.model?.trim() || DEFAULT_MODEL,
       messages: [{ role: "system", content: input.systemPrompt }],
     },
     voice: {
-      provider: input.voiceProvider?.trim() || "11labs",
-      voiceId: input.voiceId?.trim() || "burt",
+      provider: input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER,
+      voiceId: input.voiceId?.trim() || DEFAULT_VOICE_ID,
     },
   };
 }
