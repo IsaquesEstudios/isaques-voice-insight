@@ -1095,33 +1095,73 @@ function TelefoniaPage() {
                 }
               />
             </div>
+            {trialBlocked && (
+              <Alert className="border-amber-500/40 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <AlertDescription className="text-xs text-amber-100/90 space-y-2">
+                  <p>
+                    Sua conta Twilio está em modo <b>trial</b> e não pode enviar SMS
+                    para números não verificados (erro 21608). Para prosseguir,
+                    verifique este número na Twilio Console e depois clique em
+                    "Já verifiquei".
+                  </p>
+                  <a
+                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 underline text-amber-200 hover:text-amber-100"
+                  >
+                    Abrir Twilio Verified Caller IDs
+                    <Link2 className="h-3 w-3" />
+                  </a>
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
                 Cancelar
               </Button>
-              <Button
-                onClick={() =>
-                  sendOtpMutation.mutate({
-                    phoneE164: testContactForm.phoneE164.trim(),
-                    label: testContactForm.label.trim(),
-                  })
-                }
-                disabled={
-                  sendOtpMutation.isPending ||
-                  !testContactForm.label.trim() ||
-                  !testContactForm.phoneE164.trim() ||
-                  !isTwilioConnected
-                }
-              >
-                {sendOtpMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Enviar SMS de verificação
-              </Button>
+              {trialBlocked ? (
+                <Button
+                  onClick={() =>
+                    trustFromTwilioMutation.mutate({
+                      phoneE164: testContactForm.phoneE164.trim(),
+                      label: testContactForm.label.trim(),
+                    })
+                  }
+                  disabled={trustFromTwilioMutation.isPending}
+                >
+                  {trustFromTwilioMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Já verifiquei no Twilio Console
+                </Button>
+              ) : (
+                <Button
+                  onClick={() =>
+                    sendOtpMutation.mutate({
+                      phoneE164: testContactForm.phoneE164.trim(),
+                      label: testContactForm.label.trim(),
+                    })
+                  }
+                  disabled={
+                    sendOtpMutation.isPending ||
+                    !testContactForm.label.trim() ||
+                    !testContactForm.phoneE164.trim() ||
+                    !isTwilioConnected
+                  }
+                >
+                  {sendOtpMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Enviar SMS de verificação
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
 
       <Dialog
         open={otpStep !== null}
