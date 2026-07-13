@@ -167,10 +167,9 @@ function TelefoniaPage() {
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
-  const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
-  const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
+  const startCallerIdVerificationFn = useServerFn(startCallerIdVerification);
+  const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
   const removeTestContactFn = useServerFn(removeTestContact);
-  const addVerifiedFromTwilioFn = useServerFn(addVerifiedFromTwilio);
   const saveTestContactFn = useServerFn(saveTestContact);
 
 
