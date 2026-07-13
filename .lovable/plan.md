@@ -1,45 +1,41 @@
-# Assistentes vinculados ao usuário
+## Objetivo
 
-A Vapi não tem conceito de "usuário final" — todas as assistentes ficam na sua conta única. A forma correta é manter a Vapi como está (usando sua `VAPI_PRIVATE_KEY`) e criar uma tabela de propriedade no Supabase que mapeia `vapi_assistant_id → user_id`. Toda listagem/edição/exclusão é filtrada por essa tabela.
+Mostrar, ao lado dos selects de **Modelo** e **Voz** na aba Assistente (`/assistants/:id`), uma previsão de custo por minuto baseada na tabela pública de preços da Vapi, atualizando em tempo real conforme o usuário troca a IA. O total combinado (LLM + TTS + STT + Vapi platform fee) aparece como um pequeno resumo abaixo, ajudando a escolher a opção mais econômica.
 
-## O que muda
+Escopo restrito à tela de detalhes do assistente — nenhum outro arquivo é tocado.
 
-### 1. Banco (Supabase)
-Nova tabela `user_assistants`:
-```
-id uuid PK
-user_id uuid  (auth.users)
-vapi_assistant_id text UNIQUE
-created_at timestamptz
-```
-- RLS: cada usuário só vê/insere/deleta linhas onde `user_id = auth.uid()`.
-- Índice em `(user_id)`.
+## O que será feito
 
-### 2. Rotas protegidas
-Mover para o layout autenticado (mesmo padrão de `/telefonia`):
-- `src/routes/assistentes.tsx` → `src/routes/_authenticated/assistentes.tsx`
-- `src/routes/assistants.$id.tsx` → `src/routes/_authenticated/assistants.$id.tsx`
+1. **Novo arquivo `src/lib/vapi-pricing.ts`** (client-side, estático)
+   - Tabela `MODEL_PRICING` com custo em USD/min por `provider/model` para os modelos já listados em `MODEL_OPTIONS` (OpenAI gpt-4o, gpt-4o-mini, gpt-3.5-turbo; Anthropic claude-3.5-sonnet/haiku; Google gemini; Groq).
+   - Tabela `VOICE_PRICING` com custo USD/min por `provider/voiceId` (11labs, PlayHT, Deepgram, etc.).
+   - Constantes fixas: `STT_COST_PER_MIN` (Deepgram Nova padrão Vapi) e `VAPI_PLATFORM_FEE_PER_MIN` (0.05).
+   - Helpers `getModelCost(provider, model)`, `getVoiceCost(provider, voiceId)`, `formatUSD(n)`.
+   - Valores baseados na página pública de pricing da Vapi; comentário no topo com data e link para revisão.
 
-Sem login → redireciona para `/auth`.
+2. **Novo componente `src/components/assistants/cost-hint.tsx`**
+   - Chip inline compacto: ícone + `~ $0.XX/min` + tooltip explicando a origem do valor.
+   - Props: `label` (ex: "Modelo"), `costPerMin`, `breakdown?` (para o total).
+   - Estilo alinhado ao design atual (glass, muted-foreground, `text-xs`).
 
-### 3. Server functions (`src/lib/vapi.functions.ts`)
-Adicionar `requireSupabaseAuth` em todas as funções e cruzar Vapi com a tabela `user_assistants`:
-
-- `listVapiAssistants`: busca `vapi_assistant_id` do usuário na tabela → busca `/assistant` na Vapi → devolve só os que pertencem ao usuário.
-- `createVapiAssistant` / `duplicateVapiAssistant`: cria na Vapi, depois insere `(user_id, vapi_assistant_id)` na tabela. Se o insert falhar, deleta o assistente órfão na Vapi.
-- `getVapiAssistant` / `updateVapiAssistant` / `saveVapiAssistantConfig` / `deleteVapiAssistant`: antes de qualquer chamada Vapi, valida que existe linha `(user_id, vapi_assistant_id)`. Se não, retorna 403.
-
-### 4. UI
-Nenhuma mudança visual. Só invalida queries no login/logout (já feito no `__root.tsx`).
-
-## Migração de dados existentes
-Assistentes criadas antes desta mudança não têm dono. Duas opções (me diga qual):
-- **(A)** Ignorar: viram invisíveis para todos e permanecem só na sua conta Vapi.
-- **(B)** Atribuir todas as assistentes atualmente na Vapi ao seu usuário (o admin). Executo uma vez após o deploy.
+3. **Edição em `src/routes/_authenticated/assistants.$id.tsx`** (única alteração de tela)
+   - Importa os helpers e o `CostHint`.
+   - Abaixo do `Select` de **Modelo** (dentro da aba Assistente) renderiza `<CostHint costPerMin={getModelCost(modelProvider, model)} />`.
+   - Abaixo do `Select` de **Voz** renderiza `<CostHint costPerMin={getVoiceCost(voiceProvider, voiceId)} />`.
+   - Ao final do bloco de configuração (ou logo abaixo dos dois selects), um resumo pequeno:
+     `Custo estimado total: ~$X.XX/min` com breakdown em tooltip (LLM + TTS + STT + Vapi).
+   - Se o par provider/model não estiver na tabela, mostra `—` e tooltip "Preço não catalogado".
 
 ## Detalhes técnicos
-- A chave `VAPI_PRIVATE_KEY` continua exclusivamente no servidor — o front nunca vê.
-- A validação de posse acontece no handler antes de qualquer `fetch` para Vapi, então nem GET vaza para outro usuário.
-- Ao deletar um usuário no Supabase, o `ON DELETE CASCADE` remove as linhas de `user_assistants` (mas o assistente na Vapi fica; posso adicionar limpeza posterior se quiser).
 
-Confirma o plano e escolhe A ou B para a migração?
+- 100% frontend/presentation, sem alterações no server ou em `vapi.functions.ts`.
+- Nenhuma nova rota, migration ou secret.
+- Nenhum request adicional — cálculo local e instantâneo.
+- Formato do valor: USD com 3 casas quando < $0.10, senão 2 casas (`$0.006/min`, `$0.18/min`).
+- Comentário no `vapi-pricing.ts` avisa que os valores devem ser revisados periodicamente contra a página oficial da Vapi.
+
+## Fora do escopo (não faremos agora)
+
+- Buscar custo real das últimas chamadas via `/call` (fica para uma segunda etapa se você quiser).
+- Card de custo na lista de assistentes ou página dedicada de comparação.
+- Conversão USD→BRL.

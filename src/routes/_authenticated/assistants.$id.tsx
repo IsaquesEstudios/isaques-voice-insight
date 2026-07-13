@@ -103,6 +103,13 @@ import {
   saveVapiAssistantConfig,
 } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
+import {
+  getModelCost,
+  getVoiceCost,
+  STT_COST_PER_MIN,
+  VAPI_PLATFORM_FEE_PER_MIN,
+} from "@/lib/vapi-pricing";
+import { CostHint, CostSummary } from "@/components/assistants/cost-hint";
 
 export const Route = createFileRoute("/_authenticated/assistants/$id")({
   head: () => ({
@@ -458,8 +465,13 @@ function AssistantDetailPage() {
                             )}
                         </SelectContent>
                       </Select>
+                      <CostHint
+                        costPerMin={getModelCost(form.modelProvider, form.model)}
+                        tooltip="Custo estimado de LLM por minuto de conversa. Baseado na tabela pública Vapi."
+                      />
                     </div>
                   </div>
+
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
@@ -509,13 +521,25 @@ function AssistantDetailPage() {
                             )}
                         </SelectContent>
                       </Select>
+                      <CostHint
+                        costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
+                        tooltip="Custo estimado de TTS por minuto de voz sintetizada."
+                      />
                     </div>
                   </div>
+
+                  <CostSummary
+                    llm={getModelCost(form.modelProvider, form.model)}
+                    tts={getVoiceCost(form.voiceProvider, form.voiceId)}
+                    stt={STT_COST_PER_MIN}
+                    platform={VAPI_PLATFORM_FEE_PER_MIN}
+                  />
 
                   <div className="rounded-xl border border-white/[0.06] bg-background/40 p-4 text-xs text-muted-foreground backdrop-blur-xl">
                     Configurações avançadas de temperatura, tokens e transcrição estarão
                     disponíveis na aba <span className="text-foreground">Advanced</span>.
                   </div>
+
                 </CardContent>
               </Card>
             </div>
