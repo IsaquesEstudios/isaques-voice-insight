@@ -811,3 +811,34 @@ export const detachAssistantFromNumber = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+// Outbound test call — POST /call using an existing Vapi phone-number id and
+// an assistant that must belong to the current user.
+export const createOutboundTestCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      assistantId: string;
+      phoneNumberId: string;
+      customerNumber: string;
+    }) => {
+      if (!input?.assistantId) throw new Error("assistantId é obrigatório");
+      if (!input?.phoneNumberId) throw new Error("phoneNumberId é obrigatório");
+      const num = (input.customerNumber ?? "").trim();
+      if (!/^\+[1-9]\d{6,14}$/.test(num))
+        throw new Error("Número do celular deve estar em E.164 (ex: +5511999998888)");
+      return { ...input, customerNumber: num };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+    const res = (await vapiFetch("/call", {
+      method: "POST",
+      body: JSON.stringify({
+        assistantId: data.assistantId,
+        phoneNumberId: data.phoneNumberId,
+        customer: { number: data.customerNumber },
+      }),
+    })) as { id?: string };
+    return { ok: true as const, callId: res?.id ?? null };
+  });
+
