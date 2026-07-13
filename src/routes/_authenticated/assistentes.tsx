@@ -61,7 +61,7 @@ import {
 } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/assistentes")({
+export const Route = createFileRoute("/_authenticated/assistentes")({
   head: () => ({
     meta: [{ title: "Assistentes Virtuais — Isaques Estúdios | AI Voice" }],
   }),
