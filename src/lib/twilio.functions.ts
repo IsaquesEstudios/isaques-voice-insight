@@ -778,6 +778,34 @@ export const removeTestContact = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Saves a number directly as a test contact (verified=true) without any Twilio
+// verification. Use for cases where the user just wants to register a number
+// they own to place outbound test calls to.
+export const saveTestContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        label: z.string().trim().min(1).max(80),
+        phoneE164: e164,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("user_test_contacts")
+      .insert({
+        user_id: context.userId,
+        label: data.label,
+        phone_e164: data.phoneE164,
+        verified: true,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true as const, id: row?.id as string | undefined };
+  });
+
 // ---------- verified caller ids (Twilio-native, authoritative) ----------
 
 // Lists numbers registered in the user's Twilio account as verified caller IDs
