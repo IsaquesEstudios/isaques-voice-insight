@@ -62,13 +62,17 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
+  addTestContact,
   connectExternalNumber,
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
+  listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
+  makeTestCall,
   releaseNumber,
+  removeTestContact,
   saveTwilioCredentials,
 } from "@/lib/twilio.functions";
 
@@ -128,6 +132,10 @@ function TelefoniaPage() {
   const disconnectFn = useServerFn(disconnectTwilio);
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
+  const listTestContactsFn = useServerFn(listTestContacts);
+  const addTestContactFn = useServerFn(addTestContact);
+  const removeTestContactFn = useServerFn(removeTestContact);
+  const makeTestCallFn = useServerFn(makeTestCall);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
@@ -195,6 +203,71 @@ function TelefoniaPage() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [testContactOpen, setTestContactOpen] = useState(false);
+  const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
+  const [testCallFrom, setTestCallFrom] = useState<string>("");
+  const [callingContactId, setCallingContactId] = useState<string | null>(null);
+
+  const testContactsQuery = useQuery({
+    queryKey: ["test-contacts"],
+    queryFn: () => listTestContactsFn(),
+  });
+  const testContacts = (testContactsQuery.data ?? []) as Array<{
+    id: string;
+    label: string;
+    phone_e164: string;
+    created_at: string;
+  }>;
+
+  const addTestContactMutation = useMutation({
+    mutationFn: () =>
+      addTestContactFn({
+        data: {
+          label: testContactForm.label.trim(),
+          phoneE164: testContactForm.phoneE164.trim(),
+        },
+      }),
+    onSuccess: async () => {
+      toast.success("Contato de teste adicionado.");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      setTestContactOpen(false);
+      setTestContactForm({ label: "", phoneE164: "" });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao adicionar contato"),
+  });
+
+  const removeTestContactMutation = useMutation({
+    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
+    onSuccess: async () => {
+      toast.success("Contato removido.");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
+  });
+
+  const testCallMutation = useMutation({
+    mutationFn: (contact: { id: string; phone_e164: string }) => {
+      setCallingContactId(contact.id);
+      return makeTestCallFn({
+        data: { fromNumber: testCallFrom, toNumber: contact.phone_e164 },
+      });
+    },
+    onSuccess: (res) => {
+      if ("ok" in res && res.ok) {
+        toast.success("Chamada iniciada. Aguarde o telefone tocar.");
+      } else if ("reason" in res && res.reason === "no_credentials") {
+        toast.error("Conecte sua conta Twilio antes de testar.");
+      } else if ("reason" in res && res.reason === "unverified_number") {
+        toast.error(res.message ?? "Número não verificado no Twilio (trial).");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada"),
+    onSettled: () => setCallingContactId(null),
+  });
+
 
   const [twilioForm, setTwilioForm] = useState({
     accountSid: "",
@@ -566,7 +639,178 @@ function TelefoniaPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div>
+              <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Cadastre números pessoais e teste uma chamada saindo do seu número Twilio.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setTestContactOpen(true)}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> Novo contato
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!isTwilioConnected && (
+              <Alert className="border-warning/30 bg-warning/10">
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Conecte sua conta Twilio para poder disparar chamadas de teste. Em contas
+                  trial, o número de destino também precisa estar verificado em <b>Console
+                  Twilio → Verified Caller IDs</b>.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {numbers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Ligar a partir de:</Label>
+                <select
+                  value={testCallFrom || numbers[0]?.phone_number || ""}
+                  onChange={(e) => setTestCallFrom(e.target.value)}
+                  className="h-8 rounded-md border border-white/[0.08] bg-background/60 px-2 text-xs text-foreground"
+                >
+                  {numbers.map((n) => (
+                    <option key={n.id} value={n.phone_number}>
+                      {n.phone_number}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {testContactsQuery.isLoading ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+                />
+              ))
+            ) : testContacts.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                Nenhum contato de teste ainda. Clique em <b>Novo contato</b> para começar.
+              </p>
+            ) : (
+              testContacts.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {c.label}
+                    </p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {c.phone_e164}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      !isTwilioConnected ||
+                      numbers.length === 0 ||
+                      callingContactId === c.id
+                    }
+                    onClick={() =>
+                      testCallMutation.mutate({ id: c.id, phone_e164: c.phone_e164 })
+                    }
+                    className="gap-1.5"
+                  >
+                    {callingContactId === c.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <PhoneCall className="h-3.5 w-3.5" />
+                    )}
+                    Testar chamada
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={() => removeTestContactMutation.mutate(c.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+
+      <Dialog
+        open={testContactOpen}
+        onOpenChange={(o) => {
+          setTestContactOpen(o);
+          if (!o) setTestContactForm({ label: "", phoneE164: "" });
+        }}
+      >
+        <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle>Novo contato de teste</DialogTitle>
+            <DialogDescription>
+              Cadastre um número que receberá as chamadas de teste. Use formato E.164
+              internacional (ex: +5511999998888).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="tc-label" className="text-xs">
+                Identificação
+              </Label>
+              <Input
+                id="tc-label"
+                placeholder="Ex: Meu celular"
+                value={testContactForm.label}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tc-phone" className="text-xs">
+                Número (E.164)
+              </Label>
+              <Input
+                id="tc-phone"
+                placeholder="+5511999998888"
+                value={testContactForm.phoneE164}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                }
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => addTestContactMutation.mutate()}
+                disabled={
+                  addTestContactMutation.isPending ||
+                  !testContactForm.label.trim() ||
+                  !testContactForm.phoneE164.trim()
+                }
+              >
+                {addTestContactMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
 
 
       <Dialog
