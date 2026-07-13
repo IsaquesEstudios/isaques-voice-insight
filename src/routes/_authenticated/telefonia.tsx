@@ -659,6 +659,75 @@ function TelefoniaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Cadastrar endereço regulatório</DialogTitle>
+            <DialogDescription>
+              A Twilio exige um endereço em {pendingBuy?.countryIso} para vincular a este número.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label>Nome completo / Razão social</Label>
+              <Input
+                value={addr.customerName}
+                onChange={(e) => setAddr({ ...addr, customerName: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Rua e número</Label>
+              <Input
+                value={addr.street}
+                onChange={(e) => setAddr({ ...addr, street: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Cidade</Label>
+                <Input
+                  value={addr.city}
+                  onChange={(e) => setAddr({ ...addr, city: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Estado / Região</Label>
+                <Input
+                  value={addr.region}
+                  onChange={(e) => setAddr({ ...addr, region: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>CEP / Postal Code</Label>
+              <Input
+                value={addr.postalCode}
+                onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setAddressOpen(false)} disabled={savingAddress}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveAddress}
+              disabled={
+                savingAddress ||
+                !addr.customerName ||
+                !addr.street ||
+                !addr.city ||
+                !addr.region ||
+                !addr.postalCode
+              }
+            >
+              {savingAddress ? "Salvando…" : "Salvar e comprar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
+
   );
 }
