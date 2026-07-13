@@ -700,6 +700,47 @@ function TelefoniaPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog
+        open={bundleOpen}
+        onOpenChange={(o) => {
+          setBundleOpen(o);
+          if (!o) setSavingBundle(false);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Informar Regulatory Bundle</DialogTitle>
+            <DialogDescription>
+              A Twilio exige um Bundle aprovado para comprar números locais em {pendingBuy?.countryIso}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+              Use um Bundle com status <span className="font-medium text-foreground">twilio-approved</span>,
+              país {pendingBuy?.countryIso} e tipo <span className="font-medium text-foreground">local</span>.
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Bundle SID</Label>
+              <Input
+                value={bundleSid}
+                onChange={(e) => setBundleSid(e.target.value.trim())}
+                placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setBundleOpen(false)} disabled={savingBundle}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveBundle} disabled={savingBundle || !bundleSid.trim()}>
+              {savingBundle ? "Comprando…" : "Salvar e comprar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
