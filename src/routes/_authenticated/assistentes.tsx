@@ -122,7 +122,33 @@ interface FormState {
   name: string;
   firstMessage: string;
   systemPrompt: string;
+  modelProvider: string;
+  model: string;
+  voiceProvider: string;
+  voiceId: string;
 }
+
+const DEFAULT_MODEL_PROVIDER = "openai";
+const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_VOICE_PROVIDER = "11labs";
+const DEFAULT_VOICE_ID = "burt";
+const DEFAULT_FIRST_MESSAGE = "Olá! Como posso te ajudar hoje?";
+const DEFAULT_SYSTEM_PROMPT =
+  "Você é um assistente de voz cordial e objetivo. Fale em português do Brasil, com respostas curtas e naturais.";
+
+const MODEL_OPTIONS: Record<string, string[]> = {
+  openai: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
+  anthropic: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+  google: ["gemini-1.5-pro", "gemini-1.5-flash"],
+  groq: ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+};
+
+const VOICE_OPTIONS: Record<string, string[]> = {
+  "11labs": ["burt", "sarah", "adam", "rachel"],
+  openai: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
+  playht: ["jennifer", "melissa", "will"],
+  deepgram: ["aura-asteria-en", "aura-luna-en"],
+};
 
 const emptyForm: FormState = {
   open: false,
@@ -132,6 +158,10 @@ const emptyForm: FormState = {
   name: "",
   firstMessage: "",
   systemPrompt: "",
+  modelProvider: DEFAULT_MODEL_PROVIDER,
+  model: DEFAULT_MODEL,
+  voiceProvider: DEFAULT_VOICE_PROVIDER,
+  voiceId: DEFAULT_VOICE_ID,
 };
 
 function AssistentesPage() {
