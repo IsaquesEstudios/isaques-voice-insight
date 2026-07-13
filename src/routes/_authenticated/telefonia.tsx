@@ -80,6 +80,7 @@ import {
 } from "@/lib/twilio.functions";
 import {
   attachAssistantToNumber,
+  createOutboundTestCall,
   detachAssistantFromNumber,
   listVapiAssistants,
   listVapiPhoneNumbers,
