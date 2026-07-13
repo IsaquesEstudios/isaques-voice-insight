@@ -607,3 +607,165 @@ export const duplicateVapiAssistant = createServerFn({ method: "POST" })
     return created;
   });
 
+// ---------- Phone-number ↔ Assistant linking -----------------------------
+
+export interface VapiPhoneNumberDTO {
+  id: string;
+  provider: string;
+  number?: string | null;
+  name?: string | null;
+  assistantId?: string | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type VapiPhoneNumberRaw = Record<string, any> & { id: string };
+
+async function loadTwilioCredsForVapi(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ accountSid: string; authToken: string } | null> {
+  const { data, error } = await supabase
+    .from("user_twilio_credentials")
+    .select("account_sid, auth_token")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    accountSid: data.account_sid as string,
+    authToken: data.auth_token as string,
+  };
+}
+
+// Lists phone numbers imported on the Vapi account. Filtered/paginated by
+// caller — Vapi returns all numbers on the account.
+export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<VapiPhoneNumberDTO[]> => {
+    const data = await vapiFetch("/phone-number", { method: "GET" });
+    if (!Array.isArray(data)) return [];
+    return (data as VapiPhoneNumberRaw[]).map((n) => ({
+      id: n.id,
+      provider: (n.provider as string) ?? "twilio",
+      number: (n.number as string | undefined) ?? null,
+      name: (n.name as string | undefined) ?? null,
+      assistantId: (n.assistantId as string | undefined) ?? null,
+    }));
+  });
+
+// Attaches (or replaces) the assistant on a given phone number. Imports the
+// number on Vapi if it isn't there yet, using the user's own Twilio creds.
+export const attachAssistantToNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: { phoneNumberE164: string; assistantId: string; name?: string }) => {
+      if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
+      if (!input?.assistantId) throw new Error("assistantId é obrigatório");
+      return input;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    // Ownership: the assistant must belong to the current user.
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+
+    // Find existing Vapi phone-number entry (if any) for this E.164.
+    const all = (await vapiFetch("/phone-number", { method: "GET" })) as
+      | VapiPhoneNumberRaw[]
+      | null;
+    const existing = Array.isArray(all)
+      ? all.find((n) => (n.number as string | undefined) === data.phoneNumberE164)
+      : undefined;
+
+    let vapiNumberId: string;
+    if (existing) {
+      const patched = (await vapiFetch(`/phone-number/${existing.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assistantId: data.assistantId }),
+      })) as VapiPhoneNumberRaw;
+      vapiNumberId = patched.id;
+    } else {
+      const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
+      if (!creds) {
+        throw new Error(
+          "Conecte sua conta Twilio antes de vincular uma atendente a este número.",
+        );
+      }
+      const created = (await vapiFetch("/phone-number", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "twilio",
+          number: data.phoneNumberE164,
+          twilioAccountSid: creds.accountSid,
+          twilioAuthToken: creds.authToken,
+          assistantId: data.assistantId,
+          name: data.name ?? data.phoneNumberE164,
+        }),
+      })) as VapiPhoneNumberRaw;
+      vapiNumberId = created.id;
+    }
+
+    // Best-effort mirror to Supabase (schema-tolerant — columns may not exist).
+    try {
+      const { data: existingRow } = await context.supabase
+        .from("user_phone_numbers")
+        .select("id")
+        .eq("user_id", context.userId)
+        .eq("phone_number", data.phoneNumberE164)
+        .maybeSingle();
+      if (existingRow) {
+        await context.supabase
+          .from("user_phone_numbers")
+          .update({
+            assistant_id: data.assistantId,
+            vapi_phone_number_id: vapiNumberId,
+          })
+          .eq("id", existingRow.id);
+      } else {
+        await context.supabase.from("user_phone_numbers").insert({
+          user_id: context.userId,
+          phone_number: data.phoneNumberE164,
+          provider: "twilio",
+          assistant_id: data.assistantId,
+          vapi_phone_number_id: vapiNumberId,
+        });
+      }
+    } catch (e) {
+      console.warn("mirror user_phone_numbers failed (non-fatal)", e);
+    }
+
+    return { ok: true as const, vapiNumberId, assistantId: data.assistantId };
+  });
+
+// Removes the assistant from a Vapi phone number (leaves the number itself
+// imported on Vapi).
+export const detachAssistantFromNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { phoneNumberE164: string }) => {
+    if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const all = (await vapiFetch("/phone-number", { method: "GET" })) as
+      | VapiPhoneNumberRaw[]
+      | null;
+    const existing = Array.isArray(all)
+      ? all.find((n) => (n.number as string | undefined) === data.phoneNumberE164)
+      : undefined;
+    if (existing) {
+      await vapiFetch(`/phone-number/${existing.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assistantId: null }),
+      });
+    }
+    try {
+      await context.supabase
+        .from("user_phone_numbers")
+        .update({ assistant_id: null })
+        .eq("user_id", context.userId)
+        .eq("phone_number", data.phoneNumberE164);
+    } catch (e) {
+      console.warn("mirror detach user_phone_numbers failed (non-fatal)", e);
+    }
+    return { ok: true as const };
+  });
+
