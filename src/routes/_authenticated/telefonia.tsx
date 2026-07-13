@@ -731,7 +731,7 @@ function TelefoniaPage() {
                 onClick={() =>
                   quickCallMutation.mutate({
                     assistantId: quickAssistantId,
-                    phoneNumberId: quickFromId,
+                    fromNumberE164: quickFromId,
                     customerNumber: quickCellphone.trim(),
                   })
                 }
