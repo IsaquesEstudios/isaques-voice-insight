@@ -674,34 +674,43 @@ function TelefoniaPage() {
                             {n.region ?? "—"}
                           </TableCell>
                           <TableCell className="text-xs text-foreground">
-                            {n.assistant ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
-                                onClick={() => {
-                                  setAssignTarget(n);
-                                  setAssignAssistantId(
-                                    assistantByPhone.get(n.phone_number) ?? "",
-                                  );
-                                }}
-                              >
-                                <Bot className="h-3 w-3" />
-                                {n.assistant}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
-                                onClick={() => {
-                                  setAssignTarget(n);
-                                  setAssignAssistantId("");
-                                }}
-                              >
-                                <Plus className="h-3 w-3" />
-                                Atribuir atendente
-                              </button>
-                            )}
+                            <AssistantCombobox
+                              phoneNumberE164={n.phone_number}
+                              phoneLabel={n.phone_number}
+                              currentAssistantId={
+                                assistantByPhone.get(n.phone_number) ?? null
+                              }
+                              currentAssistantName={n.assistant}
+                              assistants={assistantsQuery.data ?? []}
+                              isLoading={assistantsQuery.isLoading}
+                              onAttach={(assistantId, assistantName) =>
+                                attachAssistantMutation.mutate(
+                                  {
+                                    phoneNumberE164: n.phone_number,
+                                    assistantId,
+                                    name: n.phone_number,
+                                  },
+                                  {
+                                    onSuccess: () =>
+                                      toast.success(
+                                        `Número roteado com sucesso para o assistente ${assistantName}`,
+                                      ),
+                                  },
+                                )
+                              }
+                              onDetach={() =>
+                                detachAssistantMutation.mutate(n.phone_number)
+                              }
+                              isPending={
+                                (attachAssistantMutation.isPending &&
+                                  attachAssistantMutation.variables?.phoneNumberE164 ===
+                                    n.phone_number) ||
+                                (detachAssistantMutation.isPending &&
+                                  detachAssistantMutation.variables === n.phone_number)
+                              }
+                            />
                           </TableCell>
+
 
                           <TableCell className="text-xs">{n.calls_today}</TableCell>
                           <TableCell className="text-xs">
