@@ -357,7 +357,24 @@ function AssistantDetailPage() {
           </TabsList>
 
           <TabsContent value="assistant" className="mt-0">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Tabs defaultValue="behavior" className="space-y-4">
+              <TabsList className="h-auto w-fit gap-1 rounded-xl border border-white/[0.08] bg-card/20 p-1 backdrop-blur-2xl">
+                <TabsTrigger
+                  value="behavior"
+                  className="gap-2 rounded-lg px-4 py-2 text-sm text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"
+                >
+                  Comportamento
+                </TabsTrigger>
+                <TabsTrigger
+                  value="model"
+                  className="gap-2 rounded-lg px-4 py-2 text-sm text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"
+                >
+                  Modelo & Voz
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="behavior" className="mt-0">
+            <div className="grid grid-cols-1 gap-4">
+
               {/* Coluna Esquerda — Comportamento */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-5 p-6">
