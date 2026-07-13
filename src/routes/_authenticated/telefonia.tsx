@@ -295,7 +295,8 @@ function TelefoniaPage() {
   const quickCallMutation = useMutation({
     mutationFn: (input: {
       assistantId: string;
-      phoneNumberId: string;
+      phoneNumberId?: string;
+      fromNumberE164?: string;
       customerNumber: string;
     }) => outboundCallFn({ data: input }),
     onSuccess: () => {
