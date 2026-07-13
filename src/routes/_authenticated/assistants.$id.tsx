@@ -103,6 +103,13 @@ import {
   saveVapiAssistantConfig,
 } from "@/lib/vapi.functions";
 import { cn } from "@/lib/utils";
+import {
+  getModelCost,
+  getVoiceCost,
+  STT_COST_PER_MIN,
+  VAPI_PLATFORM_FEE_PER_MIN,
+} from "@/lib/vapi-pricing";
+import { CostHint, CostSummary } from "@/components/assistants/cost-hint";
 
 export const Route = createFileRoute("/_authenticated/assistants/$id")({
   head: () => ({
