@@ -126,6 +126,7 @@ interface FormState {
   mode: "create" | "edit";
   editingId: string | null;
   loadingInitial: boolean;
+  step: 1 | 2;
   name: string;
   firstMessage: string;
   systemPrompt: string;
@@ -162,6 +163,7 @@ const emptyForm: FormState = {
   mode: "create",
   editingId: null,
   loadingInitial: false,
+  step: 1,
   name: "",
   firstMessage: "",
   systemPrompt: "",
@@ -170,6 +172,7 @@ const emptyForm: FormState = {
   voiceProvider: DEFAULT_VOICE_PROVIDER,
   voiceId: DEFAULT_VOICE_ID,
 };
+
 
 function AssistentesPage() {
   const fetchAssistants = useServerFn(listVapiAssistants);
@@ -589,166 +592,209 @@ function AssistentesPage() {
               {form.mode === "create" ? "Novo Assistente" : "Editar Assistente"}
             </DialogTitle>
             <DialogDescription>
-              Configure o comportamento básico do agente de voz.
+              {form.step === 1
+                ? "Passo 1 de 2 · Comportamento do agente."
+                : "Passo 2 de 2 · Modelo & Voz."}
             </DialogDescription>
+            {/* Stepper */}
+            <div className="mt-3 flex items-center gap-2">
+              <StepDot active={form.step >= 1} label="Comportamento" />
+              <div className="h-px flex-1 bg-white/[0.08]" />
+              <StepDot active={form.step >= 2} label="Modelo & Voz" />
+            </div>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="assistant-name">Nome do Assistente</Label>
-              <Input
-                id="assistant-name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Ex: Sofia • SDR"
-                disabled={form.loadingInitial}
-                required
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="assistant-first">Primeira Mensagem</Label>
-              <Textarea
-                id="assistant-first"
-                value={form.firstMessage}
-                onChange={(e) => setForm((f) => ({ ...f, firstMessage: e.target.value }))}
-                placeholder="Olá, como posso ajudar?"
-                rows={2}
-                disabled={form.loadingInitial}
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Provedor do Modelo</Label>
-                <Select
-                  value={form.modelProvider}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      modelProvider: v,
-                      model: MODEL_OPTIONS[v]?.[0] ?? "",
-                    }))
-                  }
-                  disabled={form.loadingInitial}
-                >
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(MODEL_OPTIONS).map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {form.step === 1 ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="assistant-name">Nome do Assistente</Label>
+                  <Input
+                    id="assistant-name"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Ex: Sofia • SDR"
+                    disabled={form.loadingInitial}
+                    required
+                    className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assistant-first">Primeira Mensagem</Label>
+                  <Textarea
+                    id="assistant-first"
+                    value={form.firstMessage}
+                    onChange={(e) => setForm((f) => ({ ...f, firstMessage: e.target.value }))}
+                    placeholder="Olá, como posso ajudar?"
+                    rows={2}
+                    disabled={form.loadingInitial}
+                    className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assistant-prompt">System Prompt / Instruções</Label>
+                  <Textarea
+                    id="assistant-prompt"
+                    value={form.systemPrompt}
+                    onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
+                    placeholder="Descreva o papel, tom e regras do assistente..."
+                    rows={7}
+                    disabled={form.loadingInitial}
+                    className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Provedor do Modelo</Label>
+                  <Select
+                    value={form.modelProvider}
+                    onValueChange={(v) =>
+                      setForm((f) => ({
+                        ...f,
+                        modelProvider: v,
+                        model: MODEL_OPTIONS[v]?.[0] ?? "",
+                      }))
+                    }
+                    disabled={form.loadingInitial}
+                  >
+                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(MODEL_OPTIONS).map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Modelo de IA</Label>
+                  <Select
+                    value={form.model}
+                    onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
+                    disabled={form.loadingInitial}
+                  >
+                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(MODEL_OPTIONS[form.modelProvider] ?? []).map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                      {form.model &&
+                        !(MODEL_OPTIONS[form.modelProvider] ?? []).includes(form.model) && (
+                          <SelectItem value={form.model}>{form.model}</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Provedor de Voz</Label>
+                  <Select
+                    value={form.voiceProvider}
+                    onValueChange={(v) =>
+                      setForm((f) => ({
+                        ...f,
+                        voiceProvider: v,
+                        voiceId: VOICE_OPTIONS[v]?.[0] ?? "",
+                      }))
+                    }
+                    disabled={form.loadingInitial}
+                  >
+                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(VOICE_OPTIONS).map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Voz</Label>
+                  <Select
+                    value={form.voiceId}
+                    onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
+                    disabled={form.loadingInitial}
+                  >
+                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
+                        <SelectItem key={v} value={v}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                      {form.voiceId &&
+                        !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
+                          <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Modelo de IA</Label>
-                <Select
-                  value={form.model}
-                  onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
-                  disabled={form.loadingInitial}
-                >
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(MODEL_OPTIONS[form.modelProvider] ?? []).map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                    {form.model &&
-                      !(MODEL_OPTIONS[form.modelProvider] ?? []).includes(form.model) && (
-                        <SelectItem value={form.model}>{form.model}</SelectItem>
-                      )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Provedor de Voz</Label>
-                <Select
-                  value={form.voiceProvider}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      voiceProvider: v,
-                      voiceId: VOICE_OPTIONS[v]?.[0] ?? "",
-                    }))
-                  }
-                  disabled={form.loadingInitial}
-                >
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(VOICE_OPTIONS).map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Voz</Label>
-                <Select
-                  value={form.voiceId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                  disabled={form.loadingInitial}
-                >
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                    {form.voiceId &&
-                      !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
-                        <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                      )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="assistant-prompt">System Prompt / Instruções</Label>
-              <Textarea
-                id="assistant-prompt"
-                value={form.systemPrompt}
-                onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
-                placeholder="Descreva o papel, tom e regras do assistente..."
-                rows={7}
-                disabled={form.loadingInitial}
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
-              />
-            </div>
+            )}
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setForm(emptyForm)}
-                disabled={isSubmitting}
-                className="border-white/[0.08] bg-card/20 backdrop-blur-xl"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || form.loadingInitial}
-                className="gap-2"
-              >
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {form.mode === "create" ? "Criar Assistente" : "Salvar Alterações"}
-              </Button>
+              {form.step === 2 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForm((f) => ({ ...f, step: 1 }))}
+                  disabled={isSubmitting}
+                  className="border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                >
+                  Voltar
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForm(emptyForm)}
+                  disabled={isSubmitting}
+                  className="border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                >
+                  Cancelar
+                </Button>
+              )}
+              {form.step === 1 ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (!form.name.trim()) {
+                      toast.error("Informe um nome para o assistente.");
+                      return;
+                    }
+                    setForm((f) => ({ ...f, step: 2 }));
+                  }}
+                  disabled={isSubmitting || form.loadingInitial}
+                  className="gap-2"
+                >
+                  Próximo
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || form.loadingInitial}
+                  className="gap-2"
+                >
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {form.mode === "create" ? "Criar Assistente" : "Salvar Alterações"}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
 
       {/* Delete confirmation */}
       <AlertDialog
@@ -789,6 +835,25 @@ function AssistentesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </DashboardShell>
+  );
+}
+
+function StepDot({ active, label }: { active: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={
+          active
+            ? "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground"
+            : "flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.08] bg-background/40 text-[10px] font-semibold text-muted-foreground"
+        }
+      >
+        {active ? "•" : ""}
+      </span>
+      <span className={active ? "text-xs font-medium text-foreground" : "text-xs text-muted-foreground"}>
+        {label}
+      </span>
+    </div>
   );
 }
 
