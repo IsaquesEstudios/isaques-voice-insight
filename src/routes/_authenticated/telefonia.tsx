@@ -132,6 +132,10 @@ function TelefoniaPage() {
   const disconnectFn = useServerFn(disconnectTwilio);
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
+  const listTestContactsFn = useServerFn(listTestContacts);
+  const addTestContactFn = useServerFn(addTestContact);
+  const removeTestContactFn = useServerFn(removeTestContact);
+  const makeTestCallFn = useServerFn(makeTestCall);
 
   const numbersQuery = useQuery({
     queryKey: ["my-numbers"],
