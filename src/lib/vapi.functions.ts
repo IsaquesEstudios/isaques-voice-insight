@@ -811,31 +811,78 @@ export const detachAssistantFromNumber = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-// Outbound test call — POST /call using an existing Vapi phone-number id and
-// an assistant that must belong to the current user.
+// Outbound test call — POST /call. Accepts either an existing Vapi
+// phone-number id OR an E.164 number (imports it via the user's Twilio
+// creds if not yet on Vapi).
 export const createOutboundTestCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
     (input: {
       assistantId: string;
-      phoneNumberId: string;
+      phoneNumberId?: string;
+      fromNumberE164?: string;
       customerNumber: string;
     }) => {
       if (!input?.assistantId) throw new Error("assistantId é obrigatório");
-      if (!input?.phoneNumberId) throw new Error("phoneNumberId é obrigatório");
+      if (!input?.phoneNumberId && !input?.fromNumberE164)
+        throw new Error("Selecione um número de origem");
       const num = (input.customerNumber ?? "").trim();
       if (!/^\+[1-9]\d{6,14}$/.test(num))
         throw new Error("Número do celular deve estar em E.164 (ex: +5511999998888)");
+      if (input.fromNumberE164 && !/^\+[1-9]\d{6,14}$/.test(input.fromNumberE164))
+        throw new Error("Número de origem inválido");
       return { ...input, customerNumber: num };
     },
   )
   .handler(async ({ data, context }) => {
     await assertOwnership(context.supabase, context.userId, data.assistantId);
+
+    let phoneNumberId = data.phoneNumberId;
+    if (!phoneNumberId && data.fromNumberE164) {
+      let existing: VapiPhoneNumberRaw | undefined;
+      let cursor: string | undefined;
+      for (let i = 0; i < 20; i++) {
+        const qs = new URLSearchParams({ limit: "100" });
+        if (cursor) qs.set("createdAtLt", cursor);
+        const chunk = (await vapiFetch(`/phone-number?${qs.toString()}`, {
+          method: "GET",
+        })) as (VapiPhoneNumberRaw & { createdAt?: string })[] | null;
+        if (!Array.isArray(chunk) || chunk.length === 0) break;
+        existing = chunk.find((n) => n.number === data.fromNumberE164);
+        if (existing || chunk.length < 100) break;
+        cursor = chunk[chunk.length - 1]?.createdAt;
+        if (!cursor) break;
+      }
+      if (existing) {
+        phoneNumberId = existing.id;
+      } else {
+        const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
+        if (!creds)
+          throw new Error(
+            "Conecte sua conta Twilio para usar este número como origem.",
+          );
+        const safeName =
+          data.fromNumberE164.replace(/[^a-zA-Z0-9 _-]/g, "").slice(0, 40) ||
+          "Twilio number";
+        const created = (await vapiFetch("/phone-number", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: "twilio",
+            number: data.fromNumberE164,
+            twilioAccountSid: creds.accountSid,
+            twilioAuthToken: creds.authToken,
+            name: safeName,
+          }),
+        })) as VapiPhoneNumberRaw;
+        phoneNumberId = created.id;
+      }
+    }
+
     const res = (await vapiFetch("/call", {
       method: "POST",
       body: JSON.stringify({
         assistantId: data.assistantId,
-        phoneNumberId: data.phoneNumberId,
+        phoneNumberId,
         customer: { number: data.customerNumber },
       }),
     })) as { id?: string };
