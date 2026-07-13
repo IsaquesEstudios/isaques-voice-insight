@@ -220,11 +220,18 @@ function AssistentesPage() {
     : 0;
 
   function openCreate() {
-    setForm({ ...emptyForm, open: true, mode: "create" });
+    setForm({
+      ...emptyForm,
+      open: true,
+      mode: "create",
+      firstMessage: DEFAULT_FIRST_MESSAGE,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    });
   }
 
   async function openEdit(a: VapiAssistant) {
     setForm({
+      ...emptyForm,
       open: true,
       mode: "edit",
       editingId: a.id,
@@ -232,6 +239,10 @@ function AssistentesPage() {
       name: a.name ?? "",
       firstMessage: a.firstMessage ?? "",
       systemPrompt: "",
+      modelProvider: a.model?.provider ?? DEFAULT_MODEL_PROVIDER,
+      model: a.model?.model ?? DEFAULT_MODEL,
+      voiceProvider: a.voice?.provider ?? DEFAULT_VOICE_PROVIDER,
+      voiceId: a.voice?.voiceId ?? DEFAULT_VOICE_ID,
     });
     try {
       const full = await fetchAssistant({ data: { id: a.id } });
@@ -245,6 +256,10 @@ function AssistentesPage() {
         firstMessage:
           typeof full.firstMessage === "string" ? full.firstMessage : prev.firstMessage,
         systemPrompt,
+        modelProvider: full?.model?.provider ?? prev.modelProvider,
+        model: full?.model?.model ?? prev.model,
+        voiceProvider: full?.voice?.provider ?? prev.voiceProvider,
+        voiceId: full?.voice?.voiceId ?? prev.voiceId,
         loadingInitial: false,
       }));
     } catch (err) {
@@ -262,24 +277,20 @@ function AssistentesPage() {
     }
     setIsSubmitting(true);
     try {
+      const payload = {
+        name: form.name,
+        firstMessage: form.firstMessage,
+        systemPrompt: form.systemPrompt,
+        modelProvider: form.modelProvider,
+        model: form.model,
+        voiceProvider: form.voiceProvider,
+        voiceId: form.voiceId,
+      };
       if (form.mode === "create") {
-        await createAssistant({
-          data: {
-            name: form.name,
-            firstMessage: form.firstMessage,
-            systemPrompt: form.systemPrompt,
-          },
-        });
+        await createAssistant({ data: payload });
         toast.success("Assistente criado com sucesso.");
       } else if (form.editingId) {
-        await updateAssistant({
-          data: {
-            id: form.editingId,
-            name: form.name,
-            firstMessage: form.firstMessage,
-            systemPrompt: form.systemPrompt,
-          },
-        });
+        await updateAssistant({ data: { id: form.editingId, ...payload } });
         toast.success("Assistente atualizado.");
       }
       setForm(emptyForm);
