@@ -615,77 +615,99 @@ export const addTestContact = createServerFn({ method: "POST" })
     return { ok: true, id: row?.id as string | undefined };
   });
 
-export const startContactVerification = createServerFn({ method: "POST" })
+// Sends an OTP via SMS using Twilio Verify. Works on trial accounts.
+export const sendVerifyOtp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({
+        phoneE164: e164,
+        channel: z.enum(["sms", "call"]).optional().default("sms"),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const creds = await loadCreds(context);
     if (!creds) return { ok: false as const, reason: "no_credentials" as const };
-
-    const { data: row, error } = await context.supabase
-      .from("user_test_contacts")
-      .select("id, label, phone_e164")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!row) throw new Error("Contato não encontrado.");
 
     try {
-      const json = (await twilioAccountPost(creds, "/OutgoingCallerIds.json", {
-        PhoneNumber: row.phone_e164 as string,
-        FriendlyName: (row.label as string) || (row.phone_e164 as string),
-      })) as { validation_code: string; call_sid: string };
-      return {
-        ok: true as const,
-        validationCode: json.validation_code,
-        callSid: json.call_sid,
-      };
+      const serviceSid = await ensureVerifyService(creds);
+      await twilioVerifyPost(creds, `/Services/${serviceSid}/Verifications`, {
+        To: data.phoneE164,
+        Channel: data.channel,
+      });
+      return { ok: true as const, channel: data.channel };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Already verified on Twilio side — sync DB and report success.
-      if (
-        msg.includes('"code":21450') ||
-        msg.includes("already verified") ||
-        msg.includes("Phone number is already verified")
-      ) {
-        await context.supabase
-          .from("user_test_contacts")
-          .update({ verified: true })
-          .eq("id", data.id);
-        return { ok: true as const, alreadyVerified: true as const };
-      }
-      throw err;
+      // 60200 invalid parameter, 60203 max send attempts, 60212 max attempts reached
+      return { ok: false as const, reason: "twilio_error" as const, message: msg };
     }
   });
 
-export const refreshContactVerification = createServerFn({ method: "POST" })
+// Checks the OTP. If contactId is provided, updates that row to verified=true.
+// Otherwise, inserts a new contact row with verified=true (label required).
+export const checkVerifyOtp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({
+        phoneE164: e164,
+        code: z.string().trim().min(4).max(10),
+        contactId: z.string().uuid().optional(),
+        label: z.string().trim().min(1).max(80).optional(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const creds = await loadCreds(context);
     if (!creds) return { ok: false as const, reason: "no_credentials" as const };
 
-    const { data: row, error } = await context.supabase
-      .from("user_test_contacts")
-      .select("id, phone_e164")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!row) throw new Error("Contato não encontrado.");
+    try {
+      const serviceSid = await ensureVerifyService(creds);
+      const result = (await twilioVerifyPost(
+        creds,
+        `/Services/${serviceSid}/VerificationCheck`,
+        { To: data.phoneE164, Code: data.code },
+      )) as { status: string; valid: boolean };
 
-    const json = (await twilioAccountGet(creds, "/OutgoingCallerIds.json", {
-      PhoneNumber: row.phone_e164 as string,
-      PageSize: "5",
-    })) as { outgoing_caller_ids?: Array<{ sid: string; phone_number: string }> };
-    const verified = (json.outgoing_caller_ids ?? []).length > 0;
-    if (verified) {
-      await context.supabase
+      if (result.status !== "approved" || !result.valid) {
+        return { ok: false as const, reason: "invalid_code" as const };
+      }
+
+      if (data.contactId) {
+        const { error } = await context.supabase
+          .from("user_test_contacts")
+          .update({ verified: true })
+          .eq("id", data.contactId);
+        if (error) throw new Error(error.message);
+        return { ok: true as const, id: data.contactId };
+      }
+
+      if (!data.label) {
+        return { ok: false as const, reason: "missing_label" as const };
+      }
+      const { data: row, error } = await context.supabase
         .from("user_test_contacts")
-        .update({ verified: true })
-        .eq("id", data.id);
+        .insert({
+          user_id: context.userId,
+          label: data.label,
+          phone_e164: data.phoneE164,
+          verified: true,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      return { ok: true as const, id: row?.id as string };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('"code":20404') || msg.includes("not found")) {
+        // Verification expired / already consumed
+        return { ok: false as const, reason: "expired" as const };
+      }
+      return { ok: false as const, reason: "twilio_error" as const, message: msg };
     }
-    return { ok: true as const, verified };
   });
+
 
 export const removeTestContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
