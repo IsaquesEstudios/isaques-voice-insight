@@ -352,6 +352,14 @@ function TelefoniaPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair da conta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Entrar em outra conta
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setConfirmDisconnect(true)}
                     className="text-destructive focus:text-destructive"
@@ -362,16 +370,7 @@ function TelefoniaPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
-            <Button
-              variant="outline"
-              className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4" /> Sair
-            </Button>
-            <Button variant="outline" className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
-              <Globe2 className="h-4 w-4" /> Nova Rota
-            </Button>
+
             <Button
               className="gap-2 shadow-glow"
               onClick={() => {
