@@ -1051,7 +1051,7 @@ function TelefoniaPage() {
                 {startVerificationMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Verificar por chamada
+                Enviar SMS de verificação
               </Button>
             </div>
           </div>
