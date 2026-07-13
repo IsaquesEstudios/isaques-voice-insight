@@ -688,11 +688,17 @@ function TelefoniaPage() {
                     <SelectValue placeholder="Selecione um número" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(vapiPhoneNumbersQuery.data ?? []).map((n) => (
-                      <SelectItem key={n.id} value={n.id}>
-                        {n.number ?? n.name ?? n.id}
-                      </SelectItem>
-                    ))}
+                    {numbers.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Nenhum número disponível. Conecte um número em "Adquirir número".
+                      </div>
+                    ) : (
+                      numbers.map((n) => (
+                        <SelectItem key={n.phone_number} value={n.phone_number}>
+                          {n.phone_number}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
