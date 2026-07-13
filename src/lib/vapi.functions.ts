@@ -432,6 +432,10 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
       name: input.name.trim(),
       firstMessage: input.firstMessage ?? "",
       systemPrompt: input.systemPrompt ?? "",
+      modelProvider: input.modelProvider,
+      model: input.model,
+      voiceProvider: input.voiceProvider,
+      voiceId: input.voiceId,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
