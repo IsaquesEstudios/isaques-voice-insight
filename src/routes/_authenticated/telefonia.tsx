@@ -197,9 +197,43 @@ function TelefoniaPage() {
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao adquirir número");
+      const msg = err instanceof Error ? err.message : "Falha ao adquirir número";
+      if (/Endere[çc]o regulat[oó]rio|AddressSid|21631/i.test(msg)) {
+        setPendingBuy(n);
+        setAddressOpen(true);
+        toast.message("Cadastre um endereço regulatório para concluir a compra.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setBuyingId(null);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    if (!pendingBuy) return;
+    setSavingAddress(true);
+    try {
+      await createAddressFn({
+        data: {
+          customerName: addr.customerName,
+          street: addr.street,
+          city: addr.city,
+          region: addr.region,
+          postalCode: addr.postalCode,
+          isoCountry: pendingBuy.countryIso,
+          friendlyName: `Address ${pendingBuy.countryIso}`,
+        },
+      });
+      toast.success("Endereço cadastrado. Concluindo compra…");
+      setAddressOpen(false);
+      const target = pendingBuy;
+      setPendingBuy(null);
+      await handleBuy(target);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar endereço");
+    } finally {
+      setSavingAddress(false);
     }
   };
 
