@@ -381,37 +381,44 @@ function sanitizeModelTool(tool: any): any {
   return tool;
 }
 
-export const listVapiAssistants = createServerFn({ method: "GET" }).handler(
-  async (): Promise<VapiAssistantDTO[]> => {
+export const listVapiAssistants = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<VapiAssistantDTO[]> => {
+    const owned = await listOwnedIds(context.supabase, context.userId);
+    if (owned.size === 0) return [];
     const data = await vapiFetch("/assistant", { method: "GET" });
     if (!Array.isArray(data)) return [];
-    return (data as VapiAssistantDTO[]).map((a) => ({
-      id: a.id,
-      name: a.name ?? null,
-      voice: a.voice
-        ? { provider: a.voice.provider, voiceId: a.voice.voiceId }
-        : null,
-      model: a.model
-        ? { provider: a.model.provider, model: a.model.model }
-        : null,
-      firstMessage: a.firstMessage ?? null,
-      createdAt: a.createdAt,
-      updatedAt: a.updatedAt,
-    }));
-  },
-);
+    return (data as VapiAssistantDTO[])
+      .filter((a) => owned.has(a.id))
+      .map((a) => ({
+        id: a.id,
+        name: a.name ?? null,
+        voice: a.voice
+          ? { provider: a.voice.provider, voiceId: a.voice.voiceId }
+          : null,
+        model: a.model
+          ? { provider: a.model.provider, model: a.model.model }
+          : null,
+        firstMessage: a.firstMessage ?? null,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+      }));
+  });
 
 export const getVapiAssistant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
   })
-  .handler(async ({ data }): Promise<VapiAssistantRaw> => {
+  .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertOwnership(context.supabase, context.userId, data.id);
     const res = (await vapiFetch(`/assistant/${data.id}`, { method: "GET" })) as VapiAssistantRaw;
     return res;
   });
 
 export const createVapiAssistant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: AssistantInput) => {
     if (!input?.name?.trim()) throw new Error("Nome é obrigatório");
     return {
@@ -420,14 +427,17 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
       systemPrompt: input.systemPrompt ?? "",
     };
   })
-  .handler(async ({ data }): Promise<VapiAssistantRaw> => {
-    return (await vapiFetch("/assistant", {
+  .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    const created = (await vapiFetch("/assistant", {
       method: "POST",
       body: JSON.stringify(buildPayload(data)),
     })) as VapiAssistantRaw;
+    await recordOwnership(context.supabase, context.userId, created.id);
+    return created;
   });
 
 export const updateVapiAssistant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: AssistantInput & { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     if (!input?.name?.trim()) throw new Error("Nome é obrigatório");
@@ -438,7 +448,8 @@ export const updateVapiAssistant = createServerFn({ method: "POST" })
       systemPrompt: input.systemPrompt ?? "",
     };
   })
-  .handler(async ({ data }): Promise<VapiAssistantRaw> => {
+  .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertOwnership(context.supabase, context.userId, data.id);
     const { id, ...rest } = data;
     return (await vapiFetch(`/assistant/${id}`, {
       method: "PATCH",
@@ -461,11 +472,13 @@ export interface AssistantConfigInput {
 
 // Partial PATCH used by the details page — only touches provided fields.
 export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: AssistantConfigInput) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
   })
-  .handler(async ({ data }): Promise<VapiAssistantRaw> => {
+  .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertOwnership(context.supabase, context.userId, data.id);
     const body: Record<string, unknown> = {};
     if (typeof data.name === "string") body.name = data.name.trim();
     if (typeof data.firstMessage === "string") body.firstMessage = data.firstMessage;
@@ -506,23 +519,28 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
   });
 
 export const deleteVapiAssistant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
   })
-  .handler(async ({ data }): Promise<{ ok: true }> => {
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    await assertOwnership(context.supabase, context.userId, data.id);
     await vapiFetch(`/assistant/${data.id}`, { method: "DELETE" });
+    await removeOwnership(context.supabase, context.userId, data.id);
     return { ok: true };
   });
 
 // Duplicates an existing assistant by fetching its full config, stripping
 // server-managed fields, and creating a new one with " - Cópia" appended.
 export const duplicateVapiAssistant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
   })
-  .handler(async ({ data }): Promise<VapiAssistantRaw> => {
+  .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertOwnership(context.supabase, context.userId, data.id);
     const source = (await vapiFetch(`/assistant/${data.id}`, {
       method: "GET",
     })) as VapiAssistantRaw;
@@ -544,8 +562,11 @@ export const duplicateVapiAssistant = createServerFn({ method: "POST" })
         : "Assistente Sem Nome";
     clone.name = `${baseName} - Cópia`;
 
-    return (await vapiFetch("/assistant", {
+    const created = (await vapiFetch("/assistant", {
       method: "POST",
       body: JSON.stringify(clone),
     })) as VapiAssistantRaw;
+    await recordOwnership(context.supabase, context.userId, created.id);
+    return created;
   });
+
