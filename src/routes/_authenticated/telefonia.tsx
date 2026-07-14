@@ -309,13 +309,13 @@ function TelefoniaPage() {
 
 
   const removeTestContactMutation = useMutation({
-    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
+    mutationFn: (sid: string) => deleteVerifiedCallerIdFn({ data: { sid } }),
     onSuccess: async () => {
-      toast.success("Contato removido.");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      toast.success("Caller ID removido da sua conta Twilio.");
+      await queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
+      toast.error(err instanceof Error ? err.message : "Falha ao remover Caller ID"),
   });
 
   // Reset verification state whenever the modal closes.
