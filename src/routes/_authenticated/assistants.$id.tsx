@@ -627,6 +627,12 @@ function AssistantDetailPage() {
 
 
   async function handleSave() {
+    if (voiceListMismatch) {
+      toast.error(
+        `A voz "${form.voiceId}" não pertence ao provider "${form.voiceProvider}". Selecione uma voz válida.`,
+      );
+      return;
+    }
     setIsSaving(true);
     try {
       await saveConfig({
