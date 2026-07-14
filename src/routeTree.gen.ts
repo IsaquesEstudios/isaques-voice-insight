@@ -16,6 +16,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTelefoniaRouteImport } from './routes/_authenticated/telefonia'
+import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
 import { Route as AuthenticatedAssistentesRouteImport } from './routes/_authenticated/assistentes'
 import { Route as AuthenticatedAssistantsIdRouteImport } from './routes/_authenticated/assistants.$id'
 
@@ -53,6 +54,11 @@ const AuthenticatedTelefoniaRoute = AuthenticatedTelefoniaRouteImport.update({
   path: '/telefonia',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedReunioesRoute = AuthenticatedReunioesRouteImport.update({
+  id: '/reunioes',
+  path: '/reunioes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAssistentesRoute =
   AuthenticatedAssistentesRouteImport.update({
     id: '/assistentes',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/assistentes': typeof AuthenticatedAssistentesRoute
+  '/reunioes': typeof AuthenticatedReunioesRoute
   '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
 }
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/assistentes': typeof AuthenticatedAssistentesRoute
+  '/reunioes': typeof AuthenticatedReunioesRoute
   '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
 }
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/_authenticated/assistentes': typeof AuthenticatedAssistentesRoute
+  '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
   '/_authenticated/telefonia': typeof AuthenticatedTelefoniaRoute
   '/_authenticated/assistants/$id': typeof AuthenticatedAssistantsIdRoute
 }
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/assistentes'
+    | '/reunioes'
     | '/telefonia'
     | '/assistants/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/assistentes'
+    | '/reunioes'
     | '/telefonia'
     | '/assistants/$id'
   id:
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/_authenticated/assistentes'
+    | '/_authenticated/reunioes'
     | '/_authenticated/telefonia'
     | '/_authenticated/assistants/$id'
   fileRoutesById: FileRoutesById
@@ -192,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTelefoniaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/reunioes': {
+      id: '/_authenticated/reunioes'
+      path: '/reunioes'
+      fullPath: '/reunioes'
+      preLoaderRoute: typeof AuthenticatedReunioesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/assistentes': {
       id: '/_authenticated/assistentes'
       path: '/assistentes'
@@ -211,12 +230,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssistentesRoute: typeof AuthenticatedAssistentesRoute
+  AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
   AuthenticatedTelefoniaRoute: typeof AuthenticatedTelefoniaRoute
   AuthenticatedAssistantsIdRoute: typeof AuthenticatedAssistantsIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssistentesRoute: AuthenticatedAssistentesRoute,
+  AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
   AuthenticatedTelefoniaRoute: AuthenticatedTelefoniaRoute,
   AuthenticatedAssistantsIdRoute: AuthenticatedAssistantsIdRoute,
 }
