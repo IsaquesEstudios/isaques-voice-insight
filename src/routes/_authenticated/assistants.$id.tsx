@@ -623,7 +623,12 @@ function AssistantDetailPage() {
     }));
   }, [form.voiceProvider]);
 
-  const allVoices = voicesQuery.data?.length ? voicesQuery.data : staticVoices;
+  // Para 11labs e azure a lista da API mistura idiomas — usamos apenas o catálogo
+  // estático curado em PT-BR. Para outros provedores, mantém o comportamento original.
+  const ptBrOnlyProviders = new Set(["11labs", "azure"]);
+  const allVoices = ptBrOnlyProviders.has(form.voiceProvider)
+    ? staticVoices
+    : (voicesQuery.data?.length ? voicesQuery.data : staticVoices);
 
   // Se a lista de vozes carregou (API ou fallback) e o voiceId atual não está nela,
   // a Vapi rejeitará o PATCH com 400 ("voice.voiceId must be one of ...").
