@@ -19,6 +19,7 @@ import {
   Check,
   Link2,
   ChevronsUpDown,
+  RefreshCw,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -299,6 +300,9 @@ function TelefoniaPage() {
     queryKey: ["verified-caller-ids"],
     queryFn: () => listVerifiedCallerIdsFn(),
     enabled: isTwilioConnected,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
   const testContacts = (testContactsQuery.data ?? []).map((c) => ({
     id: c.sid,
@@ -848,20 +852,29 @@ function TelefoniaPage() {
                   Caller IDs verificados diretamente na sua conta Twilio.
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                asChild
-                className="gap-1.5"
-              >
-                <a
-                  href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
-                  target="_blank"
-                  rel="noreferrer"
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5"
+                  disabled={!isTwilioConnected || testContactsQuery.isFetching}
+                  onClick={() => testContactsQuery.refetch()}
+                  title="Atualizar lista"
                 >
-                  <Plus className="h-4 w-4" /> Verificar na Twilio
-                </a>
-              </Button>
+                  <RefreshCw
+                    className={`h-4 w-4 ${testContactsQuery.isFetching ? "animate-spin" : ""}`}
+                  />
+                </Button>
+                <Button size="sm" variant="outline" asChild className="gap-1.5">
+                  <a
+                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Plus className="h-4 w-4" /> Verificar na Twilio
+                  </a>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {!isTwilioConnected && (
@@ -881,9 +894,14 @@ function TelefoniaPage() {
                   />
                 ))
               ) : isTwilioConnected && testContacts.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  Nenhum Caller ID verificado. Cadastre um em <b>Console Twilio → Verified Caller IDs</b>.
-                </p>
+                <div className="space-y-2 py-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum Caller ID verificado encontrado na sua conta Twilio.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/80">
+                    Verifique um número em <b>Console → Phone Numbers → Verified Caller IDs</b> e clique em atualizar.
+                  </p>
+                </div>
               ) : (
                 testContacts.map((c) => {
                   const from = rowCallFrom[c.id] ?? numbers[0]?.phone_number ?? "";
