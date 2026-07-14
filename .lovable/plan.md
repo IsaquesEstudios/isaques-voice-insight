@@ -1,26 +1,41 @@
 ## Objetivo
-Simplificar o card "Contatos de teste" em `/telefonia`: remover o seletor "Número de origem" e deixar apenas a escolha da assistente + botão **Ligar**. O número de origem é escolhido automaticamente.
+Adicionar um botão **"Testar no navegador"** na página de detalhe da assistente (`/assistants/:id`) que abre uma chamada de voz Web via SDK oficial da Vapi (`@vapi-ai/web`), permitindo que **qualquer usuário logado** teste sua própria IA falando pelo microfone do navegador — sem depender de Twilio, número comprado ou Caller ID verificado.
 
-## Mudanças (arquivo único: `src/routes/_authenticated/telefonia.tsx`)
+## Como isso funciona pra múltiplos usuários
+- A **Vapi Public Key** é segura para uso no navegador (é isso que a própria Vapi documenta para o SDK Web). Não expõe dados de conta.
+- O isolamento por usuário já existe: cada assistente pertence ao usuário logado via `user_assistants`. A página `/assistants/:id` só carrega assistentes do usuário atual, então o botão só aparece pra assistentes que ele possui. Todo usuário pode usar o mesmo botão pra testar as próprias assistentes.
 
-1. **Remover UI de seleção de origem**
-   - Apagar o bloco `Label "Número de origem" + Select` dentro do map de `testContacts` (aprox. linhas 938–966).
-   - Remover o estado `rowCallFrom` e o `setRowCallFrom` (ficam sem uso).
+## Mudanças
 
-2. **Escolher o número de origem automaticamente**
-   - No `testCallMutation.mutationFn`, substituir a leitura de `rowCallFrom[contact.id]` por uma seleção automática:
-     - Preferir o primeiro número da lista `numbers` (Vapi phone numbers já conectados) que tenha uma assistente vinculada — ou simplesmente `numbers[0]?.phone_number`.
-   - Se `numbers.length === 0`, rejeitar com toast: *"Conecte um número em 'Conectar Número' antes de testar a ligação."* (mantém orientação clara em vez de sumir com o erro).
-   - O botão **Ligar** fica desabilitado quando: sem assistente selecionada, sem números disponíveis, Twilio não conectado, ou chamada em andamento.
+### 1. Secret
+- Adicionar `VAPI_PUBLIC_KEY` via `add_secret` (usuário cola o valor de Vapi Dashboard → Settings → API Keys → Public Key).
+- Expor a chave ao browser via server function pública (não como `VITE_*`, pra evitar hardcode no bundle): `getVapiPublicKey()` em `src/lib/vapi.functions.ts` — retorna `process.env.VAPI_PUBLIC_KEY` sem autenticação obrigatória. É seguro porque a chave já foi projetada para uso client-side.
 
-3. **Ajustar o texto de ajuda do card**
-   - Atualizar o subtítulo do card para deixar claro que a ligação parte automaticamente do primeiro número conectado.
-   - Se `numbers.length === 0`, mostrar um `Alert` curto acima da lista: *"Nenhum número conectado à Vapi. Vá em 'Conectar Número' para poder disparar testes."*
+### 2. Dependência
+- `bun add @vapi-ai/web` (SDK oficial de Web Call).
+
+### 3. Componente novo
+- `src/components/assistants/web-call-dialog.tsx`:
+  - Props: `assistantId: string`, `assistantName: string`, controlled `open/onOpenChange`.
+  - Estados: `idle → connecting → in_call → ended | error`.
+  - Ao abrir, busca a public key via `useServerFn(getVapiPublicKey)` (com cache pelo React Query — `queryKey: ['vapi-public-key']`, `staleTime: Infinity`).
+  - Instancia `new Vapi(publicKey)` e chama `vapi.start(assistantId)`.
+  - Eventos escutados: `call-start`, `call-end`, `speech-start`, `speech-end`, `message` (para transcript), `error`.
+  - UI: status ao vivo (Conectando/Em ligação/Encerrada), indicador de quem está falando (usuário/IA), transcript rolável em tempo real, botões **Mutar**, **Encerrar**.
+  - Solicita permissão de microfone via `getUserMedia({ audio: true })` no start; mostra erro amigável se negado.
+  - Ao fechar o dialog: `vapi.stop()` + cleanup dos listeners.
+
+### 4. Integração na página de detalhe
+- Em `src/routes/assistants.$id.tsx` (ou `src/routes/_authenticated/assistants.$id.tsx`, conforme rota atual), adicionar botão **"Testar no navegador"** com ícone `Mic` ao lado dos botões existentes no header da página.
+- Botão controla o `open` do `WebCallDialog`.
+- Nenhuma mudança em outras páginas (lista de assistentes, telefonia, etc.).
+
+## Segurança / limites
+- A Public Key da Vapi é feita para browser — mesma classe de risco de uma publishable key. Não expõe dados nem permite gerenciar recursos.
+- Rate limiting: a Vapi já aplica limites por assistente na conta; não vamos adicionar limite extra sem o usuário pedir.
+- Cada usuário só vê e testa suas próprias assistentes (garantido pelo `user_assistants` já existente na rota de detalhe).
 
 ## Fora de escopo
-- Não alterar `vapi.functions.ts` nem `twilio.functions.ts`.
-- Não mexer nos outros cards (Rotas ativas, Meus números, modal Conectar Número).
-- Não alterar o fluxo de verificação de Caller IDs.
-
-## Sobre "número padrão da Twilio"
-A Vapi/Twilio não fornece um número global padrão — a ligação sai de um número que **você conectou** à Vapi. É por isso que o select aparecia vazio: se nenhum número foi importado para a Vapi ainda, não há origem para disparar. A tela vai passar a escolher sozinha o primeiro disponível, e se não houver nenhum, mostra o aviso pedindo para conectar um em "Conectar Número".
+- Não mexer em `/telefonia`, `/assistentes` (lista), nem no fluxo de Caller IDs.
+- Não alterar `vapi.functions.ts` além de adicionar a função `getVapiPublicKey`.
+- Não trocar o SDK por WebRTC manual nem gerar `webCallUrl` via API (usuário optou pelo SDK com public key).
