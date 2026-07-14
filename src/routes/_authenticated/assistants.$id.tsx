@@ -608,19 +608,31 @@ function AssistantDetailPage() {
     staleTime: 1000 * 60 * 30,
   });
 
-  const allVoices = voicesQuery.data ?? [];
+  // Vozes estáticas como fallback quando a API da Vapi não retorna nada
+  // (ex.: ElevenLabs BYOK não expõe a biblioteca pública).
+  const staticVoices = useMemo(() => {
+    const hardcoded = VOICES_BY_PROVIDER[form.voiceProvider] ?? [];
+    if (hardcoded.length === 0) return [];
+    return hardcoded.map((v) => ({
+      providerId: v.value,
+      name: v.label.split(" — ")[0],
+      languageCode: form.voiceProvider === "11labs" ? "pt-br" : undefined,
+      language: form.voiceProvider === "11labs" ? "Portuguese (Brazil)" : undefined,
+    }));
+  }, [form.voiceProvider]);
 
-  // Se a lista pública de vozes carregou e o voiceId atual não está nela,
+  const allVoices = voicesQuery.data?.length ? voicesQuery.data : staticVoices;
+
+  // Se a lista de vozes carregou (API ou fallback) e o voiceId atual não está nela,
   // a Vapi rejeitará o PATCH com 400 ("voice.voiceId must be one of ...").
-  // Providers BYOK retornam lista vazia — nesse caso não validamos.
   const voiceListMismatch = useMemo(() => {
     if (!form.voiceProvider || !form.voiceId) return false;
-    if (voicesQuery.isLoading || !voicesQuery.data) return false;
-    const list = voicesQuery.data;
+    if (voicesQuery.isLoading) return false;
+    const list = allVoices;
     if (list.length === 0) return false;
     const target = form.voiceId.toLowerCase();
     return !list.some((v) => (v.providerId || "").toLowerCase() === target);
-  }, [form.voiceProvider, form.voiceId, voicesQuery.data, voicesQuery.isLoading]);
+  }, [form.voiceProvider, form.voiceId, voicesQuery.isLoading, allVoices]);
 
   // Traduções pt-BR para metadados vindos da API da Vapi.
   const translateLanguage = (raw?: string, code?: string): string => {
