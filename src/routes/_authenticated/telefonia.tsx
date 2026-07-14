@@ -74,8 +74,10 @@ import {
   listTwilioNumbers,
   listTwilioTrunks,
   listVerifiedCallerIds,
+  purchaseTwilioNumber,
   releaseNumber,
   saveTwilioCredentials,
+  searchAvailableTwilioNumbers,
   sendVerifyOtp,
 } from "@/lib/twilio.functions";
 
