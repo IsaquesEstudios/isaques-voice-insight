@@ -287,6 +287,11 @@ function AssistantDetailPage() {
           (a?.model?.messages ?? []).find(
             (m: { role?: string; content?: string }) => m?.role === "system",
           )?.content ?? "";
+        const v = (a?.voice ?? {}) as Record<string, unknown>;
+        const ssp = (a?.startSpeakingPlan ?? {}) as Record<string, unknown>;
+        const stp = (a?.stopSpeakingPlan ?? {}) as Record<string, unknown>;
+        const numOrNull = (x: unknown): number | null =>
+          typeof x === "number" && Number.isFinite(x) ? x : null;
         setForm({
           name: typeof a.name === "string" ? a.name : "",
           firstMessage: typeof a.firstMessage === "string" ? a.firstMessage : "",
@@ -296,7 +301,24 @@ function AssistantDetailPage() {
           voiceProvider: typeof a?.voice?.provider === "string" ? a.voice.provider : "",
           voiceId: typeof a?.voice?.voiceId === "string" ? a.voice.voiceId : "",
           status: typeof a.name === "string" && a.name.trim() ? "Ativo" : "Rascunho",
+          voiceModel: typeof v.model === "string" ? v.model : "",
+          voiceStability: numOrNull(v.stability),
+          voiceSimilarityBoost: numOrNull(v.similarityBoost),
+          voiceStyle: numOrNull(v.style),
+          voiceUseSpeakerBoost: v.useSpeakerBoost === true,
+          voiceSpeed: numOrNull(v.speed),
+          voiceEmotion: typeof v.emotion === "string" ? v.emotion : "",
+          voiceTemperature: numOrNull(v.temperature),
+          voiceFillerInjectionEnabled: v.fillerInjectionEnabled === true,
+          startWaitSeconds: numOrNull(ssp.waitSeconds),
+          smartEndpointingEnabled: ssp.smartEndpointingEnabled === true,
+          stopNumWords: numOrNull(stp.numWords),
+          stopVoiceSeconds: numOrNull(stp.voiceSeconds),
+          stopBackoffSeconds: numOrNull(stp.backoffSeconds),
+          backgroundSound: (a as { backgroundSound?: string })?.backgroundSound === "office" ? "office" : "off",
+          backgroundDenoisingEnabled: (a as { backgroundDenoisingEnabled?: boolean })?.backgroundDenoisingEnabled === true,
         });
+
         setTools(
           Array.isArray(a?.model?.tools)
             ? a.model.tools
