@@ -294,7 +294,7 @@ function AssistantDetailPage() {
   const allVoices = voicesQuery.data ?? [];
 
   // Build list of languages present in this provider's voice library.
-  const languageOptions = React.useMemo(() => {
+  const languageOptions = useMemo(() => {
     const map = new Map<string, string>(); // code -> label
     for (const v of allVoices) {
       const code = (v.languageCode || v.language || "").trim();
@@ -308,10 +308,10 @@ function AssistantDetailPage() {
   }, [allVoices]);
 
   const hasLanguageData = languageOptions.length > 0;
-  const [languageFilter, setLanguageFilter] = React.useState<string>("all");
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   // When voices load, default the filter to pt-BR / pt if available.
-  React.useEffect(() => {
+  useEffect(() => {
     if (!hasLanguageData) return;
     const codes = languageOptions.map((l) => l.code.toLowerCase());
     const preferred = codes.find((c) => c === "pt-br")
@@ -323,7 +323,7 @@ function AssistantDetailPage() {
     }
   }, [hasLanguageData, languageOptions]);
 
-  const filteredVoices = React.useMemo(() => {
+  const filteredVoices = useMemo(() => {
     if (!hasLanguageData || languageFilter === "all") return allVoices;
     return allVoices.filter(
       (v) => (v.languageCode || v.language || "") === languageFilter,
