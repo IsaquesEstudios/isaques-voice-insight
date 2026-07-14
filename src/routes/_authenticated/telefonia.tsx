@@ -894,9 +894,14 @@ function TelefoniaPage() {
                   />
                 ))
               ) : isTwilioConnected && testContacts.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  Nenhum Caller ID verificado. Cadastre um em <b>Console Twilio → Verified Caller IDs</b>.
-                </p>
+                <div className="space-y-2 py-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum Caller ID verificado encontrado na sua conta Twilio.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/80">
+                    Verifique um número em <b>Console → Phone Numbers → Verified Caller IDs</b> e clique em atualizar.
+                  </p>
+                </div>
               ) : (
                 testContacts.map((c) => {
                   const from = rowCallFrom[c.id] ?? numbers[0]?.phone_number ?? "";
