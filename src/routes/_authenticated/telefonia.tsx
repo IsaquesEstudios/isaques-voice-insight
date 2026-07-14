@@ -841,64 +841,156 @@ function TelefoniaPage() {
           </Card>
 
           <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">
-                Rotas ativas (Twilio Trunks)
-              </CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Caller IDs verificados diretamente na sua conta Twilio.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                className="gap-1.5"
+              >
+                <a
+                  href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Plus className="h-4 w-4" /> Verificar na Twilio
+                </a>
+              </Button>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!isTwilioConnected ? (
-                <p className="text-xs text-muted-foreground">
-                  Conecte sua conta Twilio para listar suas Elastic SIP Trunks.
-                </p>
-              ) : twilioTrunksQuery.isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
+              {!isTwilioConnected && (
+                <Alert className="border-warning/30 bg-warning/10">
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  <AlertDescription className="text-xs text-muted-foreground">
+                    Conecte sua conta Twilio para listar seus Caller IDs verificados.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {isTwilioConnected && testContactsQuery.isLoading ? (
+                Array.from({ length: 2 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-16 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+                    className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
                   />
                 ))
-              ) : liveTrunks.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Nenhum trunk encontrado na sua conta Twilio.
+              ) : isTwilioConnected && testContacts.length === 0 ? (
+                <p className="py-6 text-center text-xs text-muted-foreground">
+                  Nenhum Caller ID verificado. Cadastre um em <b>Console Twilio → Verified Caller IDs</b>.
                 </p>
               ) : (
-                liveTrunks.map((r) => {
-                  const load = Math.min(100, r.numbersCount * 10);
+                testContacts.map((c) => {
+                  const from = rowCallFrom[c.id] ?? numbers[0]?.phone_number ?? "";
+                  const assistantId = rowCallAssistant[c.id] ?? "";
                   return (
                     <div
-                      key={r.sid}
-                      className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
+                      key={c.id}
+                      className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">
-                          {r.friendlyName}
-                        </p>
-                        <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                          {r.status}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {r.numbersCount} números vinculados
-                        {r.domainName ? ` • ${r.domainName}` : ""}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
-                          <div
-                            className={cn(
-                              "h-full rounded-full",
-                              load > 85
-                                ? "bg-destructive"
-                                : load > 60
-                                  ? "bg-chart-3"
-                                  : "bg-primary",
-                            )}
-                            style={{ width: `${load}%` }}
-                          />
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {c.label}
+                            </p>
+                            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                              Verificado
+                            </span>
+                          </div>
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {c.phone_e164}
+                          </p>
                         </div>
-                        <span className="text-[11px] font-mono text-muted-foreground">
-                          {load}%
-                        </span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeTestContactMutation.mutate(c.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Número de origem
+                          </Label>
+                          <Select
+                            value={from}
+                            onValueChange={(v) =>
+                              setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
+                            }
+                          >
+                            <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectValue placeholder="Selecione um número" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {numbers.length === 0 ? (
+                                <div className="px-3 py-2 text-xs text-muted-foreground">
+                                  Conecte um número em "Conectar Número".
+                                </div>
+                              ) : (
+                                numbers.map((n) => (
+                                  <SelectItem key={n.phone_number} value={n.phone_number}>
+                                    {n.phone_number}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Assistente
+                          </Label>
+                          <Select
+                            value={assistantId}
+                            onValueChange={(v) =>
+                              setRowCallAssistant((prev) => ({ ...prev, [c.id]: v }))
+                            }
+                          >
+                            <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectValue placeholder="Selecione uma assistente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(assistantsQuery.data ?? []).map((a) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.name ?? "Sem nome"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="w-full gap-1.5 shadow-glow"
+                          disabled={
+                            !isTwilioConnected ||
+                            !from ||
+                            !assistantId ||
+                            callingContactId === c.id
+                          }
+                          onClick={() =>
+                            testCallMutation.mutate({
+                              id: c.id,
+                              phone_e164: c.phone_e164,
+                            })
+                          }
+                        >
+                          {callingContactId === c.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <PhoneCall className="h-3.5 w-3.5" />
+                          )}
+                          Ligar
+                        </Button>
                       </div>
                     </div>
                   );
@@ -909,161 +1001,72 @@ function TelefoniaPage() {
         </div>
 
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <div>
-              <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Cadastre números pessoais e teste uma chamada saindo do seu número Twilio.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setTestContactOpen(true)}
-              className="gap-1.5"
-            >
-              <Plus className="h-4 w-4" /> Novo contato
-            </Button>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">
+              Rotas ativas (Twilio Trunks)
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {!isTwilioConnected && (
-              <Alert className="border-warning/30 bg-warning/10">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Conecte sua conta Twilio para poder disparar chamadas de teste. Em contas
-                  trial, o número de destino também precisa estar verificado em <b>Console
-                  Twilio → Verified Caller IDs</b>.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {testContactsQuery.isLoading ? (
-              Array.from({ length: 2 }).map((_, i) => (
+          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {!isTwilioConnected ? (
+              <p className="text-xs text-muted-foreground">
+                Conecte sua conta Twilio para listar suas Elastic SIP Trunks.
+              </p>
+            ) : twilioTrunksQuery.isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+                  className="h-16 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
                 />
               ))
-            ) : testContacts.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">
-                Nenhum contato de teste ainda. Clique em <b>Novo contato</b> para começar.
+            ) : liveTrunks.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhum trunk encontrado na sua conta Twilio.
               </p>
             ) : (
-              testContacts.map((c) => {
-                const from = rowCallFrom[c.id] ?? numbers[0]?.phone_number ?? "";
-                const assistantId = rowCallAssistant[c.id] ?? "";
+              liveTrunks.map((r) => {
+                const load = Math.min(100, r.numbersCount * 10);
                 return (
                   <div
-                    key={c.id}
-                    className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
+                    key={r.sid}
+                    className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold text-foreground">
-                            {c.label}
-                          </p>
-                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                            Verificado
-                          </span>
-                        </div>
-                        <p className="truncate font-mono text-xs text-muted-foreground">
-                          {c.phone_e164}
-                        </p>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => removeTestContactMutation.mutate(c.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-foreground">
+                        {r.friendlyName}
+                      </p>
+                      <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                        {r.status}
+                      </span>
                     </div>
-
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Número de origem
-                        </Label>
-                        <Select
-                          value={from}
-                          onValueChange={(v) =>
-                            setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
-                          }
-                        >
-                          <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                            <SelectValue placeholder="Selecione um número" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {numbers.length === 0 ? (
-                              <div className="px-3 py-2 text-xs text-muted-foreground">
-                                Conecte um número em "Conectar Número".
-                              </div>
-                            ) : (
-                              numbers.map((n) => (
-                                <SelectItem key={n.phone_number} value={n.phone_number}>
-                                  {n.phone_number}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {r.numbersCount} números vinculados
+                      {r.domainName ? ` • ${r.domainName}` : ""}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
+                        <div
+                          className={cn(
+                            "h-full rounded-full",
+                            load > 85
+                              ? "bg-destructive"
+                              : load > 60
+                                ? "bg-chart-3"
+                                : "bg-primary",
+                          )}
+                          style={{ width: `${load}%` }}
+                        />
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Assistente
-                        </Label>
-                        <Select
-                          value={assistantId}
-                          onValueChange={(v) =>
-                            setRowCallAssistant((prev) => ({ ...prev, [c.id]: v }))
-                          }
-                        >
-                          <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                            <SelectValue placeholder="Selecione uma assistente" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(assistantsQuery.data ?? []).map((a) => (
-                              <SelectItem key={a.id} value={a.id}>
-                                {a.name ?? "Sem nome"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="gap-1.5 shadow-glow"
-                        disabled={
-                          !isTwilioConnected ||
-                          !from ||
-                          !assistantId ||
-                          callingContactId === c.id
-                        }
-                        onClick={() =>
-                          testCallMutation.mutate({
-                            id: c.id,
-                            phone_e164: c.phone_e164,
-                          })
-                        }
-                      >
-                        {callingContactId === c.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <PhoneCall className="h-3.5 w-3.5" />
-                        )}
-                        Ligar
-                      </Button>
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        {load}%
+                      </span>
                     </div>
                   </div>
                 );
               })
             )}
-
-
           </CardContent>
         </Card>
-      </div>
+
 
 
       <Dialog
