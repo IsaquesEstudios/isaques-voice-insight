@@ -102,8 +102,10 @@ import { Switch } from "@/components/ui/switch";
 import {
   getVapiAssistant,
   listVapiAssistants,
+  listVapiVoices,
   saveVapiAssistantConfig,
 } from "@/lib/vapi.functions";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   getModelCost,
