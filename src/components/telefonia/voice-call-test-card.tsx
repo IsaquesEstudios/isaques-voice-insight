@@ -22,13 +22,32 @@ import {
 } from "@/lib/vapi.functions";
 
 interface Props {
-  /** Prefill customer number (verified Twilio caller ID). */
+  defaultLabel?: string;
   defaultCustomerNumber?: string;
-  /** Fix the assistant — when provided, hides the assistant selector. */
-  assistantId?: string;
+  onSuccess?: () => void;
 }
 
-export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props) {
+/** Extract the exact Vapi error message from a thrown Error text. */
+function extractVapiMessage(raw: string): string {
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart >= 0) {
+    try {
+      const parsed = JSON.parse(raw.slice(jsonStart));
+      const msg = parsed?.message;
+      if (Array.isArray(msg)) return msg.join(", ");
+      if (typeof msg === "string" && msg.trim()) return msg;
+    } catch {
+      // fallthrough
+    }
+  }
+  return raw || "Falha desconhecida";
+}
+
+export function VoiceCallTestCard({
+  defaultLabel,
+  defaultCustomerNumber,
+  onSuccess,
+}: Props) {
   const listAssistantsFn = useServerFn(listVapiAssistants);
   const listVapiPhoneNumbersFn = useServerFn(listVapiPhoneNumbers);
   const outboundCallFn = useServerFn(createOutboundTestCall);
@@ -36,7 +55,6 @@ export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props)
   const assistantsQuery = useQuery({
     queryKey: ["vapi-assistants"],
     queryFn: () => listAssistantsFn(),
-    enabled: !assistantId,
   });
   const phonesQuery = useQuery({
     queryKey: ["vapi-phone-numbers"],
@@ -48,11 +66,10 @@ export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props)
     [phonesQuery.data],
   );
 
-  const [selectedAssistant, setSelectedAssistant] = useState<string>(assistantId ?? "");
-  const [selectedPhoneId, setSelectedPhoneId] = useState<string>("");
-  const [customerNumber, setCustomerNumber] = useState<string>(
-    defaultCustomerNumber ?? "",
-  );
+  const [label, setLabel] = useState(defaultLabel ?? "");
+  const [customerNumber, setCustomerNumber] = useState(defaultCustomerNumber ?? "");
+  const [selectedAssistant, setSelectedAssistant] = useState("");
+  const [selectedPhoneId, setSelectedPhoneId] = useState("");
 
   const callMutation = useMutation({
     mutationFn: (input: {
@@ -61,57 +78,34 @@ export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props)
       customerNumber: string;
     }) => outboundCallFn({ data: input }),
     onSuccess: () => {
-      toast.info(
-        "Chamada iniciada! Atenda o seu celular. Como você está usando uma conta de teste da Twilio, você ouvirá uma gravação em inglês. Pressione QUALQUER TECLA do teclado do seu celular para liberar a linha e falar com a IA.",
-        { duration: Infinity, closeButton: true },
-      );
+      toast.success("Ligação disparada! Atenda o celular.");
+      onSuccess?.();
     },
     onError: (err: unknown) => {
       const raw = err instanceof Error ? err.message : String(err ?? "");
-      const lower = raw.toLowerCase();
-      let msg = raw || "Falha ao iniciar a chamada.";
-      if (
-        lower.includes("unauthorized") ||
-        lower.includes("api key") ||
-        lower.includes("authentication") ||
-        lower.includes("401") ||
-        lower.includes("403")
-      ) {
-        msg = "Falha de autenticação com a Vapi. Verifique a chave VAPI_PRIVATE_KEY.";
-      } else if (
-        lower.includes("e.164") ||
-        lower.includes("invalid") ||
-        lower.includes("number")
-      ) {
-        msg =
-          "Número inválido. Digite no formato internacional com código do país (ex: +5511999998888).";
-      }
-      toast.error(msg);
+      const message = extractVapiMessage(raw);
+      toast.error(`Erro na Vapi: ${message}`);
     },
   });
 
-  const effectiveAssistantId = assistantId ?? selectedAssistant;
+  const cleanedNumber = customerNumber.replace(/[\s-]/g, "");
   const canCall =
-    !!effectiveAssistantId &&
+    !!label.trim() &&
+    !!selectedAssistant &&
     !!selectedPhoneId &&
-    /^\+[1-9]\d{6,14}$/.test(customerNumber.replace(/[\s-]/g, ""));
+    /^\+[1-9]\d{6,14}$/.test(cleanedNumber);
 
   const handleCall = () => {
-    if (!effectiveAssistantId) {
-      toast.error("Selecione uma atendente.");
-      return;
-    }
-    const cleaned = customerNumber.replace(/[\s-]/g, "");
-    if (!/^\+[1-9]\d{6,14}$/.test(cleaned)) {
+    if (!/^\+[1-9]\d{6,14}$/.test(cleanedNumber)) {
       toast.error(
-        "Digite o número no formato internacional com código do país (ex: +5511999998888).",
+        "Erro na Vapi: Digite o número no formato internacional com código do país (ex: +5511999998888).",
       );
       return;
     }
     callMutation.mutate({
-      assistantId: effectiveAssistantId,
+      assistantId: selectedAssistant,
       phoneNumberId: selectedPhoneId,
-      customerNumber: cleaned,
+      customerNumber: cleanedNumber,
     });
   };
 
@@ -124,27 +118,47 @@ export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {!assistantId ? (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Atendente</Label>
-            <Select value={selectedAssistant} onValueChange={setSelectedAssistant}>
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    assistantsQuery.isLoading ? "Carregando..." : "Selecione a atendente"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {(assistantsQuery.data ?? []).map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name ?? "Sem nome"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Identificação</Label>
+          <Input
+            placeholder="Ex: Meu celular"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Número de Destino</Label>
+          <Input
+            placeholder="+5511999999999"
+            value={customerNumber}
+            onChange={(e) => setCustomerNumber(e.target.value)}
+            inputMode="tel"
+            autoComplete="tel"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Atendente</Label>
+          <Select value={selectedAssistant} onValueChange={setSelectedAssistant}>
+            <SelectTrigger>
+              <SelectValue
+                placeholder={
+                  assistantsQuery.isLoading
+                    ? "Carregando..."
+                    : "Selecione a atendente"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {(assistantsQuery.data ?? []).map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name ?? "Sem nome"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs">Número de Origem</Label>
@@ -171,20 +185,6 @@ export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props)
           </Select>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Seu celular (E.164)</Label>
-          <Input
-            placeholder="+5511999998888"
-            value={customerNumber}
-            onChange={(e) => setCustomerNumber(e.target.value)}
-            inputMode="tel"
-            autoComplete="tel"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Use o número já verificado na Twilio como Verified Caller ID.
-          </p>
-        </div>
-
         <Button
           type="button"
           className="w-full"
@@ -194,12 +194,12 @@ export function VoiceCallTestCard({ defaultCustomerNumber, assistantId }: Props)
           {callMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Ligando...
+              Disparando...
             </>
           ) : (
             <>
               <PhoneCall className="mr-2 h-4 w-4" />
-              Me Ligar Agora
+              Disparar Ligação de Teste
             </>
           )}
         </Button>
