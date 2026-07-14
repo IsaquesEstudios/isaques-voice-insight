@@ -611,7 +611,7 @@ function AssistantDetailPage() {
 
   // Vozes estáticas como fallback quando a API da Vapi não retorna nada
   // (ex.: ElevenLabs BYOK não expõe a biblioteca pública).
-  const staticVoices = useMemo(() => {
+  const staticVoices = useMemo<VapiVoiceOption[]>(() => {
     const hardcoded = VOICES_BY_PROVIDER[form.voiceProvider] ?? [];
     if (hardcoded.length === 0) return [];
     return hardcoded.map((v) => ({
@@ -619,6 +619,10 @@ function AssistantDetailPage() {
       name: v.label.split(" — ")[0],
       languageCode: form.voiceProvider === "11labs" ? "pt-br" : undefined,
       language: form.voiceProvider === "11labs" ? "Portuguese (Brazil)" : undefined,
+      gender: undefined,
+      accent: undefined,
+      previewUrl: undefined,
+      description: undefined,
     }));
   }, [form.voiceProvider]);
 
