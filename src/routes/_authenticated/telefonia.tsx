@@ -320,6 +320,98 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
   });
 
+  // Reset verification state whenever the modal closes.
+  const resetVerification = () => {
+    setVerifyStep("form");
+    setVerifyState(null);
+    setVerifyStarting(false);
+    setVerifyExpired(false);
+  };
+
+  const startVerification = async () => {
+    const label = testContactForm.label.trim();
+    const phone = testContactForm.phoneE164.trim();
+    if (!label) return toast.error("Informe uma identificação.");
+    if (!/^\+[1-9]\d{7,14}$/.test(phone))
+      return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
+
+    setVerifyStarting(true);
+    setVerifyExpired(false);
+    try {
+      const res = await startCallerIdVerificationFn({
+        data: { phoneE164: phone, friendlyName: label },
+      });
+      if (!res.ok) {
+        const reason =
+          res.reason === "no_credentials"
+            ? "Conecte sua conta Twilio primeiro."
+            : `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`;
+        toast.error(reason);
+        return;
+      }
+      setVerifyState({
+        validationCode: res.validationCode,
+        phoneE164: phone,
+        label,
+        startedAt: Date.now(),
+      });
+      setVerifyStep("waiting");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação");
+    } finally {
+      setVerifyStarting(false);
+    }
+  };
+
+  // Polling: enquanto o modal está em "waiting", consulta a lista de Verified
+  // Caller IDs a cada 3s. Assim que o número aparecer, salvamos o contato.
+  useEffect(() => {
+    if (verifyStep !== "waiting" || !verifyState) return;
+    let cancelled = false;
+    const TIMEOUT_MS = 2 * 60 * 1000;
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (Date.now() - verifyState.startedAt > TIMEOUT_MS) {
+        setVerifyExpired(true);
+        return;
+      }
+      try {
+        const list = await listVerifiedCallerIdsFn();
+        const found = (list ?? []).some(
+          (r: { phone_number: string }) => r.phone_number === verifyState.phoneE164,
+        );
+        if (found && !cancelled) {
+          try {
+            await saveTestContactFn({
+              data: { label: verifyState.label, phoneE164: verifyState.phoneE164 },
+            });
+            toast.success("Número verificado e salvo!");
+            await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+            setTestContactOpen(false);
+            setTestContactForm({ label: "", phoneE164: "" });
+            resetVerification();
+          } catch (err) {
+            toast.error(
+              err instanceof Error ? err.message : "Falha ao salvar contato após verificação",
+            );
+          }
+          return;
+        }
+      } catch {
+        // silêncio: tentaremos novamente no próximo tick
+      }
+      if (!cancelled) setTimeout(tick, 3000);
+    };
+    const t = setTimeout(tick, 2000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [verifyStep, verifyState, listVerifiedCallerIdsFn, saveTestContactFn, queryClient]);
+
+
+
   const testCallMutation = useMutation({
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
