@@ -914,3 +914,113 @@ export const makeTestCall = createServerFn({ method: "POST" })
       throw err;
     }
   });
+
+// ---------- search & purchase Twilio numbers ----------
+
+export const searchAvailableTwilioNumbers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        countryCode: z.string().length(2).default("US"),
+        areaCode: z.string().optional(),
+        contains: z.string().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) return { ok: false as const, reason: "no_credentials" as const };
+    const q: Record<string, string> = {
+      PageSize: "20",
+      VoiceEnabled: "true",
+    };
+    if (data.areaCode) q.AreaCode = data.areaCode;
+    if (data.contains) q.Contains = data.contains;
+    try {
+      const json = (await twilioAccountGet(
+        creds,
+        `/AvailablePhoneNumbers/${data.countryCode}/Local.json`,
+        q,
+      )) as {
+        available_phone_numbers?: Array<{
+          phone_number: string;
+          friendly_name?: string;
+          locality?: string;
+          region?: string;
+          iso_country?: string;
+          capabilities?: { voice?: boolean; SMS?: boolean; MMS?: boolean };
+        }>;
+      };
+      const rows = json.available_phone_numbers ?? [];
+      return {
+        ok: true as const,
+        numbers: rows.map((r) => ({
+          phoneNumber: r.phone_number,
+          friendlyName: r.friendly_name ?? r.phone_number,
+          locality: r.locality ?? null,
+          region: r.region ?? null,
+          country: r.iso_country ?? data.countryCode,
+          voice: !!r.capabilities?.voice,
+          sms: !!r.capabilities?.SMS,
+        })),
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, reason: "twilio_error" as const, message: msg };
+    }
+  });
+
+export const purchaseTwilioNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        phoneNumber: z.string().regex(/^\+[1-9]\d{6,14}$/),
+        friendlyName: z.string().max(64).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const creds = await loadCreds(context);
+    if (!creds) throw new Error("Conecte sua conta Twilio antes de comprar um número.");
+    try {
+      const form: Record<string, string> = { PhoneNumber: data.phoneNumber };
+      if (data.friendlyName) form.FriendlyName = data.friendlyName;
+      const json = (await twilioAccountPost(
+        creds,
+        "/IncomingPhoneNumbers.json",
+        form,
+      )) as { sid: string; phone_number: string; friendly_name?: string };
+      return {
+        ok: true as const,
+        sid: json.sid,
+        phoneNumber: json.phone_number,
+        friendlyName: json.friendly_name ?? null,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Trial account can't buy numbers
+      if (msg.includes('"code":21452') || msg.includes("not available")) {
+        return {
+          ok: false as const,
+          reason: "unavailable" as const,
+          message: "Este número não está mais disponível. Faça uma nova busca.",
+        };
+      }
+      if (
+        msg.includes('"code":20003') ||
+        msg.includes('"code":20429') ||
+        msg.includes("trial") ||
+        msg.includes("upgrade")
+      ) {
+        return {
+          ok: false as const,
+          reason: "trial_limit" as const,
+          message:
+            "Sua conta Twilio é trial e não pode comprar números adicionais. Faça upgrade em console.twilio.com ou reutilize o número trial já emitido.",
+        };
+      }
+      throw err;
+    }
+  });

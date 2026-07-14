@@ -74,8 +74,10 @@ import {
   listTwilioNumbers,
   listTwilioTrunks,
   listVerifiedCallerIds,
+  purchaseTwilioNumber,
   releaseNumber,
   saveTwilioCredentials,
+  searchAvailableTwilioNumbers,
   sendVerifyOtp,
 } from "@/lib/twilio.functions";
 
@@ -271,7 +273,7 @@ function TelefoniaPage() {
 
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"twilio" | "sip">("twilio");
+  const [tab, setTab] = useState<"twilio" | "buy" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
@@ -455,11 +457,85 @@ function TelefoniaPage() {
     return `sip:${slug}@sip.vapi.ai`;
   }, [userQuery.data]);
 
+  // ---- Comprar número Twilio ----
+  const searchTwilioFn = useServerFn(searchAvailableTwilioNumbers);
+  const purchaseTwilioFn = useServerFn(purchaseTwilioNumber);
+  const [buyForm, setBuyForm] = useState({
+    countryCode: "US",
+    areaCode: "",
+    contains: "",
+  });
+  const [buyResults, setBuyResults] = useState<
+    Array<{
+      phoneNumber: string;
+      friendlyName: string;
+      locality: string | null;
+      region: string | null;
+      country: string;
+      voice: boolean;
+      sms: boolean;
+    }>
+  >([]);
+  const [buySearching, setBuySearching] = useState(false);
+  const [buyingNumber, setBuyingNumber] = useState<string | null>(null);
+
+  const handleSearchTwilio = async () => {
+    setBuySearching(true);
+    try {
+      const res = await searchTwilioFn({
+        data: {
+          countryCode: (buyForm.countryCode || "US").toUpperCase(),
+          areaCode: buyForm.areaCode.trim() || undefined,
+          contains: buyForm.contains.trim() || undefined,
+        },
+      });
+      if (!res.ok) {
+        if (res.reason === "no_credentials") {
+          toast.error("Conecte sua conta Twilio primeiro.");
+          setTab("twilio");
+        } else {
+          toast.error(res.message ?? "Falha ao buscar números na Twilio.");
+        }
+        setBuyResults([]);
+        return;
+      }
+      setBuyResults(res.numbers);
+      if (res.numbers.length === 0) {
+        toast.info("Nenhum número encontrado. Ajuste país / DDD / contém e tente novamente.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na busca.");
+    } finally {
+      setBuySearching(false);
+    }
+  };
+
+  const handleBuyTwilio = async (phoneNumber: string) => {
+    setBuyingNumber(phoneNumber);
+    try {
+      const res = await purchaseTwilioFn({ data: { phoneNumber } });
+      if (!("ok" in res) || !res.ok) {
+        toast.error(res.message ?? "Não foi possível comprar este número.");
+        return;
+      }
+      toast.success(`Número ${res.phoneNumber} adquirido na Twilio!`);
+      setBuyResults((prev) => prev.filter((n) => n.phoneNumber !== phoneNumber));
+      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao comprar número.");
+    } finally {
+      setBuyingNumber(null);
+    }
+  };
+
   const resetModal = () => {
     setTab("twilio");
     setTwilioForm({ accountSid: "", authToken: "" });
     setSipForm({ routeName: "" });
     setCopied(false);
+    setBuyResults([]);
+    setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
   };
 
   const handleCopySip = async () => {
@@ -941,7 +1017,20 @@ function TelefoniaPage() {
                           <Alert className="border-warning/30 bg-warning/10 py-2">
                             <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                             <AlertDescription className="text-[11px] text-muted-foreground">
-                              Nenhum número conectado à Vapi. Vá em "Conectar Número" para poder disparar testes.
+                              Nenhum número Twilio disponível.{" "}
+                              <button
+                                type="button"
+                                className="underline underline-offset-2 hover:text-foreground"
+                                onClick={() => {
+                                  setTab(isTwilioConnected ? "buy" : "twilio");
+                                  setOpen(true);
+                                }}
+                              >
+                                {isTwilioConnected
+                                  ? "Comprar número na Twilio"
+                                  : "Conectar Twilio"}
+                              </button>{" "}
+                              para poder disparar testes.
                             </AlertDescription>
                           </Alert>
                         ) : (
@@ -1218,11 +1307,105 @@ function TelefoniaPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "twilio" | "sip")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="twilio">Twilio</TabsTrigger>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "twilio" | "buy" | "sip")}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="twilio">Credenciais</TabsTrigger>
+              <TabsTrigger value="buy" disabled={!isTwilioConnected}>
+                Comprar número
+              </TabsTrigger>
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="buy" className="mt-4 space-y-4">
+              <Alert className="border-primary/30 bg-primary/10 text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Pesquise e compre um número na sua conta Twilio. Contas trial só podem
+                  usar o número gratuito emitido no cadastro — para adquirir novos,
+                  faça upgrade da conta Twilio.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="grid gap-1">
+                  <Label className="text-[11px] text-muted-foreground">País (ISO-2)</Label>
+                  <Input
+                    value={buyForm.countryCode}
+                    maxLength={2}
+                    onChange={(e) =>
+                      setBuyForm({ ...buyForm, countryCode: e.target.value.toUpperCase() })
+                    }
+                    placeholder="US"
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-[11px] text-muted-foreground">DDD / Area code</Label>
+                  <Input
+                    value={buyForm.areaCode}
+                    onChange={(e) => setBuyForm({ ...buyForm, areaCode: e.target.value })}
+                    placeholder="415"
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-[11px] text-muted-foreground">Contém dígitos</Label>
+                  <Input
+                    value={buyForm.contains}
+                    onChange={(e) => setBuyForm({ ...buyForm, contains: e.target.value })}
+                    placeholder="7777"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleSearchTwilio}
+                  disabled={buySearching}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {buySearching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Signal className="h-4 w-4" />
+                  )}
+                  Pesquisar
+                </Button>
+              </div>
+
+              {buyResults.length > 0 && (
+                <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-white/[0.08] bg-background/40 p-2">
+                  {buyResults.map((n) => (
+                    <div
+                      key={n.phoneNumber}
+                      className="flex items-center justify-between gap-3 rounded-md border border-white/[0.06] bg-card/40 p-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm">{n.phoneNumber}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {[n.locality, n.region, n.country].filter(Boolean).join(" · ") || "—"}
+                          {n.voice ? " · Voz" : ""}
+                          {n.sms ? " · SMS" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleBuyTwilio(n.phoneNumber)}
+                        disabled={buyingNumber !== null}
+                        className="gap-1.5"
+                      >
+                        {buyingNumber === n.phoneNumber ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                        Comprar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
 
             <TabsContent value="twilio" className="mt-4 space-y-4">
               <Alert className="border-primary/30 bg-primary/10 text-foreground">
