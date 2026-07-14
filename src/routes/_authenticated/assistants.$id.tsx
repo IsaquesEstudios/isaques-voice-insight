@@ -939,6 +939,255 @@ function AssistantDetailPage() {
                     </div>
                   </div>
 
+                  {/* Ajuste fino de áudio ---------------------------------- */}
+                  <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Ajuste fino de áudio</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Controles avançados de qualidade e naturalidade da fala. Deixe em branco para usar o padrão da Vapi.
+                      </p>
+                    </div>
+
+                    <Accordion type="multiple" className="w-full">
+                      {/* --- Parâmetros do provedor de voz --- */}
+                      <AccordionItem value="voice-params" className="border-white/[0.06]">
+                        <AccordionTrigger className="text-sm">Parâmetros do provedor</AccordionTrigger>
+                        <AccordionContent className="space-y-4 pt-2">
+                          {form.voiceProvider === "11labs" && (
+                            <>
+                              <div className="space-y-2">
+                                <Label>Modelo (ElevenLabs)</Label>
+                                <Select
+                                  value={form.voiceModel || "default"}
+                                  onValueChange={(v) =>
+                                    setForm((f) => ({ ...f, voiceModel: v === "default" ? "" : v }))
+                                  }
+                                  disabled={isLoading}
+                                >
+                                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                    <SelectItem value="default">Padrão da Vapi</SelectItem>
+                                    <SelectItem value="eleven_multilingual_v2">
+                                      eleven_multilingual_v2 (melhor para PT-BR)
+                                    </SelectItem>
+                                    <SelectItem value="eleven_turbo_v2_5">
+                                      eleven_turbo_v2_5 (mais rápido, multilíngue)
+                                    </SelectItem>
+                                    <SelectItem value="eleven_flash_v2_5">
+                                      eleven_flash_v2_5 (menor latência)
+                                    </SelectItem>
+                                    <SelectItem value="eleven_monolingual_v1">
+                                      eleven_monolingual_v1 (só inglês)
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Para melhor sotaque brasileiro, use <code>eleven_multilingual_v2</code>.
+                                </p>
+                              </div>
+
+                              <SliderField
+                                label="Estabilidade"
+                                hint="Menor = mais expressivo/emocional. Maior = monotônico e consistente."
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                value={form.voiceStability}
+                                onChange={(v) => setForm((f) => ({ ...f, voiceStability: v }))}
+                                disabled={isLoading}
+                              />
+                              <SliderField
+                                label="Similarity boost"
+                                hint="Aproxima do timbre original da voz. Alto demais causa artefatos."
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                value={form.voiceSimilarityBoost}
+                                onChange={(v) => setForm((f) => ({ ...f, voiceSimilarityBoost: v }))}
+                                disabled={isLoading}
+                              />
+                              <SliderField
+                                label="Style exaggeration"
+                                hint="Reforça o estilo da voz. 0 é mais neutro/rápido."
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                value={form.voiceStyle}
+                                onChange={(v) => setForm((f) => ({ ...f, voiceStyle: v }))}
+                                disabled={isLoading}
+                              />
+                              <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                                <div className="text-xs">
+                                  <p className="font-medium text-foreground">Speaker boost</p>
+                                  <p className="text-muted-foreground">Aumenta a similaridade com o falante original.</p>
+                                </div>
+                                <Switch
+                                  checked={form.voiceUseSpeakerBoost}
+                                  onCheckedChange={(c) => setForm((f) => ({ ...f, voiceUseSpeakerBoost: c }))}
+                                  disabled={isLoading}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {(form.voiceProvider === "cartesia" || form.voiceProvider === "playht") && (
+                            <div className="space-y-2">
+                              <Label>Emoção</Label>
+                              <Input
+                                value={form.voiceEmotion}
+                                onChange={(e) => setForm((f) => ({ ...f, voiceEmotion: e.target.value }))}
+                                placeholder="ex.: happiness:high, sadness:low"
+                                className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                                disabled={isLoading}
+                              />
+                              <p className="text-[11px] text-muted-foreground">
+                                Consulte a documentação do provedor para os rótulos aceitos.
+                              </p>
+                            </div>
+                          )}
+
+                          {form.voiceProvider === "playht" && (
+                            <SliderField
+                              label="Temperature"
+                              hint="Aleatoriedade da fala. 0 = determinístico."
+                              min={0}
+                              max={2}
+                              step={0.05}
+                              value={form.voiceTemperature}
+                              onChange={(v) => setForm((f) => ({ ...f, voiceTemperature: v }))}
+                              disabled={isLoading}
+                            />
+                          )}
+
+                          {/* Velocidade — válido para maioria dos providers */}
+                          <SliderField
+                            label="Velocidade"
+                            hint="1.0 = ritmo natural. <1 mais devagar, >1 mais rápido."
+                            min={0.5}
+                            max={2}
+                            step={0.05}
+                            value={form.voiceSpeed}
+                            onChange={(v) => setForm((f) => ({ ...f, voiceSpeed: v }))}
+                            disabled={isLoading}
+                          />
+
+                          <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                            <div className="text-xs">
+                              <p className="font-medium text-foreground">Injeção de fillers</p>
+                              <p className="text-muted-foreground">Adiciona "hmm", "então" etc. para soar mais humano.</p>
+                            </div>
+                            <Switch
+                              checked={form.voiceFillerInjectionEnabled}
+                              onCheckedChange={(c) => setForm((f) => ({ ...f, voiceFillerInjectionEnabled: c }))}
+                              disabled={isLoading}
+                            />
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* --- Turno de fala --- */}
+                      <AccordionItem value="turn-taking" className="border-white/[0.06]">
+                        <AccordionTrigger className="text-sm">Turno de fala (start / stop)</AccordionTrigger>
+                        <AccordionContent className="space-y-4 pt-2">
+                          <SliderField
+                            label="Wait seconds (start)"
+                            hint="Tempo de silêncio do usuário antes da IA começar a falar."
+                            min={0}
+                            max={3}
+                            step={0.1}
+                            value={form.startWaitSeconds}
+                            onChange={(v) => setForm((f) => ({ ...f, startWaitSeconds: v }))}
+                            disabled={isLoading}
+                          />
+                          <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                            <div className="text-xs">
+                              <p className="font-medium text-foreground">Smart endpointing</p>
+                              <p className="text-muted-foreground">Detecta fim de frase por semântica (LLM) — reduz interrupções.</p>
+                            </div>
+                            <Switch
+                              checked={form.smartEndpointingEnabled}
+                              onCheckedChange={(c) => setForm((f) => ({ ...f, smartEndpointingEnabled: c }))}
+                              disabled={isLoading}
+                            />
+                          </div>
+                          <SliderField
+                            label="Num words (stop)"
+                            hint="Quantas palavras o usuário precisa dizer para a IA parar. 0 = mais sensível."
+                            min={0}
+                            max={10}
+                            step={1}
+                            value={form.stopNumWords}
+                            onChange={(v) => setForm((f) => ({ ...f, stopNumWords: v }))}
+                            disabled={isLoading}
+                          />
+                          <SliderField
+                            label="Voice seconds (stop)"
+                            hint="Duração mínima de voz do usuário para interromper a IA."
+                            min={0}
+                            max={2}
+                            step={0.05}
+                            value={form.stopVoiceSeconds}
+                            onChange={(v) => setForm((f) => ({ ...f, stopVoiceSeconds: v }))}
+                            disabled={isLoading}
+                          />
+                          <SliderField
+                            label="Backoff seconds (stop)"
+                            hint="Tempo que a IA espera antes de retomar após ser interrompida."
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={form.stopBackoffSeconds}
+                            onChange={(v) => setForm((f) => ({ ...f, stopBackoffSeconds: v }))}
+                            disabled={isLoading}
+                          />
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* --- Ambiente sonoro --- */}
+                      <AccordionItem value="ambient" className="border-white/[0.06]">
+                        <AccordionTrigger className="text-sm">Ambiente sonoro</AccordionTrigger>
+                        <AccordionContent className="space-y-4 pt-2">
+                          <div className="space-y-2">
+                            <Label>Ruído de fundo</Label>
+                            <Select
+                              value={form.backgroundSound}
+                              onValueChange={(v) =>
+                                setForm((f) => ({ ...f, backgroundSound: v as "off" | "office" }))
+                              }
+                              disabled={isLoading}
+                            >
+                              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                <SelectItem value="off">Silêncio (off)</SelectItem>
+                                <SelectItem value="office">Escritório (office)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[11px] text-muted-foreground">
+                              Um leve ambiente ajuda a "esconder" a natureza sintética da voz em ligações.
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                            <div className="text-xs">
+                              <p className="font-medium text-foreground">Denoising do usuário</p>
+                              <p className="text-muted-foreground">Remove ruído do áudio recebido — melhora transcrição.</p>
+                            </div>
+                            <Switch
+                              checked={form.backgroundDenoisingEnabled}
+                              onCheckedChange={(c) => setForm((f) => ({ ...f, backgroundDenoisingEnabled: c }))}
+                              disabled={isLoading}
+                            />
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+
+
+
                 </CardContent>
               </Card>
             </div>
