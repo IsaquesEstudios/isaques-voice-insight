@@ -104,6 +104,7 @@ import {
   listVapiAssistants,
   listVapiVoices,
   saveVapiAssistantConfig,
+  type VapiVoiceOption,
 } from "@/lib/vapi.functions";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
