@@ -36,6 +36,91 @@ interface Props {
 
 type VapiConstructor = new (publicKey: string) => Vapi;
 
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+
+  const err = error as {
+    error?: { message?: string; msg?: string } | string;
+    message?: string;
+    errorMsg?: string;
+  };
+
+  if (typeof err?.error === "string") return err.error;
+
+  const message = err?.error?.message || err?.error?.msg || err?.errorMsg || err?.message;
+  if (message) return message;
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Erro desconhecido.";
+  }
+}
+
+function formatCallError(error: unknown): string {
+  const technicalDetail = extractErrorMessage(error);
+  const normalized = technicalDetail.toLowerCase();
+
+  if (normalized.includes("class extends value") || normalized.includes("is not a constructor")) {
+    return [
+      "Problema: o SDK de chamadas da Vapi não carregou corretamente no navegador.",
+      "Causa provável: conflito no pacote de eventos usado pelo SDK durante o carregamento do app.",
+      "Como resolver: atualize a página e tente novamente; se continuar, é um problema técnico da integração, não da configuração da assistente.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
+  if (
+    normalized.includes("permission") ||
+    normalized.includes("microphone") ||
+    normalized.includes("notallowederror") ||
+    normalized.includes("permission denied")
+  ) {
+    return [
+      "Problema: o navegador bloqueou o acesso ao microfone.",
+      "Causa provável: a permissão de microfone foi negada ou ainda não foi concedida para este site.",
+      "Como resolver: libere o microfone no navegador e inicie a ligação novamente.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
+  if (
+    normalized.includes("public key") ||
+    normalized.includes("api key") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("invalid key")
+  ) {
+    return [
+      "Problema: a chave pública da Vapi está ausente, incorreta ou pertence a outra conta.",
+      "Causa provável: VAPI_PUBLIC_KEY não é a Public Key da mesma conta onde essa assistente foi criada.",
+      "Como resolver: confira a secret VAPI_PUBLIC_KEY e nunca use a Private Key nesse campo.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
+  if (normalized.includes("assistant") && (normalized.includes("not found") || normalized.includes("404"))) {
+    return [
+      "Problema: a assistente não foi encontrada na conta Vapi usada pela chave pública.",
+      "Causa provável: o ID da assistente pertence a outra conta ou ela foi removida.",
+      "Como resolver: confirme se a assistente e a VAPI_PUBLIC_KEY são da mesma conta Vapi.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
+  return [
+    "Problema: a ligação de teste não pôde ser iniciada.",
+    "Causa provável: alguma configuração obrigatória da assistente falhou ou a Vapi recusou a chamada.",
+    "Como resolver: confira se a assistente tem modelo, voz e transcrição configurados e tente novamente.",
+    `Detalhe técnico: ${technicalDetail}`,
+  ].join("\n");
+}
+
+function showCallError(message: string) {
+  toast.error("Erro na chamada", {
+    description: message.split("\n").slice(0, 3).join("\n"),
+  });
+}
+
 async function loadVapiConstructor(): Promise<VapiConstructor> {
   const mod = await import("@vapi-ai/web");
   const maybeDefault = mod.default as unknown;
@@ -99,11 +184,11 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     try {
       // Permission ping — clearer error than Vapi's generic failure
       await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
+    } catch (e) {
       setStatus("error");
-      setErrorMsg(
-        "Permita o acesso ao microfone no navegador para iniciar a ligação.",
-      );
+      const msg = formatCallError(e);
+      setErrorMsg(msg);
+      showCallError(msg);
       return;
     }
 
@@ -143,25 +228,19 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       });
       vapi.on("call-start-failed", (event) => {
         console.error("[vapi] call-start-failed", event);
-        const msg = event?.error || "Falha ao iniciar chamada.";
+        const msg = formatCallError(event?.error || event || "Falha ao iniciar chamada.");
         setStatus("error");
         setErrorMsg(msg);
-        toast.error(msg);
+        showCallError(msg);
       });
       vapi.on("speech-start", () => setSpeaker("assistant"));
       vapi.on("speech-end", () => setSpeaker(null));
       vapi.on("error", (e: unknown) => {
         console.error("[vapi] error event", e);
-        const err = e as { error?: { message?: string; msg?: string }; message?: string; errorMsg?: string };
-        const msg =
-          err?.error?.message ||
-          err?.error?.msg ||
-          err?.errorMsg ||
-          err?.message ||
-          (typeof e === "string" ? e : JSON.stringify(e));
+        const msg = formatCallError(e);
         setStatus("error");
-        setErrorMsg(msg || "Erro na chamada.");
-        toast.error(msg || "Erro na chamada.");
+        setErrorMsg(msg);
+        showCallError(msg);
       });
       vapi.on("message", (message: {
         type?: string;
@@ -194,11 +273,10 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     } catch (e) {
       window.clearTimeout(timeout);
       console.error("[vapi] start threw", e);
-      const err = e as { message?: string; error?: { message?: string } };
-      const msg = err?.error?.message || err?.message || "Falha ao iniciar chamada.";
+      const msg = formatCallError(e);
       setStatus("error");
       setErrorMsg(msg);
-      toast.error(msg);
+      showCallError(msg);
     }
   }
 
@@ -285,7 +363,9 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               {errorMsg && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">{errorMsg}</AlertDescription>
+                  <AlertDescription className="whitespace-pre-line text-xs leading-relaxed">
+                    {errorMsg}
+                  </AlertDescription>
                 </Alert>
               )}
 
