@@ -1146,7 +1146,7 @@ function AssistantDetailPage() {
                           </p>
                         ) : voicesQuery.isLoading ? (
                           <Skeleton className="h-10 w-full" />
-                        ) : voicesQuery.isError ? (
+                        ) : voicesQuery.isError && staticVoices.length === 0 ? (
                           <>
                             <Input
                               value={form.voiceId}
