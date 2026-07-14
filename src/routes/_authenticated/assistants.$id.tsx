@@ -861,7 +861,13 @@ function AssistantDetailPage() {
                           onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
                           disabled={isLoading}
                         >
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                          <SelectTrigger
+                            className={`bg-background/40 backdrop-blur-xl ${
+                              compatModelBad
+                                ? "border-destructive ring-1 ring-destructive"
+                                : "border-white/[0.08]"
+                            }`}
+                          >
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
@@ -876,10 +882,14 @@ function AssistantDetailPage() {
                               )}
                           </SelectContent>
                         </Select>
+                        {compatModelBad && !compat.ok && (
+                          <p className="text-xs text-destructive">{compat.message}</p>
+                        )}
                         <CostHint
                           costPerMin={getModelCost(form.modelProvider, form.model)}
                           tooltip="Custo estimado do LLM por minuto de conversa."
                         />
+
                       </div>
                     </div>
                   </div>
