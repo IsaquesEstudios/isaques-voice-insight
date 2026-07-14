@@ -641,7 +641,28 @@ function AssistantDetailPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Voz / Voice ID</Label>
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>Voz / Voice ID</Label>
+                          {hasLanguageData && languageOptions.length > 1 && (
+                            <Select
+                              value={languageFilter}
+                              onValueChange={setLanguageFilter}
+                              disabled={isLoading}
+                            >
+                              <SelectTrigger className="h-7 w-auto min-w-[9rem] border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <SelectValue placeholder="Idioma" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72 border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                <SelectItem value="all">Todos os idiomas</SelectItem>
+                                {languageOptions.map((l) => (
+                                  <SelectItem key={l.code} value={l.code}>
+                                    {l.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
                         {!form.voiceProvider ? (
                           <p className="text-xs text-muted-foreground">
                             Selecione um provedor primeiro.
