@@ -214,6 +214,25 @@ interface FormState {
   voiceProvider: string;
   voiceId: string;
   status: "Ativo" | "Rascunho";
+  // Voice tuning
+  voiceModel: string;
+  voiceStability: number | null;
+  voiceSimilarityBoost: number | null;
+  voiceStyle: number | null;
+  voiceUseSpeakerBoost: boolean;
+  voiceSpeed: number | null;
+  voiceEmotion: string;
+  voiceTemperature: number | null;
+  voiceFillerInjectionEnabled: boolean;
+  // Speaking plans
+  startWaitSeconds: number | null;
+  smartEndpointingEnabled: boolean;
+  stopNumWords: number | null;
+  stopVoiceSeconds: number | null;
+  stopBackoffSeconds: number | null;
+  // Background
+  backgroundSound: "off" | "office";
+  backgroundDenoisingEnabled: boolean;
 }
 
 const empty: FormState = {
@@ -225,7 +244,24 @@ const empty: FormState = {
   voiceProvider: "",
   voiceId: "",
   status: "Rascunho",
+  voiceModel: "",
+  voiceStability: null,
+  voiceSimilarityBoost: null,
+  voiceStyle: null,
+  voiceUseSpeakerBoost: false,
+  voiceSpeed: null,
+  voiceEmotion: "",
+  voiceTemperature: null,
+  voiceFillerInjectionEnabled: false,
+  startWaitSeconds: null,
+  smartEndpointingEnabled: false,
+  stopNumWords: null,
+  stopVoiceSeconds: null,
+  stopBackoffSeconds: null,
+  backgroundSound: "off",
+  backgroundDenoisingEnabled: false,
 };
+
 
 function AssistantDetailPage() {
   const { id } = Route.useParams();
