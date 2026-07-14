@@ -123,6 +123,63 @@ export const Route = createFileRoute("/_authenticated/assistants/$id")({
   component: AssistantDetailPage,
 });
 
+// Slider genérico com label + valor + botão "limpar" (deixa null = usa padrão da Vapi).
+function SliderField({
+  label,
+  hint,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+}) {
+  const active = value != null;
+  const display = active ? value : (min + max) / 2;
+  return (
+    <div className="space-y-2 rounded-lg border border-white/[0.06] bg-background/30 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs">{label}</Label>
+        <div className="flex items-center gap-2">
+          <span className={cn("font-mono text-xs", active ? "text-foreground" : "text-muted-foreground")}>
+            {active ? display.toFixed(step < 1 ? 2 : 0) : "padrão"}
+          </span>
+          {active && (
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              disabled={disabled}
+            >
+              limpar
+            </button>
+          )}
+        </div>
+      </div>
+      <Slider
+        min={min}
+        max={max}
+        step={step}
+        value={[display]}
+        onValueChange={([v]) => onChange(v)}
+        disabled={disabled}
+      />
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+
+
 // Provedores/modelos/vozes só com IDs documentados em docs.vapi.ai/providers/*
 const MODEL_PROVIDERS = [
   { value: "openai", label: "OpenAI" },
