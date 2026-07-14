@@ -132,7 +132,14 @@ function buildPayload(input: AssistantInput) {
     transcriber: { ...DEFAULT_TRANSCRIBER_BLOCK },
     model: {
       provider: input.modelProvider?.trim() || DEFAULT_MODEL_PROVIDER,
-      model: input.model?.trim() || DEFAULT_MODEL,
+      model:
+        input.model?.trim() === "gpt-4o-realtime-preview"
+          ? "gpt-4o-realtime-preview-2024-12-17"
+          : input.model?.trim() === "gpt-4o-mini-realtime-preview"
+            ? "gpt-4o-mini-realtime-preview-2024-12-17"
+            : input.model?.trim() === "gpt-4o"
+              ? "chatgpt-4o-latest"
+              : input.model?.trim() || DEFAULT_MODEL,
       messages: [{ role: "system", content: input.systemPrompt }],
     },
     voice,
@@ -554,7 +561,17 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       const currentModel = (current?.model ?? {}) as Record<string, unknown>;
       const model: Record<string, unknown> = { ...currentModel };
       if (data.modelProvider) model.provider = data.modelProvider;
-      if (data.model) model.model = data.model;
+      if (data.model) {
+        const normalizedModel =
+          data.model === "gpt-4o-realtime-preview"
+            ? "gpt-4o-realtime-preview-2024-12-17"
+            : data.model === "gpt-4o-mini-realtime-preview"
+              ? "gpt-4o-mini-realtime-preview-2024-12-17"
+              : data.model === "gpt-4o"
+                ? "chatgpt-4o-latest"
+                : data.model;
+        model.model = normalizedModel;
+      }
       if (typeof data.systemPrompt === "string") {
         model.messages = [{ role: "system", content: data.systemPrompt }];
       }
