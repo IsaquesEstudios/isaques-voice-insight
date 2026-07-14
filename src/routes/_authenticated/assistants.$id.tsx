@@ -104,6 +104,7 @@ import {
   listVapiAssistants,
   listVapiVoices,
   saveVapiAssistantConfig,
+  type VapiVoiceOption,
 } from "@/lib/vapi.functions";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -277,7 +278,9 @@ const VOICE_PROVIDERS = [
 ];
 
 // Vapi Voices ativas — https://docs.vapi.ai/providers/voice/vapi-voices
-// OpenAI/Deepgram: IDs fixos e documentados. BYOK: voiceIds vêm da dashboard do usuário.
+// OpenAI/Deepgram: IDs fixos e documentados.
+// ElevenLabs: lista pública de vozes multilíngues + vozes brasileiras da Voice Library.
+// IDs da Voice Library podem mudar; se um falhar, use o input manual ou troque de voz.
 const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   vapi: [
     { value: "Elliot", label: "Elliot V2 — Male, Canadian" },
@@ -329,7 +332,86 @@ const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
     { value: "javier", label: "Javier (ES)" },
     { value: "diana", label: "Diana (ES)" },
   ],
-  "11labs": [],
+  "11labs": [
+    // Vozes padrão multilíngues da ElevenLabs (funcionam bem em português)
+    { value: "pNInz6obpgDQGcFmaJgB", label: "Adam — multilíngue" },
+    { value: "AZnzlk1XvdvUeBnXmlld", label: "Antoni — multilíngue" },
+    { value: "ZQe5CZNwzXWgMbkx8Uln", label: "Arnold — multilíngue" },
+    { value: "EXAVITQu4vr4xnSDxMaL", label: "Bella — multilíngue" },
+    { value: "N2lVS1w4EtoT3dr4eOWO", label: "Callum — multilíngue" },
+    { value: "IKne3meq5aSn9XLyUdCD", label: "Charlie — multilíngue" },
+    { value: "onwK4e9ZLuTAKqWW03F9", label: "Daniel — multilíngue" },
+    { value: "cjVigY5qzO86Huf0OWal", label: "Eric — multilíngue" },
+    { value: "JBFqnCBsd6RMkjVDRZzb", label: "George — multilíngue" },
+    { value: "cgSgspJ2msm6clMCkdW9", label: "Jessica — multilíngue" },
+    { value: "FGY2WhTYpPnrIDTdsKH5", label: "Laura — multilíngue" },
+    { value: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam — multilíngue" },
+    { value: "pFZP5JQG7iQjIQuC4Bku", label: "Lily — multilíngue" },
+    { value: "XrExE9yKIg1WjnnlVkGX", label: "Matilda — multilíngue" },
+    { value: "CwhRBWXzGAHq8TQ4Fs17", label: "Roger — multilíngue" },
+    { value: "Yko7PKHZNXotIFUBG7I9", label: "Sarah — multilíngue" },
+    { value: "bIHbv24MWmeRgasZH58o", label: "Will — multilíngue" },
+    // Vozes brasileiras da ElevenLabs Voice Library
+    { value: "NQ10OlqJ7vYH6XwegHSW", label: "Lucke — PT-BR, masculino" },
+    { value: "dX7gRq1dIvLTgUaWpEFn", label: "Rafael Valente — PT-BR, narrador" },
+    { value: "cFylwQo5ufGYUNyRS167", label: "Luka — PT-BR, masculino jovem" },
+    { value: "CstacWqMhJQlnfLPxRG4", label: "Will (Deep) — PT-BR, narrador infantil" },
+    { value: "y3X5crcIDtFawPx7bcNq", label: "Eliel — PT-BR, contador de histórias" },
+    { value: "eVXYtPVYB9wDoz9NVTIy", label: "Carla Voice — PT-BR, feminino jovem" },
+    { value: "AaeZyyi87RCxtFnHPS3e", label: "Prof. Campanholi — PT-BR, didático" },
+    { value: "EIkHVdkuarjkYUyMnoes", label: "Nelton — PT-BR, audiobooks" },
+    { value: "qarDw4DEvUqP3FBlpO0T", label: "Jon Oliveira — PT-BR, comercial" },
+    { value: "33B4UnXyTNbgLmdEDh5P", label: "Keren — PT-BR, feminino doce" },
+    { value: "RGymW84CSmfVugnA5tvA", label: "Roberta — PT-BR, conversacional" },
+    { value: "rpNe0HOx7heUulPiOEaG", label: "Diego — PT-BR, propaganda" },
+    { value: "tS45q0QcrDHqHoaWdCDR", label: "Lax — PT-BR, engraçado/sarcástico" },
+    { value: "r2fkFV8WAqXq2AqBpgJT", label: "Amandoca — PT-BR, feminino divertido" },
+    { value: "MZxV5lN3cv7hi1376O0m", label: "Ana Dias — PT-BR, feminino envolvente" },
+    { value: "9pDzHy2OpOgeXM8SeL0t", label: "Borges — PT-BR, masculino calmo" },
+    { value: "GDzHdQOi6jjf8zaXhCYD", label: "Raquel — PT-BR, expressiva" },
+    { value: "7lu3ze7orhWaNeSPowWx", label: "Lucas — PT-BR, social media" },
+    { value: "YNOujSUmHtgN6anjqXPf", label: "Victor Power — PT-BR, ebooks" },
+    { value: "qPfM2laM0pRL4rrZtBGl", label: "Sandro Dutra — PT-BR, articulado" },
+    { value: "7u8qsX4HQsSHJ0f8xsQZ", label: "João Pedro — PT-BR, dinâmico" },
+    { value: "bJrNspxJVFovUxNBQ0wh", label: "Marcelo Costa — PT-BR, artístico" },
+    { value: "lWq4KDY8znfkV0DrK8Vb", label: "Yasmin Alves — PT-BR, feminino" },
+    { value: "oi8rgjIfLgJRsQ6rbZh3", label: "Amanda Kelly — PT-BR, doce" },
+    { value: "Qrdut83w0Cr152Yb4Xn3", label: "Paulo — PT-BR, informativo" },
+    { value: "83Nae6GFQiNslSbuzmE7", label: "Eduardo Monteiro — PT-BR, nordestino" },
+    { value: "6pQlwCgfwffNdI3jjzM6", label: "Fernando Borges — PT-BR, urbano" },
+    { value: "hwnuNyWkl9DjdTFykrN6", label: "Adriano — PT-BR, grave" },
+    { value: "5p9IbzcK4R8rN1fpGdMF", label: "Davi — PT-BR, amigável" },
+    { value: "eUAnqvLQWNX29twcYLUM", label: "Dyego — PT-BR, noticiário" },
+    { value: "OB6x7EbXYlhG4DDTB1XU", label: "Michelle — PT-BR, feminino jovem" },
+    { value: "ZqE9vIHPcrC35dZv0Svu", label: "Adam Borges — PT-BR, sensual" },
+    { value: "7iqXtOF3wl3pomwXFY7G", label: "Fernanda — PT-BR, profissional" },
+    { value: "xNGAXaCH8MaasNuo7Hr7", label: "Beto — PT-BR, neutro/nativo" },
+    { value: "HOfBIVLhom4mc9WvXfyH", label: "Andrea Lot — PT-BR, autoritário" },
+    { value: "Eyspt3SYhZzXd1Jd3J8O", label: "Bia — PT-BR, direto" },
+    { value: "wHnxjlY53t8X9Oi14Awz", label: "Juliano Magalhães — PT-BR, narrador" },
+    { value: "u0Dga8xTuplGDHoYA40p", label: "Nina M. — PT-BR, feminino jovem" },
+    { value: "kd1lRcSdRGIfyKxQKjmH", label: "Ale Garcia — PT-BR, descontraído" },
+    { value: "ycxdm1PRMs962FxyyuJ0", label: "Otto — PT-BR, jovem/épico" },
+    { value: "iScHbNW8K33gNo3lGgbo", label: "Marianne — PT-BR, doce/calma" },
+    { value: "cyD08lEy76q03ER1jZ7y", label: "Scheila — PT-BR, séria" },
+    { value: "rnJZLKxtlBZt77uIED10", label: "Sergio — PT-BR, sênior/grave" },
+    { value: "vibfi5nlk3hs8Mtvf9Oy", label: "Ana — PT-BR, relaxada" },
+    { value: "GnDrTQvdzZ7wqAKfLzVQ", label: "Guilherme — PT-BR, direto" },
+    { value: "ETf5cmpNIbpSiXmBaR2m", label: "Samuel — PT-BR, lento/calmado" },
+    { value: "5lrBPYY4YvMbKHTo8kvZ", label: "Arthur — PT-BR, profissional" },
+    { value: "3Je7qW9yPOhc47iG41pH", label: "Yuri — PT-BR, convidativo" },
+    { value: "YU8EsJtXFMyKMxYtheDk", label: "Mário — PT-BR, animado" },
+    { value: "n2aB5UDlpf5USMJH7Qst", label: "Gilson Lima — PT-BR, articulado" },
+    { value: "F7823wtD50WK1gnmgBk5", label: "Matheus Moretti — PT-BR, calmo" },
+    { value: "TY3h8ANhQUsJaa0Bga5F", label: "Cassio Cruz — PT-BR, confiante" },
+    { value: "GFPGeIuI7dxt6YeFLE7l", label: "Ayres — PT-BR, gentil" },
+    { value: "IlrWo5tGgTuxNTHyGhWD", label: "Vagner de Souza — PT-BR, sério" },
+    { value: "4RyYr3owp1gnOgHKTs6D", label: "Aline Mota — PT-BR, profissional" },
+    { value: "Hmn4B9B77pf6ttydteJ8", label: "Kaique — PT-BR, poético" },
+    { value: "LuQ9eaWO9yCQrR73VQFa", label: "Victor Pinho — PT-BR, jovial" },
+    { value: "5EtawPduB139avoMLQgH", label: "Thais — PT-BR, feminino jovem" },
+    { value: "k3f7zOv6LF88v78QHCNh", label: "Gabriel — PT-BR, dinâmico" },
+  ],
   cartesia: [],
   playht: [],
   azure: [],
@@ -527,19 +609,35 @@ function AssistantDetailPage() {
     staleTime: 1000 * 60 * 30,
   });
 
-  const allVoices = voicesQuery.data ?? [];
+  // Vozes estáticas como fallback quando a API da Vapi não retorna nada
+  // (ex.: ElevenLabs BYOK não expõe a biblioteca pública).
+  const staticVoices = useMemo<VapiVoiceOption[]>(() => {
+    const hardcoded = VOICES_BY_PROVIDER[form.voiceProvider] ?? [];
+    if (hardcoded.length === 0) return [];
+    return hardcoded.map((v) => ({
+      providerId: v.value,
+      name: v.label.split(" — ")[0],
+      languageCode: form.voiceProvider === "11labs" ? "pt-br" : undefined,
+      language: form.voiceProvider === "11labs" ? "Portuguese (Brazil)" : undefined,
+      gender: undefined,
+      accent: undefined,
+      previewUrl: undefined,
+      description: undefined,
+    }));
+  }, [form.voiceProvider]);
 
-  // Se a lista pública de vozes carregou e o voiceId atual não está nela,
+  const allVoices = voicesQuery.data?.length ? voicesQuery.data : staticVoices;
+
+  // Se a lista de vozes carregou (API ou fallback) e o voiceId atual não está nela,
   // a Vapi rejeitará o PATCH com 400 ("voice.voiceId must be one of ...").
-  // Providers BYOK retornam lista vazia — nesse caso não validamos.
   const voiceListMismatch = useMemo(() => {
     if (!form.voiceProvider || !form.voiceId) return false;
-    if (voicesQuery.isLoading || !voicesQuery.data) return false;
-    const list = voicesQuery.data;
+    if (voicesQuery.isLoading) return false;
+    const list = allVoices;
     if (list.length === 0) return false;
     const target = form.voiceId.toLowerCase();
     return !list.some((v) => (v.providerId || "").toLowerCase() === target);
-  }, [form.voiceProvider, form.voiceId, voicesQuery.data, voicesQuery.isLoading]);
+  }, [form.voiceProvider, form.voiceId, voicesQuery.isLoading, allVoices]);
 
   // Traduções pt-BR para metadados vindos da API da Vapi.
   const translateLanguage = (raw?: string, code?: string): string => {
@@ -1150,8 +1248,8 @@ function AssistantDetailPage() {
                       <p className="mb-1 font-medium text-foreground">Dicas para melhorar o sotaque</p>
                       <ul className="list-disc space-y-1 pl-4">
                         <li>
-                          Escolha uma voz nativa do idioma-alvo (ex.: filtre por Portuguese (Brazil) em Azure ou Cartesia).
-                          ElevenLabs e OpenAI não expõem idioma público — use vozes multilingues e deixe o prompt em português.
+                          Para sotaque brasileiro, prefira as vozes marcadas "PT-BR" na lista da ElevenLabs ou use o filtro de idioma quando disponível (Azure/Cartesia).
+                          OpenAI não expõe idioma público — use vozes multilíngues e deixe o prompt em português.
                         </li>
                         <li>
                           No prompt do sistema, deixe explícito: "Responda sempre em português do Brasil, com pronúncia natural brasileira."
