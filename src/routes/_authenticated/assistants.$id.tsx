@@ -580,7 +580,7 @@ function AssistantDetailPage() {
                             setForm((f) => ({
                               ...f,
                               voiceProvider: v,
-                              voiceId: VOICES_BY_PROVIDER[v]?.[0]?.value ?? "",
+                              voiceId: "",
                             }))
                           }
                           disabled={isLoading}
@@ -599,7 +599,29 @@ function AssistantDetailPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Voz / Voice ID</Label>
-                        {voiceOptions.length === 0 ? (
+                        {!form.voiceProvider ? (
+                          <p className="text-xs text-muted-foreground">
+                            Selecione um provedor primeiro.
+                          </p>
+                        ) : voicesQuery.isLoading ? (
+                          <Skeleton className="h-10 w-full" />
+                        ) : voicesQuery.isError ? (
+                          <>
+                            <Input
+                              value={form.voiceId}
+                              onChange={(e) =>
+                                setForm((f) => ({ ...f, voiceId: e.target.value }))
+                              }
+                              placeholder="Cole o voiceId manualmente"
+                              disabled={isLoading}
+                              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                            />
+                            <p className="text-xs text-destructive">
+                              Falha ao carregar vozes da Vapi. Digite o voiceId
+                              manualmente.
+                            </p>
+                          </>
+                        ) : voiceOptions.length === 0 ? (
                           <>
                             <Input
                               value={form.voiceId}
@@ -611,32 +633,54 @@ function AssistantDetailPage() {
                               className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
                             />
                             <p className="text-xs text-muted-foreground">
-                              Para {form.voiceProvider}, o voiceId deve vir da sua conta
-                              sincronizada na Vapi (Integrations).
+                              Nenhuma voz pública para {form.voiceProvider}. O
+                              voiceId deve vir da sua conta sincronizada na Vapi.
                             </p>
                           </>
                         ) : (
-                          <Select
-                            value={form.voiceId}
-                            onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                            disabled={isLoading}
-                          >
-                            <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                              <SelectValue placeholder="Selecione..." />
-                            </SelectTrigger>
-                            <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                              {voiceOptions.map((v) => (
-                                <SelectItem key={v.value} value={v.value}>
-                                  {v.label}
-                                </SelectItem>
-                              ))}
-                              {!voiceOptions.some((v) => v.value === form.voiceId) &&
-                                form.voiceId && (
-                                  <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                                )}
-                            </SelectContent>
-                          </Select>
+                          <>
+                            <Select
+                              value={form.voiceId}
+                              onValueChange={(v) =>
+                                setForm((f) => ({ ...f, voiceId: v }))
+                              }
+                              disabled={isLoading}
+                            >
+                              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                                <SelectValue placeholder="Selecione uma voz..." />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72 border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                {voiceOptions.map((v) => (
+                                  <SelectItem key={v.value} value={v.value}>
+                                    {v.label}
+                                  </SelectItem>
+                                ))}
+                                {!voiceOptions.some(
+                                  (v) => v.value === form.voiceId,
+                                ) &&
+                                  form.voiceId && (
+                                    <SelectItem value={form.voiceId}>
+                                      {form.voiceId} (atual)
+                                    </SelectItem>
+                                  )}
+                              </SelectContent>
+                            </Select>
+                            {(() => {
+                              const current = voiceOptions.find(
+                                (v) => v.value === form.voiceId,
+                              );
+                              return current?.previewUrl ? (
+                                <audio
+                                  key={current.value}
+                                  controls
+                                  src={current.previewUrl}
+                                  className="mt-1 h-8 w-full"
+                                />
+                              ) : null;
+                            })()}
+                          </>
                         )}
+
                         <CostHint
                           costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
                           tooltip="Custo estimado de TTS por minuto de voz sintetizada."
