@@ -696,7 +696,7 @@ function AssistantDetailPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isSaving || isLoading}
+              disabled={isSaving || isLoading || compatBad}
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
             >
               {isSaving ? (
@@ -706,6 +706,7 @@ function AssistantDetailPage() {
               )}
               Salvar Alterações
             </Button>
+
           </div>
         </div>
 
