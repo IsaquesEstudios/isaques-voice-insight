@@ -85,6 +85,7 @@ import {
   listVapiAssistants,
   listVapiPhoneNumbers,
 } from "@/lib/vapi.functions";
+import { VoiceCallTestCard } from "@/components/telefonia/voice-call-test-card";
 import {
   Select,
   SelectContent,
@@ -1105,7 +1106,14 @@ function TelefoniaPage() {
                   Enviar código por SMS
                 </Button>
               </div>
+
+              <div className="pt-2">
+                <VoiceCallTestCard
+                  defaultCustomerNumber={testContactForm.phoneE164.trim()}
+                />
+              </div>
             </div>
+
           ) : (
             <div className="space-y-4">
               <div className="space-y-1.5">
