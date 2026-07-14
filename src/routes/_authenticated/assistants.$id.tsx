@@ -997,9 +997,16 @@ function AssistantDetailPage() {
                               }
                               disabled={isLoading}
                             >
-                              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectTrigger
+                                className={`bg-background/40 backdrop-blur-xl ${
+                                  compatVoiceBad
+                                    ? "border-destructive ring-1 ring-destructive"
+                                    : "border-white/[0.08]"
+                                }`}
+                              >
                                 <SelectValue placeholder="Selecione uma voz..." />
                               </SelectTrigger>
+
                               <SelectContent className="max-h-72 border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                                 {voiceOptions.map((v) => (
                                   <SelectItem key={v.value} value={v.value}>
