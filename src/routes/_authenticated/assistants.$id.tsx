@@ -507,8 +507,25 @@ function AssistantDetailPage() {
           model: form.model,
           voiceProvider: form.voiceProvider,
           voiceId: form.voiceId,
+          voiceModel: form.voiceModel || null,
+          voiceStability: form.voiceStability,
+          voiceSimilarityBoost: form.voiceSimilarityBoost,
+          voiceStyle: form.voiceStyle,
+          voiceUseSpeakerBoost: form.voiceUseSpeakerBoost,
+          voiceSpeed: form.voiceSpeed,
+          voiceEmotion: form.voiceEmotion || null,
+          voiceTemperature: form.voiceTemperature,
+          voiceFillerInjectionEnabled: form.voiceFillerInjectionEnabled,
+          startWaitSeconds: form.startWaitSeconds,
+          smartEndpointingEnabled: form.smartEndpointingEnabled,
+          stopNumWords: form.stopNumWords,
+          stopVoiceSeconds: form.stopVoiceSeconds,
+          stopBackoffSeconds: form.stopBackoffSeconds,
+          backgroundSound: form.backgroundSound,
+          backgroundDenoisingEnabled: form.backgroundDenoisingEnabled,
         },
       });
+
       toast.success("Alterações salvas.");
     } catch (err) {
       console.error(err);
