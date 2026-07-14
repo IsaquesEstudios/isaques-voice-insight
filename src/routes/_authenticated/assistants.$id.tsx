@@ -723,7 +723,7 @@ function AssistantDetailPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isSaving || isLoading || compatBad}
+              disabled={isSaving || isLoading || compatBad || voiceListMismatch}
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
             >
               {isSaving ? (
