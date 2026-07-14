@@ -290,8 +290,7 @@ function TelefoniaPage() {
   const [verifyChecking, setVerifyChecking] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
 
-  // Per-row call controls (origin number + assistant)
-  const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
+  // Per-row call controls (assistant only; origin number chosen automatically)
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
 
   const outboundCallFn = useServerFn(createOutboundTestCall);
