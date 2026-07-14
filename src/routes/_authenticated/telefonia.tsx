@@ -852,20 +852,29 @@ function TelefoniaPage() {
                   Caller IDs verificados diretamente na sua conta Twilio.
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                asChild
-                className="gap-1.5"
-              >
-                <a
-                  href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
-                  target="_blank"
-                  rel="noreferrer"
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5"
+                  disabled={!isTwilioConnected || testContactsQuery.isFetching}
+                  onClick={() => testContactsQuery.refetch()}
+                  title="Atualizar lista"
                 >
-                  <Plus className="h-4 w-4" /> Verificar na Twilio
-                </a>
-              </Button>
+                  <RefreshCw
+                    className={`h-4 w-4 ${testContactsQuery.isFetching ? "animate-spin" : ""}`}
+                  />
+                </Button>
+                <Button size="sm" variant="outline" asChild className="gap-1.5">
+                  <a
+                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Plus className="h-4 w-4" /> Verificar na Twilio
+                  </a>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {!isTwilioConnected && (
