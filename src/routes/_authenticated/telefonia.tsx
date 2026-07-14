@@ -411,14 +411,16 @@ function TelefoniaPage() {
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
       const assistantId = rowCallAssistant[contact.id];
-      const fromNumberE164 = rowCallFrom[contact.id];
+      const fromNumberE164 = numbers[0]?.phone_number ?? "";
       if (!assistantId) {
         setCallingContactId(null);
         return Promise.reject(new Error("Selecione uma assistente."));
       }
       if (!fromNumberE164) {
         setCallingContactId(null);
-        return Promise.reject(new Error("Selecione o número de origem."));
+        return Promise.reject(
+          new Error("Conecte um número em 'Conectar Número' antes de testar a ligação."),
+        );
       }
       return outboundCallFn({
         data: {
