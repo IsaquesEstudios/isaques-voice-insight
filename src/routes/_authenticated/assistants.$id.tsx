@@ -290,11 +290,54 @@ function AssistantDetailPage() {
     enabled: !!form.voiceProvider,
     staleTime: 1000 * 60 * 30,
   });
-  const voiceOptions = (voicesQuery.data ?? []).map((v) => ({
-    value: v.providerId,
-    label: v.name,
-    previewUrl: v.previewUrl,
-  }));
+
+  const allVoices = voicesQuery.data ?? [];
+
+  // Build list of languages present in this provider's voice library.
+  const languageOptions = React.useMemo(() => {
+    const map = new Map<string, string>(); // code -> label
+    for (const v of allVoices) {
+      const code = (v.languageCode || v.language || "").trim();
+      if (!code) continue;
+      const label = (v.language || v.languageCode || code).trim();
+      if (!map.has(code)) map.set(code, label);
+    }
+    return Array.from(map.entries())
+      .map(([code, label]) => ({ code, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allVoices]);
+
+  const hasLanguageData = languageOptions.length > 0;
+  const [languageFilter, setLanguageFilter] = React.useState<string>("all");
+
+  // When voices load, default the filter to pt-BR / pt if available.
+  React.useEffect(() => {
+    if (!hasLanguageData) return;
+    const codes = languageOptions.map((l) => l.code.toLowerCase());
+    const preferred = codes.find((c) => c === "pt-br")
+      ?? codes.find((c) => c.startsWith("pt"))
+      ?? codes.find((c) => /portug/i.test(languageOptions.find((l) => l.code.toLowerCase() === c)?.label ?? ""));
+    if (preferred) {
+      const match = languageOptions.find((l) => l.code.toLowerCase() === preferred);
+      if (match) setLanguageFilter(match.code);
+    }
+  }, [hasLanguageData, languageOptions]);
+
+  const filteredVoices = React.useMemo(() => {
+    if (!hasLanguageData || languageFilter === "all") return allVoices;
+    return allVoices.filter(
+      (v) => (v.languageCode || v.language || "") === languageFilter,
+    );
+  }, [allVoices, languageFilter, hasLanguageData]);
+
+  const voiceOptions = filteredVoices.map((v) => {
+    const meta = [v.language, v.accent, v.gender].filter(Boolean).join(" · ");
+    return {
+      value: v.providerId,
+      label: meta ? `${v.name} — ${meta}` : v.name,
+      previewUrl: v.previewUrl,
+    };
+  });
 
 
   async function handleSave() {
