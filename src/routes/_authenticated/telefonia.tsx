@@ -71,10 +71,14 @@ import {
   listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
+  listVerifiedCallerIds,
   releaseNumber,
   removeTestContact,
+  saveTestContact,
   saveTwilioCredentials,
+  startCallerIdVerification,
 } from "@/lib/twilio.functions";
+
 
 import {
   attachAssistantToNumber,
@@ -83,7 +87,7 @@ import {
   listVapiAssistants,
   listVapiPhoneNumbers,
 } from "@/lib/vapi.functions";
-import { VoiceCallTestCard } from "@/components/telefonia/voice-call-test-card";
+
 import {
   Select,
   SelectContent,
@@ -166,6 +170,10 @@ function TelefoniaPage() {
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
   const removeTestContactFn = useServerFn(removeTestContact);
+  const saveTestContactFn = useServerFn(saveTestContact);
+  const startCallerIdVerificationFn = useServerFn(startCallerIdVerification);
+  const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
+
 
 
 
@@ -271,7 +279,17 @@ function TelefoniaPage() {
   const [connecting, setConnecting] = useState(false);
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
+  const [verifyStep, setVerifyStep] = useState<"form" | "waiting">("form");
+  const [verifyState, setVerifyState] = useState<{
+    validationCode: string;
+    phoneE164: string;
+    label: string;
+    startedAt: number;
+  } | null>(null);
+  const [verifyStarting, setVerifyStarting] = useState(false);
+  const [verifyExpired, setVerifyExpired] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
+
   // Per-row call controls (origin number + assistant)
   const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
@@ -301,6 +319,98 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
   });
+
+  // Reset verification state whenever the modal closes.
+  const resetVerification = () => {
+    setVerifyStep("form");
+    setVerifyState(null);
+    setVerifyStarting(false);
+    setVerifyExpired(false);
+  };
+
+  const startVerification = async () => {
+    const label = testContactForm.label.trim();
+    const phone = testContactForm.phoneE164.trim();
+    if (!label) return toast.error("Informe uma identificação.");
+    if (!/^\+[1-9]\d{7,14}$/.test(phone))
+      return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
+
+    setVerifyStarting(true);
+    setVerifyExpired(false);
+    try {
+      const res = await startCallerIdVerificationFn({
+        data: { phoneE164: phone, friendlyName: label },
+      });
+      if (!res.ok) {
+        const reason =
+          res.reason === "no_credentials"
+            ? "Conecte sua conta Twilio primeiro."
+            : `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`;
+        toast.error(reason);
+        return;
+      }
+      setVerifyState({
+        validationCode: res.validationCode,
+        phoneE164: phone,
+        label,
+        startedAt: Date.now(),
+      });
+      setVerifyStep("waiting");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação");
+    } finally {
+      setVerifyStarting(false);
+    }
+  };
+
+  // Polling: enquanto o modal está em "waiting", consulta a lista de Verified
+  // Caller IDs a cada 3s. Assim que o número aparecer, salvamos o contato.
+  useEffect(() => {
+    if (verifyStep !== "waiting" || !verifyState) return;
+    let cancelled = false;
+    const TIMEOUT_MS = 2 * 60 * 1000;
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (Date.now() - verifyState.startedAt > TIMEOUT_MS) {
+        setVerifyExpired(true);
+        return;
+      }
+      try {
+        const list = await listVerifiedCallerIdsFn();
+        const found = (list ?? []).some(
+          (r: { phone_number: string }) => r.phone_number === verifyState.phoneE164,
+        );
+        if (found && !cancelled) {
+          try {
+            await saveTestContactFn({
+              data: { label: verifyState.label, phoneE164: verifyState.phoneE164 },
+            });
+            toast.success("Número verificado e salvo!");
+            await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+            setTestContactOpen(false);
+            setTestContactForm({ label: "", phoneE164: "" });
+            resetVerification();
+          } catch (err) {
+            toast.error(
+              err instanceof Error ? err.message : "Falha ao salvar contato após verificação",
+            );
+          }
+          return;
+        }
+      } catch {
+        // silêncio: tentaremos novamente no próximo tick
+      }
+      if (!cancelled) setTimeout(tick, 3000);
+    };
+    const t = setTimeout(tick, 2000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [verifyStep, verifyState, listVerifiedCallerIdsFn, saveTestContactFn, queryClient]);
+
+
 
   const testCallMutation = useMutation({
     mutationFn: (contact: { id: string; phone_e164: string }) => {
@@ -970,24 +1080,126 @@ function TelefoniaPage() {
           setTestContactOpen(o);
           if (!o) {
             setTestContactForm({ label: "", phoneE164: "" });
+            resetVerification();
           }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>Teste de Voz por Telefone</DialogTitle>
+            <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              Dispare uma ligação de teste via Vapi para um número de destino.
+              A Twilio vai ligar para o seu número e você digitará um código de 6 dígitos
+              no teclado do celular. Após verificado, o contato fica liberado para receber
+              chamadas da Vapi mesmo em contas trial.
             </DialogDescription>
           </DialogHeader>
 
-          <VoiceCallTestCard
-            defaultLabel={testContactForm.label}
-            defaultCustomerNumber={testContactForm.phoneE164}
-            onSuccess={() => setTestContactOpen(false)}
-          />
+          {verifyStep === "form" ? (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Identificação</Label>
+                <Input
+                  placeholder="Ex: Meu celular"
+                  value={testContactForm.label}
+                  onChange={(e) =>
+                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
+                  }
+                  disabled={verifyStarting}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Número (E.164)</Label>
+                <Input
+                  placeholder="+5511999999999"
+                  value={testContactForm.phoneE164}
+                  onChange={(e) =>
+                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                  }
+                  disabled={verifyStarting}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Inclua o código do país (+55 para Brasil).
+                </p>
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={startVerification}
+                disabled={verifyStarting || !isTwilioConnected}
+              >
+                {verifyStarting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PhoneCall className="h-4 w-4" />
+                )}
+                Verificar número (ligação da Twilio)
+              </Button>
+              {!isTwilioConnected && (
+                <p className="text-center text-[11px] text-warning">
+                  Conecte sua conta Twilio antes de verificar um número.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Código de verificação
+                </p>
+                <p className="mt-1 font-mono text-4xl font-bold tracking-[0.3em] text-primary">
+                  {verifyState?.validationCode}
+                </p>
+              </div>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  A Twilio está ligando agora para{" "}
+                  <span className="font-mono text-foreground">{verifyState?.phoneE164}</span>.
+                </p>
+                <p>
+                  Atenda e digite o código acima no teclado do celular. Assim que a Twilio
+                  confirmar, o contato será salvo automaticamente.
+                </p>
+              </div>
+
+              {verifyExpired ? (
+                <Alert className="border-warning/30 bg-warning/10">
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  <AlertDescription className="text-xs">
+                    Tempo esgotado. A ligação expirou sem confirmação. Tente novamente.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Aguardando verificação…
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={resetVerification}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={startVerification}
+                  disabled={verifyStarting}
+                >
+                  {verifyStarting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <PhoneCall className="h-4 w-4" />
+                  )}
+                  Reenviar chamada
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
+
 
 
 
