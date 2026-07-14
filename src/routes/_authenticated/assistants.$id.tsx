@@ -1248,8 +1248,8 @@ function AssistantDetailPage() {
                       <p className="mb-1 font-medium text-foreground">Dicas para melhorar o sotaque</p>
                       <ul className="list-disc space-y-1 pl-4">
                         <li>
-                          Escolha uma voz nativa do idioma-alvo (ex.: filtre por Portuguese (Brazil) em Azure ou Cartesia).
-                          ElevenLabs e OpenAI não expõem idioma público — use vozes multilingues e deixe o prompt em português.
+                          Para sotaque brasileiro, prefira as vozes marcadas "PT-BR" na lista da ElevenLabs ou use o filtro de idioma quando disponível (Azure/Cartesia).
+                          OpenAI não expõe idioma público — use vozes multilíngues e deixe o prompt em português.
                         </li>
                         <li>
                           No prompt do sistema, deixe explícito: "Responda sempre em português do Brasil, com pronúncia natural brasileira."
