@@ -673,6 +673,9 @@ function AssistantDetailPage() {
     const target = form.voiceId.toLowerCase();
     return !list.some((v) => (v.providerId || "").toLowerCase() === target);
   }, [form.voiceProvider, form.voiceId, voicesQuery.isLoading, voicesQuery.isError, voicesQuery.data, allVoices]);
+  const elevenLabsVoiceUnavailable =
+    form.voiceProvider === "11labs" && !voicesQuery.isLoading && allVoices.length === 0;
+  const voiceSelectionMissing = Boolean(form.voiceProvider && allVoices.length > 0 && !form.voiceId);
 
   // Traduções pt-BR para metadados vindos da API da Vapi.
   const translateLanguage = (raw?: string, code?: string): string => {
@@ -818,6 +821,17 @@ function AssistantDetailPage() {
 
 
   async function handleSave() {
+    if (elevenLabsVoiceUnavailable) {
+      toast.error("Nenhuma voz ElevenLabs PT-BR disponível.", {
+        description:
+          "A Vapi não retornou nenhuma voz brasileira da ElevenLabs para esta conta. Sincronize uma voz PT-BR na Vapi ou use Azure.",
+      });
+      return;
+    }
+    if (voiceSelectionMissing) {
+      toast.error("Selecione uma voz antes de salvar.");
+      return;
+    }
     if (voiceListMismatch) {
       toast.error(
         form.voiceProvider === "11labs"
@@ -926,7 +940,7 @@ function AssistantDetailPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isSaving || isLoading || compatBad || voiceListMismatch}
+              disabled={isSaving || isLoading || compatBad || voiceListMismatch || elevenLabsVoiceUnavailable || voiceSelectionMissing}
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
             >
               {isSaving ? (
@@ -1281,6 +1295,11 @@ function AssistantDetailPage() {
                             {form.voiceProvider === "11labs"
                               ? `A voz "${form.voiceId}" não está disponível na lista real da ElevenLabs PT-BR na Vapi. Escolha uma voz do dropdown ou use Azure.`
                               : `A voz "${form.voiceId}" não existe no provider "${form.voiceProvider}". Selecione uma voz da lista acima antes de salvar.`}
+                          </p>
+                        )}
+                        {voiceSelectionMissing && (
+                          <p className="text-xs text-destructive">
+                            Selecione uma voz da lista antes de salvar.
                           </p>
                         )}
 
