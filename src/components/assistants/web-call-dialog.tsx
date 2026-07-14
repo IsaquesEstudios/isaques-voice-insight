@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import Vapi from "@vapi-ai/web";
+import type Vapi from "@vapi-ai/web";
 import { Loader2, Mic, MicOff, PhoneOff, PhoneCall, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,6 +32,27 @@ interface Props {
   assistantName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+type VapiConstructor = new (publicKey: string) => Vapi;
+
+async function loadVapiConstructor(): Promise<VapiConstructor> {
+  const mod = await import("@vapi-ai/web");
+  const maybeDefault = mod.default as unknown;
+  const maybeNestedDefault = (maybeDefault as { default?: unknown } | null)?.default;
+  const ctor =
+    typeof maybeDefault === "function"
+      ? maybeDefault
+      : typeof maybeNestedDefault === "function"
+        ? maybeNestedDefault
+        : null;
+
+  if (!ctor) {
+    console.error("[vapi] invalid SDK module shape", mod);
+    throw new Error("Não foi possível carregar o SDK de chamadas da Vapi.");
+  }
+
+  return ctor as VapiConstructor;
 }
 
 export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }: Props) {
@@ -95,56 +116,6 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       return;
     }
 
-    const vapi = new Vapi(keyQuery.data.publicKey);
-    vapiRef.current = vapi;
-
-    vapi.on("call-start", () => {
-      console.log("[vapi] call-start");
-      setStatus("in_call");
-    });
-    vapi.on("call-end", () => {
-      console.log("[vapi] call-end");
-      setStatus("ended");
-    });
-    vapi.on("speech-start", () => setSpeaker("assistant"));
-    vapi.on("speech-end", () => setSpeaker(null));
-    vapi.on("error", (e: unknown) => {
-      console.error("[vapi] error event", e);
-      const err = e as { error?: { message?: string; msg?: string }; message?: string; errorMsg?: string };
-      const msg =
-        err?.error?.message ||
-        err?.error?.msg ||
-        err?.errorMsg ||
-        err?.message ||
-        (typeof e === "string" ? e : JSON.stringify(e));
-      setStatus("error");
-      setErrorMsg(msg || "Erro na chamada.");
-      toast.error(msg || "Erro na chamada.");
-    });
-    vapi.on("message", (message: {
-      type?: string;
-      transcriptType?: string;
-      role?: string;
-      transcript?: string;
-    }) => {
-      console.log("[vapi] message", message);
-      if (
-        message?.type === "transcript" &&
-        message.transcriptType === "final" &&
-        message.transcript &&
-        (message.role === "user" || message.role === "assistant")
-      ) {
-        setTranscript((prev) => [
-          ...prev,
-          {
-            id: `${Date.now()}-${Math.random()}`,
-            role: message.role as "user" | "assistant",
-            text: message.transcript!,
-          },
-        ]);
-      }
-    });
-
     // Timeout — surface a helpful message if Vapi never fires call-start/error
     const timeout = window.setTimeout(() => {
       setErrorMsg((prev) =>
@@ -155,6 +126,67 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     }, 15000);
 
     try {
+      const VapiCtor = await loadVapiConstructor();
+      const vapi = new VapiCtor(keyQuery.data.publicKey);
+      vapiRef.current = vapi;
+
+      vapi.on("call-start", () => {
+        console.log("[vapi] call-start");
+        setStatus("in_call");
+      });
+      vapi.on("call-end", () => {
+        console.log("[vapi] call-end");
+        setStatus("ended");
+      });
+      vapi.on("call-start-progress", (event) => {
+        console.log("[vapi] call-start-progress", event);
+      });
+      vapi.on("call-start-failed", (event) => {
+        console.error("[vapi] call-start-failed", event);
+        const msg = event?.error || "Falha ao iniciar chamada.";
+        setStatus("error");
+        setErrorMsg(msg);
+        toast.error(msg);
+      });
+      vapi.on("speech-start", () => setSpeaker("assistant"));
+      vapi.on("speech-end", () => setSpeaker(null));
+      vapi.on("error", (e: unknown) => {
+        console.error("[vapi] error event", e);
+        const err = e as { error?: { message?: string; msg?: string }; message?: string; errorMsg?: string };
+        const msg =
+          err?.error?.message ||
+          err?.error?.msg ||
+          err?.errorMsg ||
+          err?.message ||
+          (typeof e === "string" ? e : JSON.stringify(e));
+        setStatus("error");
+        setErrorMsg(msg || "Erro na chamada.");
+        toast.error(msg || "Erro na chamada.");
+      });
+      vapi.on("message", (message: {
+        type?: string;
+        transcriptType?: string;
+        role?: string;
+        transcript?: string;
+      }) => {
+        console.log("[vapi] message", message);
+        if (
+          message?.type === "transcript" &&
+          message.transcriptType === "final" &&
+          message.transcript &&
+          (message.role === "user" || message.role === "assistant")
+        ) {
+          setTranscript((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}-${Math.random()}`,
+              role: message.role as "user" | "assistant",
+              text: message.transcript!,
+            },
+          ]);
+        }
+      });
+
       console.log("[vapi] starting call for assistant", assistantId);
       const res = await vapi.start(assistantId);
       console.log("[vapi] start resolved", res);
