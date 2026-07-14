@@ -366,6 +366,21 @@ function AssistantDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [webCallOpen, setWebCallOpen] = useState(false);
 
+  const compat = useMemo(
+    () =>
+      checkVoiceModelCompat(
+        form.voiceProvider,
+        form.voiceId,
+        form.modelProvider,
+        form.model,
+      ),
+    [form.voiceProvider, form.voiceId, form.modelProvider, form.model],
+  );
+  const compatBad = !compat.ok;
+  const compatModelBad = compatBad && compat.fields.includes("model");
+  const compatVoiceBad = compatBad && compat.fields.includes("voice");
+
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
