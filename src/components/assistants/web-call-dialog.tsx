@@ -86,18 +86,40 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       return;
     }
 
+    // Sanity check: public keys are UUIDs; private keys start with "sk_"
+    if (keyQuery.data.publicKey.startsWith("sk_")) {
+      setStatus("error");
+      setErrorMsg(
+        "A secret VAPI_PUBLIC_KEY parece ser uma chave privada (sk_...). Use a Public Key da Vapi (Dashboard → API Keys → Public Key).",
+      );
+      return;
+    }
+
     const vapi = new Vapi(keyQuery.data.publicKey);
     vapiRef.current = vapi;
 
-    vapi.on("call-start", () => setStatus("in_call"));
-    vapi.on("call-end", () => setStatus("ended"));
+    vapi.on("call-start", () => {
+      console.log("[vapi] call-start");
+      setStatus("in_call");
+    });
+    vapi.on("call-end", () => {
+      console.log("[vapi] call-end");
+      setStatus("ended");
+    });
     vapi.on("speech-start", () => setSpeaker("assistant"));
     vapi.on("speech-end", () => setSpeaker(null));
     vapi.on("error", (e: unknown) => {
-      const msg = e instanceof Error ? e.message : "Erro na chamada.";
+      console.error("[vapi] error event", e);
+      const err = e as { error?: { message?: string; msg?: string }; message?: string; errorMsg?: string };
+      const msg =
+        err?.error?.message ||
+        err?.error?.msg ||
+        err?.errorMsg ||
+        err?.message ||
+        (typeof e === "string" ? e : JSON.stringify(e));
       setStatus("error");
-      setErrorMsg(msg);
-      toast.error(msg);
+      setErrorMsg(msg || "Erro na chamada.");
+      toast.error(msg || "Erro na chamada.");
     });
     vapi.on("message", (message: {
       type?: string;
@@ -105,6 +127,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       role?: string;
       transcript?: string;
     }) => {
+      console.log("[vapi] message", message);
       if (
         message?.type === "transcript" &&
         message.transcriptType === "final" &&
@@ -122,15 +145,31 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       }
     });
 
+    // Timeout — surface a helpful message if Vapi never fires call-start/error
+    const timeout = window.setTimeout(() => {
+      setErrorMsg((prev) =>
+        prev ??
+        "A chamada demorou demais para conectar. Verifique se a Public Key da Vapi corresponde à conta que criou este assistente, e se o assistente tem transcriber + voice + model configurados.",
+      );
+      setStatus((s) => (s === "connecting" ? "error" : s));
+    }, 15000);
+
     try {
-      await vapi.start(assistantId);
+      console.log("[vapi] starting call for assistant", assistantId);
+      const res = await vapi.start(assistantId);
+      console.log("[vapi] start resolved", res);
+      window.clearTimeout(timeout);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao iniciar chamada.";
+      window.clearTimeout(timeout);
+      console.error("[vapi] start threw", e);
+      const err = e as { message?: string; error?: { message?: string } };
+      const msg = err?.error?.message || err?.message || "Falha ao iniciar chamada.";
       setStatus("error");
       setErrorMsg(msg);
       toast.error(msg);
     }
   }
+
 
   function endCall() {
     if (vapiRef.current) {
