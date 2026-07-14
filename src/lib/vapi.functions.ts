@@ -1011,11 +1011,20 @@ export const listVapiVoices = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<VapiVoiceOption[]> => {
     const provider = (data.provider || "").trim();
     if (!provider) return [];
-    const raw = (await vapiFetch(`/voice-library/${encodeURIComponent(provider)}`, {
-      method: "GET",
-    })) as Array<Record<string, unknown>> | null;
+    // /voice-library existe só para providers externos (11labs, playht, cartesia...).
+    // Para "vapi" (vozes nativas) e outros sem library pública, a API responde 404 —
+    // devolvemos [] para o cliente cair no fallback estático em vez de exibir erro.
+    let raw: unknown = null;
+    try {
+      raw = await vapiFetch(`/voice-library/${encodeURIComponent(provider)}`, {
+        method: "GET",
+      });
+    } catch {
+      return [];
+    }
     if (!Array.isArray(raw)) return [];
-    return raw
+    const arr = raw as Array<Record<string, unknown>>;
+    return arr
       .map((v) => ({
         providerId: String(v.providerId ?? v.slug ?? v.id ?? ""),
         name: String(v.name ?? v.providerId ?? ""),
