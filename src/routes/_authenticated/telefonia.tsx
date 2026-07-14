@@ -277,15 +277,14 @@ function TelefoniaPage() {
   const [connecting, setConnecting] = useState(false);
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
-  const [verifyStep, setVerifyStep] = useState<"form" | "waiting">("form");
+  const [verifyStep, setVerifyStep] = useState<"form" | "code">("form");
   const [verifyState, setVerifyState] = useState<{
-    validationCode: string;
     phoneE164: string;
     label: string;
-    startedAt: number;
   } | null>(null);
+  const [otpCode, setOtpCode] = useState("");
   const [verifyStarting, setVerifyStarting] = useState(false);
-  const [verifyExpired, setVerifyExpired] = useState(false);
+  const [verifyChecking, setVerifyChecking] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
 
   // Per-row call controls (origin number + assistant)
