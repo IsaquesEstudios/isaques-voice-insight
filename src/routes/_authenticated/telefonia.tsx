@@ -165,8 +165,6 @@ function TelefoniaPage() {
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
-  const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
-  const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
   const removeTestContactFn = useServerFn(removeTestContact);
 
 
