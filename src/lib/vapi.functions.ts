@@ -172,10 +172,27 @@ async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
     await new Promise((r) => setTimeout(r, 300 * attempt));
   }
   console.error("Vapi API error", lastStatus, lastBody);
+  const rawMessage = (() => {
+    try {
+      const parsed = JSON.parse(lastBody) as { message?: unknown; error?: unknown };
+      if (Array.isArray(parsed.message)) return parsed.message.join(" ");
+      if (typeof parsed.message === "string") return parsed.message;
+      if (typeof parsed.error === "string") return parsed.error;
+    } catch {
+      // keep raw body below
+    }
+    return lastBody?.slice(0, 500) ?? "";
+  })();
+  if (/couldn'?t find 11labs voice/i.test(rawMessage)) {
+    throw new Error(
+      "Voz ElevenLabs não encontrada. A voz selecionada não existe na conta/lista ElevenLabs conectada à Vapi. Selecione uma voz brasileira carregada no dropdown ou ajuste/remova as credenciais ElevenLabs dentro da Vapi. " +
+        `Detalhe técnico: ${rawMessage}`,
+    );
+  }
   throw new Error(
     lastStatus >= 500 && lastStatus < 600
       ? `A API da Vapi está temporariamente indisponível (${lastStatus}). Tente novamente em instantes.`
-      : `Vapi ${init.method ?? "GET"} ${path} retornou ${lastStatus}: ${lastBody?.slice(0, 500) ?? ""}`,
+      : `Vapi ${init.method ?? "GET"} ${path} retornou ${lastStatus}: ${rawMessage}`,
   );
 }
 
