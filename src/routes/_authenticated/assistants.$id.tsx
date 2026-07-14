@@ -293,18 +293,110 @@ function AssistantDetailPage() {
 
   const allVoices = voicesQuery.data ?? [];
 
+  // Traduções pt-BR para metadados vindos da API da Vapi.
+  const translateLanguage = (raw?: string, code?: string): string => {
+    const key = (code || raw || "").toLowerCase().trim();
+    const byCode: Record<string, string> = {
+      "pt-br": "Português (Brasil)",
+      "pt-pt": "Português (Portugal)",
+      pt: "Português",
+      "en-us": "Inglês (EUA)",
+      "en-gb": "Inglês (Reino Unido)",
+      "en-au": "Inglês (Austrália)",
+      en: "Inglês",
+      "es-es": "Espanhol (Espanha)",
+      "es-mx": "Espanhol (México)",
+      es: "Espanhol",
+      "fr-fr": "Francês",
+      fr: "Francês",
+      "de-de": "Alemão",
+      de: "Alemão",
+      "it-it": "Italiano",
+      it: "Italiano",
+      "ja-jp": "Japonês",
+      ja: "Japonês",
+      "ko-kr": "Coreano",
+      ko: "Coreano",
+      "zh-cn": "Chinês (Mandarim)",
+      zh: "Chinês",
+      "ru-ru": "Russo",
+      ru: "Russo",
+      "nl-nl": "Holandês",
+      nl: "Holandês",
+      "pl-pl": "Polonês",
+      pl: "Polonês",
+      "tr-tr": "Turco",
+      tr: "Turco",
+      "ar-sa": "Árabe",
+      ar: "Árabe",
+      "hi-in": "Hindi",
+      hi: "Hindi",
+      multi: "Multilíngue",
+      multilingual: "Multilíngue",
+    };
+    if (byCode[key]) return byCode[key];
+    const label = (raw || code || "").trim();
+    if (!label) return "";
+    // Traduções por nome inglês -> pt-BR (fallback quando não há código).
+    const byLabel: Record<string, string> = {
+      portuguese: "Português",
+      "portuguese (brazil)": "Português (Brasil)",
+      "portuguese (portugal)": "Português (Portugal)",
+      english: "Inglês",
+      "english (us)": "Inglês (EUA)",
+      "english (united states)": "Inglês (EUA)",
+      "english (uk)": "Inglês (Reino Unido)",
+      spanish: "Espanhol",
+      french: "Francês",
+      german: "Alemão",
+      italian: "Italiano",
+      japanese: "Japonês",
+      korean: "Coreano",
+      chinese: "Chinês",
+      russian: "Russo",
+      dutch: "Holandês",
+      polish: "Polonês",
+      turkish: "Turco",
+      arabic: "Árabe",
+      multilingual: "Multilíngue",
+    };
+    return byLabel[label.toLowerCase()] ?? label;
+  };
+
+  const translateGender = (g?: string): string => {
+    const key = (g || "").toLowerCase().trim();
+    if (key === "male" || key === "m") return "Masculino";
+    if (key === "female" || key === "f") return "Feminino";
+    if (key === "neutral" || key === "non-binary") return "Neutro";
+    return g ?? "";
+  };
+
+  const translateAccent = (a?: string): string => {
+    const key = (a || "").toLowerCase().trim();
+    const map: Record<string, string> = {
+      american: "Americano",
+      british: "Britânico",
+      australian: "Australiano",
+      indian: "Indiano",
+      brazilian: "Brasileiro",
+      european: "Europeu",
+      neutral: "Neutro",
+    };
+    return map[key] ?? a ?? "";
+  };
+
   // Build list of languages present in this provider's voice library.
   const languageOptions = useMemo(() => {
-    const map = new Map<string, string>(); // code -> label
+    const map = new Map<string, string>(); // code -> label traduzido
     for (const v of allVoices) {
       const code = (v.languageCode || v.language || "").trim();
       if (!code) continue;
-      const label = (v.language || v.languageCode || code).trim();
+      const label = translateLanguage(v.language, v.languageCode) || code;
       if (!map.has(code)) map.set(code, label);
     }
     return Array.from(map.entries())
       .map(([code, label]) => ({ code, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [allVoices]);
 
   const hasLanguageData = languageOptions.length > 0;
@@ -331,7 +423,11 @@ function AssistantDetailPage() {
   }, [allVoices, languageFilter, hasLanguageData]);
 
   const voiceOptions = filteredVoices.map((v) => {
-    const meta = [v.language, v.accent, v.gender].filter(Boolean).join(" · ");
+    const meta = [
+      translateLanguage(v.language, v.languageCode),
+      translateAccent(v.accent),
+      translateGender(v.gender),
+    ].filter(Boolean).join(" · ");
     return {
       value: v.providerId,
       label: meta ? `${v.name} — ${meta}` : v.name,
