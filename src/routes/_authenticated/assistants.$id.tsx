@@ -236,6 +236,7 @@ function AssistantDetailPage() {
   const [tools, setTools] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [webCallOpen, setWebCallOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
