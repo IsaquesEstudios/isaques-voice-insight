@@ -281,7 +281,21 @@ function AssistantDetailPage() {
   }, [id, fetchAssistant]);
 
   const modelOptions = MODELS_BY_PROVIDER[form.modelProvider] ?? [];
-  const voiceOptions = VOICES_BY_PROVIDER[form.voiceProvider] ?? [];
+
+  // Fetch voices from Vapi voice-library for the selected provider.
+  const listVoicesFn = useServerFn(listVapiVoices);
+  const voicesQuery = useQuery({
+    queryKey: ["vapi-voices", form.voiceProvider],
+    queryFn: () => listVoicesFn({ data: { provider: form.voiceProvider } }),
+    enabled: !!form.voiceProvider,
+    staleTime: 1000 * 60 * 30,
+  });
+  const voiceOptions = (voicesQuery.data ?? []).map((v) => ({
+    value: v.providerId,
+    label: v.name,
+    previewUrl: v.previewUrl,
+  }));
+
 
   async function handleSave() {
     setIsSaving(true);
