@@ -319,8 +319,41 @@ const empty: FormState = {
   backgroundDenoisingEnabled: false,
 };
 
+// ---- Regras de compatibilidade voz ↔ modelo ------------------------------
+// OpenAI: vozes "realtime-only" só funcionam com modelos gpt-*-realtime-*.
+const OPENAI_REALTIME_VOICES = new Set(["ash", "ballad", "coral", "sage", "verse"]);
+
+function isRealtimeModel(model: string): boolean {
+  return /realtime/i.test(model);
+}
+
+interface CompatIssue {
+  ok: false;
+  fields: Array<"model" | "voice">;
+  message: string;
+}
+type CompatResult = { ok: true } | CompatIssue;
+
+function checkVoiceModelCompat(
+  voiceProvider: string,
+  voiceId: string,
+  _modelProvider: string,
+  model: string,
+): CompatResult {
+  if (voiceProvider === "openai" && OPENAI_REALTIME_VOICES.has(voiceId)) {
+    if (!isRealtimeModel(model)) {
+      return {
+        ok: false,
+        fields: ["model", "voice"],
+        message: `A voz "${voiceId}" (OpenAI) só funciona com modelos realtime (ex.: gpt-4o-realtime-preview). Troque o modelo ou escolha outra voz.`,
+      };
+    }
+  }
+  return { ok: true };
+}
 
 function AssistantDetailPage() {
+
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const fetchAssistant = useServerFn(getVapiAssistant);
@@ -332,6 +365,21 @@ function AssistantDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [webCallOpen, setWebCallOpen] = useState(false);
+
+  const compat = useMemo(
+    () =>
+      checkVoiceModelCompat(
+        form.voiceProvider,
+        form.voiceId,
+        form.modelProvider,
+        form.model,
+      ),
+    [form.voiceProvider, form.voiceId, form.modelProvider, form.model],
+  );
+  const compatBad = !compat.ok;
+  const compatModelBad = compatBad && compat.fields.includes("model");
+  const compatVoiceBad = compatBad && compat.fields.includes("voice");
+
 
   useEffect(() => {
     let cancelled = false;
@@ -648,7 +696,7 @@ function AssistantDetailPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isSaving || isLoading}
+              disabled={isSaving || isLoading || compatBad}
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
             >
               {isSaving ? (
@@ -658,6 +706,7 @@ function AssistantDetailPage() {
               )}
               Salvar Alterações
             </Button>
+
           </div>
         </div>
 
@@ -812,7 +861,13 @@ function AssistantDetailPage() {
                           onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
                           disabled={isLoading}
                         >
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                          <SelectTrigger
+                            className={`bg-background/40 backdrop-blur-xl ${
+                              compatModelBad
+                                ? "border-destructive ring-1 ring-destructive"
+                                : "border-white/[0.08]"
+                            }`}
+                          >
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
@@ -827,10 +882,14 @@ function AssistantDetailPage() {
                               )}
                           </SelectContent>
                         </Select>
+                        {compatModelBad && !compat.ok && (
+                          <p className="text-xs text-destructive">{compat.message}</p>
+                        )}
                         <CostHint
                           costPerMin={getModelCost(form.modelProvider, form.model)}
                           tooltip="Custo estimado do LLM por minuto de conversa."
                         />
+
                       </div>
                     </div>
                   </div>
@@ -938,9 +997,16 @@ function AssistantDetailPage() {
                               }
                               disabled={isLoading}
                             >
-                              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectTrigger
+                                className={`bg-background/40 backdrop-blur-xl ${
+                                  compatVoiceBad
+                                    ? "border-destructive ring-1 ring-destructive"
+                                    : "border-white/[0.08]"
+                                }`}
+                              >
                                 <SelectValue placeholder="Selecione uma voz..." />
                               </SelectTrigger>
+
                               <SelectContent className="max-h-72 border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                                 {voiceOptions.map((v) => (
                                   <SelectItem key={v.value} value={v.value}>
@@ -972,6 +1038,10 @@ function AssistantDetailPage() {
                             })()}
                           </>
                         )}
+                        {compatVoiceBad && !compat.ok && (
+                          <p className="text-xs text-destructive">{compat.message}</p>
+                        )}
+
 
                         <CostHint
                           costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
