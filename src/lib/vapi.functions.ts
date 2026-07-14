@@ -889,3 +889,14 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
     return { ok: true as const, callId: res?.id ?? null };
   });
 
+// Vapi Public Key for Web Call SDK (browser-safe). Requires auth so we don't
+// expose the key to unauthenticated callers.
+export const getVapiPublicKey = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const key = process.env.VAPI_PUBLIC_KEY;
+    if (!key) throw new Error("VAPI_PUBLIC_KEY não configurada.");
+    return { publicKey: key };
+  });
+
+
