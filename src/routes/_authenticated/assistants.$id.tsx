@@ -191,13 +191,25 @@ const MODEL_PROVIDERS = [
 
 const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   openai: [
+    { value: "gpt-5.4", label: "GPT-5.4" },
+    { value: "gpt-5.4-mini", label: "GPT-5.4 mini" },
+    { value: "gpt-5.4-nano", label: "GPT-5.4 nano" },
+    { value: "gpt-5.2", label: "GPT-5.2" },
+    { value: "gpt-5.1", label: "GPT-5.1" },
+    { value: "gpt-5", label: "GPT-5" },
+    { value: "gpt-5-mini", label: "GPT-5 mini" },
+    { value: "gpt-5-nano", label: "GPT-5 nano" },
     { value: "gpt-4.1", label: "GPT-4.1" },
     { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-    { value: "gpt-4o", label: "GPT-4o" },
-    { value: "gpt-4o-mini", label: "GPT-4o mini" },
-    { value: "gpt-4o-realtime-preview", label: "GPT-4o Realtime (preview)" },
-    { value: "gpt-4o-mini-realtime-preview", label: "GPT-4o mini Realtime (preview)" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 nano" },
+    { value: "chatgpt-4o-latest", label: "ChatGPT-4o latest" },
+    { value: "gpt-4o-realtime-preview-2024-12-17", label: "GPT-4o Realtime (preview 2024-12-17)" },
+    { value: "gpt-4o-realtime-preview-2024-10-01", label: "GPT-4o Realtime (preview 2024-10-01)" },
+    { value: "gpt-4o-mini-realtime-preview-2024-12-17", label: "GPT-4o mini Realtime (preview 2024-12-17)" },
+    { value: "o3", label: "o3" },
     { value: "o3-mini", label: "o3-mini" },
+    { value: "o4-mini", label: "o4-mini" },
+    { value: "o1-mini", label: "o1-mini" },
   ],
 
   anthropic: [
@@ -348,7 +360,7 @@ function checkVoiceModelCompat(
       return {
         ok: false,
         fields: ["model", "voice"],
-        message: `A voz "${voiceId}" (OpenAI) só funciona com modelos realtime (ex.: gpt-4o-realtime-preview). Troque o modelo ou escolha outra voz.`,
+        message: `A voz "${voiceId}" (OpenAI) só funciona com modelos realtime (ex.: gpt-4o-realtime-preview-2024-12-17). Troque o modelo ou escolha outra voz.`,
       };
     }
   }
