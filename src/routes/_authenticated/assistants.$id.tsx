@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
+import { WebCallDialog } from "@/components/assistants/web-call-dialog";
+import { PhoneCall } from "lucide-react";
 import {
   ArrowLeft,
   Brain,
@@ -234,6 +236,7 @@ function AssistantDetailPage() {
   const [tools, setTools] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [webCallOpen, setWebCallOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -346,18 +349,29 @@ function AssistantDetailPage() {
             )}
           </div>
 
-          <Button
-            onClick={handleSave}
-            disabled={isSaving || isLoading}
-            className="gap-2 bg-success text-success-foreground hover:bg-success/90"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Salvar Alterações
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setWebCallOpen(true)}
+              disabled={isLoading}
+              className="gap-2 border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+            >
+              <PhoneCall className="h-4 w-4" />
+              Testar no navegador
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || isLoading}
+              className="gap-2 bg-success text-success-foreground hover:bg-success/90"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Salvar Alterações
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="assistant" className="space-y-6">
@@ -642,6 +656,12 @@ function AssistantDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+      <WebCallDialog
+        assistantId={id}
+        assistantName={form.name?.trim() || "Assistente"}
+        open={webCallOpen}
+        onOpenChange={setWebCallOpen}
+      />
     </DashboardShell>
   );
 }
