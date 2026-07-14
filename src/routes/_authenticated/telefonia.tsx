@@ -69,14 +69,15 @@ import {
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
-  listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
+  listVerifiedCallerIds,
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
   sendVerifyOtp,
 } from "@/lib/twilio.functions";
+
 
 
 import {
