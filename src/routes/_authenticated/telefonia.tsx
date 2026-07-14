@@ -85,6 +85,7 @@ import {
   listVapiAssistants,
   listVapiPhoneNumbers,
 } from "@/lib/vapi.functions";
+import { VoiceCallTestCard } from "@/components/telefonia/voice-call-test-card";
 import {
   Select,
   SelectContent,
