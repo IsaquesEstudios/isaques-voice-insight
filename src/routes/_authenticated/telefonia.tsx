@@ -457,11 +457,85 @@ function TelefoniaPage() {
     return `sip:${slug}@sip.vapi.ai`;
   }, [userQuery.data]);
 
+  // ---- Comprar número Twilio ----
+  const searchTwilioFn = useServerFn(searchAvailableTwilioNumbers);
+  const purchaseTwilioFn = useServerFn(purchaseTwilioNumber);
+  const [buyForm, setBuyForm] = useState({
+    countryCode: "US",
+    areaCode: "",
+    contains: "",
+  });
+  const [buyResults, setBuyResults] = useState<
+    Array<{
+      phoneNumber: string;
+      friendlyName: string;
+      locality: string | null;
+      region: string | null;
+      country: string;
+      voice: boolean;
+      sms: boolean;
+    }>
+  >([]);
+  const [buySearching, setBuySearching] = useState(false);
+  const [buyingNumber, setBuyingNumber] = useState<string | null>(null);
+
+  const handleSearchTwilio = async () => {
+    setBuySearching(true);
+    try {
+      const res = await searchTwilioFn({
+        data: {
+          countryCode: (buyForm.countryCode || "US").toUpperCase(),
+          areaCode: buyForm.areaCode.trim() || undefined,
+          contains: buyForm.contains.trim() || undefined,
+        },
+      });
+      if (!res.ok) {
+        if (res.reason === "no_credentials") {
+          toast.error("Conecte sua conta Twilio primeiro.");
+          setTab("twilio");
+        } else {
+          toast.error(res.message ?? "Falha ao buscar números na Twilio.");
+        }
+        setBuyResults([]);
+        return;
+      }
+      setBuyResults(res.numbers);
+      if (res.numbers.length === 0) {
+        toast.info("Nenhum número encontrado. Ajuste país / DDD / contém e tente novamente.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na busca.");
+    } finally {
+      setBuySearching(false);
+    }
+  };
+
+  const handleBuyTwilio = async (phoneNumber: string) => {
+    setBuyingNumber(phoneNumber);
+    try {
+      const res = await purchaseTwilioFn({ data: { phoneNumber } });
+      if (!("ok" in res) || !res.ok) {
+        toast.error(res.message ?? "Não foi possível comprar este número.");
+        return;
+      }
+      toast.success(`Número ${res.phoneNumber} adquirido na Twilio!`);
+      setBuyResults((prev) => prev.filter((n) => n.phoneNumber !== phoneNumber));
+      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao comprar número.");
+    } finally {
+      setBuyingNumber(null);
+    }
+  };
+
   const resetModal = () => {
     setTab("twilio");
     setTwilioForm({ accountSid: "", authToken: "" });
     setSipForm({ routeName: "" });
     setCopied(false);
+    setBuyResults([]);
+    setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
   };
 
   const handleCopySip = async () => {
