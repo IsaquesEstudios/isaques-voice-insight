@@ -267,14 +267,10 @@ const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+// Apenas provedores com vozes em Português do Brasil (PT-BR).
 const VOICE_PROVIDERS = [
-  { value: "vapi", label: "Vapi Voices" },
-  { value: "openai", label: "OpenAI" },
-  { value: "deepgram", label: "Deepgram (Aura 2)" },
-  { value: "11labs", label: "ElevenLabs (BYOK)" },
-  { value: "cartesia", label: "Cartesia (BYOK)" },
-  { value: "playht", label: "PlayHT (BYOK)" },
-  { value: "azure", label: "Azure (BYOK)" },
+  { value: "11labs", label: "ElevenLabs (BYOK) — PT-BR" },
+  { value: "azure", label: "Azure (BYOK) — PT-BR" },
 ];
 
 // Vapi Voices ativas — https://docs.vapi.ai/providers/voice/vapi-voices
