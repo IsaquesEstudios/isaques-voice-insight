@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { WebCallDialog } from "@/components/assistants/web-call-dialog";
 import { PhoneCall } from "lucide-react";
 import {
@@ -290,11 +290,54 @@ function AssistantDetailPage() {
     enabled: !!form.voiceProvider,
     staleTime: 1000 * 60 * 30,
   });
-  const voiceOptions = (voicesQuery.data ?? []).map((v) => ({
-    value: v.providerId,
-    label: v.name,
-    previewUrl: v.previewUrl,
-  }));
+
+  const allVoices = voicesQuery.data ?? [];
+
+  // Build list of languages present in this provider's voice library.
+  const languageOptions = useMemo(() => {
+    const map = new Map<string, string>(); // code -> label
+    for (const v of allVoices) {
+      const code = (v.languageCode || v.language || "").trim();
+      if (!code) continue;
+      const label = (v.language || v.languageCode || code).trim();
+      if (!map.has(code)) map.set(code, label);
+    }
+    return Array.from(map.entries())
+      .map(([code, label]) => ({ code, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allVoices]);
+
+  const hasLanguageData = languageOptions.length > 0;
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
+
+  // When voices load, default the filter to pt-BR / pt if available.
+  useEffect(() => {
+    if (!hasLanguageData) return;
+    const codes = languageOptions.map((l) => l.code.toLowerCase());
+    const preferred = codes.find((c) => c === "pt-br")
+      ?? codes.find((c) => c.startsWith("pt"))
+      ?? codes.find((c) => /portug/i.test(languageOptions.find((l) => l.code.toLowerCase() === c)?.label ?? ""));
+    if (preferred) {
+      const match = languageOptions.find((l) => l.code.toLowerCase() === preferred);
+      if (match) setLanguageFilter(match.code);
+    }
+  }, [hasLanguageData, languageOptions]);
+
+  const filteredVoices = useMemo(() => {
+    if (!hasLanguageData || languageFilter === "all") return allVoices;
+    return allVoices.filter(
+      (v) => (v.languageCode || v.language || "") === languageFilter,
+    );
+  }, [allVoices, languageFilter, hasLanguageData]);
+
+  const voiceOptions = filteredVoices.map((v) => {
+    const meta = [v.language, v.accent, v.gender].filter(Boolean).join(" · ");
+    return {
+      value: v.providerId,
+      label: meta ? `${v.name} — ${meta}` : v.name,
+      previewUrl: v.previewUrl,
+    };
+  });
 
 
   async function handleSave() {
@@ -598,7 +641,28 @@ function AssistantDetailPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Voz / Voice ID</Label>
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>Voz / Voice ID</Label>
+                          {hasLanguageData && languageOptions.length > 1 && (
+                            <Select
+                              value={languageFilter}
+                              onValueChange={setLanguageFilter}
+                              disabled={isLoading}
+                            >
+                              <SelectTrigger className="h-7 w-auto min-w-[9rem] border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <SelectValue placeholder="Idioma" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72 border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                <SelectItem value="all">Todos os idiomas</SelectItem>
+                                {languageOptions.map((l) => (
+                                  <SelectItem key={l.code} value={l.code}>
+                                    {l.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
                         {!form.voiceProvider ? (
                           <p className="text-xs text-muted-foreground">
                             Selecione um provedor primeiro.
@@ -686,6 +750,21 @@ function AssistantDetailPage() {
                           tooltip="Custo estimado de TTS por minuto de voz sintetizada."
                         />
                       </div>
+                    </div>
+                    <div className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground">
+                      <p className="mb-1 font-medium text-foreground">Dicas para melhorar o sotaque</p>
+                      <ul className="list-disc space-y-1 pl-4">
+                        <li>
+                          Escolha uma voz nativa do idioma-alvo (ex.: filtre por Portuguese (Brazil) em Azure ou Cartesia).
+                          ElevenLabs e OpenAI não expõem idioma público — use vozes multilingues e deixe o prompt em português.
+                        </li>
+                        <li>
+                          No prompt do sistema, deixe explícito: "Responda sempre em português do Brasil, com pronúncia natural brasileira."
+                        </li>
+                        <li>
+                          Verifique o transcriber (Deepgram Nova 3 Multi já detecta pt-BR). Se estiver fixo em inglês, a IA pode responder com sotaque errado.
+                        </li>
+                      </ul>
                     </div>
                   </div>
 

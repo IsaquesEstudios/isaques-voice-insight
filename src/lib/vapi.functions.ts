@@ -905,6 +905,8 @@ export interface VapiVoiceOption {
   name: string;
   gender?: string;
   accent?: string;
+  language?: string;
+  languageCode?: string;
   previewUrl?: string;
   description?: string;
 }
@@ -925,6 +927,8 @@ export const listVapiVoices = createServerFn({ method: "GET" })
         name: String(v.name ?? v.providerId ?? ""),
         gender: typeof v.gender === "string" ? v.gender : undefined,
         accent: typeof v.accent === "string" ? v.accent : undefined,
+        language: typeof v.language === "string" ? v.language : undefined,
+        languageCode: typeof v.languageCode === "string" ? v.languageCode : undefined,
         previewUrl: typeof v.previewUrl === "string" ? v.previewUrl : undefined,
         description: typeof v.description === "string" ? v.description : undefined,
       }))
