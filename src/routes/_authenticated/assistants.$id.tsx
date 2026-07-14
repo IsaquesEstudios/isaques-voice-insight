@@ -267,14 +267,10 @@ const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+// Apenas provedores com vozes em Português do Brasil (PT-BR).
 const VOICE_PROVIDERS = [
-  { value: "vapi", label: "Vapi Voices" },
-  { value: "openai", label: "OpenAI" },
-  { value: "deepgram", label: "Deepgram (Aura 2)" },
-  { value: "11labs", label: "ElevenLabs (BYOK)" },
-  { value: "cartesia", label: "Cartesia (BYOK)" },
-  { value: "playht", label: "PlayHT (BYOK)" },
-  { value: "azure", label: "Azure (BYOK)" },
+  { value: "11labs", label: "ElevenLabs (BYOK) — PT-BR" },
+  { value: "azure", label: "Azure (BYOK) — PT-BR" },
 ];
 
 // Vapi Voices ativas — https://docs.vapi.ai/providers/voice/vapi-voices
@@ -414,7 +410,25 @@ const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   ],
   cartesia: [],
   playht: [],
-  azure: [],
+  azure: [
+    // Azure Neural TTS — vozes pt-BR (https://learn.microsoft.com/azure/ai-services/speech-service/language-support)
+    { value: "pt-BR-FranciscaNeural", label: "Francisca — PT-BR, feminino" },
+    { value: "pt-BR-AntonioNeural", label: "Antônio — PT-BR, masculino" },
+    { value: "pt-BR-BrendaNeural", label: "Brenda — PT-BR, feminino" },
+    { value: "pt-BR-DonatoNeural", label: "Donato — PT-BR, masculino" },
+    { value: "pt-BR-ElzaNeural", label: "Elza — PT-BR, feminino" },
+    { value: "pt-BR-FabioNeural", label: "Fábio — PT-BR, masculino" },
+    { value: "pt-BR-GiovannaNeural", label: "Giovanna — PT-BR, feminino" },
+    { value: "pt-BR-HumbertoNeural", label: "Humberto — PT-BR, masculino" },
+    { value: "pt-BR-JulioNeural", label: "Júlio — PT-BR, masculino" },
+    { value: "pt-BR-LeilaNeural", label: "Leila — PT-BR, feminino" },
+    { value: "pt-BR-LeticiaNeural", label: "Letícia — PT-BR, feminino" },
+    { value: "pt-BR-ManuelaNeural", label: "Manuela — PT-BR, feminino" },
+    { value: "pt-BR-NicolauNeural", label: "Nicolau — PT-BR, masculino" },
+    { value: "pt-BR-ThalitaNeural", label: "Thalita — PT-BR, feminino" },
+    { value: "pt-BR-ValerioNeural", label: "Valério — PT-BR, masculino" },
+    { value: "pt-BR-YaraNeural", label: "Yara — PT-BR, feminino" },
+  ],
 };
 
 interface FormState {
