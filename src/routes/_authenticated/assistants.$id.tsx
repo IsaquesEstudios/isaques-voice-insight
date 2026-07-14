@@ -822,8 +822,9 @@ function AssistantDetailPage() {
 
       toast.success("Alterações salvas.");
     } catch (err) {
-      console.error(err);
-      toast.error("Erro ao salvar alterações.");
+      console.error("Save error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Erro ao salvar alterações.", { description: msg.slice(0, 400) });
     } finally {
       setIsSaving(false);
     }
