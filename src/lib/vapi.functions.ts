@@ -502,6 +502,25 @@ export interface AssistantConfigInput {
   voiceId?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools?: any[];
+  // ---- Voice tuning (provider-specific + generic) ----
+  voiceModel?: string | null; // ElevenLabs model (eleven_multilingual_v2, ...)
+  voiceStability?: number | null; // 0..1 (11labs)
+  voiceSimilarityBoost?: number | null; // 0..1 (11labs)
+  voiceStyle?: number | null; // 0..1 (11labs)
+  voiceUseSpeakerBoost?: boolean | null; // 11labs
+  voiceSpeed?: number | null; // 0.25..4 (11labs/openai/cartesia/playht)
+  voiceEmotion?: string | null; // cartesia/playht
+  voiceTemperature?: number | null; // playht 0..2
+  voiceFillerInjectionEnabled?: boolean | null;
+  // ---- Speaking plan ----
+  startWaitSeconds?: number | null;
+  smartEndpointingEnabled?: boolean | null;
+  stopNumWords?: number | null;
+  stopVoiceSeconds?: number | null;
+  stopBackoffSeconds?: number | null;
+  // ---- Background ----
+  backgroundSound?: "off" | "office" | null;
+  backgroundDenoisingEnabled?: boolean | null;
 }
 
 // Partial PATCH used by the details page — only touches provided fields.
@@ -543,17 +562,60 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       body.model = model;
     }
 
-    if (data.voiceProvider || data.voiceId) {
-      body.voice = {
-        ...(data.voiceProvider ? { provider: data.voiceProvider } : {}),
-        ...(data.voiceId ? { voiceId: data.voiceId } : {}),
-      };
-    }
+    // ----- voice block -----
+    const voicePatch: Record<string, unknown> = {};
+    if (data.voiceProvider) voicePatch.provider = data.voiceProvider;
+    if (data.voiceId) voicePatch.voiceId = data.voiceId;
+    if (data.voiceModel != null && data.voiceModel !== "")
+      voicePatch.model = data.voiceModel;
+    if (typeof data.voiceSpeed === "number") voicePatch.speed = data.voiceSpeed;
+    if (typeof data.voiceEmotion === "string" && data.voiceEmotion)
+      voicePatch.emotion = data.voiceEmotion;
+    if (typeof data.voiceTemperature === "number")
+      voicePatch.temperature = data.voiceTemperature;
+    if (typeof data.voiceFillerInjectionEnabled === "boolean")
+      voicePatch.fillerInjectionEnabled = data.voiceFillerInjectionEnabled;
+    // 11labs nested tuning
+    const elevenTuning: Record<string, unknown> = {};
+    if (typeof data.voiceStability === "number")
+      elevenTuning.stability = data.voiceStability;
+    if (typeof data.voiceSimilarityBoost === "number")
+      elevenTuning.similarityBoost = data.voiceSimilarityBoost;
+    if (typeof data.voiceStyle === "number") elevenTuning.style = data.voiceStyle;
+    if (typeof data.voiceUseSpeakerBoost === "boolean")
+      elevenTuning.useSpeakerBoost = data.voiceUseSpeakerBoost;
+    if (Object.keys(elevenTuning).length > 0) Object.assign(voicePatch, elevenTuning);
+
+    if (Object.keys(voicePatch).length > 0) body.voice = voicePatch;
+
+    // ----- speaking plans -----
+    const startPlan: Record<string, unknown> = {};
+    if (typeof data.startWaitSeconds === "number")
+      startPlan.waitSeconds = data.startWaitSeconds;
+    if (typeof data.smartEndpointingEnabled === "boolean")
+      startPlan.smartEndpointingEnabled = data.smartEndpointingEnabled;
+    if (Object.keys(startPlan).length > 0) body.startSpeakingPlan = startPlan;
+
+    const stopPlan: Record<string, unknown> = {};
+    if (typeof data.stopNumWords === "number") stopPlan.numWords = data.stopNumWords;
+    if (typeof data.stopVoiceSeconds === "number")
+      stopPlan.voiceSeconds = data.stopVoiceSeconds;
+    if (typeof data.stopBackoffSeconds === "number")
+      stopPlan.backoffSeconds = data.stopBackoffSeconds;
+    if (Object.keys(stopPlan).length > 0) body.stopSpeakingPlan = stopPlan;
+
+    // ----- background -----
+    if (data.backgroundSound === "off" || data.backgroundSound === "office")
+      body.backgroundSound = data.backgroundSound;
+    if (typeof data.backgroundDenoisingEnabled === "boolean")
+      body.backgroundDenoisingEnabled = data.backgroundDenoisingEnabled;
+
     return (await vapiFetch(`/assistant/${data.id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     })) as VapiAssistantRaw;
   });
+
 
 export const deleteVapiAssistant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
