@@ -1,37 +1,40 @@
+## Objetivo
+Adicionar, dentro do popup "Novo contato de teste" em `/telefonia`, o fluxo oficial da Twilio de **Verified Caller IDs** — a única forma de liberar contas trial a receberem ligações da Vapi/Twilio no número informado.
 
-## O que muda
+## Como funciona (fluxo Twilio nativo)
+1. Usuário digita Identificação + Número de destino no popup.
+2. Clica em **"Verificar número (ligação da Twilio)"**.
+3. Backend chama `POST /OutgoingCallerIds.json` na Twilio → a Twilio devolve um `validation_code` de 6 dígitos e liga imediatamente para o número.
+4. UI mostra o código de 6 dígitos na tela + instrução: *"A Twilio está ligando para o seu celular. Atenda e digite este código no teclado."*
+5. Frontend faz polling em `GET /OutgoingCallerIds.json?PhoneNumber=...` a cada 3s (timeout 2 min). Assim que o número aparece na lista, está verificado.
+6. Salva o contato em `user_test_contacts` com `verified = true` e fecha o modal.
+7. A partir daí, o card **Teste de Voz por Telefone** (que já existe no popup) funciona — a Vapi consegue ligar via Twilio para esse número.
 
-Substituir o fluxo atual (SMS OTP / salvar direto / importar) da seção **Contatos de teste** pelo mesmo mecanismo que o Twilio Console usa em "Verify your first Caller ID":
+## Alterações
 
-1. Você digita **nome + número (E.164)** e clica em "Iniciar verificação".
-2. A Twilio liga imediatamente para esse número (via `POST /OutgoingCallerIds.json` na sua conta Twilio conectada) e devolve um código de 6 dígitos.
-3. Mostramos o código em destaque no modal com a instrução: "Atenda a ligação e digite este código no teclado do telefone."
-4. Enquanto o modal está aberto, fazemos polling do endpoint `/OutgoingCallerIds.json` a cada 3s.
-5. Assim que o número aparecer lá (= Twilio confirmou), gravamos automaticamente em `user_test_contacts` como `verified: true` e fechamos o modal — o contato já aparece na lista pronto para "Ligar".
+### `src/lib/twilio.functions.ts`
+- `startCallerIdVerification({ phoneNumber, friendlyName })` → `POST /OutgoingCallerIds.json` com `PhoneNumber` e `FriendlyName`. Retorna `{ validationCode, callSid }`.
+- `listVerifiedCallerIds({ phoneNumber? })` → `GET /OutgoingCallerIds.json` (filtrando por `PhoneNumber` quando fornecido). Retorna array de `{ phoneNumber, friendlyName, sid }`.
+- Manter helpers SMS existentes intocados (usuário pode voltar a usá-los depois), mas eles não serão chamados por este fluxo.
 
-O restante da UI da seção (lista de contatos, seletor de número de origem, seletor de assistente, botão "Ligar") não é tocado.
+### `src/routes/_authenticated/telefonia.tsx` (popup "Novo contato de teste")
+- Remover UI residual de SMS/OTP.
+- Novo layout do modal em 2 etapas:
+  - **Etapa 1** — form: Identificação, Número (E.164), botão **"Verificar número (ligação da Twilio)"**.
+  - **Etapa 2** — tela de verificação:
+    - Exibe o código de 6 dígitos em destaque (badge grande, monospace).
+    - Texto: "A Twilio está ligando para `+55…`. Atenda e digite este código no teclado do celular."
+    - Indicador de polling ("Aguardando verificação…") + botão "Cancelar" e "Reenviar chamada".
+    - Ao detectar verificação bem-sucedida: toast verde, `saveTestContact({ phoneNumber, label, verified: true })`, `refetch` da lista, fecha modal.
+    - Timeout 2 min → toast informativo e botão "Tentar novamente".
+- Manter o card `VoiceCallTestCard` que já existe no popup **fora** deste fluxo — ele passa a estar disponível na lista principal ou embaixo, após o contato ser criado. (Não removemos nada dele.)
 
-## Escopo dos arquivos
+### Tratamento de erros específicos da Twilio
+- `21450` (número inválido) → "Número inválido. Use formato E.164 (+55…)".
+- `21611` / trial restrictions em `OutgoingCallerIds` → mensagem exata da Twilio no toast.
+- Qualquer outro erro → `Erro Twilio: ${message}`.
 
-Apenas **`src/routes/_authenticated/telefonia.tsx`** — nenhuma outra tela ou arquivo é alterado.
-
-O backend não precisa de mudanças: `startCallerIdVerification`, `listVerifiedCallerIds` e `saveTestContact` já existem em `src/lib/twilio.functions.ts`.
-
-## Detalhes técnicos
-
-- **Imports**: adicionar `startCallerIdVerification, listVerifiedCallerIds` e remover `sendVerifyOtp, checkVerifyOtp, addVerifiedFromTwilio` (deixam de ser usados). `saveTestContact` fica.
-- **Estado**: remover `otpStep`, `otpCode`, `trialBlocked`. Adicionar `verifyStep: { phoneE164; label; validationCode; sid? } | null`.
-- **Mutations**: substituir `sendOtpMutation`, `confirmOtpMutation`, `trustFromTwilioMutation` por uma única `startVerifyMutation` que chama `startCallerIdVerification`. `saveContactMutation` permanece — passa a ser disparada automaticamente pelo efeito de polling.
-- **Polling**: `useQuery(["verified-caller-ids"], listVerifiedCallerIds, { enabled: !!verifyStep, refetchInterval: 3000 })` + `useEffect` que, quando `phoneE164` aparece na lista, chama `saveContactMutation` e limpa `verifyStep`.
-- **Erros da Twilio**:
-  - `10002` (conta trial não permite verificação por chamada): mostrar alerta explicando o motivo — sem tentar SMS (contas trial também bloqueiam SMS para números não verificados).
-  - Outros: toast com a mensagem retornada.
-- **Modal**: dois estados internos —
-  - Sem `verifyStep`: form (identificação + número) + botão "Iniciar verificação por chamada".
-  - Com `verifyStep`: bloco grande com o `validationCode` em fonte mono + texto "A Twilio está ligando para {phoneE164}. Atenda e digite este código no teclado." + botão "Cancelar" e um spinner "Aguardando confirmação…".
-- **Remover** o segundo `<Dialog>` de "Digite o código recebido por SMS" (linhas ~1146–1211).
-
-## Observações
-
-- O fluxo é idêntico ao do console Twilio — funciona para qualquer conta que consiga usar "Verify a Caller ID" no console. Contas trial da Twilio geralmente **bloqueiam** esse endpoint via API (erro 10002); nesse caso o alerta orienta a verificar pelo próprio console (a lista continua sendo lida da mesma API, então o número aparecerá aqui automaticamente após a verificação manual).
-- Nada muda no comportamento do botão "Ligar" nem nos seletores de origem/assistente.
+## Fora de escopo
+- Não mexer no `VoiceCallTestCard`.
+- Não alterar tabelas do Supabase.
+- Não tocar em rotas fora de `/telefonia` nem em `twilio.functions.ts` além dos dois helpers listados.
