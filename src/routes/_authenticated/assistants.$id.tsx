@@ -1038,6 +1038,10 @@ function AssistantDetailPage() {
                             })()}
                           </>
                         )}
+                        {compatVoiceBad && !compat.ok && (
+                          <p className="text-xs text-destructive">{compat.message}</p>
+                        )}
+
 
                         <CostHint
                           costPerMin={getVoiceCost(form.voiceProvider, form.voiceId)}
