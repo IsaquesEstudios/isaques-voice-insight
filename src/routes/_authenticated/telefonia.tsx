@@ -272,14 +272,6 @@ function TelefoniaPage() {
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  // Twilio Verify SMS OTP flow: Twilio sends a 6-digit code via SMS to the
-  // number and we confirm with `checkVerifyOtp`. Works on trial accounts too
-  // (Verify's free tier ignores the "unverified destination" restriction).
-  const [verifyStep, setVerifyStep] = useState<
-    | null
-    | { phoneE164: string; label: string }
-  >(null);
-  const [otpCode, setOtpCode] = useState("");
   // Per-row call controls (origin number + assistant)
   const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
@@ -299,67 +291,6 @@ function TelefoniaPage() {
     verified: boolean;
   }>;
 
-  const sendOtpMutation = useMutation({
-    mutationFn: async (input: { phoneE164: string; label: string }) => {
-      const res = (await sendVerifyOtpFn({
-        data: { phoneE164: input.phoneE164, channel: "sms" },
-      })) as
-        | { ok: true; channel: string }
-        | { ok: false; reason: string; message?: string };
-      return { res, input };
-    },
-    onSuccess: ({ res, input }) => {
-      if (res.ok) {
-        setVerifyStep({ phoneE164: input.phoneE164, label: input.label });
-        setOtpCode("");
-        toast.success("Código enviado por SMS.");
-      } else if (res.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      } else if (res.reason === "trial_unverified") {
-        toast.error(
-          "Sua conta Twilio está em trial e não permite SMS para este número. Verifique-o no Twilio Console → Verified Caller IDs e tente novamente.",
-          { duration: 8000 },
-        );
-      } else {
-        toast.error(res.message ?? "Falha ao enviar código.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao enviar código"),
-  });
-
-  const confirmOtpMutation = useMutation({
-    mutationFn: async (input: { phoneE164: string; label: string; code: string }) => {
-      const res = (await checkVerifyOtpFn({
-        data: {
-          phoneE164: input.phoneE164,
-          code: input.code,
-          label: input.label,
-        },
-      })) as
-        | { ok: true; id?: string }
-        | { ok: false; reason: string; message?: string };
-      return res;
-    },
-    onSuccess: async (res) => {
-      if (res.ok) {
-        toast.success("Número verificado e salvo.");
-        setTestContactOpen(false);
-        setVerifyStep(null);
-        setOtpCode("");
-        setTestContactForm({ label: "", phoneE164: "" });
-        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      } else if (res.reason === "invalid_code") {
-        toast.error("Código inválido. Confira o SMS e tente novamente.");
-      } else if (res.reason === "expired") {
-        toast.error("Código expirado. Solicite um novo SMS.");
-      } else {
-        toast.error(res.message ?? "Falha ao confirmar código.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao confirmar código"),
-  });
 
   const removeTestContactMutation = useMutation({
     mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
