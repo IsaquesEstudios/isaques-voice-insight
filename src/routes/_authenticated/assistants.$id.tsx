@@ -471,6 +471,18 @@ function AssistantDetailPage() {
 
   const allVoices = voicesQuery.data ?? [];
 
+  // Se a lista pública de vozes carregou e o voiceId atual não está nela,
+  // a Vapi rejeitará o PATCH com 400 ("voice.voiceId must be one of ...").
+  // Providers BYOK retornam lista vazia — nesse caso não validamos.
+  const voiceListMismatch = useMemo(() => {
+    if (!form.voiceProvider || !form.voiceId) return false;
+    if (voicesQuery.isLoading || !voicesQuery.data) return false;
+    const list = voicesQuery.data as Array<{ value: string }>;
+    if (list.length === 0) return false;
+    const target = form.voiceId.toLowerCase();
+    return !list.some((v) => (v.value || "").toLowerCase() === target);
+  }, [form.voiceProvider, form.voiceId, voicesQuery.data, voicesQuery.isLoading]);
+
   // Traduções pt-BR para metadados vindos da API da Vapi.
   const translateLanguage = (raw?: string, code?: string): string => {
     const key = (code || raw || "").toLowerCase().trim();
