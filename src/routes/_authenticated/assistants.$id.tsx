@@ -410,7 +410,25 @@ const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   ],
   cartesia: [],
   playht: [],
-  azure: [],
+  azure: [
+    // Azure Neural TTS — vozes pt-BR (https://learn.microsoft.com/azure/ai-services/speech-service/language-support)
+    { value: "pt-BR-FranciscaNeural", label: "Francisca — PT-BR, feminino" },
+    { value: "pt-BR-AntonioNeural", label: "Antônio — PT-BR, masculino" },
+    { value: "pt-BR-BrendaNeural", label: "Brenda — PT-BR, feminino" },
+    { value: "pt-BR-DonatoNeural", label: "Donato — PT-BR, masculino" },
+    { value: "pt-BR-ElzaNeural", label: "Elza — PT-BR, feminino" },
+    { value: "pt-BR-FabioNeural", label: "Fábio — PT-BR, masculino" },
+    { value: "pt-BR-GiovannaNeural", label: "Giovanna — PT-BR, feminino" },
+    { value: "pt-BR-HumbertoNeural", label: "Humberto — PT-BR, masculino" },
+    { value: "pt-BR-JulioNeural", label: "Júlio — PT-BR, masculino" },
+    { value: "pt-BR-LeilaNeural", label: "Leila — PT-BR, feminino" },
+    { value: "pt-BR-LeticiaNeural", label: "Letícia — PT-BR, feminino" },
+    { value: "pt-BR-ManuelaNeural", label: "Manuela — PT-BR, feminino" },
+    { value: "pt-BR-NicolauNeural", label: "Nicolau — PT-BR, masculino" },
+    { value: "pt-BR-ThalitaNeural", label: "Thalita — PT-BR, feminino" },
+    { value: "pt-BR-ValerioNeural", label: "Valério — PT-BR, masculino" },
+    { value: "pt-BR-YaraNeural", label: "Yara — PT-BR, feminino" },
+  ],
 };
 
 interface FormState {
