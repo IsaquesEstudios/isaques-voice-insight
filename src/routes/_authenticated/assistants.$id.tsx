@@ -471,6 +471,18 @@ function AssistantDetailPage() {
 
   const allVoices = voicesQuery.data ?? [];
 
+  // Se a lista pública de vozes carregou e o voiceId atual não está nela,
+  // a Vapi rejeitará o PATCH com 400 ("voice.voiceId must be one of ...").
+  // Providers BYOK retornam lista vazia — nesse caso não validamos.
+  const voiceListMismatch = useMemo(() => {
+    if (!form.voiceProvider || !form.voiceId) return false;
+    if (voicesQuery.isLoading || !voicesQuery.data) return false;
+    const list = voicesQuery.data;
+    if (list.length === 0) return false;
+    const target = form.voiceId.toLowerCase();
+    return !list.some((v) => (v.providerId || "").toLowerCase() === target);
+  }, [form.voiceProvider, form.voiceId, voicesQuery.data, voicesQuery.isLoading]);
+
   // Traduções pt-BR para metadados vindos da API da Vapi.
   const translateLanguage = (raw?: string, code?: string): string => {
     const key = (code || raw || "").toLowerCase().trim();
@@ -711,7 +723,7 @@ function AssistantDetailPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isSaving || isLoading || compatBad}
+              disabled={isSaving || isLoading || compatBad || voiceListMismatch}
               className="gap-2 bg-success text-success-foreground hover:bg-success/90"
             >
               {isSaving ? (
@@ -1055,6 +1067,12 @@ function AssistantDetailPage() {
                         )}
                         {compatVoiceBad && !compat.ok && (
                           <p className="text-xs text-destructive">{compat.message}</p>
+                        )}
+                        {voiceListMismatch && (
+                          <p className="text-xs text-destructive">
+                            A voz "{form.voiceId}" não existe no provider "{form.voiceProvider}".
+                            Selecione uma voz da lista acima antes de salvar.
+                          </p>
                         )}
 
 
