@@ -170,7 +170,7 @@ function TelefoniaPage() {
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
-  const removeTestContactFn = useServerFn(removeTestContact);
+  const deleteVerifiedCallerIdFn = useServerFn(deleteVerifiedCallerId);
   const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
   const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
 
