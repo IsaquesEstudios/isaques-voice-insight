@@ -64,7 +64,6 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  checkVerifyOtp,
   connectExternalNumber,
   disconnectTwilio,
   getTwilioConnection,
@@ -75,7 +74,6 @@ import {
   releaseNumber,
   removeTestContact,
   saveTwilioCredentials,
-  sendVerifyOtp,
 } from "@/lib/twilio.functions";
 
 import {
@@ -167,8 +165,6 @@ function TelefoniaPage() {
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
-  const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
-  const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
   const removeTestContactFn = useServerFn(removeTestContact);
 
 
@@ -276,14 +272,6 @@ function TelefoniaPage() {
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  // Twilio Verify SMS OTP flow: Twilio sends a 6-digit code via SMS to the
-  // number and we confirm with `checkVerifyOtp`. Works on trial accounts too
-  // (Verify's free tier ignores the "unverified destination" restriction).
-  const [verifyStep, setVerifyStep] = useState<
-    | null
-    | { phoneE164: string; label: string }
-  >(null);
-  const [otpCode, setOtpCode] = useState("");
   // Per-row call controls (origin number + assistant)
   const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
@@ -303,67 +291,6 @@ function TelefoniaPage() {
     verified: boolean;
   }>;
 
-  const sendOtpMutation = useMutation({
-    mutationFn: async (input: { phoneE164: string; label: string }) => {
-      const res = (await sendVerifyOtpFn({
-        data: { phoneE164: input.phoneE164, channel: "sms" },
-      })) as
-        | { ok: true; channel: string }
-        | { ok: false; reason: string; message?: string };
-      return { res, input };
-    },
-    onSuccess: ({ res, input }) => {
-      if (res.ok) {
-        setVerifyStep({ phoneE164: input.phoneE164, label: input.label });
-        setOtpCode("");
-        toast.success("Código enviado por SMS.");
-      } else if (res.reason === "no_credentials") {
-        toast.error("Conecte sua conta Twilio primeiro.");
-      } else if (res.reason === "trial_unverified") {
-        toast.error(
-          "Sua conta Twilio está em trial e não permite SMS para este número. Verifique-o no Twilio Console → Verified Caller IDs e tente novamente.",
-          { duration: 8000 },
-        );
-      } else {
-        toast.error(res.message ?? "Falha ao enviar código.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao enviar código"),
-  });
-
-  const confirmOtpMutation = useMutation({
-    mutationFn: async (input: { phoneE164: string; label: string; code: string }) => {
-      const res = (await checkVerifyOtpFn({
-        data: {
-          phoneE164: input.phoneE164,
-          code: input.code,
-          label: input.label,
-        },
-      })) as
-        | { ok: true; id?: string }
-        | { ok: false; reason: string; message?: string };
-      return res;
-    },
-    onSuccess: async (res) => {
-      if (res.ok) {
-        toast.success("Número verificado e salvo.");
-        setTestContactOpen(false);
-        setVerifyStep(null);
-        setOtpCode("");
-        setTestContactForm({ label: "", phoneE164: "" });
-        await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      } else if (res.reason === "invalid_code") {
-        toast.error("Código inválido. Confira o SMS e tente novamente.");
-      } else if (res.reason === "expired") {
-        toast.error("Código expirado. Solicite um novo SMS.");
-      } else {
-        toast.error(res.message ?? "Falha ao confirmar código.");
-      }
-    },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao confirmar código"),
-  });
 
   const removeTestContactMutation = useMutation({
     mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
@@ -1043,137 +970,22 @@ function TelefoniaPage() {
           setTestContactOpen(o);
           if (!o) {
             setTestContactForm({ label: "", phoneE164: "" });
-            setVerifyStep(null);
           }
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {verifyStep ? "Digite o código recebido por SMS" : "Novo contato de teste"}
-            </DialogTitle>
+            <DialogTitle>Teste de Voz por Telefone</DialogTitle>
             <DialogDescription>
-              {verifyStep
-                ? `Enviamos um SMS com um código de 6 dígitos para ${verifyStep.phoneE164}. Digite-o abaixo para confirmar.`
-                : "Registre um número para usar como destino de ligações de teste. A Twilio envia um SMS gratuito com um código para confirmar a posse."}
+              Dispare uma ligação de teste via Vapi para um número de destino.
             </DialogDescription>
           </DialogHeader>
 
-          {!verifyStep ? (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="tc-label" className="text-xs">Identificação</Label>
-                <Input
-                  id="tc-label"
-                  placeholder="Ex: Meu celular"
-                  value={testContactForm.label}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tc-phone" className="text-xs">Número (E.164)</Label>
-                <Input
-                  id="tc-phone"
-                  placeholder="+5511999998888"
-                  value={testContactForm.phoneE164}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="ghost" onClick={() => setTestContactOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() =>
-                    sendOtpMutation.mutate({
-                      phoneE164: testContactForm.phoneE164.trim(),
-                      label: testContactForm.label.trim(),
-                    })
-                  }
-                  disabled={
-                    sendOtpMutation.isPending ||
-                    !testContactForm.label.trim() ||
-                    !testContactForm.phoneE164.trim()
-                  }
-                >
-                  {sendOtpMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Enviar código por SMS
-                </Button>
-              </div>
-
-              <div className="pt-2">
-                <VoiceCallTestCard
-                  defaultCustomerNumber={testContactForm.phoneE164.trim()}
-                />
-              </div>
-            </div>
-
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="tc-otp" className="text-xs">Código de 6 dígitos</Label>
-                <Input
-                  id="tc-otp"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={10}
-                  placeholder="123456"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  className="font-mono text-center text-2xl tracking-[0.35em]"
-                />
-              </div>
-              <div className="flex justify-between gap-2 pt-1">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setVerifyStep(null);
-                    setOtpCode("");
-                  }}
-                >
-                  Voltar
-                </Button>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      sendOtpMutation.mutate({
-                        phoneE164: verifyStep.phoneE164,
-                        label: verifyStep.label,
-                      })
-                    }
-                    disabled={sendOtpMutation.isPending}
-                  >
-                    {sendOtpMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Reenviar SMS
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      confirmOtpMutation.mutate({
-                        phoneE164: verifyStep.phoneE164,
-                        label: verifyStep.label,
-                        code: otpCode.trim(),
-                      })
-                    }
-                    disabled={confirmOtpMutation.isPending || otpCode.trim().length < 4}
-                  >
-                    {confirmOtpMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Confirmar
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          <VoiceCallTestCard
+            defaultLabel={testContactForm.label}
+            defaultCustomerNumber={testContactForm.phoneE164}
+            onSuccess={() => setTestContactOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 
