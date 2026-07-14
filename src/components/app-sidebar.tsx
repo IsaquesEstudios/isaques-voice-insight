@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Bot,
   PhoneCall,
+  Video,
   Inbox,
   ListChecks,
   Settings,
