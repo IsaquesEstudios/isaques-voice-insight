@@ -899,4 +899,37 @@ export const getVapiPublicKey = createServerFn({ method: "GET" })
     return { publicKey: key };
   });
 
+// List available voices for a given voice provider via Vapi voice-library.
+export interface VapiVoiceOption {
+  providerId: string;
+  name: string;
+  gender?: string;
+  accent?: string;
+  previewUrl?: string;
+  description?: string;
+}
+
+export const listVapiVoices = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { provider: string }) => data)
+  .handler(async ({ data }): Promise<VapiVoiceOption[]> => {
+    const provider = (data.provider || "").trim();
+    if (!provider) return [];
+    const raw = (await vapiFetch(`/voice-library/${encodeURIComponent(provider)}`, {
+      method: "GET",
+    })) as Array<Record<string, unknown>> | null;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((v) => ({
+        providerId: String(v.providerId ?? v.slug ?? v.id ?? ""),
+        name: String(v.name ?? v.providerId ?? ""),
+        gender: typeof v.gender === "string" ? v.gender : undefined,
+        accent: typeof v.accent === "string" ? v.accent : undefined,
+        previewUrl: typeof v.previewUrl === "string" ? v.previewUrl : undefined,
+        description: typeof v.description === "string" ? v.description : undefined,
+      }))
+      .filter((v) => v.providerId && v.name);
+  });
+
+
 
