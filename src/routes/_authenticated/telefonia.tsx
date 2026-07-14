@@ -1049,12 +1049,12 @@ function TelefoniaPage() {
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>
-              {verifyStep ? "Verificando número na Twilio" : "Novo contato de teste"}
+              {verifyStep ? "Digite o código recebido por SMS" : "Novo contato de teste"}
             </DialogTitle>
             <DialogDescription>
               {verifyStep
-                ? "A Twilio está ligando para o número. Atenda e digite o código no teclado do telefone."
-                : "Registre um número para usar como destino de ligações de teste. A Twilio vai ligar para confirmar a posse (mesmo fluxo do Verified Caller IDs no console)."}
+                ? `Enviamos um SMS com um código de 6 dígitos para ${verifyStep.phoneE164}. Digite-o abaixo para confirmar.`
+                : "Registre um número para usar como destino de ligações de teste. A Twilio envia um SMS gratuito com um código para confirmar a posse."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1088,72 +1088,87 @@ function TelefoniaPage() {
                 </Button>
                 <Button
                   onClick={() =>
-                    startVerifyMutation.mutate({
+                    sendOtpMutation.mutate({
                       phoneE164: testContactForm.phoneE164.trim(),
                       label: testContactForm.label.trim(),
                     })
                   }
                   disabled={
-                    startVerifyMutation.isPending ||
+                    sendOtpMutation.isPending ||
                     !testContactForm.label.trim() ||
                     !testContactForm.phoneE164.trim()
                   }
                 >
-                  {startVerifyMutation.isPending && (
+                  {sendOtpMutation.isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Iniciar verificação por chamada
+                  Enviar código por SMS
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-4 text-center">
-                <div className="text-xs text-muted-foreground">
-                  Ligação para <b>{verifyStep.phoneE164}</b>
-                </div>
-                <div className="mt-2 font-mono text-4xl tracking-[0.35em]">
-                  {verifyStep.validationCode}
-                </div>
-                <div className="mt-3 text-xs text-muted-foreground">
-                  Atenda e digite este código no teclado do telefone.
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Aguardando confirmação da Twilio…
+              <div className="space-y-1.5">
+                <Label htmlFor="tc-otp" className="text-xs">Código de 6 dígitos</Label>
+                <Input
+                  id="tc-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={10}
+                  placeholder="123456"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  className="font-mono text-center text-2xl tracking-[0.35em]"
+                />
               </div>
               <div className="flex justify-between gap-2 pt-1">
                 <Button
                   variant="ghost"
                   onClick={() => {
                     setVerifyStep(null);
-                    setTestContactOpen(false);
-                    setTestContactForm({ label: "", phoneE164: "" });
+                    setOtpCode("");
                   }}
                 >
-                  Cancelar
+                  Voltar
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    startVerifyMutation.mutate({
-                      phoneE164: verifyStep.phoneE164,
-                      label: verifyStep.label,
-                    })
-                  }
-                  disabled={startVerifyMutation.isPending}
-                >
-                  {startVerifyMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Ligar novamente
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      sendOtpMutation.mutate({
+                        phoneE164: verifyStep.phoneE164,
+                        label: verifyStep.label,
+                      })
+                    }
+                    disabled={sendOtpMutation.isPending}
+                  >
+                    {sendOtpMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Reenviar SMS
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      confirmOtpMutation.mutate({
+                        phoneE164: verifyStep.phoneE164,
+                        label: verifyStep.label,
+                        code: otpCode.trim(),
+                      })
+                    }
+                    disabled={confirmOtpMutation.isPending || otpCode.trim().length < 4}
+                  >
+                    {confirmOtpMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Confirmar
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
 
 
 
