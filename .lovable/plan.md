@@ -1,25 +1,26 @@
-## Diagnóstico
+## Objetivo
+Simplificar o card "Contatos de teste" em `/telefonia`: remover o seletor "Número de origem" e deixar apenas a escolha da assistente + botão **Ligar**. O número de origem é escolhido automaticamente.
 
-A lista "Contatos de teste" usa `useQuery({ queryKey: ["verified-caller-ids"] })` que herda o cache global longo (`staleTime` alto configurado para navegação instantânea). Como o Caller ID foi verificado **fora do app** (no Console Twilio), o React Query nunca é invalidado — ele continua servindo o snapshot vazio em cache. A chamada à Twilio (`GET /OutgoingCallerIds.json`) está correta e o mapeamento (`outgoing_caller_ids → { sid, phone_number, friendly_name }`) também.
+## Mudanças (arquivo único: `src/routes/_authenticated/telefonia.tsx`)
 
-## Correções (arquivo único: `src/routes/_authenticated/telefonia.tsx`)
+1. **Remover UI de seleção de origem**
+   - Apagar o bloco `Label "Número de origem" + Select` dentro do map de `testContacts` (aprox. linhas 938–966).
+   - Remover o estado `rowCallFrom` e o `setRowCallFrom` (ficam sem uso).
 
-1. **Forçar refetch ao entrar no card**  
-   No `useQuery` do `testContactsQuery`, adicionar:
-   - `staleTime: 0`
-   - `refetchOnMount: "always"`
-   - `refetchOnWindowFocus: true`  
-   Isso garante que, sempre que a página `/telefonia` for aberta ou refocada, ele bate na Twilio novamente e pega o Caller ID recém-verificado.
+2. **Escolher o número de origem automaticamente**
+   - No `testCallMutation.mutationFn`, substituir a leitura de `rowCallFrom[contact.id]` por uma seleção automática:
+     - Preferir o primeiro número da lista `numbers` (Vapi phone numbers já conectados) que tenha uma assistente vinculada — ou simplesmente `numbers[0]?.phone_number`.
+   - Se `numbers.length === 0`, rejeitar com toast: *"Conecte um número em 'Conectar Número' antes de testar a ligação."* (mantém orientação clara em vez de sumir com o erro).
+   - O botão **Ligar** fica desabilitado quando: sem assistente selecionada, sem números disponíveis, Twilio não conectado, ou chamada em andamento.
 
-2. **Botão "Atualizar" no header do card "Contatos de teste"**  
-   Adicionar um `IconButton` (ícone `RefreshCw` do lucide) ao lado do botão "Novo contato" que chama `testContactsQuery.refetch()` com um spinner enquanto `isFetching`. Assim o usuário força a sincronização sem esperar remount.
-
-3. **Feedback de estado vazio mais claro**  
-   Se `data.length === 0` e o usuário está conectado ao Twilio, além do texto atual mostrar um aviso curto: *"Nenhum Caller ID verificado encontrado na sua conta Twilio. Verifique um número em Console → Phone Numbers → Verified Caller IDs e clique em Atualizar."*
-
-Nenhuma mudança em `twilio.functions.ts` — a função server-side já está correta.
+3. **Ajustar o texto de ajuda do card**
+   - Atualizar o subtítulo do card para deixar claro que a ligação parte automaticamente do primeiro número conectado.
+   - Se `numbers.length === 0`, mostrar um `Alert` curto acima da lista: *"Nenhum número conectado à Vapi. Vá em 'Conectar Número' para poder disparar testes."*
 
 ## Fora de escopo
-- Não mexer no fluxo de criação (popup "Novo contato").
-- Não alterar `twilio.functions.ts`.
-- Não tocar em outros cards da página.
+- Não alterar `vapi.functions.ts` nem `twilio.functions.ts`.
+- Não mexer nos outros cards (Rotas ativas, Meus números, modal Conectar Número).
+- Não alterar o fluxo de verificação de Caller IDs.
+
+## Sobre "número padrão da Twilio"
+A Vapi/Twilio não fornece um número global padrão — a ligação sai de um número que **você conectou** à Vapi. É por isso que o select aparecia vazio: se nenhum número foi importado para a Vapi ainda, não há origem para disparar. A tela vai passar a escolher sozinha o primeiro disponível, e se não houver nenhum, mostra o aviso pedindo para conectar um em "Conectar Número".

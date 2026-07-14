@@ -290,8 +290,7 @@ function TelefoniaPage() {
   const [verifyChecking, setVerifyChecking] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
 
-  // Per-row call controls (origin number + assistant)
-  const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
+  // Per-row call controls (assistant only; origin number chosen automatically)
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
 
   const outboundCallFn = useServerFn(createOutboundTestCall);
@@ -412,14 +411,16 @@ function TelefoniaPage() {
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
       const assistantId = rowCallAssistant[contact.id];
-      const fromNumberE164 = rowCallFrom[contact.id];
+      const fromNumberE164 = numbers[0]?.phone_number ?? "";
       if (!assistantId) {
         setCallingContactId(null);
         return Promise.reject(new Error("Selecione uma assistente."));
       }
       if (!fromNumberE164) {
         setCallingContactId(null);
-        return Promise.reject(new Error("Selecione o número de origem."));
+        return Promise.reject(
+          new Error("Conecte um número em 'Conectar Número' antes de testar a ligação."),
+        );
       }
       return outboundCallFn({
         data: {
@@ -904,7 +905,7 @@ function TelefoniaPage() {
                 </div>
               ) : (
                 testContacts.map((c) => {
-                  const from = rowCallFrom[c.id] ?? numbers[0]?.phone_number ?? "";
+                  const from = numbers[0]?.phone_number ?? "";
                   const assistantId = rowCallAssistant[c.id] ?? "";
                   return (
                     <div
@@ -936,34 +937,18 @@ function TelefoniaPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Número de origem
-                          </Label>
-                          <Select
-                            value={from}
-                            onValueChange={(v) =>
-                              setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
-                            }
-                          >
-                            <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                              <SelectValue placeholder="Selecione um número" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {numbers.length === 0 ? (
-                                <div className="px-3 py-2 text-xs text-muted-foreground">
-                                  Conecte um número em "Conectar Número".
-                                </div>
-                              ) : (
-                                numbers.map((n) => (
-                                  <SelectItem key={n.phone_number} value={n.phone_number}>
-                                    {n.phone_number}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        {numbers.length === 0 ? (
+                          <Alert className="border-warning/30 bg-warning/10 py-2">
+                            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                            <AlertDescription className="text-[11px] text-muted-foreground">
+                              Nenhum número conectado à Vapi. Vá em "Conectar Número" para poder disparar testes.
+                            </AlertDescription>
+                          </Alert>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            Origem automática: <span className="font-mono">{from}</span>
+                          </p>
+                        )}
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                             Assistente
