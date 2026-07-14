@@ -132,7 +132,14 @@ function buildPayload(input: AssistantInput) {
     transcriber: { ...DEFAULT_TRANSCRIBER_BLOCK },
     model: {
       provider: input.modelProvider?.trim() || DEFAULT_MODEL_PROVIDER,
-      model: input.model?.trim() || DEFAULT_MODEL,
+      model:
+        input.model?.trim() === "gpt-4o-realtime-preview"
+          ? "gpt-4o-realtime-preview-2024-12-17"
+          : input.model?.trim() === "gpt-4o-mini-realtime-preview"
+            ? "gpt-4o-mini-realtime-preview-2024-12-17"
+            : input.model?.trim() === "gpt-4o"
+              ? "chatgpt-4o-latest"
+              : input.model?.trim() || DEFAULT_MODEL,
       messages: [{ role: "system", content: input.systemPrompt }],
     },
     voice,
