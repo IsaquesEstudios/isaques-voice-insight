@@ -329,25 +329,8 @@ const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
     { value: "diana", label: "Diana (ES)" },
   ],
   "11labs": [
-    // Vozes padrão multilíngues da ElevenLabs (funcionam bem em português)
-    { value: "pNInz6obpgDQGcFmaJgB", label: "Adam — multilíngue" },
-    { value: "AZnzlk1XvdvUeBnXmlld", label: "Antoni — multilíngue" },
-    { value: "ZQe5CZNwzXWgMbkx8Uln", label: "Arnold — multilíngue" },
-    { value: "EXAVITQu4vr4xnSDxMaL", label: "Bella — multilíngue" },
-    { value: "N2lVS1w4EtoT3dr4eOWO", label: "Callum — multilíngue" },
-    { value: "IKne3meq5aSn9XLyUdCD", label: "Charlie — multilíngue" },
-    { value: "onwK4e9ZLuTAKqWW03F9", label: "Daniel — multilíngue" },
-    { value: "cjVigY5qzO86Huf0OWal", label: "Eric — multilíngue" },
-    { value: "JBFqnCBsd6RMkjVDRZzb", label: "George — multilíngue" },
-    { value: "cgSgspJ2msm6clMCkdW9", label: "Jessica — multilíngue" },
-    { value: "FGY2WhTYpPnrIDTdsKH5", label: "Laura — multilíngue" },
-    { value: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam — multilíngue" },
-    { value: "pFZP5JQG7iQjIQuC4Bku", label: "Lily — multilíngue" },
-    { value: "XrExE9yKIg1WjnnlVkGX", label: "Matilda — multilíngue" },
-    { value: "CwhRBWXzGAHq8TQ4Fs17", label: "Roger — multilíngue" },
-    { value: "Yko7PKHZNXotIFUBG7I9", label: "Sarah — multilíngue" },
-    { value: "bIHbv24MWmeRgasZH58o", label: "Will — multilíngue" },
-    // Vozes brasileiras da ElevenLabs Voice Library
+    // Somente vozes nativas em Português (Brasil) da ElevenLabs Voice Library.
+    // Vozes multilíngues foram removidas porque saem com sotaque estrangeiro.
     { value: "NQ10OlqJ7vYH6XwegHSW", label: "Lucke — PT-BR, masculino" },
     { value: "dX7gRq1dIvLTgUaWpEFn", label: "Rafael Valente — PT-BR, narrador" },
     { value: "cFylwQo5ufGYUNyRS167", label: "Luka — PT-BR, masculino jovem" },
