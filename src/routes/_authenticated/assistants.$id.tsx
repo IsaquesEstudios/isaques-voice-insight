@@ -656,6 +656,12 @@ function AssistantDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+      <WebCallDialog
+        assistantId={id}
+        assistantName={form.name?.trim() || "Assistente"}
+        open={webCallOpen}
+        onOpenChange={setWebCallOpen}
+      />
     </DashboardShell>
   );
 }
