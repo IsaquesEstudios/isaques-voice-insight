@@ -64,6 +64,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
+  checkVerifyOtp,
   connectExternalNumber,
   disconnectTwilio,
   getTwilioConnection,
@@ -71,12 +72,10 @@ import {
   listTestContacts,
   listTwilioNumbers,
   listTwilioTrunks,
-  listVerifiedCallerIds,
   releaseNumber,
   removeTestContact,
-  saveTestContact,
   saveTwilioCredentials,
-  startCallerIdVerification,
+  sendVerifyOtp,
 } from "@/lib/twilio.functions";
 
 
@@ -170,9 +169,8 @@ function TelefoniaPage() {
   const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
   const listTestContactsFn = useServerFn(listTestContacts);
   const removeTestContactFn = useServerFn(removeTestContact);
-  const saveTestContactFn = useServerFn(saveTestContact);
-  const startCallerIdVerificationFn = useServerFn(startCallerIdVerification);
-  const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
+  const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
+  const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
 
 
 
@@ -279,15 +277,14 @@ function TelefoniaPage() {
   const [connecting, setConnecting] = useState(false);
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
-  const [verifyStep, setVerifyStep] = useState<"form" | "waiting">("form");
+  const [verifyStep, setVerifyStep] = useState<"form" | "code">("form");
   const [verifyState, setVerifyState] = useState<{
-    validationCode: string;
     phoneE164: string;
     label: string;
-    startedAt: number;
   } | null>(null);
+  const [otpCode, setOtpCode] = useState("");
   const [verifyStarting, setVerifyStarting] = useState(false);
-  const [verifyExpired, setVerifyExpired] = useState(false);
+  const [verifyChecking, setVerifyChecking] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
 
   // Per-row call controls (origin number + assistant)
@@ -324,8 +321,9 @@ function TelefoniaPage() {
   const resetVerification = () => {
     setVerifyStep("form");
     setVerifyState(null);
+    setOtpCode("");
     setVerifyStarting(false);
-    setVerifyExpired(false);
+    setVerifyChecking(false);
   };
 
   const startVerification = async () => {
@@ -336,79 +334,72 @@ function TelefoniaPage() {
       return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
 
     setVerifyStarting(true);
-    setVerifyExpired(false);
     try {
-      const res = await startCallerIdVerificationFn({
-        data: { phoneE164: phone, friendlyName: label },
+      const res = await sendVerifyOtpFn({
+        data: { phoneE164: phone, channel: "sms" },
       });
       if (!res.ok) {
-        const reason =
-          res.reason === "no_credentials"
-            ? "Conecte sua conta Twilio primeiro."
-            : `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`;
-        toast.error(reason);
+        if (res.reason === "no_credentials") {
+          toast.error("Conecte sua conta Twilio primeiro.");
+        } else if (res.reason === "trial_unverified") {
+          toast.error(
+            "Conta trial da Twilio: cadastre o número em Verified Caller IDs no Console Twilio antes de enviar o SMS.",
+            { duration: 8000 },
+          );
+        } else {
+          toast.error(
+            `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`,
+          );
+        }
         return;
       }
-      setVerifyState({
-        validationCode: res.validationCode,
-        phoneE164: phone,
-        label,
-        startedAt: Date.now(),
-      });
-      setVerifyStep("waiting");
+      setVerifyState({ phoneE164: phone, label });
+      setOtpCode("");
+      setVerifyStep("code");
+      toast.success("SMS enviado! Digite o código recebido.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação");
+      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS");
     } finally {
       setVerifyStarting(false);
     }
   };
 
-  // Polling: enquanto o modal está em "waiting", consulta a lista de Verified
-  // Caller IDs a cada 3s. Assim que o número aparecer, salvamos o contato.
-  useEffect(() => {
-    if (verifyStep !== "waiting" || !verifyState) return;
-    let cancelled = false;
-    const TIMEOUT_MS = 2 * 60 * 1000;
-
-    const tick = async () => {
-      if (cancelled) return;
-      if (Date.now() - verifyState.startedAt > TIMEOUT_MS) {
-        setVerifyExpired(true);
+  const confirmOtp = async () => {
+    if (!verifyState) return;
+    const code = otpCode.trim();
+    if (!/^\d{4,10}$/.test(code)) return toast.error("Digite o código recebido por SMS.");
+    setVerifyChecking(true);
+    try {
+      const res = await checkVerifyOtpFn({
+        data: {
+          phoneE164: verifyState.phoneE164,
+          code,
+          label: verifyState.label,
+        },
+      });
+      if (!res.ok) {
+        if (res.reason === "invalid_code") toast.error("Código incorreto. Tente novamente.");
+        else if (res.reason === "expired")
+          toast.error("Código expirado. Reenvie o SMS.");
+        else if (res.reason === "no_credentials")
+          toast.error("Conecte sua conta Twilio primeiro.");
+        else
+          toast.error(
+            `Erro Twilio: ${("message" in res && res.message) || "falha ao validar"}`,
+          );
         return;
       }
-      try {
-        const list = await listVerifiedCallerIdsFn();
-        const found = (list ?? []).some(
-          (r: { phone_number: string }) => r.phone_number === verifyState.phoneE164,
-        );
-        if (found && !cancelled) {
-          try {
-            await saveTestContactFn({
-              data: { label: verifyState.label, phoneE164: verifyState.phoneE164 },
-            });
-            toast.success("Número verificado e salvo!");
-            await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-            setTestContactOpen(false);
-            setTestContactForm({ label: "", phoneE164: "" });
-            resetVerification();
-          } catch (err) {
-            toast.error(
-              err instanceof Error ? err.message : "Falha ao salvar contato após verificação",
-            );
-          }
-          return;
-        }
-      } catch {
-        // silêncio: tentaremos novamente no próximo tick
-      }
-      if (!cancelled) setTimeout(tick, 3000);
-    };
-    const t = setTimeout(tick, 2000);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [verifyStep, verifyState, listVerifiedCallerIdsFn, saveTestContactFn, queryClient]);
+      toast.success("Número verificado e salvo!");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      setTestContactOpen(false);
+      setTestContactForm({ label: "", phoneE164: "" });
+      resetVerification();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao validar código");
+    } finally {
+      setVerifyChecking(false);
+    }
+  };
 
 
 
@@ -1088,9 +1079,8 @@ function TelefoniaPage() {
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              A Twilio vai ligar para o seu número e você digitará um código de 6 dígitos
-              no teclado do celular. Após verificado, o contato fica liberado para receber
-              chamadas da Vapi mesmo em contas trial.
+              Enviaremos um SMS via Twilio Verify com um código de 6 dígitos.
+              Digite o código para confirmar que o número é seu.
             </DialogDescription>
           </DialogHeader>
 
@@ -1131,7 +1121,7 @@ function TelefoniaPage() {
                 ) : (
                   <PhoneCall className="h-4 w-4" />
                 )}
-                Verificar número (ligação da Twilio)
+                Enviar SMS de verificação
               </Button>
               {!isTwilioConnected && (
                 <p className="text-center text-[11px] text-warning">
@@ -1141,60 +1131,55 @@ function TelefoniaPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Código de verificação
-                </p>
-                <p className="mt-1 font-mono text-4xl font-bold tracking-[0.3em] text-primary">
-                  {verifyState?.validationCode}
-                </p>
-              </div>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  A Twilio está ligando agora para{" "}
+                  Enviamos um SMS para{" "}
                   <span className="font-mono text-foreground">{verifyState?.phoneE164}</span>.
-                </p>
-                <p>
-                  Atenda e digite o código acima no teclado do celular. Assim que a Twilio
-                  confirmar, o contato será salvo automaticamente.
+                  Digite abaixo o código recebido.
                 </p>
               </div>
-
-              {verifyExpired ? (
-                <Alert className="border-warning/30 bg-warning/10">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <AlertDescription className="text-xs">
-                    Tempo esgotado. A ligação expirou sem confirmação. Tente novamente.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Aguardando verificação…
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Código de verificação</Label>
+                <Input
+                  placeholder="123456"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  disabled={verifyChecking}
+                  className="font-mono text-center text-xl tracking-[0.4em]"
+                  maxLength={10}
+                />
+              </div>
 
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   className="flex-1"
                   onClick={resetVerification}
+                  disabled={verifyChecking}
                 >
                   Voltar
                 </Button>
                 <Button
                   className="flex-1 gap-2"
-                  onClick={startVerification}
-                  disabled={verifyStarting}
+                  onClick={confirmOtp}
+                  disabled={verifyChecking || otpCode.length < 4}
                 >
-                  {verifyStarting ? (
+                  {verifyChecking ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PhoneCall className="h-4 w-4" />
-                  )}
-                  Reenviar chamada
+                  ) : null}
+                  Validar código
                 </Button>
               </div>
+              <button
+                type="button"
+                onClick={startVerification}
+                disabled={verifyStarting}
+                className="w-full text-center text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {verifyStarting ? "Reenviando..." : "Reenviar SMS"}
+              </button>
             </div>
           )}
         </DialogContent>
