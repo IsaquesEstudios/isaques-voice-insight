@@ -195,8 +195,11 @@ const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
     { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
     { value: "gpt-4o", label: "GPT-4o" },
     { value: "gpt-4o-mini", label: "GPT-4o mini" },
+    { value: "gpt-4o-realtime-preview", label: "GPT-4o Realtime (preview)" },
+    { value: "gpt-4o-mini-realtime-preview", label: "GPT-4o mini Realtime (preview)" },
     { value: "o3-mini", label: "o3-mini" },
   ],
+
   anthropic: [
     { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
     { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
