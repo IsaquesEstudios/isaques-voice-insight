@@ -321,8 +321,9 @@ function TelefoniaPage() {
   const resetVerification = () => {
     setVerifyStep("form");
     setVerifyState(null);
+    setOtpCode("");
     setVerifyStarting(false);
-    setVerifyExpired(false);
+    setVerifyChecking(false);
   };
 
   const startVerification = async () => {
@@ -333,79 +334,72 @@ function TelefoniaPage() {
       return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
 
     setVerifyStarting(true);
-    setVerifyExpired(false);
     try {
-      const res = await startCallerIdVerificationFn({
-        data: { phoneE164: phone, friendlyName: label },
+      const res = await sendVerifyOtpFn({
+        data: { phoneE164: phone, channel: "sms" },
       });
       if (!res.ok) {
-        const reason =
-          res.reason === "no_credentials"
-            ? "Conecte sua conta Twilio primeiro."
-            : `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`;
-        toast.error(reason);
+        if (res.reason === "no_credentials") {
+          toast.error("Conecte sua conta Twilio primeiro.");
+        } else if (res.reason === "trial_unverified") {
+          toast.error(
+            "Conta trial da Twilio: cadastre o número em Verified Caller IDs no Console Twilio antes de enviar o SMS.",
+            { duration: 8000 },
+          );
+        } else {
+          toast.error(
+            `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`,
+          );
+        }
         return;
       }
-      setVerifyState({
-        validationCode: res.validationCode,
-        phoneE164: phone,
-        label,
-        startedAt: Date.now(),
-      });
-      setVerifyStep("waiting");
+      setVerifyState({ phoneE164: phone, label });
+      setOtpCode("");
+      setVerifyStep("code");
+      toast.success("SMS enviado! Digite o código recebido.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao iniciar verificação");
+      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS");
     } finally {
       setVerifyStarting(false);
     }
   };
 
-  // Polling: enquanto o modal está em "waiting", consulta a lista de Verified
-  // Caller IDs a cada 3s. Assim que o número aparecer, salvamos o contato.
-  useEffect(() => {
-    if (verifyStep !== "waiting" || !verifyState) return;
-    let cancelled = false;
-    const TIMEOUT_MS = 2 * 60 * 1000;
-
-    const tick = async () => {
-      if (cancelled) return;
-      if (Date.now() - verifyState.startedAt > TIMEOUT_MS) {
-        setVerifyExpired(true);
+  const confirmOtp = async () => {
+    if (!verifyState) return;
+    const code = otpCode.trim();
+    if (!/^\d{4,10}$/.test(code)) return toast.error("Digite o código recebido por SMS.");
+    setVerifyChecking(true);
+    try {
+      const res = await checkVerifyOtpFn({
+        data: {
+          phoneE164: verifyState.phoneE164,
+          code,
+          label: verifyState.label,
+        },
+      });
+      if (!res.ok) {
+        if (res.reason === "invalid_code") toast.error("Código incorreto. Tente novamente.");
+        else if (res.reason === "expired")
+          toast.error("Código expirado. Reenvie o SMS.");
+        else if (res.reason === "no_credentials")
+          toast.error("Conecte sua conta Twilio primeiro.");
+        else
+          toast.error(
+            `Erro Twilio: ${("message" in res && res.message) || "falha ao validar"}`,
+          );
         return;
       }
-      try {
-        const list = await listVerifiedCallerIdsFn();
-        const found = (list ?? []).some(
-          (r: { phone_number: string }) => r.phone_number === verifyState.phoneE164,
-        );
-        if (found && !cancelled) {
-          try {
-            await saveTestContactFn({
-              data: { label: verifyState.label, phoneE164: verifyState.phoneE164 },
-            });
-            toast.success("Número verificado e salvo!");
-            await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-            setTestContactOpen(false);
-            setTestContactForm({ label: "", phoneE164: "" });
-            resetVerification();
-          } catch (err) {
-            toast.error(
-              err instanceof Error ? err.message : "Falha ao salvar contato após verificação",
-            );
-          }
-          return;
-        }
-      } catch {
-        // silêncio: tentaremos novamente no próximo tick
-      }
-      if (!cancelled) setTimeout(tick, 3000);
-    };
-    const t = setTimeout(tick, 2000);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [verifyStep, verifyState, listVerifiedCallerIdsFn, saveTestContactFn, queryClient]);
+      toast.success("Número verificado e salvo!");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
+      setTestContactOpen(false);
+      setTestContactForm({ label: "", phoneE164: "" });
+      resetVerification();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao validar código");
+    } finally {
+      setVerifyChecking(false);
+    }
+  };
 
 
 
