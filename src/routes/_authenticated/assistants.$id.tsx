@@ -477,10 +477,10 @@ function AssistantDetailPage() {
   const voiceListMismatch = useMemo(() => {
     if (!form.voiceProvider || !form.voiceId) return false;
     if (voicesQuery.isLoading || !voicesQuery.data) return false;
-    const list = voicesQuery.data as Array<{ value: string }>;
+    const list = voicesQuery.data;
     if (list.length === 0) return false;
     const target = form.voiceId.toLowerCase();
-    return !list.some((v) => (v.value || "").toLowerCase() === target);
+    return !list.some((v) => (v.providerId || "").toLowerCase() === target);
   }, [form.voiceProvider, form.voiceId, voicesQuery.data, voicesQuery.isLoading]);
 
   // Traduções pt-BR para metadados vindos da API da Vapi.
