@@ -1118,29 +1118,41 @@ function AssistantDetailPage() {
                             />
                           )}
 
-                          {/* Velocidade — válido para maioria dos providers */}
-                          <SliderField
-                            label="Velocidade"
-                            hint="1.0 = ritmo natural. <1 mais devagar, >1 mais rápido."
-                            min={0.5}
-                            max={2}
-                            step={0.05}
-                            value={form.voiceSpeed}
-                            onChange={(v) => setForm((f) => ({ ...f, voiceSpeed: v }))}
-                            disabled={isLoading}
-                          />
-
-                          <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 p-3">
-                            <div className="text-xs">
-                              <p className="font-medium text-foreground">Injeção de fillers</p>
-                              <p className="text-muted-foreground">Adiciona "hmm", "então" etc. para soar mais humano.</p>
-                            </div>
-                            <Switch
-                              checked={form.voiceFillerInjectionEnabled}
-                              onCheckedChange={(c) => setForm((f) => ({ ...f, voiceFillerInjectionEnabled: c }))}
+                          {/* Velocidade — suportado por cartesia/playht/openai/azure/deepgram/rime */}
+                          {["cartesia", "playht", "openai", "azure", "deepgram", "rime-ai"].includes(form.voiceProvider) && (
+                            <SliderField
+                              label="Velocidade"
+                              hint="1.0 = ritmo natural. <1 mais devagar, >1 mais rápido."
+                              min={0.5}
+                              max={2}
+                              step={0.05}
+                              value={form.voiceSpeed}
+                              onChange={(v) => setForm((f) => ({ ...f, voiceSpeed: v }))}
                               disabled={isLoading}
                             />
-                          </div>
+                          )}
+
+                          {/* Injeção de fillers — apenas 11labs na Vapi */}
+                          {form.voiceProvider === "11labs" && (
+                            <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                              <div className="text-xs">
+                                <p className="font-medium text-foreground">Injeção de fillers</p>
+                                <p className="text-muted-foreground">Adiciona "hmm", "então" etc. para soar mais humano.</p>
+                              </div>
+                              <Switch
+                                checked={form.voiceFillerInjectionEnabled}
+                                onCheckedChange={(c) => setForm((f) => ({ ...f, voiceFillerInjectionEnabled: c }))}
+                                disabled={isLoading}
+                              />
+                            </div>
+                          )}
+
+                          {!form.voiceProvider && (
+                            <p className="text-xs text-muted-foreground">
+                              Selecione um provedor de voz para ver as opções disponíveis.
+                            </p>
+                          )}
+
                         </AccordionContent>
                       </AccordionItem>
 

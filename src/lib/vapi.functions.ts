@@ -563,30 +563,45 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
     }
 
     // ----- voice block -----
+    // Cada provedor da Vapi aceita apenas um subconjunto de propriedades no
+    // objeto `voice`. Enviar chaves fora desse conjunto → 400 (ex.:
+    // "voice.property speed should not exist" em 11labs). Portanto filtramos
+    // por provider antes de mandar o PATCH.
+    const provider = (data.voiceProvider ?? "").toLowerCase();
+    const supports = {
+      speed: ["cartesia", "playht", "openai", "azure", "deepgram", "rime-ai"].includes(provider),
+      emotion: ["cartesia", "playht"].includes(provider),
+      temperature: provider === "playht",
+      elevenTuning: provider === "11labs",
+      model: provider === "11labs",
+      fillerInjection: provider === "11labs",
+    };
+
     const voicePatch: Record<string, unknown> = {};
     if (data.voiceProvider) voicePatch.provider = data.voiceProvider;
     if (data.voiceId) voicePatch.voiceId = data.voiceId;
-    if (data.voiceModel != null && data.voiceModel !== "")
+    if (supports.model && data.voiceModel != null && data.voiceModel !== "")
       voicePatch.model = data.voiceModel;
-    if (typeof data.voiceSpeed === "number") voicePatch.speed = data.voiceSpeed;
-    if (typeof data.voiceEmotion === "string" && data.voiceEmotion)
+    if (supports.speed && typeof data.voiceSpeed === "number")
+      voicePatch.speed = data.voiceSpeed;
+    if (supports.emotion && typeof data.voiceEmotion === "string" && data.voiceEmotion)
       voicePatch.emotion = data.voiceEmotion;
-    if (typeof data.voiceTemperature === "number")
+    if (supports.temperature && typeof data.voiceTemperature === "number")
       voicePatch.temperature = data.voiceTemperature;
-    if (typeof data.voiceFillerInjectionEnabled === "boolean")
+    if (supports.fillerInjection && typeof data.voiceFillerInjectionEnabled === "boolean")
       voicePatch.fillerInjectionEnabled = data.voiceFillerInjectionEnabled;
-    // 11labs nested tuning
-    const elevenTuning: Record<string, unknown> = {};
-    if (typeof data.voiceStability === "number")
-      elevenTuning.stability = data.voiceStability;
-    if (typeof data.voiceSimilarityBoost === "number")
-      elevenTuning.similarityBoost = data.voiceSimilarityBoost;
-    if (typeof data.voiceStyle === "number") elevenTuning.style = data.voiceStyle;
-    if (typeof data.voiceUseSpeakerBoost === "boolean")
-      elevenTuning.useSpeakerBoost = data.voiceUseSpeakerBoost;
-    if (Object.keys(elevenTuning).length > 0) Object.assign(voicePatch, elevenTuning);
+    if (supports.elevenTuning) {
+      if (typeof data.voiceStability === "number")
+        voicePatch.stability = data.voiceStability;
+      if (typeof data.voiceSimilarityBoost === "number")
+        voicePatch.similarityBoost = data.voiceSimilarityBoost;
+      if (typeof data.voiceStyle === "number") voicePatch.style = data.voiceStyle;
+      if (typeof data.voiceUseSpeakerBoost === "boolean")
+        voicePatch.useSpeakerBoost = data.voiceUseSpeakerBoost;
+    }
 
     if (Object.keys(voicePatch).length > 0) body.voice = voicePatch;
+
 
     // ----- speaking plans -----
     const startPlan: Record<string, unknown> = {};
