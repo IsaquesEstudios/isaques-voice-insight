@@ -1079,9 +1079,8 @@ function TelefoniaPage() {
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              A Twilio vai ligar para o seu número e você digitará um código de 6 dígitos
-              no teclado do celular. Após verificado, o contato fica liberado para receber
-              chamadas da Vapi mesmo em contas trial.
+              Enviaremos um SMS via Twilio Verify com um código de 6 dígitos.
+              Digite o código para confirmar que o número é seu.
             </DialogDescription>
           </DialogHeader>
 
@@ -1122,7 +1121,7 @@ function TelefoniaPage() {
                 ) : (
                   <PhoneCall className="h-4 w-4" />
                 )}
-                Verificar número (ligação da Twilio)
+                Enviar SMS de verificação
               </Button>
               {!isTwilioConnected && (
                 <p className="text-center text-[11px] text-warning">
@@ -1132,60 +1131,55 @@ function TelefoniaPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Código de verificação
-                </p>
-                <p className="mt-1 font-mono text-4xl font-bold tracking-[0.3em] text-primary">
-                  {verifyState?.validationCode}
-                </p>
-              </div>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  A Twilio está ligando agora para{" "}
+                  Enviamos um SMS para{" "}
                   <span className="font-mono text-foreground">{verifyState?.phoneE164}</span>.
-                </p>
-                <p>
-                  Atenda e digite o código acima no teclado do celular. Assim que a Twilio
-                  confirmar, o contato será salvo automaticamente.
+                  Digite abaixo o código recebido.
                 </p>
               </div>
-
-              {verifyExpired ? (
-                <Alert className="border-warning/30 bg-warning/10">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <AlertDescription className="text-xs">
-                    Tempo esgotado. A ligação expirou sem confirmação. Tente novamente.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Aguardando verificação…
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Código de verificação</Label>
+                <Input
+                  placeholder="123456"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  disabled={verifyChecking}
+                  className="font-mono text-center text-xl tracking-[0.4em]"
+                  maxLength={10}
+                />
+              </div>
 
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   className="flex-1"
                   onClick={resetVerification}
+                  disabled={verifyChecking}
                 >
                   Voltar
                 </Button>
                 <Button
                   className="flex-1 gap-2"
-                  onClick={startVerification}
-                  disabled={verifyStarting}
+                  onClick={confirmOtp}
+                  disabled={verifyChecking || otpCode.length < 4}
                 >
-                  {verifyStarting ? (
+                  {verifyChecking ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PhoneCall className="h-4 w-4" />
-                  )}
-                  Reenviar chamada
+                  ) : null}
+                  Validar código
                 </Button>
               </div>
+              <button
+                type="button"
+                onClick={startVerification}
+                disabled={verifyStarting}
+                className="w-full text-center text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {verifyStarting ? "Reenviando..." : "Reenviar SMS"}
+              </button>
             </div>
           )}
         </DialogContent>
