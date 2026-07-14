@@ -1023,7 +1023,8 @@ export const listVapiVoices = createServerFn({ method: "GET" })
       return [];
     }
     if (!Array.isArray(raw)) return [];
-    return raw
+    const arr = raw as Array<Record<string, unknown>>;
+    return arr
       .map((v) => ({
         providerId: String(v.providerId ?? v.slug ?? v.id ?? ""),
         name: String(v.name ?? v.providerId ?? ""),
