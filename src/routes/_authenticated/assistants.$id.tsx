@@ -319,8 +319,41 @@ const empty: FormState = {
   backgroundDenoisingEnabled: false,
 };
 
+// ---- Regras de compatibilidade voz ↔ modelo ------------------------------
+// OpenAI: vozes "realtime-only" só funcionam com modelos gpt-*-realtime-*.
+const OPENAI_REALTIME_VOICES = new Set(["ash", "ballad", "coral", "sage", "verse"]);
+
+function isRealtimeModel(model: string): boolean {
+  return /realtime/i.test(model);
+}
+
+interface CompatIssue {
+  ok: false;
+  fields: Array<"model" | "voice">;
+  message: string;
+}
+type CompatResult = { ok: true } | CompatIssue;
+
+function checkVoiceModelCompat(
+  voiceProvider: string,
+  voiceId: string,
+  _modelProvider: string,
+  model: string,
+): CompatResult {
+  if (voiceProvider === "openai" && OPENAI_REALTIME_VOICES.has(voiceId)) {
+    if (!isRealtimeModel(model)) {
+      return {
+        ok: false,
+        fields: ["model", "voice"],
+        message: `A voz "${voiceId}" (OpenAI) só funciona com modelos realtime (ex.: gpt-4o-realtime-preview). Troque o modelo ou escolha outra voz.`,
+      };
+    }
+  }
+  return { ok: true };
+}
 
 function AssistantDetailPage() {
+
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const fetchAssistant = useServerFn(getVapiAssistant);
