@@ -295,17 +295,16 @@ function TelefoniaPage() {
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
   const testContactsQuery = useQuery({
-    queryKey: ["test-contacts"],
-    queryFn: () => listTestContactsFn(),
+    queryKey: ["verified-caller-ids"],
+    queryFn: () => listVerifiedCallerIdsFn(),
+    enabled: isTwilioConnected,
   });
-  const testContacts = (testContactsQuery.data ?? []).filter(
-    (c: { verified: boolean }) => c.verified,
-  ) as Array<{
-    id: string;
-    label: string;
-    phone_e164: string;
-    verified: boolean;
-  }>;
+  const testContacts = (testContactsQuery.data ?? []).map((c) => ({
+    id: c.sid,
+    label: c.friendly_name || c.phone_number,
+    phone_e164: c.phone_number,
+    verified: true,
+  }));
 
 
   const removeTestContactMutation = useMutation({
