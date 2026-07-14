@@ -1068,6 +1068,12 @@ function AssistantDetailPage() {
                         {compatVoiceBad && !compat.ok && (
                           <p className="text-xs text-destructive">{compat.message}</p>
                         )}
+                        {voiceListMismatch && (
+                          <p className="text-xs text-destructive">
+                            A voz "{form.voiceId}" não existe no provider "{form.voiceProvider}".
+                            Selecione uma voz da lista acima antes de salvar.
+                          </p>
+                        )}
 
 
                         <CostHint
