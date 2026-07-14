@@ -751,6 +751,21 @@ function AssistantDetailPage() {
                         />
                       </div>
                     </div>
+                    <div className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground">
+                      <p className="mb-1 font-medium text-foreground">Dicas para melhorar o sotaque</p>
+                      <ul className="list-disc space-y-1 pl-4">
+                        <li>
+                          Escolha uma voz nativa do idioma-alvo (ex.: filtre por Portuguese (Brazil) em Azure ou Cartesia).
+                          ElevenLabs e OpenAI não expõem idioma público — use vozes multilingues e deixe o prompt em português.
+                        </li>
+                        <li>
+                          No prompt do sistema, deixe explícito: "Responda sempre em português do Brasil, com pronúncia natural brasileira."
+                        </li>
+                        <li>
+                          Verifique o transcriber (Deepgram Nova 3 Multi já detecta pt-BR). Se estiver fixo em inglês, a IA pode responder com sotaque errado.
+                        </li>
+                      </ul>
+                    </div>
                   </div>
 
                 </CardContent>
