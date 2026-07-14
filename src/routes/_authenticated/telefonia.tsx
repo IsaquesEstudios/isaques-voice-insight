@@ -300,6 +300,9 @@ function TelefoniaPage() {
     queryKey: ["verified-caller-ids"],
     queryFn: () => listVerifiedCallerIdsFn(),
     enabled: isTwilioConnected,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
   const testContacts = (testContactsQuery.data ?? []).map((c) => ({
     id: c.sid,
