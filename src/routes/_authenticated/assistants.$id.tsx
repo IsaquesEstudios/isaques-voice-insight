@@ -414,6 +414,29 @@ const VOICES_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+function isBrazilianPortugueseVoice(v: VapiVoiceOption): boolean {
+  const haystack = [
+    v.languageCode,
+    v.language,
+    v.accent,
+    v.description,
+    v.name,
+    v.providerId,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    /\bpt[-_ ]?br\b/.test(haystack) ||
+    haystack.includes("portuguese (brazil)") ||
+    haystack.includes("português (brasil)") ||
+    haystack.includes("brazilian portuguese") ||
+    haystack.includes("brasileiro") ||
+    haystack.includes("brasileira")
+  );
+}
+
 interface FormState {
   name: string;
   firstMessage: string;
@@ -623,12 +646,20 @@ function AssistantDetailPage() {
     }));
   }, [form.voiceProvider]);
 
-  // Para 11labs e azure a lista da API mistura idiomas — usamos apenas o catálogo
-  // estático curado em PT-BR. Para outros provedores, mantém o comportamento original.
-  const ptBrOnlyProviders = new Set(["11labs", "azure"]);
-  const allVoices = ptBrOnlyProviders.has(form.voiceProvider)
-    ? staticVoices
-    : (voicesQuery.data?.length ? voicesQuery.data : staticVoices);
+  const apiVoices = voicesQuery.data ?? [];
+  const elevenLabsPtBrVoices = useMemo(
+    () => apiVoices.filter(isBrazilianPortugueseVoice),
+    [apiVoices],
+  );
+
+  // ElevenLabs usa somente a lista real retornada pela Vapi, filtrada para PT-BR.
+  // O fallback estático anterior mostrava IDs públicos que podem não existir na
+  // conta ElevenLabs conectada à Vapi, causando o erro "Couldn't Find 11labs Voice".
+  const allVoices = form.voiceProvider === "11labs"
+    ? elevenLabsPtBrVoices
+    : form.voiceProvider === "azure"
+      ? staticVoices
+      : (apiVoices.length ? apiVoices : staticVoices);
 
   // Se a lista de vozes carregou (API ou fallback) e o voiceId atual não está nela,
   // a Vapi rejeitará o PATCH com 400 ("voice.voiceId must be one of ...").
@@ -636,10 +667,12 @@ function AssistantDetailPage() {
     if (!form.voiceProvider || !form.voiceId) return false;
     if (voicesQuery.isLoading) return false;
     const list = allVoices;
-    if (list.length === 0) return false;
+    const hasAuthoritativeElevenLabsList =
+      form.voiceProvider === "11labs" && !voicesQuery.isError && Array.isArray(voicesQuery.data);
+    if (list.length === 0) return hasAuthoritativeElevenLabsList;
     const target = form.voiceId.toLowerCase();
     return !list.some((v) => (v.providerId || "").toLowerCase() === target);
-  }, [form.voiceProvider, form.voiceId, voicesQuery.isLoading, allVoices]);
+  }, [form.voiceProvider, form.voiceId, voicesQuery.isLoading, voicesQuery.isError, voicesQuery.data, allVoices]);
 
   // Traduções pt-BR para metadados vindos da API da Vapi.
   const translateLanguage = (raw?: string, code?: string): string => {
@@ -787,7 +820,9 @@ function AssistantDetailPage() {
   async function handleSave() {
     if (voiceListMismatch) {
       toast.error(
-        `A voz "${form.voiceId}" não pertence ao provider "${form.voiceProvider}". Selecione uma voz válida.`,
+        form.voiceProvider === "11labs"
+          ? `A voz "${form.voiceId}" não foi encontrada na lista ElevenLabs PT-BR disponível na Vapi. Escolha uma voz do dropdown ou use Azure.`
+          : `A voz "${form.voiceId}" não pertence ao provider "${form.voiceProvider}". Selecione uma voz válida.`,
       );
       return;
     }
@@ -826,7 +861,10 @@ function AssistantDetailPage() {
     } catch (err) {
       console.error("Save error:", err);
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error("Erro ao salvar alterações.", { description: msg.slice(0, 400) });
+      const isElevenLabsVoiceError = /elevenlabs|11labs|voz/i.test(msg) && /não encontrada|couldn'?t find|find/i.test(msg);
+      toast.error(isElevenLabsVoiceError ? "Voz ElevenLabs indisponível." : "Erro ao salvar alterações.", {
+        description: msg.slice(0, 500),
+      });
     } finally {
       setIsSaving(false);
     }
@@ -1164,6 +1202,11 @@ function AssistantDetailPage() {
                               manualmente.
                             </p>
                           </>
+                        ) : form.voiceProvider === "11labs" && voiceOptions.length === 0 ? (
+                          <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                            Nenhuma voz brasileira da ElevenLabs foi encontrada na lista real da Vapi.
+                            Sincronize uma voz PT-BR na conta ElevenLabs conectada à Vapi ou use Azure.
+                          </p>
                         ) : voiceOptions.length === 0 ? (
                           <>
                             <Input
@@ -1235,8 +1278,9 @@ function AssistantDetailPage() {
                         )}
                         {voiceListMismatch && (
                           <p className="text-xs text-destructive">
-                            A voz "{form.voiceId}" não existe no provider "{form.voiceProvider}".
-                            Selecione uma voz da lista acima antes de salvar.
+                            {form.voiceProvider === "11labs"
+                              ? `A voz "${form.voiceId}" não está disponível na lista real da ElevenLabs PT-BR na Vapi. Escolha uma voz do dropdown ou use Azure.`
+                              : `A voz "${form.voiceId}" não existe no provider "${form.voiceProvider}". Selecione uma voz da lista acima antes de salvar.`}
                           </p>
                         )}
 
