@@ -518,6 +518,9 @@ const empty: FormState = {
   stopBackoffSeconds: null,
   backgroundSound: "off",
   backgroundDenoisingEnabled: false,
+  transcriberProvider: "",
+  transcriberModel: "",
+  transcriberLanguage: "",
 };
 
 // ---- Regras de compatibilidade voz ↔ modelo ------------------------------
