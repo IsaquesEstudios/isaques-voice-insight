@@ -1210,7 +1210,7 @@ function AssistantDetailPage() {
 
 
           <TabsContent value="logs" className="mt-0">
-            <LogsTab />
+            <LogsTab assistantId={id} />
           </TabsContent>
           <TabsContent value="tools" className="mt-0">
             <ToolsTab
@@ -1221,8 +1221,9 @@ function AssistantDetailPage() {
             />
           </TabsContent>
           <TabsContent value="analysis" className="mt-0">
-            <AnalysisTab />
+            <AnalysisTab assistantId={id} />
           </TabsContent>
+
           <TabsContent value="advanced" className="mt-0">
             <AdvancedTab />
           </TabsContent>
