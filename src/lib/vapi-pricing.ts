@@ -74,6 +74,7 @@ export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
     "gpt-4.1-mini": { costPerMin: 0.008, latencyMs: 500, intelligence: 13 },
     "gpt-4o": { costPerMin: 0.06, latencyMs: 700, intelligence: 15 },
     "gpt-4o-mini": { costPerMin: 0.006, latencyMs: 550, intelligence: 12 },
+    "gpt-4.1-nano": { costPerMin: 0.01, latencyMs: 470, intelligence: 10 },
     "o3-mini": { costPerMin: 0.04, latencyMs: 900, intelligence: 16 },
   },
   anthropic: {
