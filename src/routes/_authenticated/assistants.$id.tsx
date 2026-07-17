@@ -1131,29 +1131,13 @@ function AssistantDetailPage() {
                         (modelSpec?.latencyMs ?? 0) +
                         (voiceSpec?.latencyMs ?? 0);
 
-                      // Métricas reais (quando ativo e existem chamadas na conta Vapi).
-                      const stats = callStatsQuery.data;
-                      const useReal = isActive && stats && stats.callCount > 0;
-                      const realCost = useReal && stats.avgCostPerMin != null ? stats.avgCostPerMin : null;
-                      const realLat = useReal && stats.avgLatencyMs != null ? stats.avgLatencyMs : null;
-
-                      const shownCost = realCost ?? estCost;
-                      const shownLat = realLat ?? estLatency;
                       const latencyLabel =
-                        shownLat >= 1000
-                          ? `~${(shownLat / 1000).toFixed(2).replace(/\.?0+$/, "")}s`
-                          : `~${Math.round(shownLat)}ms`;
+                        estLatency >= 1000
+                          ? `~${(estLatency / 1000).toFixed(2).replace(/\.?0+$/, "")}s`
+                          : `~${Math.round(estLatency)}ms`;
 
-                      const bd = useReal ? stats.breakdown : null;
-                      const costTitle = realCost != null
-                        ? `Média real da conta Vapi (${stats!.callCount} chamadas)` +
-                          (bd
-                            ? `\nSTT ${formatUSDPerMin(bd.stt)} · LLM ${formatUSDPerMin(bd.llm)} · TTS ${formatUSDPerMin(bd.tts)} · Vapi ${formatUSDPerMin(bd.vapi)}`
-                            : "")
-                        : "Estimativa (fee Vapi + transcriber + modelo + voz)";
-                      const latTitle = realLat != null
-                        ? `Média real da conta Vapi (${stats!.callCount} chamadas)`
-                        : "Latência estimada (soma dos componentes)";
+                      const costTitle = "Previsão (fee Vapi + transcriber + modelo + voz)";
+                      const latTitle = "Latência prevista (soma dos componentes)";
 
                       return (
                         <button
@@ -1182,32 +1166,17 @@ function AssistantDetailPage() {
                           <p className="mt-1 text-[11px] text-muted-foreground">{p.description}</p>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                                realCost != null
-                                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                  : "border-white/[0.08] bg-background/60 text-foreground"
-                              }`}
+                              className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
                               title={costTitle}
                             >
-                              {realCost != null ? "Custo real " : "Custo ~"}
-                              {formatUSDPerMin(shownCost)}
+                              Custo previsto ~{formatUSDPerMin(estCost)}
                             </span>
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                                realLat != null
-                                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                  : "border-white/[0.08] bg-background/60 text-foreground"
-                              }`}
+                              className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
                               title={latTitle}
                             >
-                              {realLat != null ? "Latência real " : "Latência "}
-                              {latencyLabel}
+                              Latência prevista {latencyLabel}
                             </span>
-                            {useReal && (
-                              <span className="text-[10px] text-muted-foreground">
-                                ({stats!.callCount} chamadas)
-                              </span>
-                            )}
                           </div>
                         </button>
                       );
