@@ -101,7 +101,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   getVapiAssistant,
-  getAssistantCallStats,
+  
   listVapiAssistants,
   listVapiVoices,
   saveVapiAssistantConfig,
