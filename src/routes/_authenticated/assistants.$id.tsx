@@ -626,6 +626,9 @@ function AssistantDetailPage() {
           stopBackoffSeconds: numOrNull(stp.backoffSeconds),
           backgroundSound: (a as { backgroundSound?: string })?.backgroundSound === "office" ? "office" : "off",
           backgroundDenoisingEnabled: (a as { backgroundDenoisingEnabled?: boolean })?.backgroundDenoisingEnabled === true,
+          transcriberProvider: typeof a?.transcriber?.provider === "string" ? a.transcriber.provider : "",
+          transcriberModel: typeof a?.transcriber?.model === "string" ? a.transcriber.model : "",
+          transcriberLanguage: typeof a?.transcriber?.language === "string" ? a.transcriber.language : "",
         });
 
         setTools(
