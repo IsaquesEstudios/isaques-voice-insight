@@ -101,14 +101,30 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   getVapiAssistant,
-  
+  listAssistantCalls,
+  getAssistantAnalytics,
   listVapiAssistants,
   listVapiVoices,
   saveVapiAssistantConfig,
+  type AssistantCallLog,
   type VapiVoiceOption,
 } from "@/lib/vapi.functions";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
 import { cn } from "@/lib/utils";
 import {
   getModelCost,
@@ -1194,7 +1210,7 @@ function AssistantDetailPage() {
 
 
           <TabsContent value="logs" className="mt-0">
-            <LogsTab />
+            <LogsTab assistantId={id} />
           </TabsContent>
           <TabsContent value="tools" className="mt-0">
             <ToolsTab
@@ -1205,8 +1221,9 @@ function AssistantDetailPage() {
             />
           </TabsContent>
           <TabsContent value="analysis" className="mt-0">
-            <AnalysisTab />
+            <AnalysisTab assistantId={id} />
           </TabsContent>
+
           <TabsContent value="advanced" className="mt-0">
             <AdvancedTab />
           </TabsContent>
@@ -1224,97 +1241,229 @@ function AssistantDetailPage() {
 
 /* -------------------------------- Logs -------------------------------- */
 
-interface LogRow {
-  id: string;
-  when: string;
-  phone: string;
-  duration: string;
-  cost: string;
+function formatDuration(sec: number | null): string {
+  if (sec == null || sec <= 0) return "—";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-const MOCK_LOGS: LogRow[] = [
-  { id: "1", when: "06/07/2026 14:32", phone: "+55 11 98765-4321", duration: "03:12", cost: "$0.42" },
-  { id: "2", when: "06/07/2026 13:58", phone: "+55 21 99123-4567", duration: "01:47", cost: "$0.24" },
-  { id: "3", when: "06/07/2026 12:15", phone: "+55 31 98888-1122", duration: "05:03", cost: "$0.68" },
-  { id: "4", when: "06/07/2026 11:02", phone: "+1 415 555-2201", duration: "02:21", cost: "$0.31" },
-  { id: "5", when: "05/07/2026 19:44", phone: "+55 11 97777-9090", duration: "00:38", cost: "$0.09" },
-];
+function formatDateBR(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-function LogsTab() {
+function endedReasonBadgeClass(reason: string | null): string {
+  if (!reason) return "bg-white/[0.05] text-muted-foreground";
+  if (/customer-ended/i.test(reason)) return "bg-emerald-500/10 text-emerald-300";
+  if (/assistant-ended/i.test(reason)) return "bg-sky-500/10 text-sky-300";
+  if (/error|failed|no-answer|busy/i.test(reason)) return "bg-rose-500/10 text-rose-300";
+  if (/silence|voicemail/i.test(reason)) return "bg-amber-500/10 text-amber-300";
+  return "bg-white/[0.05] text-muted-foreground";
+}
+
+function LogsTab({ assistantId }: { assistantId: string }) {
+  const [limit, setLimit] = useState(50);
+  const [detail, setDetail] = useState<AssistantCallLog | null>(null);
+  const [detailMode, setDetailMode] = useState<"transcript" | "recording">("transcript");
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: ["vapi", "assistantCalls", assistantId, limit],
+    queryFn: () => listAssistantCalls({ data: { assistantId, limit } }),
+    staleTime: 30_000,
+  });
+
+  const calls = data?.calls ?? [];
+  const apiError = data?.error ?? (error instanceof Error ? error.message : null);
+
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Histórico do Agente</h2>
-            <p className="text-xs text-muted-foreground">
-              Últimas interações registradas por este assistente.
-            </p>
-          </div>
-          <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
-            Dados de exemplo
-          </span>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-white/[0.06] hover:bg-transparent">
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Data/Hora
-              </TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Telefone
-              </TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Duração
-              </TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Custo
-              </TableHead>
-              <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">
-                Ações
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {MOCK_LOGS.map((row) => (
-              <TableRow
-                key={row.id}
-                className="border-white/[0.04] transition-colors hover:bg-white/[0.03]"
+    <>
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Histórico do Agente</h2>
+              <p className="text-xs text-muted-foreground">
+                Últimas ligações registradas pela Vapi para este assistente.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
+                {calls.length} {calls.length === 1 ? "chamada" : "chamadas"}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                onClick={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: ["vapi", "assistantCalls", assistantId],
+                  })
+                }
+                disabled={isFetching}
               >
-                <TableCell className="text-sm text-foreground">{row.when}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
-                  {row.phone}
-                </TableCell>
-                <TableCell className="text-sm text-foreground">{row.duration}</TableCell>
-                <TableCell className="text-sm text-foreground">{row.cost}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 hover:text-primary"
-                      aria-label="Reproduzir áudio"
-                    >
-                      <Play className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 hover:text-primary"
-                      aria-label="Ver transcrição"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
+                {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Atualizar"}
+              </Button>
+            </div>
+          </div>
+
+          {apiError && (
+            <div className="border-b border-rose-500/20 bg-rose-500/10 px-6 py-3 text-xs text-rose-200">
+              Não foi possível carregar as ligações: {apiError}
+            </div>
+          )}
+
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/[0.06] hover:bg-transparent">
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Data/Hora</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Origem/Destino</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Duração</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Custo</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Motivo</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">Ações</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {isLoading &&
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`sk-${i}`} className="border-white/[0.04]">
+                    {Array.from({ length: 6 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+
+              {!isLoading && calls.length === 0 && !apiError && (
+                <TableRow className="border-white/[0.04] hover:bg-transparent">
+                  <TableCell colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
+                    Nenhuma ligação registrada ainda para este assistente.
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!isLoading &&
+                calls.map((row) => (
+                  <TableRow key={row.id} className="border-white/[0.04] transition-colors hover:bg-white/[0.03]">
+                    <TableCell className="text-sm text-foreground">{formatDateBR(row.startedAt)}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {row.customerNumber ?? row.phoneNumber ?? row.type ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-foreground">{formatDuration(row.durationSec)}</TableCell>
+                    <TableCell className="text-sm text-foreground">
+                      {row.cost != null ? `$${row.cost.toFixed(3)}` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          endedReasonBadgeClass(row.endedReason),
+                        )}
+                      >
+                        {row.endedReason ?? "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary disabled:opacity-30"
+                          aria-label="Reproduzir áudio"
+                          disabled={!row.recordingUrl}
+                          onClick={() => {
+                            setDetail(row);
+                            setDetailMode("recording");
+                          }}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary disabled:opacity-30"
+                          aria-label="Ver transcrição"
+                          disabled={!row.transcript && !row.summary}
+                          onClick={() => {
+                            setDetail(row);
+                            setDetailMode("transcript");
+                          }}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+
+          {!isLoading && calls.length >= limit && limit < 200 && (
+            <div className="flex justify-center border-t border-white/[0.06] p-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLimit((l) => Math.min(l + 50, 200))}
+                className="h-8 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+              >
+                Carregar mais
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={detail != null} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-2xl border-white/[0.08] bg-card/80 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {detailMode === "recording" ? "Gravação da ligação" : "Transcrição da ligação"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {detail && formatDateBR(detail.startedAt)} · {detail && formatDuration(detail.durationSec)}
+              {detail?.customerNumber ? ` · ${detail.customerNumber}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && detailMode === "recording" && detail.recordingUrl && (
+            <audio controls src={detail.recordingUrl} className="w-full">
+              Seu navegador não suporta áudio.
+            </audio>
+          )}
+          {detail && detailMode === "transcript" && (
+            <div className="space-y-3">
+              {detail.summary && (
+                <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                  <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                  <p className="text-xs text-foreground">{detail.summary}</p>
+                </div>
+              )}
+              {detail.transcript ? (
+                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+                  {detail.transcript}
+                </pre>
+              ) : (
+                <p className="text-xs text-muted-foreground">Transcrição indisponível para esta ligação.</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
+
 
 /* -------------------------------- Tools -------------------------------- */
 
@@ -5407,7 +5556,218 @@ interface SchemaField {
   description: string;
 }
 
-function AnalysisTab() {
+const COST_COLORS = ["#a78bfa", "#60a5fa", "#f472b6", "#fbbf24", "#34d399"];
+
+function AnalyticsPanel({ assistantId }: { assistantId: string }) {
+  const [rangeDays, setRangeDays] = useState(7);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["vapi", "assistantAnalytics", assistantId, rangeDays],
+    queryFn: () => getAssistantAnalytics({ data: { assistantId, rangeDays } }),
+    staleTime: 60_000,
+  });
+
+  const empty = {
+    totals: { count: 0, minutes: 0, cost: 0 },
+    daily: [] as Array<{ date: string; count: number; minutes: number; cost: number }>,
+    endedReasons: [] as Array<{ reason: string; count: number }>,
+    success: [] as Array<{ label: string; count: number }>,
+    costBreakdown: { stt: 0, llm: 0, tts: 0, vapi: 0, transport: 0 },
+    error: null as string | null,
+  };
+  const a = data ?? empty;
+  const avgCostPerMin = a.totals.minutes > 0 ? a.totals.cost / a.totals.minutes : 0;
+
+  const costData = [
+    { name: "STT", value: a.costBreakdown.stt },
+    { name: "LLM", value: a.costBreakdown.llm },
+    { name: "TTS", value: a.costBreakdown.tts },
+    { name: "Vapi", value: a.costBreakdown.vapi },
+    { name: "Transport", value: a.costBreakdown.transport },
+  ].filter((d) => d.value > 0);
+
+  const dailyChart = a.daily.map((d) => ({
+    ...d,
+    label: new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+  }));
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Métricas do assistente</h2>
+            <p className="text-xs text-muted-foreground">
+              Dados oficiais da API <span className="font-mono">POST /analytics</span> da Vapi.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            <Select value={String(rangeDays)} onValueChange={(v) => setRangeDays(Number(v))}>
+              <SelectTrigger className="h-8 w-32 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="90">Últimos 90 dias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {a.error && (
+        <Card className="border-rose-500/20 bg-rose-500/10">
+          <CardContent className="p-4 text-xs text-rose-200">
+            Não foi possível carregar as métricas: {a.error}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          { label: "Ligações", value: isLoading ? null : a.totals.count.toLocaleString("pt-BR") },
+          { label: "Minutos", value: isLoading ? null : a.totals.minutes.toFixed(1) },
+          { label: "Custo total", value: isLoading ? null : `$${a.totals.cost.toFixed(2)}` },
+          { label: "Custo médio/min", value: isLoading ? null : `$${avgCostPerMin.toFixed(3)}` },
+        ].map((k) => (
+          <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k.label}</p>
+              {k.value === null ? (
+                <Skeleton className="mt-2 h-6 w-20" />
+              ) : (
+                <p className="mt-1 text-xl font-semibold text-foreground">{k.value}</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Volume por dia</h3>
+              <p className="text-[11px] text-muted-foreground">Quantidade de ligações por dia no período.</p>
+            </div>
+            <div className="h-56">
+              {isLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : dailyChart.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                  Sem ligações no período.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyChart}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={10} />
+                    <YAxis stroke="#94a3b8" fontSize={10} allowDecimals={false} />
+                    <RTooltip
+                      contentStyle={{
+                        background: "rgba(15,15,20,0.9)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar dataKey="count" fill="#a78bfa" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Custo por componente</h3>
+              <p className="text-[11px] text-muted-foreground">Distribuição do custo total agregada pela Vapi.</p>
+            </div>
+            <div className="h-56">
+              {isLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : costData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                  Sem custos no período.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={costData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={72} paddingAngle={2}>
+                      {costData.map((_, i) => (
+                        <Cell key={i} fill={COST_COLORS[i % COST_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <RTooltip
+                      formatter={(v: number) => `$${v.toFixed(3)}`}
+                      contentStyle={{
+                        background: "rgba(15,15,20,0.9)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <h3 className="text-sm font-semibold text-foreground">Motivos de término</h3>
+            {isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : a.endedReasons.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nada para mostrar ainda.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {a.endedReasons.map((r) => (
+                  <div key={r.reason} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 px-3 py-2">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px]", endedReasonBadgeClass(r.reason))}>
+                      {r.reason}
+                    </span>
+                    <span className="text-xs font-medium text-foreground">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <h3 className="text-sm font-semibold text-foreground">Avaliação de sucesso</h3>
+            {isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : a.success.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Configure "Critério de Sucesso" abaixo para começar a coletar avaliações.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {a.success.map((s) => (
+                  <div key={s.label} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 px-3 py-2">
+                    <span className="text-xs text-foreground">{s.label}</span>
+                    <span className="text-xs font-medium text-foreground">{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AnalysisTab({ assistantId }: { assistantId: string }) {
+
   const [successCriteria, setSuccessCriteria] = useState(
     "A ligação é considerada bem-sucedida quando o lead demonstra interesse claro no produto e concorda em receber um contato do time comercial.",
   );
@@ -5438,8 +5798,18 @@ function AnalysisTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <AnalyticsPanel assistantId={assistantId} />
+
+      <div className="space-y-1 pt-2">
+        <h2 className="text-sm font-semibold text-foreground">Configuração da análise</h2>
+        <p className="text-xs text-muted-foreground">
+          Regras que a Vapi usa para avaliar automaticamente cada ligação.
+        </p>
+      </div>
+
       <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+
         <CardContent className="space-y-4 p-6">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
