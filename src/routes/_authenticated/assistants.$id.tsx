@@ -5798,8 +5798,18 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <AnalyticsPanel assistantId={assistantId} />
+
+      <div className="space-y-1 pt-2">
+        <h2 className="text-sm font-semibold text-foreground">Configuração da análise</h2>
+        <p className="text-xs text-muted-foreground">
+          Regras que a Vapi usa para avaliar automaticamente cada ligação.
+        </p>
+      </div>
+
       <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+
         <CardContent className="space-y-4 p-6">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
