@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
 import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/client";
+import { RouteProgress } from "@/components/route-progress";
 
 function NotFoundComponent() {
   return (
@@ -160,6 +161,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={200}>
+        <RouteProgress />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <Toaster position="bottom-right" theme="dark" richColors closeButton />
