@@ -1139,25 +1139,9 @@ function AssistantDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Stack padrão de baixo custo — apenas voz é editável */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-5 p-6">
-                  <div>
-                    <h2 className="text-sm font-semibold text-foreground">Stack padrão</h2>
-                    <p className="text-xs text-muted-foreground">
-                      Ajuste o modelo de IA e a voz do agente. Selecione um padrão acima para preencher tudo automaticamente.
-                    </p>
 
-                  </div>
-
-
-
-                  <VapiStatsPanel
-                    modelProvider={form.modelProvider}
-                    model={form.model}
-                    voiceProvider={form.voiceProvider}
-                    voiceId={form.voiceId}
-                  />
 
                   <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
                     <div>
