@@ -1104,6 +1104,21 @@ function AssistantDetailPage() {
                         form.model === p.model.model &&
                         form.voiceProvider === p.voice.provider &&
                         form.voiceId === p.voice.voiceId;
+                      const modelSpec = getModelSpec(p.model.provider, p.model.model);
+                      const voiceSpec = getVoiceSpec(p.voice.provider, p.voice.voiceId);
+                      const presetCost =
+                        VAPI_PLATFORM_FEE_PER_MIN +
+                        DEFAULT_TRANSCRIBER.costPerMin +
+                        (modelSpec?.costPerMin ?? 0) +
+                        (voiceSpec?.costPerMin ?? 0);
+                      const presetLatency =
+                        DEFAULT_TRANSCRIBER.latencyMs +
+                        (modelSpec?.latencyMs ?? 0) +
+                        (voiceSpec?.latencyMs ?? 0);
+                      const latencyLabel =
+                        presetLatency >= 1000
+                          ? `~${(presetLatency / 1000).toFixed(2).replace(/\.?0+$/, "")}s`
+                          : `~${Math.round(presetLatency)}ms`;
                       return (
                         <button
                           key={p.id}
@@ -1129,8 +1144,17 @@ function AssistantDetailPage() {
                         >
                           <p className="text-sm font-semibold text-foreground">{p.label}</p>
                           <p className="mt-1 text-[11px] text-muted-foreground">{p.description}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                              Custo ~{formatUSDPerMin(presetCost)}
+                            </span>
+                            <span className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                              Latência {latencyLabel}
+                            </span>
+                          </div>
                         </button>
                       );
+
                     })}
                   </div>
                   {form.transcriberProvider && form.transcriberModel && (
