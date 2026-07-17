@@ -1,45 +1,21 @@
-## Objetivo
+# Corrigir custo real no card do preset para bater com o painel Vapi
 
-Fazer o card do preset "Matteus" exibir custo e latência reais da conta Vapi do usuário — os mesmos valores que aparecem no painel oficial da Vapi — em vez da estimativa da tabela pública.
-
-## Onde já está certo
-
-- CRUD, ligações e billing já batem na API oficial (`https://api.vapi.ai`) com `VAPI_PRIVATE_KEY`, então cada chamada é executada e cobrada pela Vapi de verdade.
-- Já existe `getAssistantCallStats` (`src/lib/vapi.functions.ts`) que consulta `/call?assistantId=...` e a UI (`src/routes/_authenticated/assistants.$id.tsx`) já tem `useQuery` para essas stats.
-
-## O que está errado hoje
-
-O card mostrou `Custo real $0.078/min · Latência real ~6.25s`, que não bate com o painel da Vapi. Duas causas prováveis:
-
-1. Custo é derivado de `call.cost / duração`, o que inclui variações por chamada; a Vapi expõe `costBreakdown` (stt/llm/tts/vapi) por chamada, que é o valor exato do painel.
-2. Latência é medida via gap entre `messages[i].endTime` e `messages[i+1].time` (user → assistant). Isso captura o tempo de fala/silêncio do usuário, não a latência real do modelo, inflando para vários segundos.
+## Diagnóstico (confirmado em `src/lib/vapi.functions.ts` 1085-1206)
+- Somamos apenas `costBreakdown.stt + llm + tts + vapi`, descartando `transport`, `analysis`, `knowledgeBase`, `chat` e outros itens que o painel Vapi inclui no custo total da chamada.
+- Calculamos `cost/min` por chamada e depois `avg(...)` — média simples. O painel usa média ponderada por duração (Σcusto / Σminutos), o que produz um valor diferente (normalmente maior, alinhado à realidade da fatura).
+- Filtro `durSec > 5` exclui chamadas curtas que o painel ainda contabiliza.
 
 ## Mudanças
 
-### 1. `src/lib/vapi.functions.ts` — `getAssistantCallStats`
+### `src/lib/vapi.functions.ts` — `getAssistantCallStats`
+1. Trocar o cálculo de custo para usar o **total real da chamada**:
+   - Preferir `call.cost` (número que a Vapi já expõe como total cobrado da chamada). Cair para `costBreakdown.total` quando `cost` ausente. Só como último recurso somar todas as chaves numéricas do `costBreakdown` (não apenas 4).
+2. Trocar média simples por **média ponderada por duração**:
+   - Acumular `totalCost` e `totalMinutes` entre todas as chamadas válidas; `avgCostPerMin = totalCost / totalMinutes`.
+3. Manter o breakdown por componente (STT/LLM/TTS/Vapi) também **ponderado** (Σstt / Σminutos, idem llm/tts/vapi) para o tooltip continuar coerente.
+4. Reduzir filtro mínimo de duração para `durSec > 0` (evita divisão por zero, mas não descarta chamadas curtas que o painel considera).
 
-- Continuar chamando `GET /call?assistantId=...&limit=50`.
-- **Custo real**: quando `call.costBreakdown` existir, somar `stt + llm + tts + vapi` e dividir pela duração (min); é o mesmo número do painel. Cair para `call.cost / durMin` se breakdown não vier.
-- **Latência real**: em vez do gap entre mensagens, usar campos de performance por mensagem. A Vapi anexa em cada mensagem assistant um `duration` (ms de geração) e o Vapi também expõe `call.analysis` / `call.messages` com `secondsFromStart`. Estratégia:
-  - Preferir, se presente, `call.performanceMetrics` / `call.analysis.averageResponseLatency` (campo direto).
-  - Fallback: para cada par `user → assistant`, medir gap só quando `gap < 5000ms` (descarta silêncios humanos); tomar o menor gap por chamada e depois média entre chamadas, aproximando "response latency" do painel.
-- Retornar também `avgCostPerMinBreakdown` separando `stt`, `llm`, `tts`, `vapi` para permitir tooltip com o detalhamento (opcional, mesmo shape que o painel Vapi).
-
-### 2. `src/routes/_authenticated/assistants.$id.tsx` — card do preset
-
-- Já lê `callStatsQuery.data`; manter a lógica de mostrar valor real quando `callCount > 0`.
-- Ajustar o rótulo/tooltip: `Custo real` mostra `$X/min` com breakdown no tooltip (`STT $ · LLM $ · TTS $ · Vapi $`), `Latência real` mostra `~Ns` (média Vapi).
-- Se `callCount === 0`, continuar exibindo a estimativa (fallback atual).
-
-### 3. Sem mudanças
-
-- Nada de novo secret; `VAPI_PRIVATE_KEY` já configurada.
-- Sem alteração no fluxo de criação/edição do assistente.
-- Sem alteração no `vapi-pricing.ts` (continua servindo de fallback quando não há chamadas).
+Nenhuma mudança na UI — o card em `src/routes/_authenticated/assistants.$id.tsx` continua lendo `avgCostPerMin` e `breakdown` como hoje.
 
 ## Como validar
-
-1. Abrir `/assistants/<id>` do "Matteus".
-2. Card deve mostrar `Custo real ~$…/min` com valor próximo ao total do painel Vapi (ex.: soma de STT+LLM+TTS+Vapi) e `Latência real ~Ns` compatível com o painel.
-3. Tooltip do custo mostra breakdown por componente.
-4. Assistente novo (sem chamadas): card volta a mostrar a estimativa da tabela oficial.
+Após aplicar, recarregar `/assistants/:id`. O badge "Custo real" deve subir para ~$0.08–0.084/min (mesma faixa do painel, dependendo do mix de transport/analysis das 38 chamadas). Latência não muda.
