@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
 import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/client";
+import { RouteProgress } from "@/components/route-progress";
 
 function NotFoundComponent() {
   return (
