@@ -18,8 +18,9 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        events: "events/",
+        events: "events",
       },
+      dedupe: ["events"],
     },
   },
 });
