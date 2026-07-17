@@ -1105,12 +1105,15 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
     if (!Array.isArray(raw)) return empty;
 
     const calls = raw as Array<Record<string, unknown>>;
-    const costPerMinSamples: number[] = [];
-    const sttSamples: number[] = [];
-    const llmSamples: number[] = [];
-    const ttsSamples: number[] = [];
-    const vapiFeeSamples: number[] = [];
     const latencySamples: number[] = [];
+    let totalCost = 0;
+    let totalMinutes = 0;
+    let sttSum = 0;
+    let llmSum = 0;
+    let ttsSum = 0;
+    let vapiSum = 0;
+
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
     for (const c of calls) {
       const startedAt = typeof c.startedAt === "string" ? Date.parse(c.startedAt) : NaN;
@@ -1120,37 +1123,42 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
           ? (endedAt - startedAt) / 1000
           : null;
 
-      // --- Custo ---
+      // --- Custo (ponderado por duração, total real da chamada) ---
       const breakdown =
         c.costBreakdown && typeof c.costBreakdown === "object"
           ? (c.costBreakdown as Record<string, unknown>)
           : null;
-      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
-      if (breakdown && durSec != null && durSec > 5) {
-        const stt = num(breakdown.stt);
-        const llm = num(breakdown.llm);
-        const tts = num(breakdown.tts);
-        const vapiFee = num(breakdown.vapi);
-        const total = num(breakdown.total) ?? [stt, llm, tts, vapiFee].reduce<number>((a, b) => a + (b ?? 0), 0);
-        const perMin = total / (durSec / 60);
-        if (Number.isFinite(perMin) && perMin > 0) {
-          costPerMinSamples.push(perMin);
-          if (stt != null) sttSamples.push(stt / (durSec / 60));
-          if (llm != null) llmSamples.push(llm / (durSec / 60));
-          if (tts != null) ttsSamples.push(tts / (durSec / 60));
-          if (vapiFee != null) vapiFeeSamples.push(vapiFee / (durSec / 60));
+      if (durSec != null && durSec > 0) {
+        // Prefer official total: call.cost > breakdown.total > soma de TODAS as chaves numéricas do breakdown
+        let callTotal = num(c.cost) ?? (breakdown ? num(breakdown.total) : null);
+        if (callTotal == null && breakdown) {
+          let sum = 0;
+          for (const [k, v] of Object.entries(breakdown)) {
+            if (k === "total" || k === "breakdown" || k === "costs") continue;
+            const n = num(v);
+            if (n != null) sum += n;
+          }
+          callTotal = sum > 0 ? sum : null;
         }
-      } else {
-        const cost = num(c.cost);
-        if (cost != null && durSec != null && durSec > 5) {
-          costPerMinSamples.push(cost / (durSec / 60));
+        if (callTotal != null && callTotal > 0) {
+          const minutes = durSec / 60;
+          totalCost += callTotal;
+          totalMinutes += minutes;
+          if (breakdown) {
+            const stt = num(breakdown.stt);
+            const llm = num(breakdown.llm);
+            const tts = num(breakdown.tts);
+            const vfee = num(breakdown.vapi);
+            if (stt != null) sttSum += stt;
+            if (llm != null) llmSum += llm;
+            if (tts != null) ttsSum += tts;
+            if (vfee != null) vapiSum += vfee;
+          }
         }
       }
 
       // --- Latência ---
-      // 1) Vapi expõe latency via messages[].duration em ms para mensagens do bot,
-      //    ou via analysis/performanceMetrics quando disponível.
       const analysis = (c.analysis && typeof c.analysis === "object")
         ? (c.analysis as Record<string, unknown>)
         : null;
@@ -1163,7 +1171,6 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
       }
 
       const msgs = Array.isArray(c.messages) ? (c.messages as Array<Record<string, unknown>>) : [];
-      // Menor gap user->bot da chamada (aproxima "response latency"), descartando silêncios.
       let bestGap: number | null = null;
       for (let i = 0; i < msgs.length - 1; i++) {
         const cur = msgs[i];
@@ -1179,7 +1186,6 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
             typeof nxt.secondsFromStart === "number" ? nxt.secondsFromStart * 1000 : null;
           if (endT != null && startT != null && startT > endT) {
             const gap = startT - endT;
-            // < 5s exclui silêncios do usuário; > 100ms exclui ecos.
             if (gap > 100 && gap < 5000 && (bestGap == null || gap < bestGap)) {
               bestGap = gap;
             }
@@ -1194,15 +1200,16 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
 
     return {
       callCount: calls.length,
-      avgCostPerMin: avg(costPerMinSamples),
+      avgCostPerMin: totalMinutes > 0 ? totalCost / totalMinutes : null,
       avgLatencyMs: avg(latencySamples),
       breakdown: {
-        stt: avg(sttSamples),
-        llm: avg(llmSamples),
-        tts: avg(ttsSamples),
-        vapi: avg(vapiFeeSamples),
+        stt: totalMinutes > 0 && sttSum > 0 ? sttSum / totalMinutes : null,
+        llm: totalMinutes > 0 && llmSum > 0 ? llmSum / totalMinutes : null,
+        tts: totalMinutes > 0 && ttsSum > 0 ? ttsSum / totalMinutes : null,
+        vapi: totalMinutes > 0 && vapiSum > 0 ? vapiSum / totalMinutes : null,
       },
     };
   });
+
 
 
