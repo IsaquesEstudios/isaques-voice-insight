@@ -5556,7 +5556,218 @@ interface SchemaField {
   description: string;
 }
 
-function AnalysisTab() {
+const COST_COLORS = ["#a78bfa", "#60a5fa", "#f472b6", "#fbbf24", "#34d399"];
+
+function AnalyticsPanel({ assistantId }: { assistantId: string }) {
+  const [rangeDays, setRangeDays] = useState(7);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["vapi", "assistantAnalytics", assistantId, rangeDays],
+    queryFn: () => getAssistantAnalytics({ data: { assistantId, rangeDays } }),
+    staleTime: 60_000,
+  });
+
+  const empty = {
+    totals: { count: 0, minutes: 0, cost: 0 },
+    daily: [] as Array<{ date: string; count: number; minutes: number; cost: number }>,
+    endedReasons: [] as Array<{ reason: string; count: number }>,
+    success: [] as Array<{ label: string; count: number }>,
+    costBreakdown: { stt: 0, llm: 0, tts: 0, vapi: 0, transport: 0 },
+    error: null as string | null,
+  };
+  const a = data ?? empty;
+  const avgCostPerMin = a.totals.minutes > 0 ? a.totals.cost / a.totals.minutes : 0;
+
+  const costData = [
+    { name: "STT", value: a.costBreakdown.stt },
+    { name: "LLM", value: a.costBreakdown.llm },
+    { name: "TTS", value: a.costBreakdown.tts },
+    { name: "Vapi", value: a.costBreakdown.vapi },
+    { name: "Transport", value: a.costBreakdown.transport },
+  ].filter((d) => d.value > 0);
+
+  const dailyChart = a.daily.map((d) => ({
+    ...d,
+    label: new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+  }));
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Métricas do assistente</h2>
+            <p className="text-xs text-muted-foreground">
+              Dados oficiais da API <span className="font-mono">POST /analytics</span> da Vapi.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            <Select value={String(rangeDays)} onValueChange={(v) => setRangeDays(Number(v))}>
+              <SelectTrigger className="h-8 w-32 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="90">Últimos 90 dias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {a.error && (
+        <Card className="border-rose-500/20 bg-rose-500/10">
+          <CardContent className="p-4 text-xs text-rose-200">
+            Não foi possível carregar as métricas: {a.error}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          { label: "Ligações", value: isLoading ? null : a.totals.count.toLocaleString("pt-BR") },
+          { label: "Minutos", value: isLoading ? null : a.totals.minutes.toFixed(1) },
+          { label: "Custo total", value: isLoading ? null : `$${a.totals.cost.toFixed(2)}` },
+          { label: "Custo médio/min", value: isLoading ? null : `$${avgCostPerMin.toFixed(3)}` },
+        ].map((k) => (
+          <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k.label}</p>
+              {k.value === null ? (
+                <Skeleton className="mt-2 h-6 w-20" />
+              ) : (
+                <p className="mt-1 text-xl font-semibold text-foreground">{k.value}</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Volume por dia</h3>
+              <p className="text-[11px] text-muted-foreground">Quantidade de ligações por dia no período.</p>
+            </div>
+            <div className="h-56">
+              {isLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : dailyChart.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                  Sem ligações no período.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyChart}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={10} />
+                    <YAxis stroke="#94a3b8" fontSize={10} allowDecimals={false} />
+                    <RTooltip
+                      contentStyle={{
+                        background: "rgba(15,15,20,0.9)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar dataKey="count" fill="#a78bfa" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Custo por componente</h3>
+              <p className="text-[11px] text-muted-foreground">Distribuição do custo total agregada pela Vapi.</p>
+            </div>
+            <div className="h-56">
+              {isLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : costData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                  Sem custos no período.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={costData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={72} paddingAngle={2}>
+                      {costData.map((_, i) => (
+                        <Cell key={i} fill={COST_COLORS[i % COST_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <RTooltip
+                      formatter={(v: number) => `$${v.toFixed(3)}`}
+                      contentStyle={{
+                        background: "rgba(15,15,20,0.9)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <h3 className="text-sm font-semibold text-foreground">Motivos de término</h3>
+            {isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : a.endedReasons.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nada para mostrar ainda.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {a.endedReasons.map((r) => (
+                  <div key={r.reason} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 px-3 py-2">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px]", endedReasonBadgeClass(r.reason))}>
+                      {r.reason}
+                    </span>
+                    <span className="text-xs font-medium text-foreground">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardContent className="space-y-3 p-4">
+            <h3 className="text-sm font-semibold text-foreground">Avaliação de sucesso</h3>
+            {isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : a.success.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Configure "Critério de Sucesso" abaixo para começar a coletar avaliações.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {a.success.map((s) => (
+                  <div key={s.label} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 px-3 py-2">
+                    <span className="text-xs text-foreground">{s.label}</span>
+                    <span className="text-xs font-medium text-foreground">{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AnalysisTab({ assistantId }: { assistantId: string }) {
+
   const [successCriteria, setSuccessCriteria] = useState(
     "A ligação é considerada bem-sucedida quando o lead demonstra interesse claro no produto e concorda em receber um contato do time comercial.",
   );
