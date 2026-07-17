@@ -1082,16 +1082,75 @@ function AssistantDetailPage() {
 
               <TabsContent value="model" className="mt-0">
             <div className="grid grid-cols-1 gap-4">
+              {/* Padrões de IA pré-configurados */}
+              <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+                <CardContent className="space-y-4 p-6">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Padrão de IA</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Selecione um padrão pronto e aplique transcriber, modelo e voz de uma vez.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {AI_PRESETS.map((p) => {
+                      const isActive =
+                        form.transcriberProvider === p.transcriber.provider &&
+                        form.transcriberModel === p.transcriber.model &&
+                        form.modelProvider === p.model.provider &&
+                        form.model === p.model.model &&
+                        form.voiceProvider === p.voice.provider &&
+                        form.voiceId === p.voice.voiceId;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              transcriberProvider: p.transcriber.provider,
+                              transcriberModel: p.transcriber.model,
+                              transcriberLanguage: p.transcriber.language ?? "",
+                              modelProvider: p.model.provider,
+                              model: p.model.model,
+                              voiceProvider: p.voice.provider,
+                              voiceId: p.voice.voiceId,
+                            }))
+                          }
+                          className={`rounded-xl border p-4 text-left transition ${
+                            isActive
+                              ? "border-primary/60 bg-primary/10"
+                              : "border-white/[0.08] bg-background/40 hover:border-white/20 hover:bg-background/60"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-foreground">{p.label}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{p.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.transcriberProvider && form.transcriberModel && (
+                    <div className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground">Transcriber ativo:</span>{" "}
+                      {form.transcriberProvider} · {form.transcriberModel}
+                      {form.transcriberLanguage ? ` · ${form.transcriberLanguage}` : ""}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Stack padrão de baixo custo — apenas voz é editável */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-5 p-6">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Stack padrão</h2>
                     <p className="text-xs text-muted-foreground">
-                      Transcriber padronizado para o menor custo. Ajuste o modelo de IA e a voz do agente.
+                      Ajuste o modelo de IA e a voz do agente. Selecione um padrão acima para preencher tudo automaticamente.
                     </p>
 
                   </div>
+
+
 
                   <VapiStatsPanel
                     modelProvider={form.modelProvider}
