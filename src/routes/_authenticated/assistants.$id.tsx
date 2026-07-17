@@ -267,10 +267,32 @@ const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-// Apenas provedores com vozes em Português do Brasil (PT-BR).
+// Provedores de voz — Vapi (com vozes proprietárias como Elliot) + PT-BR via BYOK.
 const VOICE_PROVIDERS = [
+  { value: "vapi", label: "Vapi (nativo)" },
   { value: "11labs", label: "ElevenLabs (BYOK) — PT-BR" },
   { value: "azure", label: "Azure (BYOK) — PT-BR" },
+];
+
+// Padrões de IA pré-configurados. Ao selecionar, aplica transcriber + model + voice.
+interface AiPreset {
+  id: string;
+  label: string;
+  description: string;
+  transcriber: { provider: string; model: string; language?: string };
+  model: { provider: string; model: string };
+  voice: { provider: string; voiceId: string };
+}
+
+const AI_PRESETS: AiPreset[] = [
+  {
+    id: "matteus",
+    label: "Matteus",
+    description: "STT RT v5 · GPT-4.1 nano · Elliot v2",
+    transcriber: { provider: "vapi", model: "stt-rt-v5", language: "pt" },
+    model: { provider: "openai", model: "gpt-4.1-nano" },
+    voice: { provider: "vapi", voiceId: "Elliot" },
+  },
 ];
 
 // Vapi Voices ativas — https://docs.vapi.ai/providers/voice/vapi-voices
