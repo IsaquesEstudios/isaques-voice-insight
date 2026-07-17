@@ -101,14 +101,30 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   getVapiAssistant,
-  
+  listAssistantCalls,
+  getAssistantAnalytics,
   listVapiAssistants,
   listVapiVoices,
   saveVapiAssistantConfig,
+  type AssistantCallLog,
   type VapiVoiceOption,
 } from "@/lib/vapi.functions";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
 import { cn } from "@/lib/utils";
 import {
   getModelCost,
