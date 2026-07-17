@@ -118,6 +118,7 @@ import {
   STT_COST_PER_MIN,
   VAPI_PLATFORM_FEE_PER_MIN,
   DEFAULT_TRANSCRIBER,
+  getTranscriberSpec,
   formatUSDPerMin,
 } from "@/lib/vapi-pricing";
 import { CostHint, CostSummary } from "@/components/assistants/cost-hint";
