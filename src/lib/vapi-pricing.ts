@@ -43,6 +43,30 @@ export const DEFAULT_TRANSCRIBER: TranscriberSpec = {
   accuracyWer: 2.7,
 };
 
+// Transcribers oficialmente listados pela Vapi (dashboard values).
+// Ref.: painel oficial da Vapi — https://dashboard.vapi.ai
+export const TRANSCRIBER_SPECS: Record<string, Record<string, TranscriberSpec>> = {
+  vapi: {
+    "stt-rt-v5": {
+      provider: "Vapi",
+      label: "STT RT v5",
+      model: "stt-rt-v5",
+      costPerMin: 0.004,
+      latencyMs: 300,
+      accuracyWer: 1.8,
+    },
+  },
+  deepgram: {
+    "nova-3": DEFAULT_TRANSCRIBER,
+  },
+};
+
+export function getTranscriberSpec(provider?: string, model?: string): TranscriberSpec | null {
+  if (!provider || !model) return null;
+  return TRANSCRIBER_SPECS[provider]?.[model] ?? null;
+}
+
+
 // Somente modelos listados em docs.vapi.ai/providers/model/*
 export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
   openai: {
