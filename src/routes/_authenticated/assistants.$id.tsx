@@ -1416,21 +1416,6 @@ function AssistantDetailPage() {
                         />
                       </div>
                     </div>
-                    <div className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-xs text-muted-foreground">
-                      <p className="mb-1 font-medium text-foreground">Dicas para melhorar o sotaque</p>
-                      <ul className="list-disc space-y-1 pl-4">
-                        <li>
-                          Para sotaque brasileiro, prefira as vozes marcadas "PT-BR" na lista da ElevenLabs ou use o filtro de idioma quando disponível (Azure/Cartesia).
-                          OpenAI não expõe idioma público — use vozes multilíngues e deixe o prompt em português.
-                        </li>
-                        <li>
-                          No prompt do sistema, deixe explícito: "Responda sempre em português do Brasil, com pronúncia natural brasileira."
-                        </li>
-                        <li>
-                          Verifique o transcriber (Deepgram Nova 3 Multi já detecta pt-BR). Se estiver fixo em inglês, a IA pode responder com sotaque errado.
-                        </li>
-                      </ul>
-                    </div>
                   </div>
 
                   {/* Ajuste fino de áudio ---------------------------------- */}
