@@ -576,8 +576,11 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
     if (data.transcriberProvider && data.transcriberModel) {
       const t: Record<string, unknown> = {
         provider: data.transcriberProvider,
-        model: data.transcriberModel,
       };
+      // Vapi's own transcriber provider ("vapi") doesn't accept a `model` field.
+      if (data.transcriberProvider !== "vapi") {
+        t.model = data.transcriberModel;
+      }
       if (data.transcriberLanguage) t.language = data.transcriberLanguage;
       body.transcriber = t;
     } else {
