@@ -1068,20 +1068,31 @@ export const listVapiVoices = createServerFn({ method: "GET" })
       .filter((v) => v.providerId && v.name);
   });
 
-// Aggregate cost/latency stats from recent calls for a given assistant.
-// Cost: média de $/min calculado como cost/(duration_s/60).
-// Latência: para cada par (user → bot) em messages, media o gap em ms.
+// Aggregate real cost/latency stats from recent calls for a given assistant.
+// Prefer official Vapi fields: costBreakdown (STT/LLM/TTS/Vapi) and messages[].duration.
 export interface AssistantCallStats {
   callCount: number;
   avgCostPerMin: number | null;
   avgLatencyMs: number | null;
+  breakdown: {
+    stt: number | null;
+    llm: number | null;
+    tts: number | null;
+    vapi: number | null;
+  };
 }
 
 export const getAssistantCallStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { assistantId: string }) => data)
   .handler(async ({ data }): Promise<AssistantCallStats> => {
-    if (!data.assistantId) return { callCount: 0, avgCostPerMin: null, avgLatencyMs: null };
+    const empty: AssistantCallStats = {
+      callCount: 0,
+      avgCostPerMin: null,
+      avgLatencyMs: null,
+      breakdown: { stt: null, llm: null, tts: null, vapi: null },
+    };
+    if (!data.assistantId) return empty;
     let raw: unknown;
     try {
       raw = await vapiFetch(
@@ -1089,47 +1100,109 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
         { method: "GET" },
       );
     } catch {
-      return { callCount: 0, avgCostPerMin: null, avgLatencyMs: null };
+      return empty;
     }
-    if (!Array.isArray(raw)) return { callCount: 0, avgCostPerMin: null, avgLatencyMs: null };
+    if (!Array.isArray(raw)) return empty;
 
     const calls = raw as Array<Record<string, unknown>>;
     const costPerMinSamples: number[] = [];
+    const sttSamples: number[] = [];
+    const llmSamples: number[] = [];
+    const ttsSamples: number[] = [];
+    const vapiFeeSamples: number[] = [];
     const latencySamples: number[] = [];
 
     for (const c of calls) {
-      const cost = typeof c.cost === "number" ? c.cost : null;
       const startedAt = typeof c.startedAt === "string" ? Date.parse(c.startedAt) : NaN;
       const endedAt = typeof c.endedAt === "string" ? Date.parse(c.endedAt) : NaN;
-      if (cost != null && Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt > startedAt) {
-        const durSec = (endedAt - startedAt) / 1000;
-        if (durSec > 5) costPerMinSamples.push(cost / (durSec / 60));
+      const durSec =
+        Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt > startedAt
+          ? (endedAt - startedAt) / 1000
+          : null;
+
+      // --- Custo ---
+      const breakdown =
+        c.costBreakdown && typeof c.costBreakdown === "object"
+          ? (c.costBreakdown as Record<string, unknown>)
+          : null;
+      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+      if (breakdown && durSec != null && durSec > 5) {
+        const stt = num(breakdown.stt);
+        const llm = num(breakdown.llm);
+        const tts = num(breakdown.tts);
+        const vapiFee = num(breakdown.vapi);
+        const total = num(breakdown.total) ?? [stt, llm, tts, vapiFee].reduce<number>((a, b) => a + (b ?? 0), 0);
+        const perMin = total / (durSec / 60);
+        if (Number.isFinite(perMin) && perMin > 0) {
+          costPerMinSamples.push(perMin);
+          if (stt != null) sttSamples.push(stt / (durSec / 60));
+          if (llm != null) llmSamples.push(llm / (durSec / 60));
+          if (tts != null) ttsSamples.push(tts / (durSec / 60));
+          if (vapiFee != null) vapiFeeSamples.push(vapiFee / (durSec / 60));
+        }
+      } else {
+        const cost = num(c.cost);
+        if (cost != null && durSec != null && durSec > 5) {
+          costPerMinSamples.push(cost / (durSec / 60));
+        }
+      }
+
+      // --- Latência ---
+      // 1) Vapi expõe latency via messages[].duration em ms para mensagens do bot,
+      //    ou via analysis/performanceMetrics quando disponível.
+      const analysis = (c.analysis && typeof c.analysis === "object")
+        ? (c.analysis as Record<string, unknown>)
+        : null;
+      const directLat =
+        num((c as { averageResponseLatency?: unknown }).averageResponseLatency) ??
+        (analysis ? num(analysis.averageResponseLatency) : null);
+      if (directLat != null && directLat > 0 && directLat < 15000) {
+        latencySamples.push(directLat);
+        continue;
       }
 
       const msgs = Array.isArray(c.messages) ? (c.messages as Array<Record<string, unknown>>) : [];
+      // Menor gap user->bot da chamada (aproxima "response latency"), descartando silêncios.
+      let bestGap: number | null = null;
       for (let i = 0; i < msgs.length - 1; i++) {
         const cur = msgs[i];
         const nxt = msgs[i + 1];
         const curRole = String(cur.role ?? "");
         const nxtRole = String(nxt.role ?? "");
         if (curRole === "user" && (nxtRole === "bot" || nxtRole === "assistant")) {
-          const endT = typeof cur.endTime === "number" ? cur.endTime
-            : typeof cur.time === "number" ? cur.time : null;
-          const startT = typeof nxt.time === "number" ? nxt.time
-            : typeof nxt.secondsFromStart === "number" ? nxt.secondsFromStart * 1000 : null;
+          const endT =
+            typeof cur.endTime === "number" ? cur.endTime :
+            typeof cur.time === "number" ? cur.time : null;
+          const startT =
+            typeof nxt.time === "number" ? nxt.time :
+            typeof nxt.secondsFromStart === "number" ? nxt.secondsFromStart * 1000 : null;
           if (endT != null && startT != null && startT > endT) {
             const gap = startT - endT;
-            if (gap > 100 && gap < 15000) latencySamples.push(gap);
+            // < 5s exclui silêncios do usuário; > 100ms exclui ecos.
+            if (gap > 100 && gap < 5000 && (bestGap == null || gap < bestGap)) {
+              bestGap = gap;
+            }
           }
         }
       }
+      if (bestGap != null) latencySamples.push(bestGap);
     }
 
-    const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+    const avg = (arr: number[]) =>
+      arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
     return {
       callCount: calls.length,
       avgCostPerMin: avg(costPerMinSamples),
       avgLatencyMs: avg(latencySamples),
+      breakdown: {
+        stt: avg(sttSamples),
+        llm: avg(llmSamples),
+        tts: avg(ttsSamples),
+        vapi: avg(vapiFeeSamples),
+      },
     };
   });
+
 
