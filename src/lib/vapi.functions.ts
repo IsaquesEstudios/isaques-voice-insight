@@ -545,6 +545,10 @@ export interface AssistantConfigInput {
   // ---- Background ----
   backgroundSound?: "off" | "office" | null;
   backgroundDenoisingEnabled?: boolean | null;
+  // ---- Transcriber (opcional; sobrepõe o default Deepgram Nova 3 multi) ----
+  transcriberProvider?: string | null;
+  transcriberModel?: string | null;
+  transcriberLanguage?: string | null;
 }
 
 // Partial PATCH used by the details page — only touches provided fields.
@@ -568,8 +572,17 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       typeof data.systemPrompt === "string" ||
       Array.isArray(data.tools);
 
-    // Sempre padroniza o transcriber na Vapi ao salvar.
-    body.transcriber = { ...DEFAULT_TRANSCRIBER_BLOCK };
+    // Transcriber: usa override se enviado, senão padrão Deepgram Nova 3 multi.
+    if (data.transcriberProvider && data.transcriberModel) {
+      const t: Record<string, unknown> = {
+        provider: data.transcriberProvider,
+        model: data.transcriberModel,
+      };
+      if (data.transcriberLanguage) t.language = data.transcriberLanguage;
+      body.transcriber = t;
+    } else {
+      body.transcriber = { ...DEFAULT_TRANSCRIBER_BLOCK };
+    }
 
     if (needsModelPatch) {
       const current = (await vapiFetch(`/assistant/${data.id}`, {
