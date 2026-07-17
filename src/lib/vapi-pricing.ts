@@ -104,8 +104,8 @@ export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
 // e devem vir da dashboard do usuário — não listamos IDs aqui.
 export const VOICE_SPECS: Record<string, Record<string, VoiceSpec>> = {
   vapi: {
-    _default: { costPerMin: 0.02, latencyMs: 250, humanness: 70 },
-    Elliot: { costPerMin: 0.02, latencyMs: 250, humanness: 72 },
+    _default: { costPerMin: 0.02, latencyMs: 410, humanness: 95 },
+    Elliot: { costPerMin: 0.02, latencyMs: 410, humanness: 95 },
     Savannah: { costPerMin: 0.02, latencyMs: 250, humanness: 70 },
     Emma: { costPerMin: 0.02, latencyMs: 260, humanness: 71 },
     Clara: { costPerMin: 0.02, latencyMs: 260, humanness: 71 },
