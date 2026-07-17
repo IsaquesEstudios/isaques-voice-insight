@@ -568,6 +568,15 @@ function AssistantDetailPage() {
   const navigate = useNavigate();
   const fetchAssistant = useServerFn(getVapiAssistant);
   const saveConfig = useServerFn(saveVapiAssistantConfig);
+  const fetchCallStats = useServerFn(getAssistantCallStats);
+
+  const callStatsQuery = useQuery({
+    queryKey: ["assistant-call-stats", id],
+    queryFn: () => fetchCallStats({ data: { assistantId: id } }),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  });
+
 
   const [form, setForm] = useState<FormState>(empty);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
