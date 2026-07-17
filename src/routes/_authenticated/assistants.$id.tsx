@@ -900,6 +900,9 @@ function AssistantDetailPage() {
           stopBackoffSeconds: form.stopBackoffSeconds,
           backgroundSound: form.backgroundSound,
           backgroundDenoisingEnabled: form.backgroundDenoisingEnabled,
+          transcriberProvider: form.transcriberProvider || null,
+          transcriberModel: form.transcriberModel || null,
+          transcriberLanguage: form.transcriberLanguage || null,
         },
       });
 
