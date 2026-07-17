@@ -1241,97 +1241,229 @@ function AssistantDetailPage() {
 
 /* -------------------------------- Logs -------------------------------- */
 
-interface LogRow {
-  id: string;
-  when: string;
-  phone: string;
-  duration: string;
-  cost: string;
+function formatDuration(sec: number | null): string {
+  if (sec == null || sec <= 0) return "—";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-const MOCK_LOGS: LogRow[] = [
-  { id: "1", when: "06/07/2026 14:32", phone: "+55 11 98765-4321", duration: "03:12", cost: "$0.42" },
-  { id: "2", when: "06/07/2026 13:58", phone: "+55 21 99123-4567", duration: "01:47", cost: "$0.24" },
-  { id: "3", when: "06/07/2026 12:15", phone: "+55 31 98888-1122", duration: "05:03", cost: "$0.68" },
-  { id: "4", when: "06/07/2026 11:02", phone: "+1 415 555-2201", duration: "02:21", cost: "$0.31" },
-  { id: "5", when: "05/07/2026 19:44", phone: "+55 11 97777-9090", duration: "00:38", cost: "$0.09" },
-];
+function formatDateBR(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-function LogsTab() {
+function endedReasonBadgeClass(reason: string | null): string {
+  if (!reason) return "bg-white/[0.05] text-muted-foreground";
+  if (/customer-ended/i.test(reason)) return "bg-emerald-500/10 text-emerald-300";
+  if (/assistant-ended/i.test(reason)) return "bg-sky-500/10 text-sky-300";
+  if (/error|failed|no-answer|busy/i.test(reason)) return "bg-rose-500/10 text-rose-300";
+  if (/silence|voicemail/i.test(reason)) return "bg-amber-500/10 text-amber-300";
+  return "bg-white/[0.05] text-muted-foreground";
+}
+
+function LogsTab({ assistantId }: { assistantId: string }) {
+  const [limit, setLimit] = useState(50);
+  const [detail, setDetail] = useState<AssistantCallLog | null>(null);
+  const [detailMode, setDetailMode] = useState<"transcript" | "recording">("transcript");
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: ["vapi", "assistantCalls", assistantId, limit],
+    queryFn: () => listAssistantCalls({ data: { assistantId, limit } }),
+    staleTime: 30_000,
+  });
+
+  const calls = data?.calls ?? [];
+  const apiError = data?.error ?? (error instanceof Error ? error.message : null);
+
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Histórico do Agente</h2>
-            <p className="text-xs text-muted-foreground">
-              Últimas interações registradas por este assistente.
-            </p>
-          </div>
-          <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
-            Dados de exemplo
-          </span>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-white/[0.06] hover:bg-transparent">
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Data/Hora
-              </TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Telefone
-              </TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Duração
-              </TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Custo
-              </TableHead>
-              <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">
-                Ações
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {MOCK_LOGS.map((row) => (
-              <TableRow
-                key={row.id}
-                className="border-white/[0.04] transition-colors hover:bg-white/[0.03]"
+    <>
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Histórico do Agente</h2>
+              <p className="text-xs text-muted-foreground">
+                Últimas ligações registradas pela Vapi para este assistente.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
+                {calls.length} {calls.length === 1 ? "chamada" : "chamadas"}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                onClick={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: ["vapi", "assistantCalls", assistantId],
+                  })
+                }
+                disabled={isFetching}
               >
-                <TableCell className="text-sm text-foreground">{row.when}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
-                  {row.phone}
-                </TableCell>
-                <TableCell className="text-sm text-foreground">{row.duration}</TableCell>
-                <TableCell className="text-sm text-foreground">{row.cost}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 hover:text-primary"
-                      aria-label="Reproduzir áudio"
-                    >
-                      <Play className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 hover:text-primary"
-                      aria-label="Ver transcrição"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
+                {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Atualizar"}
+              </Button>
+            </div>
+          </div>
+
+          {apiError && (
+            <div className="border-b border-rose-500/20 bg-rose-500/10 px-6 py-3 text-xs text-rose-200">
+              Não foi possível carregar as ligações: {apiError}
+            </div>
+          )}
+
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/[0.06] hover:bg-transparent">
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Data/Hora</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Origem/Destino</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Duração</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Custo</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Motivo</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">Ações</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {isLoading &&
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`sk-${i}`} className="border-white/[0.04]">
+                    {Array.from({ length: 6 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+
+              {!isLoading && calls.length === 0 && !apiError && (
+                <TableRow className="border-white/[0.04] hover:bg-transparent">
+                  <TableCell colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
+                    Nenhuma ligação registrada ainda para este assistente.
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!isLoading &&
+                calls.map((row) => (
+                  <TableRow key={row.id} className="border-white/[0.04] transition-colors hover:bg-white/[0.03]">
+                    <TableCell className="text-sm text-foreground">{formatDateBR(row.startedAt)}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {row.customerNumber ?? row.phoneNumber ?? row.type ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-foreground">{formatDuration(row.durationSec)}</TableCell>
+                    <TableCell className="text-sm text-foreground">
+                      {row.cost != null ? `$${row.cost.toFixed(3)}` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          endedReasonBadgeClass(row.endedReason),
+                        )}
+                      >
+                        {row.endedReason ?? "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary disabled:opacity-30"
+                          aria-label="Reproduzir áudio"
+                          disabled={!row.recordingUrl}
+                          onClick={() => {
+                            setDetail(row);
+                            setDetailMode("recording");
+                          }}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary disabled:opacity-30"
+                          aria-label="Ver transcrição"
+                          disabled={!row.transcript && !row.summary}
+                          onClick={() => {
+                            setDetail(row);
+                            setDetailMode("transcript");
+                          }}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+
+          {!isLoading && calls.length >= limit && limit < 200 && (
+            <div className="flex justify-center border-t border-white/[0.06] p-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLimit((l) => Math.min(l + 50, 200))}
+                className="h-8 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+              >
+                Carregar mais
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={detail != null} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-2xl border-white/[0.08] bg-card/80 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {detailMode === "recording" ? "Gravação da ligação" : "Transcrição da ligação"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {detail && formatDateBR(detail.startedAt)} · {detail && formatDuration(detail.durationSec)}
+              {detail?.customerNumber ? ` · ${detail.customerNumber}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && detailMode === "recording" && detail.recordingUrl && (
+            <audio controls src={detail.recordingUrl} className="w-full">
+              Seu navegador não suporta áudio.
+            </audio>
+          )}
+          {detail && detailMode === "transcript" && (
+            <div className="space-y-3">
+              {detail.summary && (
+                <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                  <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                  <p className="text-xs text-foreground">{detail.summary}</p>
+                </div>
+              )}
+              {detail.transcript ? (
+                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+                  {detail.transcript}
+                </pre>
+              ) : (
+                <p className="text-xs text-muted-foreground">Transcrição indisponível para esta ligação.</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
+
 
 /* -------------------------------- Tools -------------------------------- */
 
