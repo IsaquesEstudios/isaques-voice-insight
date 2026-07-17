@@ -545,6 +545,10 @@ export interface AssistantConfigInput {
   // ---- Background ----
   backgroundSound?: "off" | "office" | null;
   backgroundDenoisingEnabled?: boolean | null;
+  // ---- Transcriber (opcional; sobrepõe o default Deepgram Nova 3 multi) ----
+  transcriberProvider?: string | null;
+  transcriberModel?: string | null;
+  transcriberLanguage?: string | null;
 }
 
 // Partial PATCH used by the details page — only touches provided fields.
