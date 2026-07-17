@@ -1215,4 +1215,269 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
   });
 
 
+/* --------------------- Logs (call list) --------------------- */
+
+export interface AssistantCallLog {
+  id: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSec: number | null;
+  cost: number | null;
+  costBreakdown: {
+    stt: number | null;
+    llm: number | null;
+    tts: number | null;
+    vapi: number | null;
+    transport: number | null;
+  };
+  endedReason: string | null;
+  status: string | null;
+  type: string | null;
+  customerNumber: string | null;
+  phoneNumber: string | null;
+  recordingUrl: string | null;
+  transcript: string | null;
+  summary: string | null;
+  successEvaluation: string | null;
+}
+
+export const listAssistantCalls = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { assistantId: string; limit?: number }) => data)
+  .handler(async ({ data, context }): Promise<{ calls: AssistantCallLog[]; error: string | null }> => {
+    if (!data.assistantId) return { calls: [], error: null };
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+    const limit = Math.min(Math.max(data.limit ?? 50, 1), 100);
+    let raw: unknown;
+    try {
+      raw = await vapiFetch(
+        `/call?assistantId=${encodeURIComponent(data.assistantId)}&limit=${limit}`,
+        { method: "GET" },
+      );
+    } catch (e) {
+      return { calls: [], error: e instanceof Error ? e.message : "Erro desconhecido" };
+    }
+    if (!Array.isArray(raw)) return { calls: [], error: null };
+
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    const str = (v: unknown) => (typeof v === "string" && v.length ? v : null);
+
+    const calls: AssistantCallLog[] = (raw as Array<Record<string, unknown>>).map((c) => {
+      const startedAt = str(c.startedAt);
+      const endedAt = str(c.endedAt);
+      const startMs = startedAt ? Date.parse(startedAt) : NaN;
+      const endMs = endedAt ? Date.parse(endedAt) : NaN;
+      const durationSec =
+        Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+          ? (endMs - startMs) / 1000
+          : null;
+      const breakdown =
+        c.costBreakdown && typeof c.costBreakdown === "object"
+          ? (c.costBreakdown as Record<string, unknown>)
+          : null;
+      const artifact =
+        c.artifact && typeof c.artifact === "object"
+          ? (c.artifact as Record<string, unknown>)
+          : null;
+      const analysis =
+        c.analysis && typeof c.analysis === "object"
+          ? (c.analysis as Record<string, unknown>)
+          : null;
+      const customer =
+        c.customer && typeof c.customer === "object"
+          ? (c.customer as Record<string, unknown>)
+          : null;
+      const phoneNumberObj =
+        c.phoneNumber && typeof c.phoneNumber === "object"
+          ? (c.phoneNumber as Record<string, unknown>)
+          : null;
+      return {
+        id: String(c.id ?? ""),
+        startedAt,
+        endedAt,
+        durationSec,
+        cost: num(c.cost),
+        costBreakdown: {
+          stt: breakdown ? num(breakdown.stt) : null,
+          llm: breakdown ? num(breakdown.llm) : null,
+          tts: breakdown ? num(breakdown.tts) : null,
+          vapi: breakdown ? num(breakdown.vapi) : null,
+          transport: breakdown ? num(breakdown.transport) : null,
+        },
+        endedReason: str(c.endedReason),
+        status: str(c.status),
+        type: str(c.type),
+        customerNumber: customer ? str(customer.number) : null,
+        phoneNumber: (phoneNumberObj ? str(phoneNumberObj.number) : null) ?? str(c.phoneNumberId),
+        recordingUrl:
+          (artifact ? str(artifact.recordingUrl) : null) ??
+          (artifact ? str(artifact.stereoRecordingUrl) : null) ??
+          str(c.recordingUrl),
+        transcript: artifact ? str(artifact.transcript) : null,
+        summary: analysis ? str(analysis.summary) : null,
+        successEvaluation: analysis ? str(analysis.successEvaluation) : null,
+      };
+    });
+
+    return { calls, error: null };
+  });
+
+/* --------------------- Analytics --------------------- */
+
+export interface AssistantAnalytics {
+  totals: { count: number; minutes: number; cost: number };
+  daily: Array<{ date: string; count: number; minutes: number; cost: number }>;
+  endedReasons: Array<{ reason: string; count: number }>;
+  success: Array<{ label: string; count: number }>;
+  costBreakdown: {
+    stt: number;
+    llm: number;
+    tts: number;
+    vapi: number;
+    transport: number;
+  };
+  error: string | null;
+}
+
+export const getAssistantAnalytics = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { assistantId: string; rangeDays?: number }) => data)
+  .handler(async ({ data, context }): Promise<AssistantAnalytics> => {
+    const empty: AssistantAnalytics = {
+      totals: { count: 0, minutes: 0, cost: 0 },
+      daily: [],
+      endedReasons: [],
+      success: [],
+      costBreakdown: { stt: 0, llm: 0, tts: 0, vapi: 0, transport: 0 },
+      error: null,
+    };
+    if (!data.assistantId) return empty;
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+
+    const rangeDays = data.rangeDays && data.rangeDays > 0 ? data.rangeDays : 7;
+    const end = new Date();
+    const start = new Date(end.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+    const timeRange = {
+      start: start.toISOString(),
+      end: end.toISOString(),
+      timezone: "America/Sao_Paulo",
+    };
+
+    const body = {
+      queries: [
+        {
+          name: "totals",
+          table: "call",
+          groupBy: "assistantId",
+          timeRange,
+          operations: [
+            { operation: "count", column: "id", alias: "count" },
+            { operation: "sum", column: "duration", alias: "duration" },
+            { operation: "sum", column: "minutesUsed", alias: "minutes" },
+            { operation: "sum", column: "cost", alias: "cost" },
+          ],
+        },
+        {
+          name: "daily",
+          table: "call",
+          groupBy: "assistantId",
+          timeRange: { ...timeRange, step: "day" },
+          operations: [
+            { operation: "count", column: "id", alias: "count" },
+            { operation: "sum", column: "minutesUsed", alias: "minutes" },
+            { operation: "sum", column: "cost", alias: "cost" },
+          ],
+        },
+        {
+          name: "endedReasons",
+          table: "call",
+          groupBy: "endedReason",
+          timeRange,
+          operations: [{ operation: "count", column: "id", alias: "count" }],
+        },
+        {
+          name: "success",
+          table: "call",
+          groupBy: "analysis.successEvaluation",
+          timeRange,
+          operations: [{ operation: "count", column: "id", alias: "count" }],
+        },
+        {
+          name: "costBreakdown",
+          table: "call",
+          groupBy: "assistantId",
+          timeRange,
+          operations: [
+            { operation: "sum", column: "costBreakdown.stt", alias: "stt" },
+            { operation: "sum", column: "costBreakdown.llm", alias: "llm" },
+            { operation: "sum", column: "costBreakdown.tts", alias: "tts" },
+            { operation: "sum", column: "costBreakdown.vapi", alias: "vapi" },
+            { operation: "sum", column: "costBreakdown.transport", alias: "transport" },
+          ],
+        },
+      ],
+    };
+
+    let raw: unknown;
+    try {
+      raw = await vapiFetch("/analytics", { method: "POST", body: JSON.stringify(body) });
+    } catch (e) {
+      return { ...empty, error: e instanceof Error ? e.message : "Erro desconhecido" };
+    }
+    if (!Array.isArray(raw)) return empty;
+
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    const results = raw as Array<{ name?: string; result?: Array<Record<string, unknown>> }>;
+    const byName = new Map(results.map((r) => [r.name ?? "", r.result ?? []]));
+    const matches = (row: Record<string, unknown>) =>
+      !("assistantId" in row) || row.assistantId === data.assistantId;
+
+    const totalsRows = (byName.get("totals") ?? []).filter(matches);
+    const t = totalsRows[0] ?? {};
+    const totals = {
+      count: num(t.count),
+      minutes: num(t.minutes) || num(t.duration) / 60,
+      cost: num(t.cost),
+    };
+
+    const dailyRows = (byName.get("daily") ?? []).filter(matches);
+    const daily = dailyRows
+      .map((r) => ({
+        date: String(r.date ?? r.time ?? ""),
+        count: num(r.count),
+        minutes: num(r.minutes),
+        cost: num(r.cost),
+      }))
+      .filter((r) => r.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const endedReasons = (byName.get("endedReasons") ?? [])
+      .map((r) => ({ reason: String(r.endedReason ?? "desconhecido"), count: num(r.count) }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    const success = (byName.get("success") ?? [])
+      .map((r) => {
+        const key = r["analysis.successEvaluation"] ?? r.successEvaluation;
+        return { label: String(key ?? "desconhecido"), count: num(r.count) };
+      })
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    const cbRows = (byName.get("costBreakdown") ?? []).filter(matches);
+    const cb = cbRows[0] ?? {};
+    const costBreakdown = {
+      stt: num(cb.stt),
+      llm: num(cb.llm),
+      tts: num(cb.tts),
+      vapi: num(cb.vapi),
+      transport: num(cb.transport),
+    };
+
+    return { totals, daily, endedReasons, success, costBreakdown, error: null };
+  });
+
+
+
+
 
