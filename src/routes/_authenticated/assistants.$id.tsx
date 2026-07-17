@@ -110,12 +110,16 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   getModelCost,
+  getModelSpec,
   getVoiceCost,
+  getVoiceSpec,
   STT_COST_PER_MIN,
   VAPI_PLATFORM_FEE_PER_MIN,
+  DEFAULT_TRANSCRIBER,
+  formatUSDPerMin,
 } from "@/lib/vapi-pricing";
 import { CostHint, CostSummary } from "@/components/assistants/cost-hint";
-import { VapiStatsPanel } from "@/components/assistants/vapi-stats-panel";
+
 
 export const Route = createFileRoute("/_authenticated/assistants/$id")({
   head: () => ({
