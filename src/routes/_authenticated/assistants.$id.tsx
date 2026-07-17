@@ -1117,30 +1117,23 @@ function AssistantDetailPage() {
                         form.voiceId === p.voice.voiceId;
                       const modelSpec = getModelSpec(p.model.provider, p.model.model);
                       const voiceSpec = getVoiceSpec(p.voice.provider, p.voice.voiceId);
+                      const transcriberSpec =
+                        getTranscriberSpec(p.transcriber.provider, p.transcriber.model) ??
+                        DEFAULT_TRANSCRIBER;
                       const estCost =
                         VAPI_PLATFORM_FEE_PER_MIN +
-                        DEFAULT_TRANSCRIBER.costPerMin +
+                        transcriberSpec.costPerMin +
                         (modelSpec?.costPerMin ?? 0) +
                         (voiceSpec?.costPerMin ?? 0);
                       const estLatency =
-                        DEFAULT_TRANSCRIBER.latencyMs +
+                        transcriberSpec.latencyMs +
                         (modelSpec?.latencyMs ?? 0) +
                         (voiceSpec?.latencyMs ?? 0);
 
-                      // Se este preset está ativo e existem chamadas reais, usa métrica real.
-                      const stats = callStatsQuery.data;
-                      const useReal = isActive && stats && stats.callCount > 0;
-                      const realCost = useReal && stats.avgCostPerMin != null ? stats.avgCostPerMin : null;
-                      const realLatency = useReal && stats.avgLatencyMs != null ? stats.avgLatencyMs : null;
-
-                      const shownCost = realCost ?? estCost;
-                      const shownLatency = realLatency ?? estLatency;
                       const latencyLabel =
-                        shownLatency >= 1000
-                          ? `~${(shownLatency / 1000).toFixed(2).replace(/\.?0+$/, "")}s`
-                          : `~${Math.round(shownLatency)}ms`;
-                      const isRealCost = realCost != null;
-                      const isRealLat = realLatency != null;
+                        estLatency >= 1000
+                          ? `~${(estLatency / 1000).toFixed(2).replace(/\.?0+$/, "")}s`
+                          : `~${Math.round(estLatency)}ms`;
                       return (
                         <button
                           key={p.id}
@@ -1168,35 +1161,21 @@ function AssistantDetailPage() {
                           <p className="mt-1 text-[11px] text-muted-foreground">{p.description}</p>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                                isRealCost
-                                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                  : "border-white/[0.08] bg-background/60 text-foreground"
-                              }`}
-                              title={isRealCost ? "Média real das últimas chamadas" : "Estimativa"}
+                              className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
+                              title="Custo estimado (fee Vapi + transcriber + modelo + voz)"
                             >
-                              {isRealCost ? "Custo real " : "Custo ~"}
-                              {formatUSDPerMin(shownCost)}
+                              Custo ~{formatUSDPerMin(estCost)}
                             </span>
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                                isRealLat
-                                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                  : "border-white/[0.08] bg-background/60 text-foreground"
-                              }`}
-                              title={isRealLat ? "Média real das últimas chamadas" : "Estimativa"}
+                              className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
+                              title="Latência estimada (soma dos componentes)"
                             >
-                              {isRealLat ? "Latência real " : "Latência "}
-                              {latencyLabel}
+                              Latência {latencyLabel}
                             </span>
-                            {isActive && callStatsQuery.data && callStatsQuery.data.callCount > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                ({callStatsQuery.data.callCount} chamadas)
-                              </span>
-                            )}
                           </div>
                         </button>
                       );
+
 
                     })}
                   </div>
