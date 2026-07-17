@@ -1068,5 +1068,68 @@ export const listVapiVoices = createServerFn({ method: "GET" })
       .filter((v) => v.providerId && v.name);
   });
 
+// Aggregate cost/latency stats from recent calls for a given assistant.
+// Cost: média de $/min calculado como cost/(duration_s/60).
+// Latência: para cada par (user → bot) em messages, media o gap em ms.
+export interface AssistantCallStats {
+  callCount: number;
+  avgCostPerMin: number | null;
+  avgLatencyMs: number | null;
+}
 
+export const getAssistantCallStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { assistantId: string }) => data)
+  .handler(async ({ data }): Promise<AssistantCallStats> => {
+    if (!data.assistantId) return { callCount: 0, avgCostPerMin: null, avgLatencyMs: null };
+    let raw: unknown;
+    try {
+      raw = await vapiFetch(
+        `/call?assistantId=${encodeURIComponent(data.assistantId)}&limit=50`,
+        { method: "GET" },
+      );
+    } catch {
+      return { callCount: 0, avgCostPerMin: null, avgLatencyMs: null };
+    }
+    if (!Array.isArray(raw)) return { callCount: 0, avgCostPerMin: null, avgLatencyMs: null };
+
+    const calls = raw as Array<Record<string, unknown>>;
+    const costPerMinSamples: number[] = [];
+    const latencySamples: number[] = [];
+
+    for (const c of calls) {
+      const cost = typeof c.cost === "number" ? c.cost : null;
+      const startedAt = typeof c.startedAt === "string" ? Date.parse(c.startedAt) : NaN;
+      const endedAt = typeof c.endedAt === "string" ? Date.parse(c.endedAt) : NaN;
+      if (cost != null && Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt > startedAt) {
+        const durSec = (endedAt - startedAt) / 1000;
+        if (durSec > 5) costPerMinSamples.push(cost / (durSec / 60));
+      }
+
+      const msgs = Array.isArray(c.messages) ? (c.messages as Array<Record<string, unknown>>) : [];
+      for (let i = 0; i < msgs.length - 1; i++) {
+        const cur = msgs[i];
+        const nxt = msgs[i + 1];
+        const curRole = String(cur.role ?? "");
+        const nxtRole = String(nxt.role ?? "");
+        if (curRole === "user" && (nxtRole === "bot" || nxtRole === "assistant")) {
+          const endT = typeof cur.endTime === "number" ? cur.endTime
+            : typeof cur.time === "number" ? cur.time : null;
+          const startT = typeof nxt.time === "number" ? nxt.time
+            : typeof nxt.secondsFromStart === "number" ? nxt.secondsFromStart * 1000 : null;
+          if (endT != null && startT != null && startT > endT) {
+            const gap = startT - endT;
+            if (gap > 100 && gap < 15000) latencySamples.push(gap);
+          }
+        }
+      }
+    }
+
+    const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+    return {
+      callCount: calls.length,
+      avgCostPerMin: avg(costPerMinSamples),
+      avgLatencyMs: avg(latencySamples),
+    };
+  });
 
