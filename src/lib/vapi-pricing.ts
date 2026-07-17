@@ -43,6 +43,30 @@ export const DEFAULT_TRANSCRIBER: TranscriberSpec = {
   accuracyWer: 2.7,
 };
 
+// Transcribers oficialmente listados pela Vapi (dashboard values).
+// Ref.: painel oficial da Vapi — https://dashboard.vapi.ai
+export const TRANSCRIBER_SPECS: Record<string, Record<string, TranscriberSpec>> = {
+  vapi: {
+    "stt-rt-v5": {
+      provider: "Vapi",
+      label: "STT RT v5",
+      model: "stt-rt-v5",
+      costPerMin: 0.004,
+      latencyMs: 300,
+      accuracyWer: 1.8,
+    },
+  },
+  deepgram: {
+    "nova-3": DEFAULT_TRANSCRIBER,
+  },
+};
+
+export function getTranscriberSpec(provider?: string, model?: string): TranscriberSpec | null {
+  if (!provider || !model) return null;
+  return TRANSCRIBER_SPECS[provider]?.[model] ?? null;
+}
+
+
 // Somente modelos listados em docs.vapi.ai/providers/model/*
 export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
   openai: {
@@ -50,6 +74,7 @@ export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
     "gpt-4.1-mini": { costPerMin: 0.008, latencyMs: 500, intelligence: 13 },
     "gpt-4o": { costPerMin: 0.06, latencyMs: 700, intelligence: 15 },
     "gpt-4o-mini": { costPerMin: 0.006, latencyMs: 550, intelligence: 12 },
+    "gpt-4.1-nano": { costPerMin: 0.01, latencyMs: 470, intelligence: 10 },
     "o3-mini": { costPerMin: 0.04, latencyMs: 900, intelligence: 16 },
   },
   anthropic: {
@@ -79,8 +104,8 @@ export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
 // e devem vir da dashboard do usuário — não listamos IDs aqui.
 export const VOICE_SPECS: Record<string, Record<string, VoiceSpec>> = {
   vapi: {
-    _default: { costPerMin: 0.02, latencyMs: 250, humanness: 70 },
-    Elliot: { costPerMin: 0.02, latencyMs: 250, humanness: 72 },
+    _default: { costPerMin: 0.02, latencyMs: 410, humanness: 95 },
+    Elliot: { costPerMin: 0.02, latencyMs: 410, humanness: 95 },
     Savannah: { costPerMin: 0.02, latencyMs: 250, humanness: 70 },
     Emma: { costPerMin: 0.02, latencyMs: 260, humanness: 71 },
     Clara: { costPerMin: 0.02, latencyMs: 260, humanness: 71 },
