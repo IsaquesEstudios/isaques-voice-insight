@@ -295,8 +295,8 @@ const AI_PRESETS: AiPreset[] = [
   {
     id: "matteus",
     label: "Matteus",
-    description: "STT RT v5 · GPT-4.1 nano · Elliot v2",
-    transcriber: { provider: "vapi", model: "stt-rt-v5", language: "pt" },
+    description: "Deepgram Nova-3 · GPT-4.1 nano · Elliot v2",
+    transcriber: { provider: "deepgram", model: "nova-3", language: "pt-BR" },
     model: { provider: "openai", model: "gpt-4.1-nano" },
     voice: { provider: "vapi", voiceId: "Elliot" },
   },
