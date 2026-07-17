@@ -487,6 +487,10 @@ interface FormState {
   // Background
   backgroundSound: "off" | "office";
   backgroundDenoisingEnabled: boolean;
+  // Transcriber
+  transcriberProvider: string;
+  transcriberModel: string;
+  transcriberLanguage: string;
 }
 
 const empty: FormState = {
