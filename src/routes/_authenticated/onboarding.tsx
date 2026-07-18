@@ -20,7 +20,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
   getSetupStatus,
-  getVapiConnection,
   saveVapiCredentials,
   updateVapiPublicKey,
 } from "@/lib/vapi.functions";
