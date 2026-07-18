@@ -112,7 +112,7 @@ function OnboardingPage() {
     navigate({ to: "/", replace: true });
   };
 
-  const vapiReady = vapiConn.data?.connected;
+  const vapiReady = !!status.data?.vapi;
   const twilioReady = twilioConn.data?.connected;
 
   return (
