@@ -51,10 +51,8 @@ function OnboardingPage() {
     queryKey: ["setup-status"],
     queryFn: () => getSetupStatus(),
   });
-  const vapiConn = useQuery({
-    queryKey: ["vapi-connection"],
-    queryFn: () => getVapiConnection(),
-  });
+  void getVapiConnection;
+
   const twilioConn = useQuery({
     queryKey: ["twilio-connection"],
     queryFn: () => getTwilioConnection(),
