@@ -137,7 +137,7 @@ interface FormState {
 }
 
 const DEFAULT_MODEL_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-4.1";
+const DEFAULT_MODEL = "gpt-4.1-nano";
 const DEFAULT_VOICE_PROVIDER = "vapi";
 const DEFAULT_VOICE_ID = "Elliot";
 const DEFAULT_FIRST_MESSAGE = "Olá! Como posso te ajudar hoje?";
