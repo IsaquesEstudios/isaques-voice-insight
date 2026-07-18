@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const nav = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Assistentes Virtuais", url: "/assistentes", icon: Bot },
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
@@ -59,8 +59,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => {
-                const active =
-                  item.url === "/" ? pathname === "/" : pathname.startsWith(item.url);
+                const active = pathname.startsWith(item.url);
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton

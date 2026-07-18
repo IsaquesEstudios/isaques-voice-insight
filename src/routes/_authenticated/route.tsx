@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_authenticated")({
     const supabase = getSupabaseBrowser();
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {
-      throw redirect({ to: "/auth" });
+      throw redirect({ to: "/" });
     }
     // Onboarding gate: exige Vapi e Twilio configurados antes de acessar o app.
     if (location.pathname !== "/onboarding") {

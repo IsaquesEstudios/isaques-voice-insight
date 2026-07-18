@@ -82,7 +82,7 @@ function OnboardingPage() {
   const handleContinue = () => navigate({ to: "/telefonia" });
   const handleLogout = async () => {
     await getSupabaseBrowser().auth.signOut();
-    navigate({ to: "/auth", replace: true });
+    navigate({ to: "/", replace: true });
   };
 
   return (
