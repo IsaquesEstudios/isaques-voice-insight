@@ -227,19 +227,6 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     }, 1000);
   };
 
-  const handleTrackStarted = (event?: DailyEventObjectTrack) => {
-    if (!event?.participant?.local && event?.track?.kind === "audio") {
-      const audio = document.createElement("audio");
-      audio.autoplay = true;
-      audio.style.display = "none";
-      audio.srcObject = new MediaStream([event.track]);
-      audio.play().catch((playError) => {
-        console.warn("[vapi-web] autoplay blocked", playError);
-      });
-      document.body.appendChild(audio);
-      event.track.addEventListener("ended", () => audio.remove(), { once: true });
-    }
-  };
 
   // Cleanup when dialog closes
   useEffect(() => {
