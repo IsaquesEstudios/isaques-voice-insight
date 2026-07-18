@@ -22,6 +22,20 @@ async function loadUserVapiKey(
   return (data?.private_key as string | undefined) ?? null;
 }
 
+async function loadUserVapiPublicKey(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("user_vapi_credentials")
+    .select("public_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) return null;
+  const v = (data?.public_key as string | undefined) ?? null;
+  return v && v.trim() ? v.trim() : null;
+}
+
 // Middleware: exige auth + Vapi configurada e injeta a chave via ALS.
 export const withVapiCredentials = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
