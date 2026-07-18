@@ -1663,6 +1663,21 @@ export const saveVapiCredentials = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateVapiPublicKey = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ publicKey: z.string().trim().min(20, "Public Key muito curta") }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("user_vapi_credentials")
+      .update({ public_key: data.publicKey, updated_at: new Date().toISOString() })
+      .eq("user_id", context.userId);
+    if (error) throw new Error(`DB update failed: ${error.message}`);
+    return { ok: true };
+  });
+
+
 export const getVapiConnection = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
