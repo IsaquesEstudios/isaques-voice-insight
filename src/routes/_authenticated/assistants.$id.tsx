@@ -1018,6 +1018,7 @@ function AssistantDetailPage() {
           <TabsList className="h-auto w-full justify-start gap-1 rounded-xl border border-white/[0.08] bg-card/20 p-1 backdrop-blur-2xl">
             {[
               { value: "assistant", label: "Assistant", icon: Brain },
+              { value: "model", label: "Modelo & Voz", icon: Mic },
               { value: "logs", label: "Logs", icon: ScrollText },
               { value: "tools", label: "Tools", icon: Wrench },
               { value: "analysis", label: "Analysis", icon: LineChart },
