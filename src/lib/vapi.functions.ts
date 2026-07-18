@@ -24,7 +24,7 @@ async function loadUserVapiKey(
 
 // Middleware: exige auth + Vapi configurada e injeta a chave via ALS.
 export const withVapiCredentials = createMiddleware({ type: "function" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .server(async ({ next, context }) => {
     const key = await loadUserVapiKey(context.supabase, context.userId);
     if (!key) {
@@ -469,7 +469,7 @@ function sanitizeModelTool(tool: any): any {
 }
 
 export const listVapiAssistants = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .handler(async ({ context }): Promise<VapiAssistantDTO[]> => {
     const owned = await listOwnedIds(context.supabase, context.userId);
     if (owned.size === 0) return [];
@@ -493,7 +493,7 @@ export const listVapiAssistants = createServerFn({ method: "GET" })
   });
 
 export const getVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -505,7 +505,7 @@ export const getVapiAssistant = createServerFn({ method: "POST" })
   });
 
 export const createVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: AssistantInput) => {
     if (!input?.name?.trim()) throw new Error("Nome é obrigatório");
     return {
@@ -528,7 +528,7 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
   });
 
 export const updateVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: AssistantInput & { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     if (!input?.name?.trim()) throw new Error("Nome é obrigatório");
@@ -590,7 +590,7 @@ export interface AssistantConfigInput {
 
 // Partial PATCH used by the details page — only touches provided fields.
 export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: AssistantConfigInput) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -720,7 +720,7 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
 
 
 export const deleteVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -735,7 +735,7 @@ export const deleteVapiAssistant = createServerFn({ method: "POST" })
 // Duplicates an existing assistant by fetching its full config, stripping
 // server-managed fields, and creating a new one with " - Cópia" appended.
 export const duplicateVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -808,7 +808,7 @@ async function loadTwilioCredsForVapi(
 // Lists phone numbers imported on the Vapi account. Filtered/paginated by
 // caller — Vapi returns all numbers on the account.
 export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .handler(async (): Promise<VapiPhoneNumberDTO[]> => {
     const data = await vapiFetch("/phone-number", { method: "GET" });
     if (!Array.isArray(data)) return [];
@@ -824,7 +824,7 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
 // Attaches (or replaces) the assistant on a given phone number. Imports the
 // number on Vapi if it isn't there yet, using the user's own Twilio creds.
 export const attachAssistantToNumber = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator(
     (input: { phoneNumberE164: string; assistantId: string; name?: string }) => {
       if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
@@ -945,7 +945,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
 // Removes the assistant from a Vapi phone number (leaves the number itself
 // imported on Vapi).
 export const detachAssistantFromNumber = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { phoneNumberE164: string }) => {
     if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
     return input;
@@ -979,7 +979,7 @@ export const detachAssistantFromNumber = createServerFn({ method: "POST" })
 // phone-number id OR an E.164 number (imports it via the user's Twilio
 // creds if not yet on Vapi).
 export const createOutboundTestCall = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator(
     (input: {
       assistantId: string;
@@ -1056,7 +1056,7 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
 // Vapi Public Key for Web Call SDK (browser-safe). Requires auth so we don't
 // expose the key to unauthenticated callers.
 export const getVapiPublicKey = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .handler(async () => {
     const key = process.env.VAPI_PUBLIC_KEY;
     if (!key) throw new Error("VAPI_PUBLIC_KEY não configurada.");
@@ -1076,7 +1076,7 @@ export interface VapiVoiceOption {
 }
 
 export const listVapiVoices = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { provider: string }) => data)
   .handler(async ({ data }): Promise<VapiVoiceOption[]> => {
     const provider = (data.provider || "").trim();
@@ -1123,7 +1123,7 @@ export interface AssistantCallStats {
 }
 
 export const getAssistantCallStats = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { assistantId: string }) => data)
   .handler(async ({ data }): Promise<AssistantCallStats> => {
     const empty: AssistantCallStats = {
@@ -1279,7 +1279,7 @@ export interface AssistantCallLog {
 }
 
 export const listAssistantCalls = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { assistantId: string; limit?: number }) => data)
   .handler(async ({ data, context }): Promise<{ calls: AssistantCallLog[]; error: string | null }> => {
     if (!data.assistantId) return { calls: [], error: null };
@@ -1377,7 +1377,7 @@ export interface AssistantAnalytics {
 }
 
 export const getAssistantAnalytics = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { assistantId: string; rangeDays?: number }) => data)
   .handler(async ({ data, context }): Promise<AssistantAnalytics> => {
     const empty: AssistantAnalytics = {
