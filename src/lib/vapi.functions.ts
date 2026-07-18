@@ -1110,7 +1110,7 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
       );
     }
 
-    return { callId: call.id ?? null, webCallUrl };
+    return { callId: call?.id ?? null, webCallUrl };
   });
 
 // List available voices for a given voice provider via Vapi voice-library.
