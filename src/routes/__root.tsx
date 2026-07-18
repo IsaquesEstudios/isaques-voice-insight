@@ -91,10 +91,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Isaques Estúdios | AI Voice — Dashboard" },
       {
         property: "og:description",
-        content: "Plataforma SaaS de Inteligência Artificial de Voz.",
+        content: "Painel de controle da plataforma Isaques Estúdios | AI Voice: métricas, telefonia inteligente, CRM e histórico de chamadas.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Isaques Estúdios | AI Voice — Dashboard" },
+      { name: "twitter:description", content: "Painel de controle da plataforma Isaques Estúdios | AI Voice: métricas, telefonia inteligente, CRM e histórico de chamadas." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cd73db46-a508-4f6d-8ae7-e9f0ad27925c/id-preview-85b6feb7--818d1939-d4df-4ca2-b1af-4e1dda55214f.lovable.app-1784342173943.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cd73db46-a508-4f6d-8ae7-e9f0ad27925c/id-preview-85b6feb7--818d1939-d4df-4ca2-b1af-4e1dda55214f.lovable.app-1784342173943.png" },
     ],
     links: [
       {
