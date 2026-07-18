@@ -644,121 +644,49 @@ function AssistentesPage() {
                 </div>
               </>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Provedor do Modelo</Label>
-                  <Select
-                    value={form.modelProvider}
-                    onValueChange={(v) =>
-                      setForm((f) => ({
-                        ...f,
-                        modelProvider: v,
-                        model: MODEL_OPTIONS[v]?.[0] ?? "",
-                      }))
-                    }
-                    disabled={form.loadingInitial}
-                  >
-                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(MODEL_OPTIONS).map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Modelo de IA</Label>
-                  <Select
-                    value={form.model}
-                    onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}
-                    disabled={form.loadingInitial}
-                  >
-                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(MODEL_OPTIONS[form.modelProvider] ?? []).map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m}
-                        </SelectItem>
-                      ))}
-                      {form.model &&
-                        !(MODEL_OPTIONS[form.modelProvider] ?? []).includes(form.model) && (
-                          <SelectItem value={form.model}>{form.model}</SelectItem>
-                        )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Provedor de Voz</Label>
-                  <Select
-                    value={form.voiceProvider}
-                    onValueChange={(v) =>
-                      setForm((f) => ({
-                        ...f,
-                        voiceProvider: v,
-                        voiceId: VOICE_OPTIONS[v]?.[0] ?? "",
-                      }))
-                    }
-                    disabled={form.loadingInitial}
-                  >
-                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(VOICE_OPTIONS).map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Voz</Label>
-                  {(VOICE_OPTIONS[form.voiceProvider] ?? []).length === 0 ? (
-                    <>
-                      <Input
-                        value={form.voiceId}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, voiceId: e.target.value }))
-                        }
-                        placeholder="Cole o voiceId da sua conta (BYOK)"
-                        disabled={form.loadingInitial}
-                        className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Para {form.voiceProvider}, o voiceId deve vir da sua conta
-                        sincronizada na Vapi (Integrations).
-                      </p>
-                    </>
-                  ) : (
-                    <Select
-                      value={form.voiceId}
-                      onValueChange={(v) => setForm((f) => ({ ...f, voiceId: v }))}
-                      disabled={form.loadingInitial}
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Escolha um padrão de IA pré-configurado. Mais opções em breve.
+                </p>
+                {ASSISTANT_PRESETS.map((preset) => {
+                  const selected =
+                    form.modelProvider === preset.model.provider &&
+                    form.model === preset.model.model &&
+                    form.voiceProvider === preset.voice.provider &&
+                    form.voiceId === preset.voice.voiceId;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          modelProvider: preset.model.provider,
+                          model: preset.model.model,
+                          voiceProvider: preset.voice.provider,
+                          voiceId: preset.voice.voiceId,
+                        }))
+                      }
+                      className={`w-full rounded-xl border p-4 text-left transition ${
+                        selected
+                          ? "border-primary/60 bg-primary/[0.08] shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
+                          : "border-white/[0.08] bg-background/40 hover:border-white/[0.16]"
+                      }`}
                     >
-                      <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(VOICE_OPTIONS[form.voiceProvider] ?? []).map((v) => (
-                          <SelectItem key={v} value={v}>
-                            {v}
-                          </SelectItem>
-                        ))}
-                        {form.voiceId &&
-                          !(VOICE_OPTIONS[form.voiceProvider] ?? []).includes(form.voiceId) && (
-                            <SelectItem value={form.voiceId}>{form.voiceId}</SelectItem>
-                          )}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{preset.label}</div>
+                        {selected && (
+                          <span className="text-[10px] uppercase tracking-wider text-primary">
+                            Selecionado
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {preset.description}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
             )}
             <DialogFooter>
