@@ -22,6 +22,18 @@ export default defineConfig({
       },
       dedupe: ["events"],
     },
+    build: {
+      // Workaround para bug do rolldown-vite 8.0.10+:
+      // "Class extends value #<Object> is not a constructor or null"
+      // Sem isso, classes que herdam de outras (EventEmitter no @vapi-ai/web)
+      // acabam em chunks distintos e o pai fica em TDZ na hora de avaliar.
+      // Ref: https://github.com/vitejs/vite/issues/22307
+      rolldownOptions: {
+        output: {
+          strictExecutionOrder: true,
+        },
+      },
+    },
   },
 });
 
