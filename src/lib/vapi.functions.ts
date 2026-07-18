@@ -1053,14 +1053,26 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
     return { ok: true as const, callId: res?.id ?? null };
   });
 
-// Vapi Public Key for Web Call SDK (browser-safe). Requires auth so we don't
-// expose the key to unauthenticated callers.
-export const getVapiPublicKey = createServerFn({ method: "GET" })
+export const createVapiWebCall = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
-  .handler(async () => {
-    const key = process.env.VAPI_PUBLIC_KEY;
-    if (!key) throw new Error("VAPI_PUBLIC_KEY não configurada.");
-    return { publicKey: key };
+  .inputValidator((input: { assistantId: string }) => {
+    if (!input?.assistantId) throw new Error("assistantId é obrigatório");
+    return { assistantId: input.assistantId };
+  })
+  .handler(async ({ data, context }) => {
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+    const call = (await vapiFetch("/call/web", {
+      method: "POST",
+      body: JSON.stringify({ assistantId: data.assistantId }),
+    })) as { id?: string; webCallUrl?: string } | null;
+
+    if (!call?.webCallUrl) {
+      throw new Error(
+        "A Vapi não retornou a sala da chamada web. Confira se a assistente está configurada com modelo, voz e transcrição.",
+      );
+    }
+
+    return { callId: call.id ?? null, webCallUrl: call.webCallUrl };
   });
 
 // List available voices for a given voice provider via Vapi voice-library.
