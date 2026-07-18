@@ -24,7 +24,7 @@ async function loadUserVapiKey(
 
 // Middleware: exige auth + Vapi configurada e injeta a chave via ALS.
 export const withVapiCredentials = createMiddleware({ type: "function" })
-  .middleware([withVapiCredentials])
+  .middleware([requireSupabaseAuth])
   .server(async ({ next, context }) => {
     const key = await loadUserVapiKey(context.supabase, context.userId);
     if (!key) {
