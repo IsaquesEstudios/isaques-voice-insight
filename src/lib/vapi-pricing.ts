@@ -175,7 +175,9 @@ export function getVoiceCost(provider?: string, voiceId?: string): number | null
 export function formatUSDPerMin(value: number | null): string {
   if (value === null) return "—";
   const digits = value < 0.1 ? 3 : 2;
-  return `$${value.toFixed(digits)}/min`;
+  const factor = Math.pow(10, digits);
+  const rounded = Math.ceil(value * factor) / factor;
+  return `$${rounded.toFixed(digits)}/min`;
 }
 
 export function formatLatency(ms: number | null): string {
