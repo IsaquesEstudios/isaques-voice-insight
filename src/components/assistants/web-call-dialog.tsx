@@ -265,6 +265,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     setErrorMsg(null);
     setTranscript([]);
 
+    await cleanupCall();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
@@ -289,7 +291,6 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     }, 15000);
 
     try {
-      await cleanupCall();
       const micTrack = micStreamRef.current?.getAudioTracks()[0];
       if (!micTrack || micTrack.readyState !== "live") {
         throw new Error("O microfone não está ativo para publicar áudio na chamada.");
