@@ -17,6 +17,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTelefoniaRouteImport } from './routes/_authenticated/telefonia'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedAssistentesRouteImport } from './routes/_authenticated/assistentes'
 import { Route as AuthenticatedAssistantsIdRouteImport } from './routes/_authenticated/assistants.$id'
 
@@ -59,6 +60,11 @@ const AuthenticatedReunioesRoute = AuthenticatedReunioesRouteImport.update({
   path: '/reunioes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAssistentesRoute =
   AuthenticatedAssistentesRouteImport.update({
     id: '/assistentes',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/assistentes': typeof AuthenticatedAssistentesRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/assistentes': typeof AuthenticatedAssistentesRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/crm': typeof CrmRoute
   '/historico': typeof HistoricoRoute
   '/_authenticated/assistentes': typeof AuthenticatedAssistentesRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
   '/_authenticated/telefonia': typeof AuthenticatedTelefoniaRoute
   '/_authenticated/assistants/$id': typeof AuthenticatedAssistantsIdRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/assistentes'
+    | '/onboarding'
     | '/reunioes'
     | '/telefonia'
     | '/assistants/$id'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/assistentes'
+    | '/onboarding'
     | '/reunioes'
     | '/telefonia'
     | '/assistants/$id'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/historico'
     | '/_authenticated/assistentes'
+    | '/_authenticated/onboarding'
     | '/_authenticated/reunioes'
     | '/_authenticated/telefonia'
     | '/_authenticated/assistants/$id'
@@ -211,6 +223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReunioesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/assistentes': {
       id: '/_authenticated/assistentes'
       path: '/assistentes'
@@ -230,6 +249,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssistentesRoute: typeof AuthenticatedAssistentesRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
   AuthenticatedTelefoniaRoute: typeof AuthenticatedTelefoniaRoute
   AuthenticatedAssistantsIdRoute: typeof AuthenticatedAssistantsIdRoute
@@ -237,6 +257,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssistentesRoute: AuthenticatedAssistentesRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
   AuthenticatedTelefoniaRoute: AuthenticatedTelefoniaRoute,
   AuthenticatedAssistantsIdRoute: AuthenticatedAssistantsIdRoute,
