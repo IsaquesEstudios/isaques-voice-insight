@@ -1270,6 +1270,57 @@ function endedReasonBadgeClass(reason: string | null): string {
   return "bg-white/[0.05] text-muted-foreground";
 }
 
+const ENDED_REASON_PT: Record<string, string> = {
+  "customer-ended-call": "Cliente encerrou",
+  "assistant-ended-call": "IA encerrou",
+  "customer-did-not-answer": "Não atendeu",
+  "customer-busy": "Ocupado",
+  "silence-timed-out": "Silêncio",
+  "assistant-error": "Erro da IA",
+  "pipeline-error": "Erro pipeline",
+  "voicemail": "Caixa postal",
+  "exceeded-max-duration": "Duração máx.",
+};
+function translateEndedReason(reason: string | null): string {
+  if (!reason) return "—";
+  return ENDED_REASON_PT[reason] ?? reason;
+}
+
+const CALL_TYPE_PT: Record<string, string> = {
+  webCall: "Web (navegador)",
+  inboundPhoneCall: "Telefone (entrada)",
+  outboundPhoneCall: "Telefone (saída)",
+};
+function formatOrigin(row: AssistantCallLog): string {
+  if (row.customerNumber) return row.customerNumber;
+  if (row.phoneNumber) return row.phoneNumber;
+  if (row.type && CALL_TYPE_PT[row.type]) return CALL_TYPE_PT[row.type];
+  return row.type ?? "—";
+}
+
+function statusBadge(status: string | null): { label: string; className: string } {
+  if (!status) return { label: "—", className: "bg-white/[0.05] text-muted-foreground" };
+  const map: Record<string, { label: string; className: string }> = {
+    queued: { label: "Na fila", className: "bg-slate-500/10 text-slate-300" },
+    ringing: { label: "Tocando", className: "bg-amber-500/10 text-amber-300" },
+    "in-progress": { label: "Em andamento", className: "bg-sky-500/10 text-sky-300" },
+    forwarding: { label: "Encaminhando", className: "bg-violet-500/10 text-violet-300" },
+    ended: { label: "Finalizada", className: "bg-emerald-500/10 text-emerald-300" },
+  };
+  return map[status] ?? { label: status, className: "bg-white/[0.05] text-muted-foreground" };
+}
+
+function successBadge(v: string | null): { label: string; className: string } | null {
+  if (!v) return null;
+  const low = v.toLowerCase();
+  if (low === "true" || low === "pass" || low === "success")
+    return { label: "Sucesso", className: "bg-emerald-500/10 text-emerald-300" };
+  if (low === "false" || low === "fail" || low === "failure")
+    return { label: "Falhou", className: "bg-rose-500/10 text-rose-300" };
+  return { label: v, className: "bg-white/[0.05] text-muted-foreground" };
+}
+
+
 function LogsTab({ assistantId }: { assistantId: string }) {
   const [limit, setLimit] = useState(50);
   const [detail, setDetail] = useState<AssistantCallLog | null>(null);
