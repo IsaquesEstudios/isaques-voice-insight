@@ -1703,7 +1703,7 @@ export const getSetupStatus = createServerFn({ method: "GET" })
     const [vapiRes, twilioRes] = await Promise.all([
       context.supabase
         .from("user_vapi_credentials")
-        .select("user_id")
+        .select("user_id, public_key")
         .eq("user_id", context.userId)
         .maybeSingle(),
       context.supabase
@@ -1712,8 +1712,11 @@ export const getSetupStatus = createServerFn({ method: "GET" })
         .eq("user_id", context.userId)
         .maybeSingle(),
     ]);
+    const vapiRow = vapiRes.data as { public_key: string | null } | null;
+    const hasVapiPublicKey = !!(vapiRow?.public_key && vapiRow.public_key.trim().length > 0);
     return {
-      vapi: !!vapiRes.data,
+      vapi: !!vapiRes.data && hasVapiPublicKey,
       twilio: !!twilioRes.data,
+      vapiPrivateOnly: !!vapiRes.data && !hasVapiPublicKey,
     };
   });
