@@ -227,19 +227,6 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     }, 1000);
   };
 
-  const handleTrackStarted = (event?: DailyEventObjectTrack) => {
-    if (!event?.participant?.local && event?.track?.kind === "audio") {
-      const audio = document.createElement("audio");
-      audio.autoplay = true;
-      audio.style.display = "none";
-      audio.srcObject = new MediaStream([event.track]);
-      audio.play().catch((playError) => {
-        console.warn("[vapi-web] autoplay blocked", playError);
-      });
-      document.body.appendChild(audio);
-      event.track.addEventListener("ended", () => audio.remove(), { once: true });
-    }
-  };
 
   // Cleanup when dialog closes
   useEffect(() => {
@@ -290,15 +277,40 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       const webCall = await webCallMutation.mutateAsync();
       const { default: DailyIframe } = await import("@daily-co/daily-js");
       const call = DailyIframe.createCallObject({
-        audioSource: true,
-        videoSource: false,
         subscribeToTracksAutomatically: true,
       });
       callRef.current = call;
 
+      const attachRemoteAudio = (track: MediaStreamTrack) => {
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.setAttribute("playsinline", "true");
+        audio.style.display = "none";
+        audio.srcObject = new MediaStream([track]);
+        document.body.appendChild(audio);
+        audio.play().catch((playError) => {
+          console.warn("[vapi-web] autoplay blocked", playError);
+        });
+        track.addEventListener("ended", () => audio.remove(), { once: true });
+      };
+
       call.on("app-message", handleAppMessage);
       call.on("remote-participants-audio-level", handleRemoteAudioLevel);
-      call.on("track-started", handleTrackStarted);
+      call.on("track-started", (event?: DailyEventObjectTrack) => {
+        if (!event?.participant?.local && event?.track?.kind === "audio") {
+          attachRemoteAudio(event.track);
+        }
+      });
+      call.on("participant-joined", () => {
+        // Ensure any already-live remote audio track is attached (in case
+        // track-started fired before our handler was registered).
+        const participants = call.participants();
+        Object.values(participants).forEach((p) => {
+          if (p.local) return;
+          const audioTrack = p.tracks?.audio?.persistentTrack;
+          if (audioTrack) attachRemoteAudio(audioTrack);
+        });
+      });
       call.on("left-meeting", () => setStatus("ended"));
       call.on("error", (e: unknown) => {
         console.error("[vapi-web] daily error", e);
@@ -308,8 +320,17 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
         showCallError(msg);
       });
 
-      await call.join({ url: webCall.webCallUrl });
+      await call.join({ url: webCall.webCallUrl, startVideoOff: true, startAudioOff: false });
       await call.startRemoteParticipantsAudioLevelObserver(100);
+
+      // Sweep for any remote audio already live at join time.
+      const participants = call.participants();
+      Object.values(participants).forEach((p) => {
+        if (p.local) return;
+        const audioTrack = p.tracks?.audio?.persistentTrack;
+        if (audioTrack) attachRemoteAudio(audioTrack);
+      });
+
       setStatus("in_call");
       window.clearTimeout(timeout);
     } catch (e) {
@@ -322,6 +343,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       showCallError(msg);
     }
   }
+
 
 
   function endCall() {

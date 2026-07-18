@@ -1153,9 +1153,9 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
         method: "POST",
         body: JSON.stringify({
           assistantId: data.assistantId,
-          roomDeleteOnUserLeaveEnabled: true,
         }),
       }) as Promise<{ id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null>;
+
 
     try {
       try {
