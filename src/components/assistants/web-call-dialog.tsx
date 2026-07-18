@@ -110,6 +110,15 @@ function formatCallError(error: unknown): string {
     ].join("\n");
   }
 
+  if (normalized.includes("public key") && normalized.includes("assistente")) {
+    return [
+      "Problema: a Public Key da Vapi salva não conseguiu acessar esta assistente.",
+      "Causa provável: a Public Key é de outra organização Vapi ou foi copiada incorretamente.",
+      "Como resolver: volte ao onboarding e salve a Public Key da mesma conta onde esta assistente existe.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
   return [
     "Problema: a ligação de teste não pôde ser iniciada.",
     "Causa provável: alguma configuração obrigatória da assistente falhou ou a Vapi recusou a chamada.",
