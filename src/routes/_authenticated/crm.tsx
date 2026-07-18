@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/crm")({
+export const Route = createFileRoute("/_authenticated/crm")({
   head: () => ({
     meta: [{ title: "CRM & Leads — Isaques Estúdios | AI Voice" }],
   }),

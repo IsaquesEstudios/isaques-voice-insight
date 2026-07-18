@@ -7,7 +7,7 @@ import { NumberPooling } from "@/components/dashboard/number-pooling";
 import { RecentCallsTable } from "@/components/dashboard/recent-calls-table";
 import { DashboardShell } from "@/components/dashboard/shell";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 

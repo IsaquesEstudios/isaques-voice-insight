@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/historico")({
+export const Route = createFileRoute("/_authenticated/historico")({
   head: () => ({
     meta: [{ title: "Histórico de Chamadas — Isaques Estúdios | AI Voice" }],
   }),
