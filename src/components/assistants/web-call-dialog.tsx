@@ -110,7 +110,14 @@ function formatCallError(error: unknown): string {
     ].join("\n");
   }
 
-  if (normalized.includes("assistant") && (normalized.includes("not found") || normalized.includes("404"))) {
+  if (
+    normalized.includes("assistant") &&
+    (normalized.includes("couldn't get assistant") ||
+      normalized.includes("couldn’t get assistant") ||
+      normalized.includes("does not exist") ||
+      normalized.includes("not found") ||
+      normalized.includes("404"))
+  ) {
     return [
       "Problema: a assistente não foi encontrada na conta Vapi conectada.",
       "Causa provável: o ID da assistente pertence a outra conta ou ela foi removida.",
