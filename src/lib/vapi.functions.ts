@@ -1518,3 +1518,98 @@ export const getAssistantAnalytics = createServerFn({ method: "POST" })
 
 
 
+
+/* ============================================================
+   Vapi credentials — per-user account (BYOK)
+   ============================================================ */
+
+// Validates a Vapi private key by calling GET /assistant with limit=1.
+async function validateVapiKey(key: string): Promise<void> {
+  const res = await fetch("https://api.vapi.ai/assistant?limit=1", {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error("Chave Vapi inválida. Verifique se copiou a Private Key correta.");
+  }
+  if (!res.ok) {
+    throw new Error(`Falha ao validar chave Vapi (${res.status}). Tente novamente.`);
+  }
+}
+
+export const saveVapiCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        privateKey: z.string().trim().min(20, "Chave muito curta"),
+        friendlyLabel: z.string().trim().max(80).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await validateVapiKey(data.privateKey);
+    const { error } = await context.supabase.from("user_vapi_credentials").upsert(
+      {
+        user_id: context.userId,
+        private_key: data.privateKey,
+        friendly_label: data.friendlyLabel ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw new Error(`DB upsert failed: ${error.message}`);
+    return { ok: true };
+  });
+
+export const getVapiConnection = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_vapi_credentials")
+      .select("friendly_label, updated_at")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return { connected: false as const };
+    return {
+      connected: true as const,
+      friendlyLabel: (data.friendly_label as string | null) ?? null,
+      updatedAt: data.updated_at as string,
+    };
+  });
+
+export const disconnectVapi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase
+      .from("user_vapi_credentials")
+      .delete()
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/**
+ * Combined onboarding status — used pelo gate para redirecionar ao /onboarding.
+ * Não usa `withVapiCredentials` porque precisa funcionar antes das chaves existirem.
+ */
+export const getSetupStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [vapiRes, twilioRes] = await Promise.all([
+      context.supabase
+        .from("user_vapi_credentials")
+        .select("user_id")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+      context.supabase
+        .from("user_twilio_credentials")
+        .select("user_id")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+    ]);
+    return {
+      vapi: !!vapiRes.data,
+      twilio: !!twilioRes.data,
+    };
+  });
