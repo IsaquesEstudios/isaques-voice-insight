@@ -22,6 +22,20 @@ async function loadUserVapiKey(
   return (data?.private_key as string | undefined) ?? null;
 }
 
+async function loadUserVapiPublicKey(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("user_vapi_credentials")
+    .select("public_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) return null;
+  const v = (data?.public_key as string | undefined) ?? null;
+  return v && v.trim() ? v.trim() : null;
+}
+
 // Middleware: exige auth + Vapi configurada e injeta a chave via ALS.
 export const withVapiCredentials = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
@@ -1093,13 +1107,29 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertOwnership(context.supabase, context.userId, data.assistantId);
-    // A Vapi exige uma Public Key no endpoint /call/web. O restante da plataforma
-    // usa a Private Key do usuário, então criamos um token público temporário e
-    // restrito a esta assistente antes de abrir a sala Daily.
-    const publicWebCallToken = await createScopedWebCallPublicToken(data.assistantId);
+    // /call/web exige uma Public Key da Vapi. Preferimos a chave pública que o
+    // usuário cadastrou no /onboarding; se ela não estiver disponível, caímos
+    // no fallback histórico de gerar um token público temporário via Private
+    // Key (restrito a esta assistente) — mantendo a plataforma funcional
+    // enquanto usuários antigos não configuraram a Public Key.
+    const savedPublicKey = await loadUserVapiPublicKey(
+      context.supabase,
+      context.userId,
+    );
+
+    let publicKeyValue: string;
+    let scopedTokenId: string | null = null;
+    if (savedPublicKey) {
+      publicKeyValue = savedPublicKey;
+    } else {
+      const scoped = await createScopedWebCallPublicToken(data.assistantId);
+      publicKeyValue = scoped.value;
+      scopedTokenId = scoped.id;
+    }
+
     let call: { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null = null;
     try {
-      call = (await vapiFetchWithKey(publicWebCallToken.value, "/call/web", {
+      call = (await vapiFetchWithKey(publicKeyValue, "/call/web", {
         method: "POST",
         body: JSON.stringify({
           assistantId: data.assistantId,
@@ -1107,8 +1137,8 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
         }),
       })) as { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null;
     } finally {
-      if (publicWebCallToken.id) {
-        void vapiFetch(`/token/${publicWebCallToken.id}`, { method: "DELETE" }).catch((error) => {
+      if (scopedTokenId) {
+        void vapiFetch(`/token/${scopedTokenId}`, { method: "DELETE" }).catch((error) => {
           console.warn("Falha ao remover token público temporário da Vapi", error);
         });
       }
@@ -1603,16 +1633,27 @@ export const saveVapiCredentials = createServerFn({ method: "POST" })
     z
       .object({
         privateKey: z.string().trim().min(20, "Chave muito curta"),
+        publicKey: z
+          .string()
+          .trim()
+          .min(20, "Public Key muito curta")
+          .optional()
+          .or(z.literal("")),
         friendlyLabel: z.string().trim().max(80).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await validateVapiKey(data.privateKey);
+    const publicKey =
+      data.publicKey && data.publicKey.trim().length >= 20
+        ? data.publicKey.trim()
+        : null;
     const { error } = await context.supabase.from("user_vapi_credentials").upsert(
       {
         user_id: context.userId,
         private_key: data.privateKey,
+        public_key: publicKey,
         friendly_label: data.friendlyLabel ?? null,
         updated_at: new Date().toISOString(),
       },
@@ -1627,15 +1668,17 @@ export const getVapiConnection = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("user_vapi_credentials")
-      .select("friendly_label, updated_at")
+      .select("friendly_label, updated_at, public_key")
       .eq("user_id", context.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return { connected: false as const };
+    const publicKey = (data.public_key as string | null) ?? null;
     return {
       connected: true as const,
       friendlyLabel: (data.friendly_label as string | null) ?? null,
       updatedAt: data.updated_at as string,
+      hasPublicKey: !!(publicKey && publicKey.trim().length > 0),
     };
   });
 

@@ -3,10 +3,15 @@
 CREATE TABLE IF NOT EXISTS public.user_vapi_credentials (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   private_key text NOT NULL,
+  public_key text,
   friendly_label text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Idempotent: add the column if the table pre-existed without it.
+ALTER TABLE public.user_vapi_credentials
+  ADD COLUMN IF NOT EXISTS public_key text;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_vapi_credentials TO authenticated;
 GRANT ALL ON public.user_vapi_credentials TO service_role;
