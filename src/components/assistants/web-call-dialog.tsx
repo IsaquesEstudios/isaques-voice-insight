@@ -94,18 +94,18 @@ function formatCallError(error: unknown): string {
     normalized.includes("invalid key")
   ) {
     return [
-      "Problema: a chave pública da Vapi está ausente, incorreta ou pertence a outra conta.",
-      "Causa provável: VAPI_PUBLIC_KEY não é a Public Key da mesma conta onde essa assistente foi criada.",
-      "Como resolver: confira a secret VAPI_PUBLIC_KEY e nunca use a Private Key nesse campo.",
+      "Problema: a chave Vapi da conta está ausente, incorreta ou sem permissão.",
+      "Causa provável: a credencial salva no onboarding não pertence à conta onde essa assistente foi criada.",
+      "Como resolver: refaça a conexão da Vapi no onboarding e tente novamente.",
       `Detalhe técnico: ${technicalDetail}`,
     ].join("\n");
   }
 
   if (normalized.includes("assistant") && (normalized.includes("not found") || normalized.includes("404"))) {
     return [
-      "Problema: a assistente não foi encontrada na conta Vapi usada pela chave pública.",
+      "Problema: a assistente não foi encontrada na conta Vapi conectada.",
       "Causa provável: o ID da assistente pertence a outra conta ou ela foi removida.",
-      "Como resolver: confirme se a assistente e a VAPI_PUBLIC_KEY são da mesma conta Vapi.",
+      "Como resolver: confirme se a assistente existe na mesma conta Vapi conectada no onboarding.",
       `Detalhe técnico: ${technicalDetail}`,
     ].join("\n");
   }
