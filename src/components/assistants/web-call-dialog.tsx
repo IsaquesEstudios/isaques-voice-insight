@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import DailyIframe, {
+import type {
   type DailyCall,
   type DailyEventObjectAppMessage,
   type DailyEventObjectRemoteParticipantsAudioLevel,
@@ -249,7 +249,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
 
     try {
       // Permission ping — clearer error than Vapi's generic failure
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
     } catch (e) {
       setStatus("error");
       const msg = formatCallError(e);
@@ -270,6 +271,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     try {
       await cleanupCall();
       const webCall = await webCallMutation.mutateAsync();
+      const { default: DailyIframe } = await import("@daily-co/daily-js");
       const call = DailyIframe.createCallObject({
         audioSource: true,
         videoSource: false,
