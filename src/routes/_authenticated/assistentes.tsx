@@ -188,6 +188,24 @@ const VOICE_OPTIONS: Record<string, string[]> = {
   azure: [],
 };
 
+interface AssistantPreset {
+  id: string;
+  label: string;
+  description: string;
+  model: { provider: string; model: string };
+  voice: { provider: string; voiceId: string };
+}
+
+const ASSISTANT_PRESETS: AssistantPreset[] = [
+  {
+    id: "matteus",
+    label: "Matteus",
+    description: "Deepgram Nova-3 (pt-BR) · GPT-4.1 nano · Voz Elliot V2",
+    model: { provider: "openai", model: "gpt-4.1-nano" },
+    voice: { provider: "vapi", voiceId: "Elliot" },
+  },
+];
+
 const emptyForm: FormState = {
   open: false,
   mode: "create",
