@@ -498,27 +498,24 @@ function sanitizeModelTool(tool: any): any {
 
 export const listVapiAssistants = createServerFn({ method: "GET" })
   .middleware([withVapiCredentials])
-  .handler(async ({ context }): Promise<VapiAssistantDTO[]> => {
-    const owned = await listOwnedIds(context.supabase, context.userId);
-    if (owned.size === 0) return [];
+  .handler(async (): Promise<VapiAssistantDTO[]> => {
     const data = await vapiFetch("/assistant", { method: "GET" });
     if (!Array.isArray(data)) return [];
-    return (data as VapiAssistantDTO[])
-      .filter((a) => owned.has(a.id))
-      .map((a) => ({
-        id: a.id,
-        name: a.name ?? null,
-        voice: a.voice
-          ? { provider: a.voice.provider, voiceId: a.voice.voiceId }
-          : null,
-        model: a.model
-          ? { provider: a.model.provider, model: a.model.model }
-          : null,
-        firstMessage: a.firstMessage ?? null,
-        createdAt: a.createdAt,
-        updatedAt: a.updatedAt,
-      }));
+    return (data as VapiAssistantDTO[]).map((a) => ({
+      id: a.id,
+      name: a.name ?? null,
+      voice: a.voice
+        ? { provider: a.voice.provider, voiceId: a.voice.voiceId }
+        : null,
+      model: a.model
+        ? { provider: a.model.provider, model: a.model.model }
+        : null,
+      firstMessage: a.firstMessage ?? null,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+    }));
   });
+
 
 export const getVapiAssistant = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
