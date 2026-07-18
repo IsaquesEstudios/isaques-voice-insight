@@ -76,13 +76,24 @@ function formatCallError(error: unknown): string {
   if (
     normalized.includes("permission") ||
     normalized.includes("microphone") ||
+    normalized.includes("assistant-did-not-receive-customer-audio") ||
+    normalized.includes("did not receive customer audio") ||
     normalized.includes("notallowederror") ||
     normalized.includes("permission denied")
   ) {
     return [
-      "Problema: o navegador bloqueou o acesso ao microfone.",
-      "Causa provável: a permissão de microfone foi negada ou ainda não foi concedida para este site.",
-      "Como resolver: libere o microfone no navegador e inicie a ligação novamente.",
+      "Problema: a Vapi não recebeu áudio do seu microfone.",
+      "Causa provável: o microfone foi bloqueado, ficou mudo ou o navegador não publicou áudio rápido o suficiente.",
+      "Como resolver: libere o microfone, confira se ele não está mudo e inicie a ligação novamente.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
+  if (normalized.includes("meeting has ended") || normalized.includes("exiting meeting")) {
+    return [
+      "Problema: a Vapi encerrou a sala antes da conversa começar.",
+      "Causa provável: ela não recebeu áudio do cliente dentro do tempo de entrada da chamada.",
+      "Como resolver: libere o microfone e tente novamente; a próxima ligação vai publicar o áudio antes de entrar na sala.",
       `Detalhe técnico: ${technicalDetail}`,
     ].join("\n");
   }
@@ -144,6 +155,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
   const createWebCallFn = useServerFn(createVapiWebCall);
 
   const callRef = useRef<DailyCall | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
   const speakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -160,6 +172,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       clearTimeout(speakingTimeoutRef.current);
       speakingTimeoutRef.current = null;
     }
+    micStreamRef.current?.getTracks().forEach((track) => track.stop());
+    micStreamRef.current = null;
     const currentCall = callRef.current;
     callRef.current = null;
     if (currentCall && !currentCall.isDestroyed()) {
@@ -252,9 +266,11 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     setTranscript([]);
 
     try {
-      // Permission ping — clearer error than Vapi's generic failure
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = stream;
+      if (!stream.getAudioTracks()[0]) {
+        throw new Error("Nenhum microfone ativo foi encontrado pelo navegador.");
+      }
     } catch (e) {
       setStatus("error");
       const msg = formatCallError(e);
@@ -274,6 +290,10 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
 
     try {
       await cleanupCall();
+      const micTrack = micStreamRef.current?.getAudioTracks()[0];
+      if (!micTrack || micTrack.readyState !== "live") {
+        throw new Error("O microfone não está ativo para publicar áudio na chamada.");
+      }
       const webCall = await webCallMutation.mutateAsync();
       const { default: DailyIframe } = await import("@daily-co/daily-js");
       const call = DailyIframe.createCallObject({
@@ -320,7 +340,15 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
         showCallError(msg);
       });
 
-      await call.join({ url: webCall.webCallUrl, startVideoOff: true, startAudioOff: false });
+      await call.join({
+        url: webCall.webCallUrl,
+        startVideoOff: true,
+        startAudioOff: false,
+        inputSettings: {
+          audio: { settings: { customTrack: micTrack } },
+        },
+      });
+      call.setLocalAudio(true);
       await call.startRemoteParticipantsAudioLevelObserver(100);
 
       // Sweep for any remote audio already live at join time.
