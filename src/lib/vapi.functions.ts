@@ -137,8 +137,8 @@ export interface AssistantInput {
 }
 
 function getKey(): string {
-  const key = process.env.VAPI_PRIVATE_KEY;
-  if (!key) throw new Error("VAPI_PRIVATE_KEY não configurada no servidor");
+  const key = vapiKeyStore.getStore();
+  if (!key) throw new Error("Chave Vapi ausente no contexto da requisição.");
   return key;
 }
 
