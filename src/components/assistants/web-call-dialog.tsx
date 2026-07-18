@@ -151,15 +151,16 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     }
   };
 
-  const handleAppMessage = (event?: DailyEventObjectAppMessage<string>) => {
+  const handleAppMessage = (event?: DailyEventObjectAppMessage) => {
     if (!event?.data) return;
-    if (event.data === "listening") {
+    const rawData = typeof event.data === "string" ? event.data : JSON.stringify(event.data);
+    if (rawData === "listening") {
       setStatus("in_call");
       return;
     }
 
     try {
-      const message = JSON.parse(event.data) as {
+      const message = JSON.parse(rawData) as {
         type?: string;
         transcriptType?: string;
         role?: string;
