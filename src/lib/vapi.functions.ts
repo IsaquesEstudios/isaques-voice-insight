@@ -1,6 +1,43 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createMiddleware } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+// AsyncLocalStorage carrega a chave Vapi do usuário durante toda a execução
+// do handler, para que `vapiFetch` (helper compartilhado) consiga usá-la sem
+// receber o valor por parâmetro em cada chamada.
+const vapiKeyStore = new AsyncLocalStorage<string>();
+
+async function loadUserVapiKey(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("user_vapi_credentials")
+    .select("private_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Falha ao carregar chave Vapi: ${error.message}`);
+  return (data?.private_key as string | undefined) ?? null;
+}
+
+// Middleware: exige auth + Vapi configurada e injeta a chave via ALS.
+export const withVapiCredentials = createMiddleware({ type: "function" })
+  .middleware([requireSupabaseAuth])
+  .server(async ({ next, context }) => {
+    const key = await loadUserVapiKey(context.supabase, context.userId);
+    if (!key) {
+      throw new Response(
+        JSON.stringify({
+          code: "VAPI_NOT_CONFIGURED",
+          message: "Configure sua chave Vapi em /onboarding antes de usar assistentes.",
+        }),
+        { status: 428, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return vapiKeyStore.run(key, () => next());
+  });
 
 // --- Ownership helpers -----------------------------------------------------
 // Assistants live in a single Vapi account, so per-user scoping is enforced
@@ -100,8 +137,8 @@ export interface AssistantInput {
 }
 
 function getKey(): string {
-  const key = process.env.VAPI_PRIVATE_KEY;
-  if (!key) throw new Error("VAPI_PRIVATE_KEY não configurada no servidor");
+  const key = vapiKeyStore.getStore();
+  if (!key) throw new Error("Chave Vapi ausente no contexto da requisição.");
   return key;
 }
 
@@ -432,7 +469,7 @@ function sanitizeModelTool(tool: any): any {
 }
 
 export const listVapiAssistants = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .handler(async ({ context }): Promise<VapiAssistantDTO[]> => {
     const owned = await listOwnedIds(context.supabase, context.userId);
     if (owned.size === 0) return [];
@@ -456,7 +493,7 @@ export const listVapiAssistants = createServerFn({ method: "GET" })
   });
 
 export const getVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -468,7 +505,7 @@ export const getVapiAssistant = createServerFn({ method: "POST" })
   });
 
 export const createVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: AssistantInput) => {
     if (!input?.name?.trim()) throw new Error("Nome é obrigatório");
     return {
@@ -491,7 +528,7 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
   });
 
 export const updateVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: AssistantInput & { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     if (!input?.name?.trim()) throw new Error("Nome é obrigatório");
@@ -553,7 +590,7 @@ export interface AssistantConfigInput {
 
 // Partial PATCH used by the details page — only touches provided fields.
 export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: AssistantConfigInput) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -683,7 +720,7 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
 
 
 export const deleteVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -698,7 +735,7 @@ export const deleteVapiAssistant = createServerFn({ method: "POST" })
 // Duplicates an existing assistant by fetching its full config, stripping
 // server-managed fields, and creating a new one with " - Cópia" appended.
 export const duplicateVapiAssistant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("id é obrigatório");
     return input;
@@ -771,7 +808,7 @@ async function loadTwilioCredsForVapi(
 // Lists phone numbers imported on the Vapi account. Filtered/paginated by
 // caller — Vapi returns all numbers on the account.
 export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .handler(async (): Promise<VapiPhoneNumberDTO[]> => {
     const data = await vapiFetch("/phone-number", { method: "GET" });
     if (!Array.isArray(data)) return [];
@@ -787,7 +824,7 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
 // Attaches (or replaces) the assistant on a given phone number. Imports the
 // number on Vapi if it isn't there yet, using the user's own Twilio creds.
 export const attachAssistantToNumber = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator(
     (input: { phoneNumberE164: string; assistantId: string; name?: string }) => {
       if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
@@ -908,7 +945,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
 // Removes the assistant from a Vapi phone number (leaves the number itself
 // imported on Vapi).
 export const detachAssistantFromNumber = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((input: { phoneNumberE164: string }) => {
     if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
     return input;
@@ -942,7 +979,7 @@ export const detachAssistantFromNumber = createServerFn({ method: "POST" })
 // phone-number id OR an E.164 number (imports it via the user's Twilio
 // creds if not yet on Vapi).
 export const createOutboundTestCall = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator(
     (input: {
       assistantId: string;
@@ -1019,7 +1056,7 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
 // Vapi Public Key for Web Call SDK (browser-safe). Requires auth so we don't
 // expose the key to unauthenticated callers.
 export const getVapiPublicKey = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .handler(async () => {
     const key = process.env.VAPI_PUBLIC_KEY;
     if (!key) throw new Error("VAPI_PUBLIC_KEY não configurada.");
@@ -1039,7 +1076,7 @@ export interface VapiVoiceOption {
 }
 
 export const listVapiVoices = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { provider: string }) => data)
   .handler(async ({ data }): Promise<VapiVoiceOption[]> => {
     const provider = (data.provider || "").trim();
@@ -1086,7 +1123,7 @@ export interface AssistantCallStats {
 }
 
 export const getAssistantCallStats = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { assistantId: string }) => data)
   .handler(async ({ data }): Promise<AssistantCallStats> => {
     const empty: AssistantCallStats = {
@@ -1242,7 +1279,7 @@ export interface AssistantCallLog {
 }
 
 export const listAssistantCalls = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { assistantId: string; limit?: number }) => data)
   .handler(async ({ data, context }): Promise<{ calls: AssistantCallLog[]; error: string | null }> => {
     if (!data.assistantId) return { calls: [], error: null };
@@ -1340,7 +1377,7 @@ export interface AssistantAnalytics {
 }
 
 export const getAssistantAnalytics = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([withVapiCredentials])
   .inputValidator((data: { assistantId: string; rangeDays?: number }) => data)
   .handler(async ({ data, context }): Promise<AssistantAnalytics> => {
     const empty: AssistantAnalytics = {
@@ -1481,3 +1518,98 @@ export const getAssistantAnalytics = createServerFn({ method: "POST" })
 
 
 
+
+/* ============================================================
+   Vapi credentials — per-user account (BYOK)
+   ============================================================ */
+
+// Validates a Vapi private key by calling GET /assistant with limit=1.
+async function validateVapiKey(key: string): Promise<void> {
+  const res = await fetch("https://api.vapi.ai/assistant?limit=1", {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error("Chave Vapi inválida. Verifique se copiou a Private Key correta.");
+  }
+  if (!res.ok) {
+    throw new Error(`Falha ao validar chave Vapi (${res.status}). Tente novamente.`);
+  }
+}
+
+export const saveVapiCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        privateKey: z.string().trim().min(20, "Chave muito curta"),
+        friendlyLabel: z.string().trim().max(80).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await validateVapiKey(data.privateKey);
+    const { error } = await context.supabase.from("user_vapi_credentials").upsert(
+      {
+        user_id: context.userId,
+        private_key: data.privateKey,
+        friendly_label: data.friendlyLabel ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw new Error(`DB upsert failed: ${error.message}`);
+    return { ok: true };
+  });
+
+export const getVapiConnection = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_vapi_credentials")
+      .select("friendly_label, updated_at")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return { connected: false as const };
+    return {
+      connected: true as const,
+      friendlyLabel: (data.friendly_label as string | null) ?? null,
+      updatedAt: data.updated_at as string,
+    };
+  });
+
+export const disconnectVapi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase
+      .from("user_vapi_credentials")
+      .delete()
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/**
+ * Combined onboarding status — used pelo gate para redirecionar ao /onboarding.
+ * Não usa `withVapiCredentials` porque precisa funcionar antes das chaves existirem.
+ */
+export const getSetupStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [vapiRes, twilioRes] = await Promise.all([
+      context.supabase
+        .from("user_vapi_credentials")
+        .select("user_id")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+      context.supabase
+        .from("user_twilio_credentials")
+        .select("user_id")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+    ]);
+    return {
+      vapi: !!vapiRes.data,
+      twilio: !!twilioRes.data,
+    };
+  });
