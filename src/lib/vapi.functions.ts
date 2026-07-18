@@ -54,76 +54,40 @@ export const withVapiCredentials = createMiddleware({ type: "function" })
   });
 
 // --- Ownership helpers -----------------------------------------------------
-// Assistants live in a single Vapi account, so per-user scoping is enforced
-// via a Supabase table `user_assistants` that maps vapi_assistant_id -> user_id.
+// Cada usuário usa a própria API key da Vapi, então a lista de assistentes
+// já é naturalmente escopada por conta/organização Vapi. Não filtramos mais
+// pelo banco `user_assistants` — o que existe na Vapi é o que aparece.
 async function listOwnedIds(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<Set<string>> {
-  const { data, error } = await supabase
-    .from("user_assistants")
-    .select("vapi_assistant_id")
-    .eq("user_id", userId);
-  if (error) {
-    console.error("user_assistants select error", error);
-    throw new Error("Falha ao carregar assistentes do usuário.");
-  }
-  return new Set((data ?? []).map((r) => r.vapi_assistant_id as string));
+  _supabase: SupabaseClient,
+  _userId: string,
+): Promise<Set<string> | null> {
+  return null; // null = "sem filtro, use tudo que a Vapi devolver"
 }
 
 async function assertOwnership(
-  supabase: SupabaseClient,
-  userId: string,
-  assistantId: string,
+  _supabase: SupabaseClient,
+  _userId: string,
+  _assistantId: string,
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from("user_assistants")
-    .select("vapi_assistant_id")
-    .eq("user_id", userId)
-    .eq("vapi_assistant_id", assistantId)
-    .maybeSingle();
-  if (error) {
-    console.error("user_assistants ownership check error", error);
-    throw new Error("Falha ao validar permissão.");
-  }
-  if (!data) {
-    throw new Response("Forbidden: assistente não pertence ao usuário", {
-      status: 403,
-    });
-  }
+  // No-op: a API key da Vapi do usuário já isola a organização dele.
 }
 
 async function recordOwnership(
-  supabase: SupabaseClient,
-  userId: string,
-  assistantId: string,
+  _supabase: SupabaseClient,
+  _userId: string,
+  _assistantId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("user_assistants")
-    .insert({ user_id: userId, vapi_assistant_id: assistantId });
-  if (error) {
-    console.error("user_assistants insert error", error);
-    // Best-effort rollback: remove orphan assistant from Vapi.
-    try {
-      await vapiFetch(`/assistant/${assistantId}`, { method: "DELETE" });
-    } catch (e) {
-      console.error("orphan cleanup failed", e);
-    }
-    throw new Error("Falha ao vincular assistente ao usuário.");
-  }
+  // No-op: mantido para não quebrar chamadas existentes.
 }
 
 async function removeOwnership(
-  supabase: SupabaseClient,
-  userId: string,
-  assistantId: string,
+  _supabase: SupabaseClient,
+  _userId: string,
+  _assistantId: string,
 ): Promise<void> {
-  await supabase
-    .from("user_assistants")
-    .delete()
-    .eq("user_id", userId)
-    .eq("vapi_assistant_id", assistantId);
+  // No-op.
 }
+
 
 
 export interface VapiAssistantDTO {
