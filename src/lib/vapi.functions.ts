@@ -241,7 +241,9 @@ async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
   return vapiFetchWithKey(getKey(), path, init);
 }
 
-async function createScopedWebCallPublicToken(assistantId: string): Promise<string> {
+async function createScopedWebCallPublicToken(
+  assistantId: string,
+): Promise<{ id: string | null; value: string }> {
   const token = (await vapiFetch("/token", {
     method: "POST",
     body: JSON.stringify({
@@ -252,7 +254,7 @@ async function createScopedWebCallPublicToken(assistantId: string): Promise<stri
         allowTransientAssistant: false,
       },
     }),
-  })) as { value?: string } | null;
+  })) as { id?: string; value?: string } | null;
 
   if (!token?.value) {
     throw new Error(
@@ -260,7 +262,7 @@ async function createScopedWebCallPublicToken(assistantId: string): Promise<stri
     );
   }
 
-  return token.value;
+  return { id: token.id ?? null, value: token.value };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1095,13 +1097,22 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
     // usa a Private Key do usuário, então criamos um token público temporário e
     // restrito a esta assistente antes de abrir a sala Daily.
     const publicWebCallToken = await createScopedWebCallPublicToken(data.assistantId);
-    const call = (await vapiFetchWithKey(publicWebCallToken, "/call/web", {
-      method: "POST",
-      body: JSON.stringify({
-        assistantId: data.assistantId,
-        roomDeleteOnUserLeaveEnabled: true,
-      }),
-    })) as { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null;
+    let call: { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null = null;
+    try {
+      call = (await vapiFetchWithKey(publicWebCallToken.value, "/call/web", {
+        method: "POST",
+        body: JSON.stringify({
+          assistantId: data.assistantId,
+          roomDeleteOnUserLeaveEnabled: true,
+        }),
+      })) as { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null;
+    } finally {
+      if (publicWebCallToken.id) {
+        void vapiFetch(`/token/${publicWebCallToken.id}`, { method: "DELETE" }).catch((error) => {
+          console.warn("Falha ao remover token público temporário da Vapi", error);
+        });
+      }
+    }
 
     const webCallUrl = call?.webCallUrl ?? call?.transport?.callUrl;
     if (!webCallUrl) {
