@@ -1109,6 +1109,9 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
         method: "POST",
         body: JSON.stringify({
           assistantId: data.assistantId,
+          assistantOverrides: {
+            customerJoinTimeoutSeconds: 60,
+          },
         }),
       }) as Promise<{ id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null>;
 
