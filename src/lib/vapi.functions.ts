@@ -1063,6 +1063,28 @@ export const getVapiPublicKey = createServerFn({ method: "GET" })
     return { publicKey: key };
   });
 
+export const createVapiWebCall = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { assistantId: string }) => {
+    if (!input?.assistantId) throw new Error("assistantId é obrigatório");
+    return { assistantId: input.assistantId };
+  })
+  .handler(async ({ data, context }) => {
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+    const call = (await vapiFetch("/call/web", {
+      method: "POST",
+      body: JSON.stringify({ assistantId: data.assistantId }),
+    })) as { id?: string; webCallUrl?: string } | null;
+
+    if (!call?.webCallUrl) {
+      throw new Error(
+        "A Vapi não retornou a sala da chamada web. Confira se a assistente está configurada com modelo, voz e transcrição.",
+      );
+    }
+
+    return { callId: call.id ?? null, webCallUrl: call.webCallUrl };
+  });
+
 // List available voices for a given voice provider via Vapi voice-library.
 export interface VapiVoiceOption {
   providerId: string;
