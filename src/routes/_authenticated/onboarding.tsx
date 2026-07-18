@@ -22,6 +22,7 @@ import {
   getSetupStatus,
   getVapiConnection,
   saveVapiCredentials,
+  updateVapiPublicKey,
 } from "@/lib/vapi.functions";
 import {
   getTwilioConnection,
