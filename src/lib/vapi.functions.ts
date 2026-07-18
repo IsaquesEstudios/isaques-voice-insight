@@ -1,6 +1,43 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createMiddleware } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+// AsyncLocalStorage carrega a chave Vapi do usuário durante toda a execução
+// do handler, para que `vapiFetch` (helper compartilhado) consiga usá-la sem
+// receber o valor por parâmetro em cada chamada.
+const vapiKeyStore = new AsyncLocalStorage<string>();
+
+async function loadUserVapiKey(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("user_vapi_credentials")
+    .select("private_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Falha ao carregar chave Vapi: ${error.message}`);
+  return (data?.private_key as string | undefined) ?? null;
+}
+
+// Middleware: exige auth + Vapi configurada e injeta a chave via ALS.
+export const withVapiCredentials = createMiddleware({ type: "function" })
+  .middleware([requireSupabaseAuth])
+  .server(async ({ next, context }) => {
+    const key = await loadUserVapiKey(context.supabase, context.userId);
+    if (!key) {
+      throw new Response(
+        JSON.stringify({
+          code: "VAPI_NOT_CONFIGURED",
+          message: "Configure sua chave Vapi em /onboarding antes de usar assistentes.",
+        }),
+        { status: 428, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return vapiKeyStore.run(key, () => next());
+  });
 
 // --- Ownership helpers -----------------------------------------------------
 // Assistants live in a single Vapi account, so per-user scoping is enforced
