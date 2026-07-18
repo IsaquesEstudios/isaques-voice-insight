@@ -87,6 +87,15 @@ function formatCallError(error: unknown): string {
     ].join("\n");
   }
 
+  if (normalized.includes("public key") && normalized.includes("assistente")) {
+    return [
+      "Problema: a Public Key da Vapi salva não conseguiu acessar esta assistente.",
+      "Causa provável: a Public Key é de outra organização Vapi ou foi copiada incorretamente.",
+      "Como resolver: volte ao onboarding e salve a Public Key da mesma conta onde esta assistente existe.",
+      `Detalhe técnico: ${technicalDetail}`,
+    ].join("\n");
+  }
+
   if (
     normalized.includes("public key") ||
     normalized.includes("api key") ||
@@ -106,15 +115,6 @@ function formatCallError(error: unknown): string {
       "Problema: a assistente não foi encontrada na conta Vapi conectada.",
       "Causa provável: o ID da assistente pertence a outra conta ou ela foi removida.",
       "Como resolver: confirme se a assistente existe na mesma conta Vapi conectada no onboarding.",
-      `Detalhe técnico: ${technicalDetail}`,
-    ].join("\n");
-  }
-
-  if (normalized.includes("public key") && normalized.includes("assistente")) {
-    return [
-      "Problema: a Public Key da Vapi salva não conseguiu acessar esta assistente.",
-      "Causa provável: a Public Key é de outra organização Vapi ou foi copiada incorretamente.",
-      "Como resolver: volte ao onboarding e salve a Public Key da mesma conta onde esta assistente existe.",
       `Detalhe técnico: ${technicalDetail}`,
     ].join("\n");
   }
