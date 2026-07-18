@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const nav = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Assistentes Virtuais", url: "/assistentes", icon: Bot },
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },

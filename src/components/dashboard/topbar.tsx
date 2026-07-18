@@ -27,7 +27,7 @@ export function Topbar() {
       const supabase = getSupabaseBrowser();
       await supabase.auth.signOut();
       toast.success("Você saiu da conta.");
-      navigate({ to: "/auth", replace: true });
+      navigate({ to: "/", replace: true });
     } catch (err) {
       toast.error("Falha ao sair. Tente novamente.");
       console.error(err);
