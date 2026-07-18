@@ -43,6 +43,7 @@ import {
   Info,
   Globe,
   Lock,
+  Mic,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -1018,6 +1019,7 @@ function AssistantDetailPage() {
           <TabsList className="h-auto w-full justify-start gap-1 rounded-xl border border-white/[0.08] bg-card/20 p-1 backdrop-blur-2xl">
             {[
               { value: "assistant", label: "Assistant", icon: Brain },
+              { value: "model", label: "Modelo & Voz", icon: Mic },
               { value: "logs", label: "Logs", icon: ScrollText },
               { value: "tools", label: "Tools", icon: Wrench },
               { value: "analysis", label: "Analysis", icon: LineChart },
@@ -1035,23 +1037,8 @@ function AssistantDetailPage() {
           </TabsList>
 
           <TabsContent value="assistant" className="mt-0">
-            <Tabs defaultValue="behavior" className="space-y-4">
-              <TabsList className="h-auto w-fit gap-1 rounded-xl border border-white/[0.08] bg-card/20 p-1 backdrop-blur-2xl">
-                <TabsTrigger
-                  value="behavior"
-                  className="gap-2 rounded-lg px-4 py-2 text-sm text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"
-                >
-                  Comportamento
-                </TabsTrigger>
-                <TabsTrigger
-                  value="model"
-                  className="gap-2 rounded-lg px-4 py-2 text-sm text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"
-                >
-                  Modelo & Voz
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="behavior" className="mt-0">
             <div className="grid grid-cols-1 gap-4">
+
 
               {/* Coluna Esquerda — Comportamento */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
@@ -1103,10 +1090,11 @@ function AssistantDetailPage() {
                 </CardContent>
               </Card>
             </div>
-              </TabsContent>
+          </TabsContent>
 
-              <TabsContent value="model" className="mt-0">
+          <TabsContent value="model" className="mt-0">
             <div className="grid grid-cols-1 gap-4">
+
               {/* Padrões de IA pré-configurados */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-4 p-6">
@@ -1205,9 +1193,8 @@ function AssistantDetailPage() {
               </Card>
 
             </div>
-              </TabsContent>
-            </Tabs>
           </TabsContent>
+
 
 
           <TabsContent value="logs" className="mt-0">
