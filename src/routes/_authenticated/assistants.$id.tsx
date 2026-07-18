@@ -126,6 +126,7 @@ import {
 } from "recharts";
 
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getModelCost,
   getModelSpec,
@@ -1270,6 +1271,57 @@ function endedReasonBadgeClass(reason: string | null): string {
   return "bg-white/[0.05] text-muted-foreground";
 }
 
+const ENDED_REASON_PT: Record<string, string> = {
+  "customer-ended-call": "Cliente encerrou",
+  "assistant-ended-call": "IA encerrou",
+  "customer-did-not-answer": "Não atendeu",
+  "customer-busy": "Ocupado",
+  "silence-timed-out": "Silêncio",
+  "assistant-error": "Erro da IA",
+  "pipeline-error": "Erro pipeline",
+  "voicemail": "Caixa postal",
+  "exceeded-max-duration": "Duração máx.",
+};
+function translateEndedReason(reason: string | null): string {
+  if (!reason) return "—";
+  return ENDED_REASON_PT[reason] ?? reason;
+}
+
+const CALL_TYPE_PT: Record<string, string> = {
+  webCall: "Web (navegador)",
+  inboundPhoneCall: "Telefone (entrada)",
+  outboundPhoneCall: "Telefone (saída)",
+};
+function formatOrigin(row: AssistantCallLog): string {
+  if (row.customerNumber) return row.customerNumber;
+  if (row.phoneNumber) return row.phoneNumber;
+  if (row.type && CALL_TYPE_PT[row.type]) return CALL_TYPE_PT[row.type];
+  return row.type ?? "—";
+}
+
+function statusBadge(status: string | null): { label: string; className: string } {
+  if (!status) return { label: "—", className: "bg-white/[0.05] text-muted-foreground" };
+  const map: Record<string, { label: string; className: string }> = {
+    queued: { label: "Na fila", className: "bg-slate-500/10 text-slate-300" },
+    ringing: { label: "Tocando", className: "bg-amber-500/10 text-amber-300" },
+    "in-progress": { label: "Em andamento", className: "bg-sky-500/10 text-sky-300" },
+    forwarding: { label: "Encaminhando", className: "bg-violet-500/10 text-violet-300" },
+    ended: { label: "Finalizada", className: "bg-emerald-500/10 text-emerald-300" },
+  };
+  return map[status] ?? { label: status, className: "bg-white/[0.05] text-muted-foreground" };
+}
+
+function successBadge(v: string | null): { label: string; className: string } | null {
+  if (!v) return null;
+  const low = v.toLowerCase();
+  if (low === "true" || low === "pass" || low === "success")
+    return { label: "Sucesso", className: "bg-emerald-500/10 text-emerald-300" };
+  if (low === "false" || low === "fail" || low === "failure")
+    return { label: "Falhou", className: "bg-rose-500/10 text-rose-300" };
+  return { label: v, className: "bg-white/[0.05] text-muted-foreground" };
+}
+
+
 function LogsTab({ assistantId }: { assistantId: string }) {
   const [limit, setLimit] = useState(50);
   const [detail, setDetail] = useState<AssistantCallLog | null>(null);
@@ -1327,9 +1379,11 @@ function LogsTab({ assistantId }: { assistantId: string }) {
               <TableRow className="border-white/[0.06] hover:bg-transparent">
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Data/Hora</TableHead>
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Origem/Destino</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Status</TableHead>
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Duração</TableHead>
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Custo</TableHead>
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Motivo</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Avaliação</TableHead>
                 <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -1337,7 +1391,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={`sk-${i}`} className="border-white/[0.04]">
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-24" />
                       </TableCell>
@@ -1347,67 +1401,113 @@ function LogsTab({ assistantId }: { assistantId: string }) {
 
               {!isLoading && calls.length === 0 && !apiError && (
                 <TableRow className="border-white/[0.04] hover:bg-transparent">
-                  <TableCell colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-xs text-muted-foreground">
                     Nenhuma ligação registrada ainda para este assistente.
                   </TableCell>
                 </TableRow>
               )}
 
               {!isLoading &&
-                calls.map((row) => (
-                  <TableRow key={row.id} className="border-white/[0.04] transition-colors hover:bg-white/[0.03]">
-                    <TableCell className="text-sm text-foreground">{formatDateBR(row.startedAt)}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {row.customerNumber ?? row.phoneNumber ?? row.type ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-foreground">{formatDuration(row.durationSec)}</TableCell>
-                    <TableCell className="text-sm text-foreground">
-                      {row.cost != null ? `$${row.cost.toFixed(3)}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          endedReasonBadgeClass(row.endedReason),
+                calls.map((row) => {
+                  const st = statusBadge(row.status);
+                  const succ = successBadge(row.successEvaluation);
+                  const bd = row.costBreakdown;
+                  const hasBreakdown =
+                    bd && (bd.stt || bd.llm || bd.tts || bd.vapi || bd.transport);
+                  return (
+                    <TableRow key={row.id} className="border-white/[0.04] transition-colors hover:bg-white/[0.03]">
+                      <TableCell className="text-sm text-foreground">{formatDateBR(row.startedAt)}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{formatOrigin(row)}</TableCell>
+                      <TableCell>
+                        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", st.className)}>
+                          {st.label}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-foreground">{formatDuration(row.durationSec)}</TableCell>
+                      <TableCell className="text-sm text-foreground">
+                        {row.cost != null ? (
+                          hasBreakdown ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help underline decoration-dotted underline-offset-2">
+                                  ${row.cost.toFixed(3)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                <div className="min-w-[140px] space-y-0.5">
+                                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">STT</span><span>${(bd.stt ?? 0).toFixed(4)}</span></div>
+                                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">LLM</span><span>${(bd.llm ?? 0).toFixed(4)}</span></div>
+                                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">TTS</span><span>${(bd.tts ?? 0).toFixed(4)}</span></div>
+                                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">Vapi</span><span>${(bd.vapi ?? 0).toFixed(4)}</span></div>
+                                  {bd.transport != null && (
+                                    <div className="flex justify-between gap-4"><span className="text-muted-foreground">Transporte</span><span>${bd.transport.toFixed(4)}</span></div>
+                                  )}
+                                  <div className="mt-1 flex justify-between gap-4 border-t border-white/10 pt-1 font-semibold"><span>Total</span><span>${row.cost.toFixed(3)}</span></div>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            `$${row.cost.toFixed(3)}`
+                          )
+                        ) : (
+                          "—"
                         )}
-                      >
-                        {row.endedReason ?? "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:text-primary disabled:opacity-30"
-                          aria-label="Reproduzir áudio"
-                          disabled={!row.recordingUrl}
-                          onClick={() => {
-                            setDetail(row);
-                            setDetailMode("recording");
-                          }}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                            endedReasonBadgeClass(row.endedReason),
+                          )}
                         >
-                          <Play className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:text-primary disabled:opacity-30"
-                          aria-label="Ver transcrição"
-                          disabled={!row.transcript && !row.summary}
-                          onClick={() => {
-                            setDetail(row);
-                            setDetailMode("transcript");
-                          }}
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {translateEndedReason(row.endedReason)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {succ ? (
+                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", succ.className)}>
+                            {succ.label}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:text-primary disabled:opacity-30"
+                            aria-label="Reproduzir áudio"
+                            disabled={!row.recordingUrl}
+                            onClick={() => {
+                              setDetail(row);
+                              setDetailMode("recording");
+                            }}
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:text-primary disabled:opacity-30"
+                            aria-label="Ver transcrição"
+                            disabled={!row.transcript && !row.summary}
+                            onClick={() => {
+                              setDetail(row);
+                              setDetailMode("transcript");
+                            }}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
             </TableBody>
           </Table>
+
 
           {!isLoading && calls.length >= limit && limit < 200 && (
             <div className="flex justify-center border-t border-white/[0.06] p-3">
