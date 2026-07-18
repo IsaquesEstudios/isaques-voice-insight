@@ -6,7 +6,7 @@ import {
   Plus,
   Search,
   MoreVertical,
-  Play,
+  ArrowRight,
   Pencil,
   Copy,
   Mic,
