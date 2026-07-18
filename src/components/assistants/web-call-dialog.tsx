@@ -426,7 +426,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               </Button>
               <Button
                 onClick={startCall}
-                disabled={status === "connecting" || webCallMutation.isPending}
+                disabled={webCallMutation.isPending}
                 className="gap-2"
               >
                 {webCallMutation.isPending ? (
