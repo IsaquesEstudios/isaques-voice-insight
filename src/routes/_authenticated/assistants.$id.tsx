@@ -126,6 +126,7 @@ import {
 } from "recharts";
 
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getModelCost,
   getModelSpec,
