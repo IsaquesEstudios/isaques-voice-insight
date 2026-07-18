@@ -1090,10 +1090,11 @@ function AssistantDetailPage() {
                 </CardContent>
               </Card>
             </div>
-              </TabsContent>
+          </TabsContent>
 
-              <TabsContent value="model" className="mt-0">
+          <TabsContent value="model" className="mt-0">
             <div className="grid grid-cols-1 gap-4">
+
               {/* Padrões de IA pré-configurados */}
               <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-4 p-6">
