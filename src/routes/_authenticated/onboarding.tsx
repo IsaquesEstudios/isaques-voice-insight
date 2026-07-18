@@ -175,7 +175,10 @@ function OnboardingPage() {
                     No menu lateral, clique em <span className="text-foreground">Organization</span> → <span className="text-foreground">API Keys</span>.
                   </li>
                   <li>
-                    Copie a <span className="text-foreground">Private Key</span> (começa com <code className="rounded bg-background/60 px-1">vapi_sk_…</code>).
+                    Copie a <span className="text-foreground">Private Key</span> (começa com <code className="rounded bg-background/60 px-1">vapi_sk_…</code>) — usada para gerenciar assistentes.
+                  </li>
+                  <li>
+                    Copie também a <span className="text-foreground">Public Key</span> — necessária para o botão <span className="text-foreground">Testar no navegador</span>.
                   </li>
                 </ol>
               </div>
@@ -191,6 +194,24 @@ function OnboardingPage() {
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Vapi Public Key{" "}
+                  <span className="text-muted-foreground">(opcional, mas recomendada)</span>
+                </Label>
+                <Input
+                  placeholder="ex.: 4c1a2f…"
+                  value={vapiPublicKey}
+                  onChange={(e) => setVapiPublicKey(e.target.value)}
+                  className="bg-background/50 font-mono text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Sem a Public Key você ainda consegue criar assistentes, mas o teste
+                  no navegador vai depender de um token temporário gerado pela Private
+                  Key.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between gap-3">
                 <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
                   Sair
@@ -203,7 +224,12 @@ function OnboardingPage() {
                   ) : null}
                   <Button
                     disabled={saveVapi.isPending || vapiKey.trim().length < 20}
-                    onClick={() => saveVapi.mutate(vapiKey.trim())}
+                    onClick={() =>
+                      saveVapi.mutate({
+                        privateKey: vapiKey.trim(),
+                        publicKey: vapiPublicKey.trim(),
+                      })
+                    }
                     className="gap-2 shadow-glow"
                   >
                     {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
