@@ -378,11 +378,6 @@ function AssistentesPage() {
     }
   }
 
-  function handlePlay() {
-    toast.info(
-      "Integração de Web Call ativa via SDK. O teste de voz será habilitado em breve.",
-    );
-  }
 
   return (
     <DashboardShell>
