@@ -66,16 +66,22 @@ function OnboardingPage() {
   const [twilioSid, setTwilioSid] = useState("");
   const [twilioToken, setTwilioToken] = useState("");
 
-  // Se Vapi já está conectada e Twilio não, começa direto no passo 2.
+  // Se Vapi está totalmente conectada (com public key) e Twilio não, pula para o passo 2.
   useEffect(() => {
     if (status.data?.vapi && !status.data?.twilio) {
       setStep(2);
     }
   }, [status.data?.vapi, status.data?.twilio]);
 
+  const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
+
   const saveVapi = useMutation({
-    mutationFn: (v: { privateKey: string; publicKey: string }) =>
-      saveVapiCredentials({ data: v }),
+    mutationFn: async (v: { privateKey: string; publicKey: string }) => {
+      if (vapiHasPrivateOnly) {
+        return updateVapiPublicKey({ data: { publicKey: v.publicKey } });
+      }
+      return saveVapiCredentials({ data: v });
+    },
     onSuccess: () => {
       toast.success("Vapi conectada!");
       setVapiKey("");
