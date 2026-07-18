@@ -43,6 +43,7 @@ import {
   Info,
   Globe,
   Lock,
+  Mic,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
