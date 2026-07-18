@@ -1633,16 +1633,27 @@ export const saveVapiCredentials = createServerFn({ method: "POST" })
     z
       .object({
         privateKey: z.string().trim().min(20, "Chave muito curta"),
+        publicKey: z
+          .string()
+          .trim()
+          .min(20, "Public Key muito curta")
+          .optional()
+          .or(z.literal("")),
         friendlyLabel: z.string().trim().max(80).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await validateVapiKey(data.privateKey);
+    const publicKey =
+      data.publicKey && data.publicKey.trim().length >= 20
+        ? data.publicKey.trim()
+        : null;
     const { error } = await context.supabase.from("user_vapi_credentials").upsert(
       {
         user_id: context.userId,
         private_key: data.privateKey,
+        public_key: publicKey,
         friendly_label: data.friendlyLabel ?? null,
         updated_at: new Date().toISOString(),
       },
@@ -1657,15 +1668,17 @@ export const getVapiConnection = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("user_vapi_credentials")
-      .select("friendly_label, updated_at")
+      .select("friendly_label, updated_at, public_key")
       .eq("user_id", context.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return { connected: false as const };
+    const publicKey = (data.public_key as string | null) ?? null;
     return {
       connected: true as const,
       friendlyLabel: (data.friendly_label as string | null) ?? null,
       updatedAt: data.updated_at as string,
+      hasPublicKey: !!(publicKey && publicKey.trim().length > 0),
     };
   });
 
