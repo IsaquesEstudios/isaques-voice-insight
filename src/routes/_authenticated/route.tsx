@@ -19,8 +19,7 @@ export const Route = createFileRoute("/_authenticated")({
           throw redirect({ to: "/onboarding" });
         }
       } catch (e) {
-        // Re-throw router redirects; swallow transient errors to avoid lockout.
-        if (e && typeof e === "object" && "to" in (e as Record<string, unknown>)) throw e;
+        if (isRedirect(e)) throw e;
         console.error("setup status check failed", e);
       }
     }
