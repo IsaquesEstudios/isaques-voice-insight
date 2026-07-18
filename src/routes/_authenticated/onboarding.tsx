@@ -20,8 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
   getSetupStatus,
-  getVapiConnection,
   saveVapiCredentials,
+  updateVapiPublicKey,
 } from "@/lib/vapi.functions";
 import {
   getTwilioConnection,
@@ -50,10 +50,8 @@ function OnboardingPage() {
     queryKey: ["setup-status"],
     queryFn: () => getSetupStatus(),
   });
-  const vapiConn = useQuery({
-    queryKey: ["vapi-connection"],
-    queryFn: () => getVapiConnection(),
-  });
+  
+
   const twilioConn = useQuery({
     queryKey: ["twilio-connection"],
     queryFn: () => getTwilioConnection(),
@@ -65,16 +63,22 @@ function OnboardingPage() {
   const [twilioSid, setTwilioSid] = useState("");
   const [twilioToken, setTwilioToken] = useState("");
 
-  // Se Vapi já está conectada e Twilio não, começa direto no passo 2.
+  // Se Vapi está totalmente conectada (com public key) e Twilio não, pula para o passo 2.
   useEffect(() => {
     if (status.data?.vapi && !status.data?.twilio) {
       setStep(2);
     }
   }, [status.data?.vapi, status.data?.twilio]);
 
+  const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
+
   const saveVapi = useMutation({
-    mutationFn: (v: { privateKey: string; publicKey: string }) =>
-      saveVapiCredentials({ data: v }),
+    mutationFn: async (v: { privateKey: string; publicKey: string }) => {
+      if (vapiHasPrivateOnly) {
+        return updateVapiPublicKey({ data: { publicKey: v.publicKey } });
+      }
+      return saveVapiCredentials({ data: v });
+    },
     onSuccess: () => {
       toast.success("Vapi conectada!");
       setVapiKey("");
@@ -105,7 +109,7 @@ function OnboardingPage() {
     navigate({ to: "/", replace: true });
   };
 
-  const vapiReady = vapiConn.data?.connected;
+  const vapiReady = !!status.data?.vapi;
   const twilioReady = twilioConn.data?.connected;
 
   return (
@@ -183,22 +187,27 @@ function OnboardingPage() {
                 </ol>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs">Vapi Private Key</Label>
-                <Input
-                  type="password"
-                  placeholder="vapi_sk_…"
-                  value={vapiKey}
-                  onChange={(e) => setVapiKey(e.target.value)}
-                  className="bg-background/50 font-mono text-xs"
-                />
-              </div>
+              {vapiHasPrivateOnly ? (
+                <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+                  Sua Private Key já está salva. Falta apenas a{" "}
+                  <span className="font-semibold">Public Key</span> para liberar o
+                  teste no navegador e concluir o onboarding.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Vapi Private Key</Label>
+                  <Input
+                    type="password"
+                    placeholder="vapi_sk_…"
+                    value={vapiKey}
+                    onChange={(e) => setVapiKey(e.target.value)}
+                    className="bg-background/50 font-mono text-xs"
+                  />
+                </div>
+              )}
 
               <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Vapi Public Key{" "}
-                  <span className="text-muted-foreground">(opcional, mas recomendada)</span>
-                </Label>
+                <Label className="text-xs">Vapi Public Key</Label>
                 <Input
                   placeholder="ex.: 4c1a2f…"
                   value={vapiPublicKey}
@@ -206,9 +215,7 @@ function OnboardingPage() {
                   className="bg-background/50 font-mono text-xs"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Sem a Public Key você ainda consegue criar assistentes, mas o teste
-                  no navegador vai depender de um token temporário gerado pela Private
-                  Key.
+                  Obrigatória — é a chave usada pelo botão “Testar no navegador”.
                 </p>
               </div>
 
@@ -217,13 +224,12 @@ function OnboardingPage() {
                   Sair
                 </Button>
                 <div className="flex gap-2">
-                  {vapiReady ? (
-                    <Button variant="outline" onClick={() => setStep(2)} className="gap-2">
-                      Pular <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  ) : null}
                   <Button
-                    disabled={saveVapi.isPending || vapiKey.trim().length < 20}
+                    disabled={
+                      saveVapi.isPending ||
+                      vapiPublicKey.trim().length < 20 ||
+                      (!vapiHasPrivateOnly && vapiKey.trim().length < 20)
+                    }
                     onClick={() =>
                       saveVapi.mutate({
                         privateKey: vapiKey.trim(),
