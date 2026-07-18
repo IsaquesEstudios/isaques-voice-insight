@@ -1193,9 +1193,8 @@ function AssistantDetailPage() {
               </Card>
 
             </div>
-              </TabsContent>
-            </Tabs>
           </TabsContent>
+
 
 
           <TabsContent value="logs" className="mt-0">
