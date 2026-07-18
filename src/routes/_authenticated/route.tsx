@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
+import { createFileRoute, redirect, isRedirect, Outlet } from "@tanstack/react-router";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import { getSetupStatus } from "@/lib/vapi.functions";
 
