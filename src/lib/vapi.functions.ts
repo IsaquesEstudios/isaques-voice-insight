@@ -57,12 +57,10 @@ export const withVapiCredentials = createMiddleware({ type: "function" })
 // Cada usuário usa a própria API key da Vapi, então a lista de assistentes
 // já é naturalmente escopada por conta/organização Vapi. Não filtramos mais
 // pelo banco `user_assistants` — o que existe na Vapi é o que aparece.
-async function listOwnedIds(
-  _supabase: SupabaseClient,
-  _userId: string,
-): Promise<Set<string> | null> {
-  return null; // null = "sem filtro, use tudo que a Vapi devolver"
+async function listOwnedIds(): Promise<null> {
+  return null;
 }
+
 
 async function assertOwnership(
   _supabase: SupabaseClient,
