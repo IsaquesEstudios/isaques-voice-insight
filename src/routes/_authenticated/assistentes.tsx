@@ -6,7 +6,7 @@ import {
   Plus,
   Search,
   MoreVertical,
-  Play,
+  ArrowRight,
   Pencil,
   Copy,
   Mic,
@@ -378,11 +378,6 @@ function AssistentesPage() {
     }
   }
 
-  function handlePlay() {
-    toast.info(
-      "Integração de Web Call ativa via SDK. O teste de voz será habilitado em breve.",
-    );
-  }
 
   return (
     <DashboardShell>
@@ -569,41 +564,16 @@ function AssistentesPage() {
                     <span className="text-[11px] text-muted-foreground">
                       Atualizado {metrics.updatedAgo}
                     </span>
-                    <div className="relative z-20 flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 hover:text-primary"
-                        onClick={handlePlay}
-                        aria-label="Testar assistente"
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 hover:text-primary"
-                        onClick={() => openEdit(raw)}
-                        aria-label="Editar assistente"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 hover:text-primary"
-                        onClick={() => handleDuplicate(raw)}
-                        disabled={duplicatingId === raw.id}
-                        aria-label="Duplicar assistente"
-                      >
-                        {duplicatingId === raw.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary transition-all group-hover:border-primary/60 group-hover:bg-primary/20 group-hover:shadow-glow">
+                      Abrir & configurar
+                      <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                    </span>
                   </div>
+                  {duplicatingId === raw.id && (
+                    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-background/50 backdrop-blur-sm">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))
