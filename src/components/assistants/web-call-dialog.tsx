@@ -297,7 +297,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       const attachRemoteAudio = (track: MediaStreamTrack) => {
         const audio = document.createElement("audio");
         audio.autoplay = true;
-        audio.playsInline = true;
+        audio.setAttribute("playsinline", "true");
         audio.style.display = "none";
         audio.srcObject = new MediaStream([track]);
         document.body.appendChild(audio);
