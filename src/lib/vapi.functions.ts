@@ -184,7 +184,11 @@ function buildPayload(input: AssistantInput) {
 }
 
 
-async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
+async function vapiFetchWithKey(
+  key: string,
+  path: string,
+  init: RequestInit,
+): Promise<unknown> {
   const maxAttempts = 3;
   let lastStatus = 0;
   let lastBody = "";
@@ -192,7 +196,7 @@ async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
     const res = await fetch(`https://api.vapi.ai${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${getKey()}`,
+        Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
         ...(init.headers ?? {}),
       },
@@ -231,6 +235,34 @@ async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
       ? `A API da Vapi está temporariamente indisponível (${lastStatus}). Tente novamente em instantes.`
       : `Vapi ${init.method ?? "GET"} ${path} retornou ${lastStatus}: ${rawMessage}`,
   );
+}
+
+async function vapiFetch(path: string, init: RequestInit): Promise<unknown> {
+  return vapiFetchWithKey(getKey(), path, init);
+}
+
+async function createScopedWebCallPublicToken(
+  assistantId: string,
+): Promise<{ id: string | null; value: string }> {
+  const token = (await vapiFetch("/token", {
+    method: "POST",
+    body: JSON.stringify({
+      tag: "public",
+      name: `web-${assistantId.slice(0, 8)}-${Date.now().toString(36)}`.slice(0, 40),
+      restrictions: {
+        allowedAssistantIds: [assistantId],
+        allowTransientAssistant: false,
+      },
+    }),
+  })) as { id?: string; value?: string } | null;
+
+  if (!token?.value) {
+    throw new Error(
+      "A Vapi criou o token público para chamada web, mas não retornou a chave. Tente novamente em instantes.",
+    );
+  }
+
+  return { id: token.id ?? null, value: token.value };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1061,18 +1093,35 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertOwnership(context.supabase, context.userId, data.assistantId);
-    const call = (await vapiFetch("/call/web", {
-      method: "POST",
-      body: JSON.stringify({ assistantId: data.assistantId }),
-    })) as { id?: string; webCallUrl?: string } | null;
+    // A Vapi exige uma Public Key no endpoint /call/web. O restante da plataforma
+    // usa a Private Key do usuário, então criamos um token público temporário e
+    // restrito a esta assistente antes de abrir a sala Daily.
+    const publicWebCallToken = await createScopedWebCallPublicToken(data.assistantId);
+    let call: { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null = null;
+    try {
+      call = (await vapiFetchWithKey(publicWebCallToken.value, "/call/web", {
+        method: "POST",
+        body: JSON.stringify({
+          assistantId: data.assistantId,
+          roomDeleteOnUserLeaveEnabled: true,
+        }),
+      })) as { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null;
+    } finally {
+      if (publicWebCallToken.id) {
+        void vapiFetch(`/token/${publicWebCallToken.id}`, { method: "DELETE" }).catch((error) => {
+          console.warn("Falha ao remover token público temporário da Vapi", error);
+        });
+      }
+    }
 
-    if (!call?.webCallUrl) {
+    const webCallUrl = call?.webCallUrl ?? call?.transport?.callUrl;
+    if (!webCallUrl) {
       throw new Error(
         "A Vapi não retornou a sala da chamada web. Confira se a assistente está configurada com modelo, voz e transcrição.",
       );
     }
 
-    return { callId: call.id ?? null, webCallUrl: call.webCallUrl };
+    return { callId: call?.id ?? null, webCallUrl };
   });
 
 // List available voices for a given voice provider via Vapi voice-library.
