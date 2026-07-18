@@ -279,6 +279,24 @@ async function createScopedWebCallPublicToken(
   return { id: token.id ?? null, value: token.value };
 }
 
+function getErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error ?? "");
+}
+
+function shouldRetryWebCallWithScopedToken(error: unknown): boolean {
+  const msg = getErrorText(error).toLowerCase();
+  return (
+    msg.includes("couldn't get assistant") ||
+    msg.includes("couldn’t get assistant") ||
+    msg.includes("does not exist") ||
+    msg.includes("not found") ||
+    msg.includes("invalid key") ||
+    msg.includes("unauthorized") ||
+    msg.includes("public key") ||
+    msg.includes("api key")
+  );
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sanitizeToolMessage(message: any): any {
   if (!message || typeof message !== "object") return message;
@@ -1118,9 +1136,11 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
     );
 
     let publicKeyValue: string;
+    let usedSavedPublicKey = false;
     let scopedTokenId: string | null = null;
     if (savedPublicKey) {
       publicKeyValue = savedPublicKey;
+      usedSavedPublicKey = true;
     } else {
       const scoped = await createScopedWebCallPublicToken(data.assistantId);
       publicKeyValue = scoped.value;
@@ -1128,14 +1148,38 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
     }
 
     let call: { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null = null;
-    try {
-      call = (await vapiFetchWithKey(publicKeyValue, "/call/web", {
+    const createWebCallWithKey = (key: string) =>
+      vapiFetchWithKey(key, "/call/web", {
         method: "POST",
         body: JSON.stringify({
           assistantId: data.assistantId,
           roomDeleteOnUserLeaveEnabled: true,
         }),
-      })) as { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null;
+      }) as Promise<{ id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null>;
+
+    try {
+      try {
+        call = await createWebCallWithKey(publicKeyValue);
+      } catch (error) {
+        if (!usedSavedPublicKey || !shouldRetryWebCallWithScopedToken(error)) {
+          throw error;
+        }
+
+        const scoped = await createScopedWebCallPublicToken(data.assistantId);
+        scopedTokenId = scoped.id;
+        try {
+          call = await createWebCallWithKey(scoped.value);
+        } catch (fallbackError) {
+          throw new Error(
+            [
+              "A Public Key da Vapi salva não conseguiu acessar esta assistente.",
+              "Causa provável: a Public Key pertence a outra conta/organização Vapi ou foi copiada incorretamente.",
+              "Como resolver: atualize a Public Key no onboarding usando a mesma conta Vapi da Private Key.",
+              `Detalhe técnico: ${getErrorText(error) || getErrorText(fallbackError)}`,
+            ].join(" "),
+          );
+        }
+      }
     } finally {
       if (scopedTokenId) {
         void vapiFetch(`/token/${scopedTokenId}`, { method: "DELETE" }).catch((error) => {
