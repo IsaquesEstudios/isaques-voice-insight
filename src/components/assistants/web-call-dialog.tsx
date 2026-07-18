@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import type Vapi from "@vapi-ai/web";
+import DailyIframe, {
+  type DailyCall,
+  type DailyEventObjectAppMessage,
+  type DailyEventObjectRemoteParticipantsAudioLevel,
+  type DailyEventObjectTrack,
+} from "@daily-co/daily-js";
 import { Loader2, Mic, MicOff, PhoneOff, PhoneCall, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { getVapiPublicKey } from "@/lib/vapi.functions";
+import { createVapiWebCall } from "@/lib/vapi.functions";
 
 type Status = "idle" | "connecting" | "in_call" | "ended" | "error";
 
@@ -33,8 +38,6 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-type VapiConstructor = new (publicKey: string) => Vapi;
 
 function extractErrorMessage(error: unknown): string {
   if (typeof error === "string") return error;
@@ -63,9 +66,9 @@ function formatCallError(error: unknown): string {
 
   if (normalized.includes("class extends value") || normalized.includes("is not a constructor")) {
     return [
-      "Problema: o SDK de chamadas da Vapi não carregou corretamente no navegador.",
-      "Causa provável: conflito no pacote de eventos usado pelo SDK durante o carregamento do app.",
-      "Como resolver: atualize a página e tente novamente; se continuar, é um problema técnico da integração, não da configuração da assistente.",
+      "Problema: a biblioteca de áudio da chamada não carregou corretamente no navegador.",
+      "Causa provável: conflito temporário no carregamento dos pacotes da página.",
+      "Como resolver: atualize a página e tente novamente; a chamada agora não depende mais do SDK antigo da Vapi.",
       `Detalhe técnico: ${technicalDetail}`,
     ].join("\n");
   }
@@ -121,52 +124,110 @@ function showCallError(message: string) {
   });
 }
 
-async function loadVapiConstructor(): Promise<VapiConstructor> {
-  const mod = await import("@vapi-ai/web");
-  const maybeDefault = mod.default as unknown;
-  const maybeNestedDefault = (maybeDefault as { default?: unknown } | null)?.default;
-  const ctor =
-    typeof maybeDefault === "function"
-      ? maybeDefault
-      : typeof maybeNestedDefault === "function"
-        ? maybeNestedDefault
-        : null;
-
-  if (!ctor) {
-    console.error("[vapi] invalid SDK module shape", mod);
-    throw new Error("Não foi possível carregar o SDK de chamadas da Vapi.");
-  }
-
-  return ctor as VapiConstructor;
-}
-
 export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }: Props) {
-  const getKeyFn = useServerFn(getVapiPublicKey);
-  const keyQuery = useQuery({
-    queryKey: ["vapi-public-key"],
-    queryFn: () => getKeyFn(),
-    staleTime: Infinity,
-    enabled: open,
-  });
+  const createWebCallFn = useServerFn(createVapiWebCall);
 
-  const vapiRef = useRef<Vapi | null>(null);
+  const callRef = useRef<DailyCall | null>(null);
+  const speakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState<"user" | "assistant" | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
 
+  const webCallMutation = useMutation({
+    mutationFn: () => createWebCallFn({ data: { assistantId } }),
+  });
+
+  const cleanupCall = async () => {
+    if (speakingTimeoutRef.current) {
+      clearTimeout(speakingTimeoutRef.current);
+      speakingTimeoutRef.current = null;
+    }
+    const currentCall = callRef.current;
+    callRef.current = null;
+    if (currentCall && !currentCall.isDestroyed()) {
+      await currentCall.destroy().catch(() => undefined);
+    }
+  };
+
+  const handleAppMessage = (event?: DailyEventObjectAppMessage<string>) => {
+    if (!event?.data) return;
+    if (event.data === "listening") {
+      setStatus("in_call");
+      return;
+    }
+
+    try {
+      const message = JSON.parse(event.data) as {
+        type?: string;
+        transcriptType?: string;
+        role?: string;
+        transcript?: string;
+        status?: string;
+      };
+      console.log("[vapi-web] message", message);
+      if (message.type === "status-update" && message.status === "ended") {
+        setStatus("ended");
+      }
+      if (
+        message.type === "transcript" &&
+        message.transcriptType === "final" &&
+        message.transcript &&
+        (message.role === "user" || message.role === "assistant")
+      ) {
+        setTranscript((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-${Math.random()}`,
+            role: message.role as "user" | "assistant",
+            text: message.transcript!,
+          },
+        ]);
+      }
+    } catch (parseError) {
+      console.log("[vapi-web] app-message parse error", parseError);
+    }
+  };
+
+  const handleRemoteAudioLevel = (event: DailyEventObjectRemoteParticipantsAudioLevel) => {
+    const speechLevel = Object.values(event.participantsAudioLevel).reduce(
+      (total, level) => total + level,
+      0,
+    );
+    const isSpeaking = speechLevel > 0.01;
+    if (!isSpeaking) return;
+
+    if (speakingTimeoutRef.current) {
+      clearTimeout(speakingTimeoutRef.current);
+    } else {
+      setSpeaker("assistant");
+    }
+
+    speakingTimeoutRef.current = setTimeout(() => {
+      setSpeaker(null);
+      speakingTimeoutRef.current = null;
+    }, 1000);
+  };
+
+  const handleTrackStarted = (event?: DailyEventObjectTrack) => {
+    if (!event?.participant?.local && event?.track?.kind === "audio") {
+      const audio = document.createElement("audio");
+      audio.autoplay = true;
+      audio.style.display = "none";
+      audio.srcObject = new MediaStream([event.track]);
+      audio.play().catch((playError) => {
+        console.warn("[vapi-web] autoplay blocked", playError);
+      });
+      document.body.appendChild(audio);
+      event.track.addEventListener("ended", () => audio.remove(), { once: true });
+    }
+  };
+
   // Cleanup when dialog closes
   useEffect(() => {
     if (!open) {
-      if (vapiRef.current) {
-        try {
-          vapiRef.current.stop();
-        } catch {
-          /* noop */
-        }
-        vapiRef.current = null;
-      }
+      void cleanupCall();
       setStatus("idle");
       setErrorMsg(null);
       setMuted(false);
@@ -175,8 +236,13 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
     }
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      void cleanupCall();
+    };
+  }, []);
+
   async function startCall() {
-    if (!keyQuery.data?.publicKey) return;
     setStatus("connecting");
     setErrorMsg(null);
     setTranscript([]);
@@ -192,87 +258,45 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       return;
     }
 
-    // Sanity check: public keys are UUIDs; private keys start with "sk_"
-    if (keyQuery.data.publicKey.startsWith("sk_")) {
-      setStatus("error");
-      setErrorMsg(
-        "A secret VAPI_PUBLIC_KEY parece ser uma chave privada (sk_...). Use a Public Key da Vapi (Dashboard → API Keys → Public Key).",
-      );
-      return;
-    }
-
     // Timeout — surface a helpful message if Vapi never fires call-start/error
     const timeout = window.setTimeout(() => {
       setErrorMsg((prev) =>
         prev ??
-        "A chamada demorou demais para conectar. Verifique se a Public Key da Vapi corresponde à conta que criou este assistente, e se o assistente tem transcriber + voice + model configurados.",
+        "A chamada demorou demais para conectar. Verifique se o assistente tem transcriber + voice + model configurados e tente novamente.",
       );
       setStatus((s) => (s === "connecting" ? "error" : s));
     }, 15000);
 
     try {
-      const VapiCtor = await loadVapiConstructor();
-      const vapi = new VapiCtor(keyQuery.data.publicKey);
-      vapiRef.current = vapi;
+      await cleanupCall();
+      const webCall = await webCallMutation.mutateAsync();
+      const call = DailyIframe.createCallObject({
+        audioSource: true,
+        videoSource: false,
+        subscribeToTracksAutomatically: true,
+      });
+      callRef.current = call;
 
-      vapi.on("call-start", () => {
-        console.log("[vapi] call-start");
-        setStatus("in_call");
-      });
-      vapi.on("call-end", () => {
-        console.log("[vapi] call-end");
-        setStatus("ended");
-      });
-      vapi.on("call-start-progress", (event) => {
-        console.log("[vapi] call-start-progress", event);
-      });
-      vapi.on("call-start-failed", (event) => {
-        console.error("[vapi] call-start-failed", event);
-        const msg = formatCallError(event?.error || event || "Falha ao iniciar chamada.");
-        setStatus("error");
-        setErrorMsg(msg);
-        showCallError(msg);
-      });
-      vapi.on("speech-start", () => setSpeaker("assistant"));
-      vapi.on("speech-end", () => setSpeaker(null));
-      vapi.on("error", (e: unknown) => {
-        console.error("[vapi] error event", e);
+      call.on("app-message", handleAppMessage);
+      call.on("remote-participants-audio-level", handleRemoteAudioLevel);
+      call.on("track-started", handleTrackStarted);
+      call.on("left-meeting", () => setStatus("ended"));
+      call.on("error", (e: unknown) => {
+        console.error("[vapi-web] daily error", e);
         const msg = formatCallError(e);
         setStatus("error");
         setErrorMsg(msg);
         showCallError(msg);
       });
-      vapi.on("message", (message: {
-        type?: string;
-        transcriptType?: string;
-        role?: string;
-        transcript?: string;
-      }) => {
-        console.log("[vapi] message", message);
-        if (
-          message?.type === "transcript" &&
-          message.transcriptType === "final" &&
-          message.transcript &&
-          (message.role === "user" || message.role === "assistant")
-        ) {
-          setTranscript((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              role: message.role as "user" | "assistant",
-              text: message.transcript!,
-            },
-          ]);
-        }
-      });
 
-      console.log("[vapi] starting call for assistant", assistantId);
-      const res = await vapi.start(assistantId);
-      console.log("[vapi] start resolved", res);
+      await call.join({ url: webCall.webCallUrl });
+      await call.startRemoteParticipantsAudioLevelObserver(100);
+      setStatus("in_call");
       window.clearTimeout(timeout);
     } catch (e) {
       window.clearTimeout(timeout);
-      console.error("[vapi] start threw", e);
+      console.error("[vapi-web] start threw", e);
+      await cleanupCall();
       const msg = formatCallError(e);
       setStatus("error");
       setErrorMsg(msg);
@@ -282,20 +306,17 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
 
 
   function endCall() {
-    if (vapiRef.current) {
-      try {
-        vapiRef.current.stop();
-      } catch {
-        /* noop */
-      }
+    if (callRef.current && !callRef.current.isDestroyed()) {
+      callRef.current.sendAppMessage(JSON.stringify({ type: "end-call" }));
     }
+    void cleanupCall();
     setStatus("ended");
   }
 
   function toggleMute() {
-    if (!vapiRef.current) return;
+    if (!callRef.current) return;
     const next = !muted;
-    vapiRef.current.setMuted(next);
+    callRef.current.setLocalAudio(!next);
     setMuted(next);
   }
 
@@ -316,20 +337,16 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
         </DialogHeader>
 
         <div className="space-y-4">
-          {keyQuery.isLoading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando...
-            </div>
-          ) : keyQuery.isError ? (
+          {webCallMutation.isError && status === "idle" ? (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Não foi possível obter a chave pública da Vapi. Verifique a secret
-                VAPI_PUBLIC_KEY.
+              <AlertDescription className="whitespace-pre-line text-xs leading-relaxed">
+                {formatCallError(webCallMutation.error)}
               </AlertDescription>
             </Alert>
-          ) : (
-            <>
+          ) : null}
+
+          <>
               {/* Status badge */}
               <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
                 <div className="flex items-center gap-3">
@@ -398,8 +415,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
                   )}
                 </ScrollArea>
               )}
-            </>
-          )}
+          </>
         </div>
 
         <DialogFooter className="gap-2">
@@ -410,10 +426,14 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               </Button>
               <Button
                 onClick={startCall}
-                disabled={!keyQuery.data?.publicKey || keyQuery.isLoading}
+                disabled={status === "connecting" || webCallMutation.isPending}
                 className="gap-2"
               >
-                <PhoneCall className="h-4 w-4" />
+                {webCallMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PhoneCall className="h-4 w-4" />
+                )}
                 {status === "ended" ? "Ligar novamente" : "Iniciar ligação"}
               </Button>
             </>
