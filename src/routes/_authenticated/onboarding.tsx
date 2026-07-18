@@ -61,6 +61,7 @@ function OnboardingPage() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [vapiKey, setVapiKey] = useState("");
+  const [vapiPublicKey, setVapiPublicKey] = useState("");
   const [twilioSid, setTwilioSid] = useState("");
   const [twilioToken, setTwilioToken] = useState("");
 
@@ -72,10 +73,12 @@ function OnboardingPage() {
   }, [status.data?.vapi, status.data?.twilio]);
 
   const saveVapi = useMutation({
-    mutationFn: (privateKey: string) => saveVapiCredentials({ data: { privateKey } }),
+    mutationFn: (v: { privateKey: string; publicKey: string }) =>
+      saveVapiCredentials({ data: v }),
     onSuccess: () => {
       toast.success("Vapi conectada!");
       setVapiKey("");
+      setVapiPublicKey("");
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
       setStep(2);
