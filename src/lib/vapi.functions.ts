@@ -1710,21 +1710,31 @@ export const disconnectVapi = createServerFn({ method: "POST" })
  */
 export const fetchRecordingAsDataUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ url: z.string().url() }).parse(data))
+  .inputValidator((input) =>
+    z
+      .object({
+        url: z.string().url().optional(),
+        callId: z.string().uuid().optional(),
+      })
+      .refine((value) => !!value.url || !!value.callId, {
+        message: "Informe o ID da chamada ou a URL da gravação.",
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
-    let host: string;
-    try {
-      host = new URL(data.url).hostname;
-    } catch {
-      throw new Error("URL inválida");
-    }
-    const allowed = /(^|\.)vapi\.ai$|(^|\.)daily\.co$|storage\.googleapis\.com$|(^|\.)r2\.cloudflarestorage\.com$|(^|\.)vapi-public\.[a-z0-9-]+\.amazonaws\.com$|(^|\.)amazonaws\.com$/i;
-    if (!allowed.test(host)) {
-      throw new Error(`A gravação existe, mas o domínio do arquivo ainda não está liberado para reprodução segura (${host}).`);
+    let host: string | null = null;
+    if (data.url) {
+      try {
+        host = new URL(data.url).hostname;
+      } catch {
+        throw new Error("URL inválida");
+      }
+      const allowed = /(^|\.)vapi\.ai$|(^|\.)daily\.co$|storage\.googleapis\.com$|(^|\.)r2\.cloudflarestorage\.com$|(^|\.)vapi-public\.[a-z0-9-]+\.amazonaws\.com$|(^|\.)amazonaws\.com$/i;
+      if (!allowed.test(host)) {
+        throw new Error(`A gravação existe, mas o domínio do arquivo ainda não está liberado para reprodução segura (${host}).`);
+      }
     }
 
-    // Gravações HIPAA da Vapi ficam num R2 privado; a URL crua retorna 400.
-    // Peça à Vapi um link assinado via GET /call/{id} (o recordingUrl volta com querystring de assinatura).
     const { data: cred } = await context.supabase
       .from("user_vapi_credentials")
       .select("private_key")
@@ -1732,51 +1742,85 @@ export const fetchRecordingAsDataUrl = createServerFn({ method: "POST" })
       .maybeSingle();
     const privateKey = (cred as { private_key?: string } | null)?.private_key;
 
-    let fetchUrl = data.url;
+    const extractedCallId = data.url?.match(
+      /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+    )?.[1];
+    const callId = data.callId ?? extractedCallId;
 
-    // Se for uma URL R2 sem assinatura, tente resolver via API da Vapi.
-    const isR2 = /r2\.cloudflarestorage\.com$/i.test(host);
-    const hasSignature = /[?&]X-Amz-Signature=/i.test(data.url);
-    if (isR2 && !hasSignature && privateKey) {
-      // Extrai o callId do path: .../hipaa-recordings/<callId>-<timestamp>-<uuid>-mono.wav
-      const m = data.url.match(/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i);
-      const callId = m?.[1];
-      if (callId) {
-        try {
-          const callRes = await fetch(`https://api.vapi.ai/call/${callId}`, {
-            headers: { Authorization: `Bearer ${privateKey}` },
-          });
-          if (callRes.ok) {
-            const call = (await callRes.json()) as {
-              recordingUrl?: string;
-              artifact?: { recordingUrl?: string };
-            };
-            const signed = call.artifact?.recordingUrl ?? call.recordingUrl;
-            if (signed && /[?&]X-Amz-Signature=/i.test(signed)) {
-              fetchUrl = signed;
-            }
-          }
-        } catch {
-          // ignora — cairemos no fetch direto abaixo
+    const toDataUrl = async (res: Response) => {
+      const contentType = res.headers.get("content-type") ?? "audio/wav";
+      const buf = new Uint8Array(await res.arrayBuffer());
+      let binary = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < buf.length; i += chunk) {
+        binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+      }
+      return {
+        dataUrl: `data:${contentType};base64,${btoa(binary)}`,
+        contentType,
+        bytes: buf.length,
+      };
+    };
+
+    // Caminho oficial da Vapi: artefatos privados são baixados pela API com Private Key.
+    // A API responde com redirect 302 para uma URL autenticada curta; fetch segue automaticamente.
+    if (callId && privateKey) {
+      const preferStereo = !!data.url && /stereo/i.test(data.url);
+      const endpoints = preferStereo
+        ? ["stereo-recording", "mono-recording"]
+        : ["mono-recording", "stereo-recording"];
+      let lastStatus = 0;
+      for (const endpoint of endpoints) {
+        const res = await fetch(`https://api.vapi.ai/call/${callId}/${endpoint}`, {
+          method: "GET",
+          redirect: "follow",
+          headers: { Authorization: `Bearer ${privateKey}` },
+        });
+        if (res.ok) return toDataUrl(res);
+        lastStatus = res.status;
+        if (res.status === 401 || res.status === 403) {
+          throw new Error("A Private Key da Vapi não autorizou o download da gravação. Atualize a chave em Configurações → API & Chaves.");
         }
       }
-    }
 
-    const res = await fetch(fetchUrl);
-    if (!res.ok) {
+      // Último fallback: algumas chamadas antigas retornam uma URL pública/signed no objeto da chamada.
+      const callRes = await fetch(`https://api.vapi.ai/call/${callId}`, {
+        headers: { Authorization: `Bearer ${privateKey}` },
+      });
+      if (callRes.ok) {
+        const call = (await callRes.json()) as {
+          recordingUrl?: string;
+          stereoRecordingUrl?: string;
+          artifact?: { recordingUrl?: string; stereoRecordingUrl?: string };
+        };
+        const signed =
+          call.artifact?.recordingUrl ??
+          call.artifact?.stereoRecordingUrl ??
+          call.recordingUrl ??
+          call.stereoRecordingUrl;
+        if (signed) {
+          const res = await fetch(signed, { redirect: "follow" });
+          if (res.ok) return toDataUrl(res);
+          lastStatus = res.status;
+        }
+      }
+
       throw new Error(
-        `Falha ao baixar gravação (HTTP ${res.status}). Gravações HIPAA da Vapi expiram rapidamente — recarregue a lista de logs e tente de novo, ou abra pelo painel da Vapi.`,
+        `Falha ao baixar gravação pela API oficial da Vapi (HTTP ${lastStatus || "indisponível"}). Confirme se a gravação está ativada e se a chamada já terminou de processar.`,
       );
     }
-    const contentType = res.headers.get("content-type") ?? "audio/wav";
-    const buf = new Uint8Array(await res.arrayBuffer());
-    let binary = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < buf.length; i += chunk) {
-      binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+
+    if (!data.url) {
+      throw new Error("Não foi possível identificar a URL da gravação.");
     }
-    const base64 = btoa(binary);
-    return { dataUrl: `data:${contentType};base64,${base64}`, contentType, bytes: buf.length };
+
+    const directRes = await fetch(data.url, { redirect: "follow" });
+    if (!directRes.ok) {
+      throw new Error(
+        `Falha ao baixar gravação (HTTP ${directRes.status}). Se a gravação for privada, salve a Private Key correta da Vapi e tente novamente.`,
+      );
+    }
+    return toDataUrl(directRes);
   });
 
 export const getSetupStatus = createServerFn({ method: "GET" })
