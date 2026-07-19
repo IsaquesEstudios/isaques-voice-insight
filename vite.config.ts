@@ -12,5 +12,12 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Pré-empacota o SDK da Vapi via esbuild para evitar o bug "Class extends
+    // value #<Object> is not a constructor or null" no Rolldown ao herdar de
+    // EventEmitter no navegador.
+    optimizeDeps: {
+      include: ["@vapi-ai/web", "events"],
+    },
+  },
 });
-
