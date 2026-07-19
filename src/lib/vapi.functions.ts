@@ -1467,6 +1467,10 @@ export const listAssistantCalls = createServerFn({ method: "POST" })
         transcript: artifact ? str(artifact.transcript) : null,
         summary: analysis ? str(analysis.summary) : null,
         successEvaluation: analysis ? str(analysis.successEvaluation) : null,
+        structuredData:
+          analysis && analysis.structuredData && typeof analysis.structuredData === "object"
+            ? JSON.stringify(analysis.structuredData)
+            : null,
       };
     });
 
