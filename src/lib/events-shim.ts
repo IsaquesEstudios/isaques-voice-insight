@@ -57,7 +57,10 @@ class EventEmitter {
     const listeners = this.events.get(event);
     if (!listeners) return this;
 
-    const next = listeners.filter((item) => item !== listener && item.listener !== listener);
+    const next = listeners.filter((item) => {
+      const maybeWrapped = item as Listener & { listener?: Listener };
+      return item !== listener && maybeWrapped.listener !== listener;
+    });
     if (next.length) {
       this.events.set(event, next);
     } else {
