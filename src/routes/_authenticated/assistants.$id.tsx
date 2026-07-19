@@ -107,6 +107,7 @@ import {
   listVapiAssistants,
   listVapiVoices,
   saveVapiAssistantConfig,
+  fetchRecordingAsDataUrl,
   type AssistantCallLog,
   type VapiVoiceOption,
 } from "@/lib/vapi.functions";
