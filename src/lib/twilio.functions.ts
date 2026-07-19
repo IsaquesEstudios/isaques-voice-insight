@@ -126,7 +126,10 @@ export const saveTwilioCredentials = createServerFn({ method: "POST" })
         accountSid: z
           .string()
           .trim()
-          .regex(/^AC[a-zA-Z0-9]{10,}$/, "Account SID inválido"),
+          .regex(
+            /^AC[a-fA-F0-9]{32}$/,
+            'Account SID inválido. Deve começar com "AC" seguido de 32 caracteres hexadecimais (ex.: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx). Copie do Twilio Console → Account Info.',
+          ),
         authToken: z.string().trim().min(8, "Auth Token inválido"),
         friendlyLabel: z.string().trim().max(80).optional(),
       })
