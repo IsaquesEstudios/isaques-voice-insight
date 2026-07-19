@@ -69,8 +69,8 @@ function formatCallError(error: unknown): string {
 
   if (n.includes("class extends value") || n.includes("is not a constructor")) {
     return [
-      "Problema: o SDK da Vapi não carregou corretamente no navegador.",
-      "Como resolver: recarregue a página (Ctrl+Shift+R) e tente novamente.",
+      "Problema: o SDK da Vapi carregou com uma incompatibilidade de pacote no navegador.",
+      "Como resolver: publique novamente a versão corrigida e recarregue a página.",
       `Detalhe técnico: ${detail}`,
     ].join("\n");
   }
