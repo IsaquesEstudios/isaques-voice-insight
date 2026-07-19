@@ -1387,6 +1387,60 @@ function RecordingPlayer({ url, callId }: { url?: string | null; callId: string 
   );
 }
 
+function CaptureView({ raw }: { raw: string | null }) {
+  if (!raw) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-background/20 p-8 text-center">
+        <FileText className="h-5 w-5 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">Nenhum dado capturado</p>
+        <p className="max-w-sm text-xs text-muted-foreground">
+          Configure os campos em <span className="text-foreground">Analysis → Structured Outputs</span>{" "}
+          para que a IA extraia dados desta ligação (nome, telefone, status de agendamento, etc.).
+        </p>
+      </div>
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return (
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+        {raw}
+      </pre>
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return (
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+        {JSON.stringify(parsed, null, 2)}
+      </pre>
+    );
+  }
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        Campos extraídos pela IA
+      </p>
+      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-lg border border-white/[0.06] bg-background/40">
+        {entries.map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2.5">
+            <span className="font-mono text-[11px] text-muted-foreground">{k}</span>
+            <span className="text-xs text-foreground break-words">
+              {v === null || v === undefined
+                ? "—"
+                : typeof v === "object"
+                  ? JSON.stringify(v)
+                  : String(v)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LogsTab({ assistantId }: { assistantId: string }) {
 
   const [limit, setLimit] = useState(50);
