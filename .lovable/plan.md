@@ -1,79 +1,22 @@
+Vou corrigir o player de gravações mantendo a tela atual de Logs.
 
-## Objetivo
+O que está acontecendo:
+- Os áudios existem, porque você consegue ouvir no painel da Vapi.
+- O erro atual não diz que o áudio não existe. Ele vem do nosso proxy: a URL da gravação está em um host `r2.cloudflarestorage.com`, e a validação atual só permite Vapi/Daily/Google/AWS.
+- Como o navegador também pode bloquear o download direto por CORS, precisamos permitir esse host no proxy seguro.
 
-Substituir os mocks das abas **Logs** e **Analysis** em `src/routes/_authenticated/assistants.$id.tsx` por dados reais da API oficial da Vapi, usando dois endpoints:
+Plano de implementação:
+1. Atualizar `fetchRecordingAsDataUrl` em `src/lib/vapi.functions.ts`
+   - Permitir URLs oficiais usadas pela Vapi em Cloudflare R2: `*.r2.cloudflarestorage.com`.
+   - Manter a proteção contra URLs arbitrárias para evitar uso indevido do proxy.
+   - Melhorar a mensagem de erro para ficar clara quando a gravação existir, mas o host ainda não estiver liberado.
 
-- `GET /call?assistantId=...` — lista de chamadas do assistente (o `/logs` foi descontinuado, este é o substituto oficial recomendado no fórum e SDK).
-- `POST /analytics` — agregações oficiais (`sum`, `avg`, `count`) sobre a tabela `call` com `groupBy` e `timeRange`, exatamente como o dashboard da Vapi usa.
+2. Melhorar o `RecordingPlayer` em `src/routes/_authenticated/assistants.$id.tsx`
+   - Continuar tentando carregar direto primeiro.
+   - Se falhar por CORS, usar o proxy do servidor automaticamente.
+   - Mostrar uma mensagem mais amigável: “A gravação existe, mas precisa ser carregada pelo servidor” apenas se ainda houver erro real.
+   - Manter o link “Abrir/baixar áudio original”.
 
-Tudo passa por server functions com `VAPI_PRIVATE_KEY` (nada de chamada direta do navegador).
-
----
-
-## 1) Server functions novas em `src/lib/vapi.functions.ts`
-
-### a) `listAssistantCalls({ assistantId, limit? })`
-- `GET /call?assistantId=<id>&limit=<n>` (default 50, máx 100).
-- Retorna DTO enxuto por chamada (não devolver o objeto cru): `id`, `startedAt`, `endedAt`, `durationSec`, `cost`, `costBreakdown` (stt/llm/tts/vapi/transport), `endedReason`, `status`, `type` (inbound/outbound/web), `customerNumber`, `phoneNumber` (o E.164 do número Vapi), `recordingUrl` (`artifact.recordingUrl` / `stereoRecordingUrl`), `transcript` (`artifact.transcript`), `summary` (`analysis.summary`), `successEvaluation` (`analysis.successEvaluation`), `structuredData` (`analysis.structuredData`).
-
-### b) `getAssistantAnalytics({ assistantId, rangeDays })`
-- `POST /analytics` com um único body carregando várias queries (`table: "call"`, filtradas por assistente via `groupBy: "assistantId"` — a API não tem filtro direto, então filtramos os buckets pelo `assistantId` no retorno).
-- Queries que vamos enviar:
-  1. `totals` — `operations: [count(id), sum(duration), sum(minutesUsed), sum(cost)]`, sem step (total no período).
-  2. `daily` — mesmo `operations`, com `timeRange.step: "day"` para série temporal.
-  3. `byEndedReason` — `groupBy: "endedReason"`, `operations: [count(id)]`.
-  4. `bySuccess` — `groupBy: "analysis.successEvaluation"`, `operations: [count(id)]`.
-  5. `costBreakdown` — `operations: [sum(costBreakdown.stt), sum(costBreakdown.llm), sum(costBreakdown.tts), sum(costBreakdown.vapi), sum(costBreakdown.transport)]`.
-- `timeRange.start` = agora − `rangeDays`, `timeRange.end` = agora, `timezone` = `America/Sao_Paulo`.
-- Retorno DTO: `{ totals, daily: [{date,count,minutes,cost}], endedReasons: [{reason,count}], success: [{label,count}], costBreakdown: {stt,llm,tts,vapi,transport} }`.
-
-Ambas usam `requireSupabaseAuth` e devolvem `{ error }` em vez de lançar quando a Vapi responder 4xx, para a UI mostrar estado vazio sem quebrar.
-
----
-
-## 2) `LogsTab` — dados reais
-
-Substitui `MOCK_LOGS`. Estrutura mantém o card glass atual, só troca o conteúdo:
-
-- `useSuspenseQuery` via `listAssistantCalls({ assistantId })` com `staleTime: 30s` (dá sensação instantânea ao trocar de aba, respeitando o cache global já configurado).
-- Skeleton loader (mesmo padrão das outras abas) enquanto carrega; empty state ("Nenhuma ligação registrada ainda para este assistente") quando `[]`.
-- Colunas: Data/Hora (pt-BR), Origem/Destino (customerNumber → phoneNumber), Duração (`mm:ss`), Custo (`$0.00`), Motivo de término (badge), Ações.
-- Ações por linha:
-  - ▶ **Reproduzir**: abre um `<Dialog>` com `<audio controls src={recordingUrl}>` (funciona pois a Vapi devolve URL curta assinada).
-  - 📄 **Transcrição**: `<Dialog>` mostrando `transcript` em pre-wrap + `summary` acima quando existir.
-- Botão "Atualizar" no header do card chama `queryClient.invalidateQueries`.
-
-Sem paginação nesta primeira versão — só o botão “Carregar mais” incrementando `limit` (50 → 100 → 200).
-
----
-
-## 3) `AnalysisTab` — dados reais + mantém configuração
-
-O que existe hoje (Critério de Sucesso e Extração de Dados) é **configuração do assistente**, não análise. Fica preservado no fim da aba, dentro de uma seção "Configuração da análise". No topo passa a mostrar métricas reais da Vapi.
-
-- `useSuspenseQuery` de `getAssistantAnalytics({ assistantId, rangeDays })`.
-- Seletor de período: **7d / 30d / 90d** (default 7).
-- KPIs (cards glass, 4 colunas): Total de chamadas, Minutos falados, Custo total, Custo médio por minuto (derivado).
-- Gráfico **Volume por dia** (bar chart) usando `recharts` (já disponível no template shadcn) a partir de `daily`.
-- Gráfico **Custo por componente** (pie/stacked bar) a partir de `costBreakdown` (STT/LLM/TTS/Vapi/Transport).
-- Tabela **Motivos de término** (`endedReasons`) — count por `endedReason`, ordenado desc, com badge colorido.
-- Tabela **Avaliação de sucesso** (`success`) — count por valor de `analysis.successEvaluation` (`pass`/`fail`/`unknown`).
-- Estados de erro/vazio explícitos em pt-BR (“Sem chamadas no período selecionado”, “API da Vapi indisponível: <mensagem>”).
-
----
-
-## 4) Detalhes técnicos
-
-- Reaproveita `vapiFetch` de `src/lib/vapi.functions.ts` (já traduz erros para pt-BR).
-- Novas funções ficam em `.functions.ts` (nada de import server-only em cima de rota).
-- Não muda a UI de outras abas nem o preset selector.
-- Sem novas dependências: `recharts` já é usado pelos componentes shadcn `chart`.
-
-### Arquivos afetados
-- `src/lib/vapi.functions.ts` — adiciona `listAssistantCalls`, `getAssistantAnalytics` e tipos DTO.
-- `src/routes/_authenticated/assistants.$id.tsx` — reescreve `LogsTab` e `AnalysisTab` (remove `MOCK_LOGS`), adiciona dialogs de recording/transcript e os gráficos.
-
-### Fora de escopo
-- Filtros avançados (por número, por status).
-- Paginação com cursor.
-- Alterar o preset selector, tools, telefonia ou outras páginas.
+3. Verificar o resultado
+   - Confirmar que o host R2 deixa de ser bloqueado.
+   - Confirmar que o player recebe uma URL/data URL válida para o `<audio>` exibir duração e tocar.
