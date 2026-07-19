@@ -1083,7 +1083,10 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
     return { ok: true as const, callId: res?.id ?? null };
   });
 
-export const createVapiWebCall = createServerFn({ method: "POST" })
+// Retorna a Public Key da Vapi para o SDK do navegador (@vapi-ai/web).
+// Preferimos a Public Key salva no onboarding. Se não houver, geramos um
+// token público temporário restrito somente a esta assistente.
+export const getVapiWebCallToken = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .inputValidator((input: { assistantId: string }) => {
     if (!input?.assistantId) throw new Error("assistantId é obrigatório");
@@ -1091,82 +1094,19 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertOwnership(context.supabase, context.userId, data.assistantId);
-    // /call/web exige uma Public Key da Vapi. Preferimos a chave pública que o
-    // usuário cadastrou no /onboarding; se ela não estiver disponível, caímos
-    // no fallback histórico de gerar um token público temporário via Private
-    // Key (restrito a esta assistente) — mantendo a plataforma funcional
-    // enquanto usuários antigos não configuraram a Public Key.
+
     const savedPublicKey = await loadUserVapiPublicKey(
       context.supabase,
       context.userId,
     );
-
-    let publicKeyValue: string;
-    let usedSavedPublicKey = false;
-    let scopedTokenId: string | null = null;
     if (savedPublicKey) {
-      publicKeyValue = savedPublicKey;
-      usedSavedPublicKey = true;
-    } else {
-      const scoped = await createScopedWebCallPublicToken(data.assistantId);
-      publicKeyValue = scoped.value;
-      scopedTokenId = scoped.id;
+      return { publicKey: savedPublicKey, source: "saved" as const };
     }
 
-    let call: { id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null = null;
-    const createWebCallWithKey = (key: string) =>
-      vapiFetchWithKey(key, "/call/web", {
-        method: "POST",
-        body: JSON.stringify({
-          assistantId: data.assistantId,
-          assistantOverrides: {
-            customerJoinTimeoutSeconds: 60,
-            firstMessageMode: "assistant-speaks-first",
-          },
-        }),
-      }) as Promise<{ id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null>;
-
-
-    try {
-      try {
-        call = await createWebCallWithKey(publicKeyValue);
-      } catch (error) {
-        if (!usedSavedPublicKey || !shouldRetryWebCallWithScopedToken(error)) {
-          throw error;
-        }
-
-        const scoped = await createScopedWebCallPublicToken(data.assistantId);
-        scopedTokenId = scoped.id;
-        try {
-          call = await createWebCallWithKey(scoped.value);
-        } catch (fallbackError) {
-          throw new Error(
-            [
-              "A Public Key da Vapi salva não conseguiu acessar esta assistente.",
-              "Causa provável: a Public Key pertence a outra conta/organização Vapi ou foi copiada incorretamente.",
-              "Como resolver: atualize a Public Key no onboarding usando a mesma conta Vapi da Private Key.",
-              `Detalhe técnico: ${getErrorText(error) || getErrorText(fallbackError)}`,
-            ].join(" "),
-          );
-        }
-      }
-    } finally {
-      if (scopedTokenId) {
-        void vapiFetch(`/token/${scopedTokenId}`, { method: "DELETE" }).catch((error) => {
-          console.warn("Falha ao remover token público temporário da Vapi", error);
-        });
-      }
-    }
-
-    const webCallUrl = call?.webCallUrl ?? call?.transport?.callUrl;
-    if (!webCallUrl) {
-      throw new Error(
-        "A Vapi não retornou a sala da chamada web. Confira se a assistente está configurada com modelo, voz e transcrição.",
-      );
-    }
-
-    return { callId: call?.id ?? null, webCallUrl };
+    const scoped = await createScopedWebCallPublicToken(data.assistantId);
+    return { publicKey: scoped.value, source: "scoped" as const };
   });
+
 
 // List available voices for a given voice provider via Vapi voice-library.
 export interface VapiVoiceOption {
