@@ -91,6 +91,7 @@ export interface VapiAssistantDTO {
   voice?: { provider?: string; voiceId?: string } | null;
   model?: { provider?: string; model?: string } | null;
   firstMessage?: string | null;
+  firstMessageMode?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -139,6 +140,9 @@ function buildPayload(input: AssistantInput) {
   return {
     name: input.name,
     firstMessage: input.firstMessage,
+    firstMessageMode: input.firstMessage?.trim()
+      ? "assistant-speaks-first"
+      : "assistant-speaks-first-with-model-generated-message",
     transcriber: { ...DEFAULT_TRANSCRIBER_BLOCK },
     model: {
       provider: input.modelProvider?.trim() || DEFAULT_MODEL_PROVIDER,
@@ -506,6 +510,7 @@ export const listVapiAssistants = createServerFn({ method: "GET" })
         ? { provider: a.model.provider, model: a.model.model }
         : null,
       firstMessage: a.firstMessage ?? null,
+      firstMessageMode: a.firstMessageMode ?? null,
       createdAt: a.createdAt,
       updatedAt: a.updatedAt,
     }));
@@ -619,7 +624,12 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
     await assertOwnership(context.supabase, context.userId, data.id);
     const body: Record<string, unknown> = {};
     if (typeof data.name === "string") body.name = data.name.trim();
-    if (typeof data.firstMessage === "string") body.firstMessage = data.firstMessage;
+    if (typeof data.firstMessage === "string") {
+      body.firstMessage = data.firstMessage;
+      body.firstMessageMode = data.firstMessage.trim()
+        ? "assistant-speaks-first"
+        : "assistant-speaks-first-with-model-generated-message";
+    }
 
     // Tools live under model.tools on Vapi — if we're patching either the
     // model or the tools array we must send the merged model back whole.
@@ -1111,6 +1121,7 @@ export const createVapiWebCall = createServerFn({ method: "POST" })
           assistantId: data.assistantId,
           assistantOverrides: {
             customerJoinTimeoutSeconds: 60,
+            firstMessageMode: "assistant-speaks-first",
           },
         }),
       }) as Promise<{ id?: string; webCallUrl?: string; transport?: { callUrl?: string } } | null>;
