@@ -5,7 +5,6 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   tanstackStart: {
@@ -14,19 +13,12 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    // Pré-empacota o SDK da Vapi via esbuild para evitar o bug "Class extends
-    // value #<Object> is not a constructor or null" no Rolldown ao herdar de
-    // EventEmitter no navegador.
+    // Pré-empacota o SDK da Vapi e sua dependência `events` (pacote real do npm)
+    // via esbuild para garantir interop CJS/ESM correto e evitar o bug
+    // "Class extends value #<Object> is not a constructor or null" no Rolldown
+    // ao herdar de EventEmitter no navegador.
     optimizeDeps: {
       include: ["@vapi-ai/web", "events"],
-    },
-    resolve: {
-      alias: [
-        {
-          find: /^events$/,
-          replacement: fileURLToPath(new URL("./src/lib/events-shim.ts", import.meta.url)),
-        },
-      ],
     },
     build: {
       rolldownOptions: {
