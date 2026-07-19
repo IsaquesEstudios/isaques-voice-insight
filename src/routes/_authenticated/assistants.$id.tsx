@@ -1331,6 +1331,7 @@ function RecordingPlayer({ url }: { url: string }) {
         const objUrl = URL.createObjectURL(blob);
         revoke = objUrl;
         setBlobUrl(objUrl);
+        setLoading(false);
         return;
       } catch {
         // segue pro proxy
