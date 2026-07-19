@@ -1608,21 +1608,39 @@ function LogsTab({ assistantId }: { assistantId: string }) {
             <p className="text-xs text-muted-foreground">Gravação indisponível para esta ligação.</p>
           )}
           {detail && detailMode === "transcript" && (
-            <div className="space-y-3">
-              {detail.summary && (
-                <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
-                  <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
-                  <p className="text-xs text-foreground">{detail.summary}</p>
-                </div>
-              )}
-              {detail.transcript ? (
-                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
-                  {detail.transcript}
-                </pre>
-              ) : (
-                <p className="text-xs text-muted-foreground">Transcrição indisponível para esta ligação.</p>
-              )}
-            </div>
+            <Tabs defaultValue="transcript" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 border border-white/[0.06] bg-background/40">
+                <TabsTrigger value="transcript" className="text-xs">Transcrição</TabsTrigger>
+                <TabsTrigger value="capture" className="text-xs">
+                  Captura
+                  {detail.structuredData && (
+                    <span className="ml-1.5 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300">
+                      ativo
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="transcript" className="mt-3 space-y-3">
+                {detail.summary && (
+                  <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                    <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                    <p className="text-xs text-foreground">{detail.summary}</p>
+                  </div>
+                )}
+                {detail.transcript ? (
+                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+                    {detail.transcript}
+                  </pre>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Transcrição indisponível para esta ligação.</p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="capture" className="mt-3">
+                <CaptureView raw={detail.structuredData} />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
