@@ -1523,9 +1523,10 @@ function LogsTab({ assistantId }: { assistantId: string }) {
             </DialogDescription>
           </DialogHeader>
           {detail && detailMode === "recording" && detail.recordingUrl && (
-            <audio controls src={detail.recordingUrl} className="w-full">
-              Seu navegador não suporta áudio.
-            </audio>
+            <RecordingPlayer url={detail.recordingUrl} />
+          )}
+          {detail && detailMode === "recording" && !detail.recordingUrl && (
+            <p className="text-xs text-muted-foreground">Gravação indisponível para esta ligação.</p>
           )}
           {detail && detailMode === "transcript" && (
             <div className="space-y-3">
