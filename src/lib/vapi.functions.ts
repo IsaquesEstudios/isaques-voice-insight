@@ -129,6 +129,27 @@ const DEFAULT_TRANSCRIBER_BLOCK = {
   language: "multi",
 } as const;
 
+// Faz com que o resumo da chamada seja gerado no MESMO idioma da transcrição.
+// A Vapi por padrão sempre responde em inglês; forçamos o comportamento via
+// prompt customizado no summaryPlan (documentado em Vapi > Analysis).
+const ANALYSIS_PLAN_SAME_LANGUAGE = {
+  summaryPlan: {
+    enabled: true,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an expert note-taker. You will be given a transcript of a call. Summarize the call in 2-3 sentences. DO NOT return anything except the summary. CRITICAL: Write the summary in the EXACT SAME LANGUAGE spoken in the transcript. If the conversation is in Portuguese, respond in Portuguese. If in Spanish, respond in Spanish. If in English, respond in English. Never translate.",
+      },
+      {
+        role: "user",
+        content:
+          "Here is the transcript:\n\n{{transcript}}\n\nWrite the summary now, in the same language as the transcript:",
+      },
+    ],
+  },
+} as const;
+
 function buildPayload(input: AssistantInput) {
   const voiceProvider = input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER;
   const voiceId = input.voiceId?.trim() || DEFAULT_VOICE_ID;
