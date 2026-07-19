@@ -280,7 +280,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
         const audio = document.createElement("audio");
         audio.autoplay = true;
         audio.muted = false;
-        audio.playsInline = true;
+        audio.setAttribute("playsinline", "true");
         audio.dataset.participantId = participant.session_id ?? "vapi";
         audio.srcObject = new MediaStream([track]);
         document.body.appendChild(audio);
