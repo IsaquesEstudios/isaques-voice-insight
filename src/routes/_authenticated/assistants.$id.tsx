@@ -1322,6 +1322,7 @@ function RecordingPlayer({ url }: { url: string }) {
     setError(null);
     setBlobUrl(null);
     (async () => {
+      // 1) Tenta fetch direto (funciona se o CDN mandar CORS).
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1330,6 +1331,15 @@ function RecordingPlayer({ url }: { url: string }) {
         const objUrl = URL.createObjectURL(blob);
         revoke = objUrl;
         setBlobUrl(objUrl);
+        return;
+      } catch {
+        // segue pro proxy
+      }
+      // 2) Fallback: baixa via server function (contorna CORS).
+      try {
+        const { dataUrl } = await fetchRecordingAsDataUrl({ data: { url } });
+        if (cancelled) return;
+        setBlobUrl(dataUrl);
       } catch (e) {
         if (!cancelled) setError((e as Error).message || "Falha ao carregar áudio");
       } finally {
@@ -1341,6 +1351,7 @@ function RecordingPlayer({ url }: { url: string }) {
       if (revoke) URL.revokeObjectURL(revoke);
     };
   }, [url]);
+
 
   return (
     <div className="space-y-2">
