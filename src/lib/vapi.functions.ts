@@ -178,6 +178,7 @@ function buildPayload(input: AssistantInput) {
       messages: [{ role: "system", content: input.systemPrompt }],
     },
     voice,
+    analysisPlan: { ...ANALYSIS_PLAN_SAME_LANGUAGE },
   };
 }
 
