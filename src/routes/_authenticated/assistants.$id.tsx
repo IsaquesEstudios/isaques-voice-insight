@@ -1309,7 +1309,66 @@ function successBadge(v: string | null): { label: string; className: string } | 
 }
 
 
+function RecordingPlayer({ url }: { url: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let revoke: string | null = null;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setBlobUrl(null);
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        const objUrl = URL.createObjectURL(blob);
+        revoke = objUrl;
+        setBlobUrl(objUrl);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message || "Falha ao carregar áudio");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [url]);
+
+  return (
+    <div className="space-y-2">
+      {loading && <p className="text-xs text-muted-foreground">Carregando gravação...</p>}
+      {error && (
+        <p className="text-xs text-destructive">
+          Não foi possível carregar a gravação ({error}).
+        </p>
+      )}
+      {blobUrl && (
+        <audio controls preload="metadata" src={blobUrl} className="w-full">
+          Seu navegador não suporta áudio.
+        </audio>
+      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-block text-[11px] text-primary underline"
+        download
+      >
+        Abrir/baixar áudio original
+      </a>
+    </div>
+  );
+}
+
 function LogsTab({ assistantId }: { assistantId: string }) {
+
   const [limit, setLimit] = useState(50);
   const [detail, setDetail] = useState<AssistantCallLog | null>(null);
   const [detailMode, setDetailMode] = useState<"transcript" | "recording">("transcript");
