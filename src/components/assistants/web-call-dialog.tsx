@@ -213,7 +213,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       if (typeof Vapi !== "function") {
         throw new Error("Vapi SDK export não é um construtor");
       }
-      const vapi = new Vapi(publicKey);
+      const vapi = new Vapi(publicKey) as VapiInstance;
       vapiRef.current = vapi;
 
       vapi.on("call-start", () => {
