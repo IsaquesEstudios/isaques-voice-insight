@@ -204,8 +204,15 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
 
     // 3. Carrega e inicia o SDK oficial da Vapi.
     try {
-      const mod = await import("@vapi-ai/web");
-      const Vapi = (mod as { default: new (key: string) => VapiInstance }).default;
+      const mod: any = await import("@vapi-ai/web");
+      const Vapi =
+        (typeof mod?.default === "function" && mod.default) ||
+        (typeof mod?.default?.default === "function" && mod.default.default) ||
+        (typeof mod?.Vapi === "function" && mod.Vapi) ||
+        (typeof mod === "function" && mod);
+      if (typeof Vapi !== "function") {
+        throw new Error("Vapi SDK export não é um construtor");
+      }
       const vapi = new Vapi(publicKey);
       vapiRef.current = vapi;
 
