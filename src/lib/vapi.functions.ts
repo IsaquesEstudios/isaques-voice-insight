@@ -1388,7 +1388,8 @@ export interface AssistantCallLog {
   transcript: string | null;
   summary: string | null;
   successEvaluation: string | null;
-  structuredData: Record<string, unknown> | null;
+  // JSON-serializable capture from analysisPlan.structuredDataPlan
+  structuredData: string | null;
 }
 
 export const listAssistantCalls = createServerFn({ method: "POST" })
