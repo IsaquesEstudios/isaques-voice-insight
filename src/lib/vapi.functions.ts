@@ -764,6 +764,9 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
     if (typeof data.backgroundDenoisingEnabled === "boolean")
       body.backgroundDenoisingEnabled = data.backgroundDenoisingEnabled;
 
+    // Garante que o resumo pós-chamada seja gerado no mesmo idioma da conversa.
+    body.analysisPlan = { ...ANALYSIS_PLAN_SAME_LANGUAGE };
+
     return (await vapiFetch(`/assistant/${data.id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
