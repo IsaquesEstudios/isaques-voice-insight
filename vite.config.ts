@@ -13,13 +13,9 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    // Pré-empacota o SDK da Vapi e sua dependência `events` (pacote real do npm)
-    // via esbuild para garantir interop CJS/ESM correto e evitar o bug
-    // "Class extends value #<Object> is not a constructor or null" no Rolldown
-    // ao herdar de EventEmitter no navegador.
-    optimizeDeps: {
-      include: ["@vapi-ai/web", "events"],
-    },
+    // O teste no navegador usa o retorno oficial POST /call/web + Daily.
+    // Não pré-empacotar @vapi-ai/web aqui: o SDK CJS tem interop instável no
+    // build publicado e pode disparar "Class extends value #<Object>".
     build: {
       rolldownOptions: {
         output: {

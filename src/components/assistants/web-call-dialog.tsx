@@ -16,16 +16,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { getVapiWebCallToken } from "@/lib/vapi.functions";
+import { createVapiWebCall } from "@/lib/vapi.functions";
 
-// Tipo mínimo do SDK. Importamos dinamicamente no start para evitar quebrar
-// SSR/bundle e permitir tratamento de erro amigável se o pacote falhar.
-type VapiInstance = {
-  start: (assistantId: string, assistantOverrides?: Record<string, unknown>) => Promise<unknown>;
-  stop: () => void;
+type BrowserCallInstance = {
+  stop: () => void | Promise<void>;
   setMuted: (muted: boolean) => void;
-  on: (event: string, handler: (...args: unknown[]) => void) => void;
-  removeAllListeners?: () => void;
 };
 
 type Status = "idle" | "connecting" | "in_call" | "ended" | "error";
@@ -69,8 +64,8 @@ function formatCallError(error: unknown): string {
 
   if (n.includes("class extends value") || n.includes("is not a constructor")) {
     return [
-      "Problema: o SDK da Vapi carregou com uma incompatibilidade de pacote no navegador.",
-      "Como resolver: publique novamente a versão corrigida e recarregue a página.",
+      "Problema: o SDK antigo da Vapi ainda foi carregado pelo navegador.",
+      "Como resolver: recarregue a página publicada sem cache e teste novamente.",
       `Detalhe técnico: ${detail}`,
     ].join("\n");
   }
@@ -126,30 +121,36 @@ function formatCallError(error: unknown): string {
 }
 
 export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }: Props) {
-  const getTokenFn = useServerFn(getVapiWebCallToken);
+  const createWebCallFn = useServerFn(createVapiWebCall);
 
-  const vapiRef = useRef<VapiInstance | null>(null);
+  const callRef = useRef<BrowserCallInstance | null>(null);
+  const audioElsRef = useRef<HTMLAudioElement[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState<"user" | "assistant" | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
 
-  const tokenMutation = useMutation({
-    mutationFn: () => getTokenFn({ data: { assistantId } }),
+  const webCallMutation = useMutation({
+    mutationFn: () => createWebCallFn({ data: { assistantId } }),
   });
 
   const teardown = () => {
-    const v = vapiRef.current;
-    vapiRef.current = null;
-    if (v) {
+    const activeCall = callRef.current;
+    callRef.current = null;
+    audioElsRef.current.forEach((el) => {
       try {
-        v.stop();
+        el.pause();
+        el.srcObject = null;
+        el.remove();
       } catch {
         /* noop */
       }
+    });
+    audioElsRef.current = [];
+    if (activeCall) {
       try {
-        v.removeAllListeners?.();
+        void activeCall.stop();
       } catch {
         /* noop */
       }
@@ -189,11 +190,11 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       return;
     }
 
-    // 2. Busca a Public Key da Vapi no servidor.
-    let publicKey: string;
+    // 2. Cria a chamada web real na Vapi via servidor e recebe a sala oficial.
+    let webCallUrl: string;
     try {
-      const res = await tokenMutation.mutateAsync();
-      publicKey = res.publicKey;
+      const res = await webCallMutation.mutateAsync();
+      webCallUrl = res.webCallUrl;
     } catch (e) {
       const msg = formatCallError(e);
       setStatus("error");
@@ -202,38 +203,29 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       return;
     }
 
-    // 3. Carrega e inicia o SDK oficial da Vapi.
+    // 3. Entra na sala Daily retornada pela Vapi, sem carregar o SDK problemático.
     try {
-      const mod: any = await import("@vapi-ai/web");
-      const Vapi =
-        (typeof mod?.default === "function" && mod.default) ||
-        (typeof mod?.default?.default === "function" && mod.default.default) ||
-        (typeof mod?.Vapi === "function" && mod.Vapi) ||
-        (typeof mod === "function" && mod);
-      if (typeof Vapi !== "function") {
-        throw new Error("Vapi SDK export não é um construtor");
-      }
-      const vapi = new Vapi(publicKey) as VapiInstance;
-      vapiRef.current = vapi;
+      const dailyMod: any = await import("@daily-co/daily-js");
+      const DailyIframe = dailyMod.default ?? dailyMod;
+      const call = DailyIframe.createCallObject({
+        audioSource: true,
+        videoSource: false,
+      });
 
-      vapi.on("call-start", () => {
-        setStatus("in_call");
-      });
-      vapi.on("call-end", () => {
-        setStatus("ended");
-      });
-      vapi.on("speech-start", () => setSpeaker("assistant"));
-      vapi.on("speech-end", () => setSpeaker(null));
-      vapi.on("volume-level", () => {
-        /* placeholder — poderíamos animar volume aqui */
-      });
-      vapi.on("message", (raw) => {
+      const handleMessage = (raw: unknown) => {
         const message = raw as {
           type?: string;
+          status?: string;
           role?: string;
           transcript?: string;
           transcriptType?: string;
+          endedReason?: string;
         };
+        if (message?.type === "status-update" && message.status === "ended") {
+          setStatus("ended");
+          setSpeaker(null);
+          return;
+        }
         if (
           message?.type === "transcript" &&
           message.transcriptType === "final" &&
@@ -249,16 +241,111 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
             },
           ]);
         }
+      };
+
+      const subscribeToParticipant = (participant: any) => {
+        if (!participant || participant.local || !participant.session_id) return;
+        try {
+          call.updateParticipant(participant.session_id, {
+            setSubscribedTracks: { audio: true, video: false },
+          });
+        } catch {
+          /* noop */
+        }
+      };
+
+      callRef.current = {
+        stop: () => call.destroy(),
+        setMuted: (nextMuted: boolean) => call.setLocalAudio(!nextMuted),
+      };
+
+      call.on("joined-meeting", () => {
+        setStatus("in_call");
+        try {
+          const participants = call.participants?.() ?? {};
+          Object.values(participants).forEach(subscribeToParticipant);
+        } catch {
+          /* noop */
+        }
       });
-      vapi.on("error", (e) => {
-        console.error("[vapi-web] error", e);
+      call.on("left-meeting", () => {
+        setStatus("ended");
+        setSpeaker(null);
+      });
+      call.on("participant-joined", (event: any) => subscribeToParticipant(event?.participant));
+      call.on("track-started", async (event: any) => {
+        const participant = event?.participant;
+        const track = event?.track as MediaStreamTrack | undefined;
+        if (!participant || participant.local || !track || track.kind !== "audio") return;
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.muted = false;
+        audio.setAttribute("playsinline", "true");
+        audio.dataset.participantId = participant.session_id ?? "vapi";
+        audio.srcObject = new MediaStream([track]);
+        document.body.appendChild(audio);
+        audioElsRef.current.push(audio);
+        try {
+          await audio.play();
+        } catch (playError) {
+          console.warn("[vapi-web] autoplay blocked", playError);
+        }
+        try {
+          call.sendAppMessage("playable");
+        } catch {
+          /* noop */
+        }
+      });
+      call.on("participant-left", (event: any) => {
+        const sessionId = event?.participant?.session_id;
+        if (!sessionId) return;
+        audioElsRef.current = audioElsRef.current.filter((audio) => {
+          if (audio.dataset.participantId !== sessionId) return true;
+          audio.remove();
+          return false;
+        });
+      });
+      call.on("remote-participants-audio-level", (event: any) => {
+        const levels = Object.values(event?.participantsAudioLevel ?? {}) as number[];
+        const speaking = levels.some((level) => level > 0.01);
+        if (speaking) {
+          setSpeaker("assistant");
+          window.setTimeout(() => setSpeaker((s) => (s === "assistant" ? null : s)), 1000);
+        }
+      });
+      call.on("app-message", (event: any) => {
+        if (event?.data === "listening") {
+          setStatus("in_call");
+          return;
+        }
+        try {
+          handleMessage(typeof event?.data === "string" ? JSON.parse(event.data) : event?.data);
+        } catch (parseError) {
+          console.warn("[vapi-web] app-message parse failed", parseError);
+        }
+      });
+      call.on("error", (e: unknown) => {
+        console.error("[vapi-web] daily error", e);
         const msg = formatCallError(e);
         setStatus("error");
         setErrorMsg(msg);
         toast.error("Erro na chamada", { description: msg.split("\n")[0] });
       });
 
-      await vapi.start(assistantId);
+      await call.join({ url: webCallUrl, subscribeToTracksAutomatically: false });
+      try {
+        call.startRemoteParticipantsAudioLevelObserver?.(100);
+        call.startLocalAudioLevelObserver?.(100);
+      } catch {
+        /* noop */
+      }
+      try {
+        call.updateInputSettings?.({
+          audio: { processor: { type: "noise-cancellation" } },
+        });
+      } catch {
+        /* noop */
+      }
     } catch (e) {
       console.error("[vapi-web] start threw", e);
       teardown();
@@ -275,10 +362,10 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
   }
 
   function toggleMute() {
-    const v = vapiRef.current;
-    if (!v) return;
+    const activeCall = callRef.current;
+    if (!activeCall) return;
     const next = !muted;
-    v.setMuted(next);
+    activeCall.setMuted(next);
     setMuted(next);
   }
 
@@ -375,10 +462,10 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               </Button>
               <Button
                 onClick={startCall}
-                disabled={tokenMutation.isPending}
+                disabled={webCallMutation.isPending}
                 className="gap-2"
               >
-                {tokenMutation.isPending ? (
+                {webCallMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <PhoneCall className="h-4 w-4" />

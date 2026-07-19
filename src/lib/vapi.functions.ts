@@ -1083,10 +1083,10 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
     return { ok: true as const, callId: res?.id ?? null };
   });
 
-// Retorna a Public Key da Vapi para o SDK do navegador (@vapi-ai/web).
-// Preferimos a Public Key salva no onboarding. Se não houver, geramos um
-// token público temporário restrito somente a esta assistente.
-export const getVapiWebCallToken = createServerFn({ method: "POST" })
+// Cria uma chamada web oficial na Vapi.
+// A documentação do Web SDK mostra que o fluxo real faz POST /call/web e
+// retorna `webCallUrl`; o navegador deve entrar nessa sala para ouvir/falar.
+export const createVapiWebCall = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .inputValidator((input: { assistantId: string }) => {
     if (!input?.assistantId) throw new Error("assistantId é obrigatório");
@@ -1099,12 +1099,54 @@ export const getVapiWebCallToken = createServerFn({ method: "POST" })
       context.supabase,
       context.userId,
     );
-    if (savedPublicKey) {
-      return { publicKey: savedPublicKey, source: "saved" as const };
+    let publicKey = savedPublicKey;
+    let source: "saved" | "scoped" = "saved";
+    if (!publicKey) {
+      const scoped = await createScopedWebCallPublicToken(data.assistantId);
+      publicKey = scoped.value;
+      source = "scoped";
     }
 
-    const scoped = await createScopedWebCallPublicToken(data.assistantId);
-    return { publicKey: scoped.value, source: "scoped" as const };
+    const payload = {
+      assistantId: data.assistantId,
+      roomDeleteOnUserLeaveEnabled: true,
+    };
+
+    const createWithKey = (key: string) =>
+      vapiFetchWithKey(key, "/call/web", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }) as Promise<{
+        id?: string;
+        webCallUrl?: string;
+        assistant?: { name?: string; voice?: { provider?: string } };
+        artifactPlan?: { videoRecordingEnabled?: boolean };
+      } | null>;
+
+    let webCall: Awaited<ReturnType<typeof createWithKey>>;
+    try {
+      webCall = await createWithKey(publicKey);
+    } catch (error) {
+      if (!savedPublicKey || !shouldRetryWebCallWithScopedToken(error)) throw error;
+      const scoped = await createScopedWebCallPublicToken(data.assistantId);
+      publicKey = scoped.value;
+      source = "scoped";
+      webCall = await createWithKey(publicKey);
+    }
+
+    if (!webCall?.webCallUrl) {
+      throw new Error(
+        "A Vapi criou a chamada web, mas não retornou a URL da sala (webCallUrl). Tente novamente em instantes.",
+      );
+    }
+
+    return {
+      id: webCall.id ?? null,
+      webCallUrl: webCall.webCallUrl,
+      assistant: webCall.assistant ?? null,
+      artifactPlan: webCall.artifactPlan ?? null,
+      source,
+    };
   });
 
 
