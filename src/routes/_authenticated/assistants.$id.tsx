@@ -1310,7 +1310,7 @@ function successBadge(v: string | null): { label: string; className: string } | 
 }
 
 
-function RecordingPlayer({ url }: { url: string }) {
+function RecordingPlayer({ url, callId }: { url?: string | null; callId: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1322,23 +1322,25 @@ function RecordingPlayer({ url }: { url: string }) {
     setError(null);
     setBlobUrl(null);
     (async () => {
-      // 1) Tenta fetch direto (funciona se o CDN mandar CORS).
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        if (cancelled) return;
-        const objUrl = URL.createObjectURL(blob);
-        revoke = objUrl;
-        setBlobUrl(objUrl);
-        setLoading(false);
-        return;
-      } catch {
-        // segue pro proxy
+      if (url) {
+        // 1) Tenta fetch direto (funciona se o CDN mandar CORS).
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          if (cancelled) return;
+          const objUrl = URL.createObjectURL(blob);
+          revoke = objUrl;
+          setBlobUrl(objUrl);
+          setLoading(false);
+          return;
+        } catch {
+          // segue pro proxy oficial da Vapi
+        }
       }
-      // 2) Fallback: baixa via server function (contorna CORS).
+      // 2) Fallback: baixa via endpoint oficial da Vapi com o ID da chamada.
       try {
-        const { dataUrl } = await fetchRecordingAsDataUrl({ data: { url } });
+        const { dataUrl } = await fetchRecordingAsDataUrl({ data: { url: url ?? undefined, callId } });
         if (cancelled) return;
         setBlobUrl(dataUrl);
       } catch (e) {
@@ -1351,7 +1353,7 @@ function RecordingPlayer({ url }: { url: string }) {
       cancelled = true;
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [url]);
+  }, [url, callId]);
 
 
   return (
@@ -1370,15 +1372,17 @@ function RecordingPlayer({ url }: { url: string }) {
           Seu navegador não suporta áudio.
         </audio>
       )}
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-block text-[11px] text-primary underline"
-        download
-      >
-        Abrir/baixar áudio original
-      </a>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block text-[11px] text-primary underline"
+          download
+        >
+          Abrir/baixar áudio original
+        </a>
+      )}
     </div>
   );
 }
@@ -1541,7 +1545,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
                             variant="ghost"
                             className="h-8 w-8 hover:text-primary disabled:opacity-30"
                             aria-label="Reproduzir áudio"
-                            disabled={!row.recordingUrl}
+                            disabled={!row.id}
                             onClick={() => {
                               setDetail(row);
                               setDetailMode("recording");
@@ -1597,10 +1601,10 @@ function LogsTab({ assistantId }: { assistantId: string }) {
               {detail?.customerNumber ? ` · ${detail.customerNumber}` : ""}
             </DialogDescription>
           </DialogHeader>
-          {detail && detailMode === "recording" && detail.recordingUrl && (
-            <RecordingPlayer url={detail.recordingUrl} />
+          {detail && detailMode === "recording" && detail.id && (
+            <RecordingPlayer url={detail.recordingUrl} callId={detail.id} />
           )}
-          {detail && detailMode === "recording" && !detail.recordingUrl && (
+          {detail && detailMode === "recording" && !detail.id && (
             <p className="text-xs text-muted-foreground">Gravação indisponível para esta ligação.</p>
           )}
           {detail && detailMode === "transcript" && (
