@@ -1358,9 +1358,12 @@ function RecordingPlayer({ url }: { url: string }) {
     <div className="space-y-2">
       {loading && <p className="text-xs text-muted-foreground">Carregando gravação...</p>}
       {error && (
-        <p className="text-xs text-destructive">
-          Não foi possível carregar a gravação ({error}).
-        </p>
+        <div className="space-y-1 rounded-md border border-destructive/20 bg-destructive/10 p-3">
+          <p className="text-xs font-medium text-destructive">Não foi possível carregar a gravação.</p>
+          <p className="text-[11px] text-destructive/90">
+            O áudio foi encontrado na Vapi, mas não pôde ser carregado pelo player agora: {error}
+          </p>
+        </div>
       )}
       {blobUrl && (
         <audio controls preload="metadata" src={blobUrl} className="w-full">

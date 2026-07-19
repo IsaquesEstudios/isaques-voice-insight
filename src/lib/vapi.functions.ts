@@ -1712,16 +1712,16 @@ export const fetchRecordingAsDataUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({ url: z.string().url() }).parse(data))
   .handler(async ({ data }) => {
-    // Aceita apenas hosts oficiais da Vapi/Daily para evitar SSRF.
+    // Aceita apenas hosts oficiais usados pela Vapi/Daily para evitar SSRF.
     let host: string;
     try {
       host = new URL(data.url).hostname;
     } catch {
       throw new Error("URL inválida");
     }
-    const allowed = /(^|\.)vapi\.ai$|(^|\.)daily\.co$|storage\.googleapis\.com$|(^|\.)vapi-public\.[a-z0-9-]+\.amazonaws\.com$|(^|\.)amazonaws\.com$/i;
+    const allowed = /(^|\.)vapi\.ai$|(^|\.)daily\.co$|storage\.googleapis\.com$|(^|\.)r2\.cloudflarestorage\.com$|(^|\.)vapi-public\.[a-z0-9-]+\.amazonaws\.com$|(^|\.)amazonaws\.com$/i;
     if (!allowed.test(host)) {
-      throw new Error(`Host não permitido: ${host}`);
+      throw new Error(`A gravação existe, mas o domínio do arquivo ainda não está liberado para reprodução segura (${host}).`);
     }
     const res = await fetch(data.url);
     if (!res.ok) {
