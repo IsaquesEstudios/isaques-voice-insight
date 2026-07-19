@@ -1558,7 +1558,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
                             variant="ghost"
                             className="h-8 w-8 hover:text-primary disabled:opacity-30"
                             aria-label="Ver transcrição"
-                            disabled={!row.transcript && !row.summary}
+                            disabled={!row.transcript && !row.summary && !row.structuredData}
                             onClick={() => {
                               setDetail(row);
                               setDetailMode("transcript");
