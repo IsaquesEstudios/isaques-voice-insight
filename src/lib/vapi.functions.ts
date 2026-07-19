@@ -1708,7 +1708,39 @@ export const disconnectVapi = createServerFn({ method: "POST" })
  * Combined onboarding status — used pelo gate para redirecionar ao /onboarding.
  * Não usa `withVapiCredentials` porque precisa funcionar antes das chaves existirem.
  */
+export const fetchRecordingAsDataUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({ url: z.string().url() }).parse(data))
+  .handler(async ({ data }) => {
+    // Aceita apenas hosts oficiais da Vapi/Daily para evitar SSRF.
+    let host: string;
+    try {
+      host = new URL(data.url).hostname;
+    } catch {
+      throw new Error("URL inválida");
+    }
+    const allowed = /(^|\.)vapi\.ai$|(^|\.)daily\.co$|storage\.googleapis\.com$|(^|\.)vapi-public\.[a-z0-9-]+\.amazonaws\.com$|(^|\.)amazonaws\.com$/i;
+    if (!allowed.test(host)) {
+      throw new Error(`Host não permitido: ${host}`);
+    }
+    const res = await fetch(data.url);
+    if (!res.ok) {
+      throw new Error(`Falha ao baixar gravação (HTTP ${res.status})`);
+    }
+    const contentType = res.headers.get("content-type") ?? "audio/wav";
+    const buf = new Uint8Array(await res.arrayBuffer());
+    // btoa não aceita chunks grandes; codifica em blocos.
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < buf.length; i += chunk) {
+      binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+    }
+    const base64 = btoa(binary);
+    return { dataUrl: `data:${contentType};base64,${base64}`, contentType, bytes: buf.length };
+  });
+
 export const getSetupStatus = createServerFn({ method: "GET" })
+
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const [vapiRes, twilioRes] = await Promise.all([
