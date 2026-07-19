@@ -1387,6 +1387,60 @@ function RecordingPlayer({ url, callId }: { url?: string | null; callId: string 
   );
 }
 
+function CaptureView({ raw }: { raw: string | null }) {
+  if (!raw) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-background/20 p-8 text-center">
+        <FileText className="h-5 w-5 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">Nenhum dado capturado</p>
+        <p className="max-w-sm text-xs text-muted-foreground">
+          Configure os campos em <span className="text-foreground">Analysis → Structured Outputs</span>{" "}
+          para que a IA extraia dados desta ligação (nome, telefone, status de agendamento, etc.).
+        </p>
+      </div>
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return (
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+        {raw}
+      </pre>
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return (
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+        {JSON.stringify(parsed, null, 2)}
+      </pre>
+    );
+  }
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        Campos extraídos pela IA
+      </p>
+      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-lg border border-white/[0.06] bg-background/40">
+        {entries.map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2.5">
+            <span className="font-mono text-[11px] text-muted-foreground">{k}</span>
+            <span className="text-xs text-foreground break-words">
+              {v === null || v === undefined
+                ? "—"
+                : typeof v === "object"
+                  ? JSON.stringify(v)
+                  : String(v)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LogsTab({ assistantId }: { assistantId: string }) {
 
   const [limit, setLimit] = useState(50);
@@ -1558,7 +1612,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
                             variant="ghost"
                             className="h-8 w-8 hover:text-primary disabled:opacity-30"
                             aria-label="Ver transcrição"
-                            disabled={!row.transcript && !row.summary}
+                            disabled={!row.transcript && !row.summary && !row.structuredData}
                             onClick={() => {
                               setDetail(row);
                               setDetailMode("transcript");
@@ -1608,21 +1662,39 @@ function LogsTab({ assistantId }: { assistantId: string }) {
             <p className="text-xs text-muted-foreground">Gravação indisponível para esta ligação.</p>
           )}
           {detail && detailMode === "transcript" && (
-            <div className="space-y-3">
-              {detail.summary && (
-                <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
-                  <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
-                  <p className="text-xs text-foreground">{detail.summary}</p>
-                </div>
-              )}
-              {detail.transcript ? (
-                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
-                  {detail.transcript}
-                </pre>
-              ) : (
-                <p className="text-xs text-muted-foreground">Transcrição indisponível para esta ligação.</p>
-              )}
-            </div>
+            <Tabs defaultValue="transcript" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 border border-white/[0.06] bg-background/40">
+                <TabsTrigger value="transcript" className="text-xs">Transcrição</TabsTrigger>
+                <TabsTrigger value="capture" className="text-xs">
+                  Captura
+                  {detail.structuredData && (
+                    <span className="ml-1.5 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300">
+                      ativo
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="transcript" className="mt-3 space-y-3">
+                {detail.summary && (
+                  <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                    <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                    <p className="text-xs text-foreground">{detail.summary}</p>
+                  </div>
+                )}
+                {detail.transcript ? (
+                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+                    {detail.transcript}
+                  </pre>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Transcrição indisponível para esta ligação.</p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="capture" className="mt-3">
+                <CaptureView raw={detail.structuredData} />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

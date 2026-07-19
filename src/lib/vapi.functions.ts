@@ -129,6 +129,27 @@ const DEFAULT_TRANSCRIBER_BLOCK = {
   language: "multi",
 } as const;
 
+// Faz com que o resumo da chamada seja gerado no MESMO idioma da transcrição.
+// A Vapi por padrão sempre responde em inglês; forçamos o comportamento via
+// prompt customizado no summaryPlan (documentado em Vapi > Analysis).
+const ANALYSIS_PLAN_SAME_LANGUAGE = {
+  summaryPlan: {
+    enabled: true,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an expert note-taker. You will be given a transcript of a call. Summarize the call in 2-3 sentences. DO NOT return anything except the summary. CRITICAL: Write the summary in the EXACT SAME LANGUAGE spoken in the transcript. If the conversation is in Portuguese, respond in Portuguese. If in Spanish, respond in Spanish. If in English, respond in English. Never translate.",
+      },
+      {
+        role: "user",
+        content:
+          "Here is the transcript:\n\n{{transcript}}\n\nWrite the summary now, in the same language as the transcript:",
+      },
+    ],
+  },
+} as const;
+
 function buildPayload(input: AssistantInput) {
   const voiceProvider = input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER;
   const voiceId = input.voiceId?.trim() || DEFAULT_VOICE_ID;
@@ -157,6 +178,7 @@ function buildPayload(input: AssistantInput) {
       messages: [{ role: "system", content: input.systemPrompt }],
     },
     voice,
+    analysisPlan: { ...ANALYSIS_PLAN_SAME_LANGUAGE },
   };
 }
 
@@ -741,6 +763,9 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       body.backgroundSound = data.backgroundSound;
     if (typeof data.backgroundDenoisingEnabled === "boolean")
       body.backgroundDenoisingEnabled = data.backgroundDenoisingEnabled;
+
+    // Garante que o resumo pós-chamada seja gerado no mesmo idioma da conversa.
+    body.analysisPlan = { ...ANALYSIS_PLAN_SAME_LANGUAGE };
 
     return (await vapiFetch(`/assistant/${data.id}`, {
       method: "PATCH",
@@ -1363,6 +1388,8 @@ export interface AssistantCallLog {
   transcript: string | null;
   summary: string | null;
   successEvaluation: string | null;
+  // JSON-serializable capture from analysisPlan.structuredDataPlan
+  structuredData: string | null;
 }
 
 export const listAssistantCalls = createServerFn({ method: "POST" })
@@ -1440,6 +1467,10 @@ export const listAssistantCalls = createServerFn({ method: "POST" })
         transcript: artifact ? str(artifact.transcript) : null,
         summary: analysis ? str(analysis.summary) : null,
         successEvaluation: analysis ? str(analysis.successEvaluation) : null,
+        structuredData:
+          analysis && analysis.structuredData && typeof analysis.structuredData === "object"
+            ? JSON.stringify(analysis.structuredData)
+            : null,
       };
     });
 
