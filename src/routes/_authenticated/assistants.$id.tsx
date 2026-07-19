@@ -5933,139 +5933,171 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
   );
 }
 
-function AnalysisTab({ assistantId }: { assistantId: string }) {
-
-  const [successCriteria, setSuccessCriteria] = useState(
-    "A ligação é considerada bem-sucedida quando o lead demonstra interesse claro no produto e concorda em receber um contato do time comercial.",
-  );
-  const [fields, setFields] = useState<SchemaField[]>([
-    { id: "f1", name: "nome", type: "string", description: "Nome completo do lead" },
-    { id: "f2", name: "email", type: "string", description: "E-mail principal para contato" },
-    { id: "f3", name: "orcamento", type: "number", description: "Orçamento estimado em BRL" },
-  ]);
+function AnalysisTab({ assistantId: _assistantId }: { assistantId: string }) {
+  const [fields, setFields] = useState<SchemaField[]>([]);
+  const [monitorsOpen, setMonitorsOpen] = useState(true);
 
   function addField() {
     setFields((prev) => [
       ...prev,
-      {
-        id: `f${Date.now()}`,
-        name: "",
-        type: "string",
-        description: "",
-      },
+      { id: `f${Date.now()}`, name: "", type: "string", description: "" },
     ]);
   }
-
   function updateField(id: string, patch: Partial<SchemaField>) {
     setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   }
-
   function removeField(id: string) {
     setFields((prev) => prev.filter((f) => f.id !== id));
   }
 
   return (
     <div className="space-y-6">
-      <AnalyticsPanel assistantId={assistantId} />
-
-      <div className="space-y-1 pt-2">
-        <h2 className="text-sm font-semibold text-foreground">Configuração da análise</h2>
-        <p className="text-xs text-muted-foreground">
-          Regras que a Vapi usa para avaliar automaticamente cada ligação.
-        </p>
-      </div>
-
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-
-        <CardContent className="space-y-4 p-6">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Critério de Sucesso</h2>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Descreva em linguagem natural quando a IA deve marcar a ligação como convertida.
-          </p>
-          <Textarea
-            rows={5}
-            value={successCriteria}
-            onChange={(e) => setSuccessCriteria(e.target.value)}
-            className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
-          />
-        </CardContent>
-      </Card>
-
+      {/* Structured Outputs */}
       <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
         <CardContent className="space-y-4 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">Extração de Dados</h2>
+              <h2 className="text-sm font-semibold text-foreground">Structured Outputs</h2>
               <p className="text-xs text-muted-foreground">
-                Campos que a IA deve capturar automaticamente durante a chamada.
+                Extraia campos das chamadas para relatórios, automações e scorecards.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={addField} className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addField}
+              className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+            >
               <Plus className="h-3.5 w-3.5" />
-              Adicionar Campo
+              Add Field
             </Button>
           </div>
 
-          <div className="space-y-2">
-            <div className="hidden grid-cols-[1fr_140px_1.5fr_40px] gap-2 px-1 text-[10px] uppercase tracking-wide text-muted-foreground md:grid">
-              <span>Nome do campo</span>
-              <span>Tipo</span>
-              <span>Descrição</span>
-              <span />
-            </div>
-            {fields.length === 0 && (
-              <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 p-4 text-center text-xs text-muted-foreground">
-                Nenhum campo definido. Clique em "Adicionar Campo" para começar.
+          {fields.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-background/20 p-10 text-center">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Nenhum campo sendo extraído ainda</p>
+              <p className="max-w-md text-xs text-muted-foreground">
+                Crie um structured output para capturar detalhes da ligação como status de agendamento,
+                informações do cliente ou serviços solicitados.
               </p>
-            )}
-            {fields.map((field) => (
-              <div
-                key={field.id}
-                className="grid grid-cols-1 gap-2 rounded-xl border border-white/[0.06] bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_40px]"
-              >
-                <Input
-                  value={field.name}
-                  onChange={(e) => updateField(field.id, { name: e.target.value })}
-                  placeholder="ex: telefone"
-                  className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                />
-                <Select
-                  value={field.type}
-                  onValueChange={(v) =>
-                    updateField(field.id, { type: v as SchemaField["type"] })
-                  }
-                >
-                  <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                    <SelectItem value="string">string</SelectItem>
-                    <SelectItem value="number">number</SelectItem>
-                    <SelectItem value="boolean">boolean</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={field.description}
-                  onChange={(e) => updateField(field.id, { description: e.target.value })}
-                  placeholder="Explique o que a IA deve capturar"
-                  className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => removeField(field.id)}
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                  aria-label="Remover campo"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="hidden grid-cols-[1fr_140px_1.5fr_40px] gap-2 px-1 text-[10px] uppercase tracking-wide text-muted-foreground md:grid">
+                <span>Nome do campo</span>
+                <span>Tipo</span>
+                <span>Descrição</span>
+                <span />
               </div>
-            ))}
-          </div>
+              {fields.map((field) => (
+                <div
+                  key={field.id}
+                  className="grid grid-cols-1 gap-2 rounded-xl border border-white/[0.06] bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_40px]"
+                >
+                  <Input
+                    value={field.name}
+                    onChange={(e) => updateField(field.id, { name: e.target.value })}
+                    placeholder="ex: telefone"
+                    className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                  />
+                  <Select
+                    value={field.type}
+                    onValueChange={(v) => updateField(field.id, { type: v as SchemaField["type"] })}
+                  >
+                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                      <SelectItem value="string">string</SelectItem>
+                      <SelectItem value="number">number</SelectItem>
+                      <SelectItem value="boolean">boolean</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={field.description}
+                    onChange={(e) => updateField(field.id, { description: e.target.value })}
+                    placeholder="Explique o que a IA deve capturar"
+                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeField(field.id)}
+                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                    aria-label="Remover campo"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
+      </Card>
+
+      {/* Scorecard */}
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardContent className="space-y-4 p-6">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Scorecard</h2>
+            <p className="text-xs text-muted-foreground">
+              Avalie chamadas automaticamente usando structured outputs booleanos ou numéricos.
+            </p>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Anexe um scorecard para pontuar as chamadas com base nos structured outputs deste assistente.
+          </p>
+
+          <button
+            type="button"
+            className="w-full rounded-xl border border-dashed border-white/[0.1] bg-background/20 p-4 text-left transition hover:bg-background/30"
+          >
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="text-sm font-semibold text-foreground">Criar novo scorecard</span>
+            </div>
+            <div className="mt-1 flex items-center gap-1 pl-3.5 text-xs text-muted-foreground">
+              <Plus className="h-3 w-3" /> Novo
+            </div>
+          </button>
+        </CardContent>
+      </Card>
+
+      {/* Attached Monitors */}
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Collapsible open={monitorsOpen} onOpenChange={setMonitorsOpen}>
+          <CardContent className="space-y-4 p-6">
+            <CollapsibleTrigger className="flex w-full items-start justify-between gap-3 text-left">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Monitores Anexados</h2>
+                <p className="text-xs text-muted-foreground">
+                  Supervisione o desempenho das ligações do agente em múltiplas categorias.
+                </p>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                  monitorsOpen && "rotate-180",
+                )}
+              />
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-white/[0.08] bg-background/30 backdrop-blur-xl"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Adicionar monitor
+              </Button>
+              <div className="rounded-xl border border-white/[0.06] bg-background/20 p-6 text-center text-xs text-muted-foreground">
+                Nenhum monitor anexado a este assistente
+              </div>
+            </CollapsibleContent>
+          </CardContent>
+        </Collapsible>
       </Card>
     </div>
   );
