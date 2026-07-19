@@ -38,10 +38,20 @@ export function initSupabaseBrowser(url: string, anonKey: string): SupabaseClien
 }
 
 export function getSupabaseBrowser(): SupabaseClient {
-  if (!_client) {
-    throw new Error(
-      "Supabase browser client not initialized. Ensure __root.tsx loader runs first.",
-    );
+  if (_client) return _client;
+  // Fallback de auto-init no browser: o loader de __root.tsx roda no servidor
+  // durante SSR e o estado do módulo NÃO é transferido ao cliente na
+  // hidratação inicial. Sem esse fallback, o beforeLoad de rotas filhas
+  // (ex.: _authenticated) explode antes do RootComponent montar e chamar
+  // initSupabaseBrowser. Usamos as VITE_* que já são embutidas no bundle.
+  if (typeof window !== "undefined") {
+    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+    if (url && key) {
+      return initSupabaseBrowser(url, key);
+    }
   }
-  return _client;
+  throw new Error(
+    "Supabase browser client not initialized. Ensure __root.tsx loader runs first.",
+  );
 }
