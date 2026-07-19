@@ -368,10 +368,10 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               </Button>
               <Button
                 onClick={startCall}
-                disabled={tokenMutation.isPending || status === "connecting"}
+                disabled={tokenMutation.isPending}
                 className="gap-2"
               >
-                {tokenMutation.isPending || status === "connecting" ? (
+                {tokenMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <PhoneCall className="h-4 w-4" />
