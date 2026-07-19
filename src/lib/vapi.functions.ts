@@ -1711,8 +1711,7 @@ export const disconnectVapi = createServerFn({ method: "POST" })
 export const fetchRecordingAsDataUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({ url: z.string().url() }).parse(data))
-  .handler(async ({ data }) => {
-    // Aceita apenas hosts oficiais usados pela Vapi/Daily para evitar SSRF.
+  .handler(async ({ data, context }) => {
     let host: string;
     try {
       host = new URL(data.url).hostname;
@@ -1723,13 +1722,54 @@ export const fetchRecordingAsDataUrl = createServerFn({ method: "POST" })
     if (!allowed.test(host)) {
       throw new Error(`A gravação existe, mas o domínio do arquivo ainda não está liberado para reprodução segura (${host}).`);
     }
-    const res = await fetch(data.url);
+
+    // Gravações HIPAA da Vapi ficam num R2 privado; a URL crua retorna 400.
+    // Peça à Vapi um link assinado via GET /call/{id} (o recordingUrl volta com querystring de assinatura).
+    const { data: cred } = await context.supabase
+      .from("user_vapi_credentials")
+      .select("private_key")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const privateKey = (cred as { private_key?: string } | null)?.private_key;
+
+    let fetchUrl = data.url;
+
+    // Se for uma URL R2 sem assinatura, tente resolver via API da Vapi.
+    const isR2 = /r2\.cloudflarestorage\.com$/i.test(host);
+    const hasSignature = /[?&]X-Amz-Signature=/i.test(data.url);
+    if (isR2 && !hasSignature && privateKey) {
+      // Extrai o callId do path: .../hipaa-recordings/<callId>-<timestamp>-<uuid>-mono.wav
+      const m = data.url.match(/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i);
+      const callId = m?.[1];
+      if (callId) {
+        try {
+          const callRes = await fetch(`https://api.vapi.ai/call/${callId}`, {
+            headers: { Authorization: `Bearer ${privateKey}` },
+          });
+          if (callRes.ok) {
+            const call = (await callRes.json()) as {
+              recordingUrl?: string;
+              artifact?: { recordingUrl?: string };
+            };
+            const signed = call.artifact?.recordingUrl ?? call.recordingUrl;
+            if (signed && /[?&]X-Amz-Signature=/i.test(signed)) {
+              fetchUrl = signed;
+            }
+          }
+        } catch {
+          // ignora — cairemos no fetch direto abaixo
+        }
+      }
+    }
+
+    const res = await fetch(fetchUrl);
     if (!res.ok) {
-      throw new Error(`Falha ao baixar gravação (HTTP ${res.status})`);
+      throw new Error(
+        `Falha ao baixar gravação (HTTP ${res.status}). Gravações HIPAA da Vapi expiram rapidamente — recarregue a lista de logs e tente de novo, ou abra pelo painel da Vapi.`,
+      );
     }
     const contentType = res.headers.get("content-type") ?? "audio/wav";
     const buf = new Uint8Array(await res.arrayBuffer());
-    // btoa não aceita chunks grandes; codifica em blocos.
     let binary = "";
     const chunk = 0x8000;
     for (let i = 0; i < buf.length; i += chunk) {
