@@ -64,8 +64,11 @@ import {
   updateVapiAssistant,
   deleteVapiAssistant,
   duplicateVapiAssistant,
+  getAssistantCardSummary,
   type VapiAssistantDTO,
+  type AssistantCardSummary,
 } from "@/lib/vapi.functions";
+
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/assistentes")({
