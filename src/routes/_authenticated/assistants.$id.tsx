@@ -6008,21 +6008,91 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
   );
 }
 
-function AnalysisTab({ assistantId: _assistantId }: { assistantId: string }) {
+function AnalysisTab({ assistantId }: { assistantId: string }) {
   const [fields, setFields] = useState<SchemaField[]>([]);
+  const [dirty, setDirty] = useState<Record<string, boolean>>({});
+  const [savingAll, setSavingAll] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [monitorsOpen, setMonitorsOpen] = useState(true);
 
+  const loadSchema = useServerFn(getAssistantStructuredSchema);
+  const saveSchema = useServerFn(updateAssistantStructuredSchema);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await loadSchema({ data: { assistantId } });
+        if (cancelled) return;
+        setFields(
+          r.fields.map((f, i) => ({
+            id: `f${i}-${f.name}`,
+            name: f.name,
+            type: f.type,
+            description: f.description,
+          })),
+        );
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assistantId, loadSchema]);
+
+  async function persist(next: SchemaField[]) {
+    setSavingAll(true);
+    try {
+      await saveSchema({
+        data: {
+          assistantId,
+          fields: next.map((f) => ({
+            name: f.name,
+            type: f.type,
+            description: f.description,
+          })),
+        },
+      });
+      setDirty({});
+      toast.success("Structured Outputs salvos na Vapi.");
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar na Vapi.");
+    } finally {
+      setSavingAll(false);
+    }
+  }
+
   function addField() {
-    setFields((prev) => [
-      ...prev,
-      { id: `f${Date.now()}`, name: "", type: "string", description: "" },
-    ]);
+    setFields((prev) => {
+      const id = `f${Date.now()}`;
+      setDirty((d) => ({ ...d, [id]: true }));
+      return [...prev, { id, name: "", type: "string", description: "" }];
+    });
   }
   function updateField(id: string, patch: Partial<SchemaField>) {
     setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+    setDirty((d) => ({ ...d, [id]: true }));
   }
-  function removeField(id: string) {
-    setFields((prev) => prev.filter((f) => f.id !== id));
+  async function confirmField(id: string) {
+    const target = fields.find((f) => f.id === id);
+    if (!target || !target.name.trim()) {
+      toast.error("Informe um nome para o campo.");
+      return;
+    }
+    await persist(fields);
+  }
+  async function removeField(id: string) {
+    const next = fields.filter((f) => f.id !== id);
+    setFields(next);
+    setDirty((d) => {
+      const { [id]: _drop, ...rest } = d;
+      return rest;
+    });
+    await persist(next);
   }
 
   return (
