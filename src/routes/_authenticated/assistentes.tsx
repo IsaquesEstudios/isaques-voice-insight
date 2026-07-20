@@ -621,7 +621,7 @@ function AssistentesPage() {
                         Sucesso
                       </p>
                       <p className="mt-0.5 text-sm font-semibold text-foreground">
-                        {metrics.successRate > 0 ? `${metrics.successRate}%` : "—"}
+                        {metrics.successRate != null ? `${metrics.successRate}%` : "—"}
                       </p>
                     </div>
                     <div>
