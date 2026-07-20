@@ -1981,18 +1981,65 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
     const raw = (await vapiFetch(`/assistant/${data.assistantId}`, { method: "GET" })) as
       | Record<string, unknown>
       | null;
-    const plan = (raw?.analysisPlan as Record<string, unknown> | undefined)?.structuredDataPlan as
-      | Record<string, unknown>
-      | undefined;
-    const schema = plan?.schema as Record<string, unknown> | undefined;
-    const properties = (schema?.properties ?? {}) as Record<string, { type?: string; description?: string }>;
-    const fields: StructuredSchemaField[] = Object.entries(properties).map(([name, def]) => ({
-      name,
-      type: (def?.type === "number" || def?.type === "boolean" ? def.type : "string") as StructuredSchemaField["type"],
-      description: typeof def?.description === "string" ? def.description : "",
-    }));
+    const analysisPlan = (raw?.analysisPlan as Record<string, unknown> | undefined) ?? {};
+
+    const normalizeType = (t: unknown): StructuredSchemaField["type"] =>
+      t === "number" || t === "integer" ? "number" : t === "boolean" ? "boolean" : "string";
+
+    const fields: StructuredSchemaField[] = [];
+    const seen = new Set<string>();
+    const pushField = (name: string, def: { type?: unknown; description?: unknown } | undefined) => {
+      const key = (name ?? "").trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      fields.push({
+        name: key,
+        type: normalizeType(def?.type),
+        description: typeof def?.description === "string" ? def.description : "",
+      });
+    };
+
+    // 1) Legacy single-schema: analysisPlan.structuredDataPlan.schema.properties
+    const singlePlan = analysisPlan.structuredDataPlan as Record<string, unknown> | undefined;
+    const singleSchema = singlePlan?.schema as Record<string, unknown> | undefined;
+    const singleProps = (singleSchema?.properties ?? {}) as Record<
+      string,
+      { type?: unknown; description?: unknown }
+    >;
+    for (const [name, def] of Object.entries(singleProps)) pushField(name, def);
+
+    // 2) New multi-schema: analysisPlan.structuredDataMultiPlan[] (used by the Vapi dashboard)
+    const multi = analysisPlan.structuredDataMultiPlan as unknown;
+    if (Array.isArray(multi)) {
+      for (const entry of multi) {
+        if (!entry || typeof entry !== "object") continue;
+        const e = entry as Record<string, unknown>;
+        const key = typeof e.key === "string" ? e.key : "";
+        const plan = (e.plan as Record<string, unknown> | undefined) ?? {};
+        const schema = plan.schema as Record<string, unknown> | undefined;
+        const type = schema?.type;
+        const description =
+          (typeof schema?.description === "string" && schema.description) ||
+          (typeof plan.description === "string" && plan.description) ||
+          "";
+        if (schema && (type === "object" || type === undefined)) {
+          const props = (schema.properties ?? {}) as Record<
+            string,
+            { type?: unknown; description?: unknown }
+          >;
+          if (Object.keys(props).length > 0) {
+            for (const [name, def] of Object.entries(props)) pushField(name, def);
+            continue;
+          }
+        }
+        // Scalar entry — the key itself is the field name
+        if (key) pushField(key, { type, description });
+      }
+    }
+
     return { fields };
   });
+
 
 export const updateAssistantStructuredSchema = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
