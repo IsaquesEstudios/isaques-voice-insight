@@ -1982,6 +1982,7 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
       | Record<string, unknown>
       | null;
     const analysisPlan = (raw?.analysisPlan as Record<string, unknown> | undefined) ?? {};
+    const metadata = (raw?.metadata as Record<string, unknown> | undefined) ?? {};
 
     const normalizeType = (t: unknown): StructuredSchemaField["type"] =>
       t === "number" || t === "integer" ? "number" : t === "boolean" ? "boolean" : "string";
@@ -2008,7 +2009,7 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
     >;
     for (const [name, def] of Object.entries(singleProps)) pushField(name, def);
 
-    // 2) New multi-schema: analysisPlan.structuredDataMultiPlan[] (used by the Vapi dashboard)
+    // 2) analysisPlan.structuredDataMultiPlan[]
     const multi = analysisPlan.structuredDataMultiPlan as unknown;
     if (Array.isArray(multi)) {
       for (const entry of multi) {
@@ -2017,12 +2018,7 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
         const key = typeof e.key === "string" ? e.key : "";
         const plan = (e.plan as Record<string, unknown> | undefined) ?? {};
         const schema = plan.schema as Record<string, unknown> | undefined;
-        const type = schema?.type;
-        const description =
-          (typeof schema?.description === "string" && schema.description) ||
-          (typeof plan.description === "string" && plan.description) ||
-          "";
-        if (schema && (type === "object" || type === undefined)) {
+        if (schema && (schema.type === "object" || schema.type === undefined)) {
           const props = (schema.properties ?? {}) as Record<
             string,
             { type?: unknown; description?: unknown }
@@ -2032,13 +2028,42 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
             continue;
           }
         }
-        // Scalar entry — the key itself is the field name
-        if (key) pushField(key, { type, description });
+        if (key) pushField(key, { type: schema?.type, description: schema?.description });
+      }
+    }
+
+    // 3) New reusable Structured Outputs referenced by metadata.structuredOutputIds
+    const ids = metadata.structuredOutputIds as unknown;
+    if (Array.isArray(ids) && ids.length > 0) {
+      const results = await Promise.allSettled(
+        ids
+          .filter((v): v is string => typeof v === "string" && v.length > 0)
+          .map((id) => vapiFetch(`/structured-output/${id}`, { method: "GET" })),
+      );
+      for (const r of results) {
+        if (r.status !== "fulfilled" || !r.value || typeof r.value !== "object") continue;
+        const so = r.value as Record<string, unknown>;
+        const name =
+          (typeof so.name === "string" && so.name) ||
+          (typeof so.key === "string" && so.key) ||
+          "";
+        // Try common shapes for the field type/description
+        const schema = (so.schema as Record<string, unknown> | undefined) ?? undefined;
+        const type =
+          (so.type as unknown) ??
+          (schema?.type as unknown) ??
+          "string";
+        const description =
+          (typeof so.description === "string" && so.description) ||
+          (typeof schema?.description === "string" && schema.description) ||
+          "";
+        pushField(name, { type, description });
       }
     }
 
     return { fields };
   });
+
 
 
 export const updateAssistantStructuredSchema = createServerFn({ method: "POST" })
