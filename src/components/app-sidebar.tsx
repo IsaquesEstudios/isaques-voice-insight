@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Bot,
@@ -24,15 +25,27 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const nav = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  activePaths?: string[];
+};
+
+const nav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Assistentes Virtuais", url: "/assistentes", icon: Bot },
+  {
+    title: "Assistentes Virtuais",
+    url: "/assistentes",
+    icon: Bot,
+    activePaths: ["/assistentes", "/assistants/"],
+  },
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
   { title: "CRM & Leads", url: "/crm", icon: Inbox },
   { title: "Histórico de Chamadas", url: "/historico", icon: ListChecks },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
-] as const;
+];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
@@ -59,7 +72,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => {
-                const active = pathname.startsWith(item.url);
+                const active = (item.activePaths ?? [item.url]).some((path) =>
+                  pathname.startsWith(path)
+                );
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
