@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, isRedirect, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -39,6 +39,18 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
       },
     ],
   }),
+  // Se todas as credenciais já estão salvas, nem abre a tela — vai direto ao painel.
+  beforeLoad: async () => {
+    try {
+      const status = await getSetupStatus();
+      if (status?.vapi && status?.twilio) {
+        throw redirect({ to: "/dashboard" });
+      }
+    } catch (e) {
+      if (isRedirect(e)) throw e;
+      // Se o status falhar, deixa o componente lidar com o erro.
+    }
+  },
   component: OnboardingPage,
 });
 
