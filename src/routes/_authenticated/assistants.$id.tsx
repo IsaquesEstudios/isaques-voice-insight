@@ -1027,7 +1027,6 @@ function AssistantDetailPage() {
               { value: "logs", label: "Logs", icon: ScrollText },
               { value: "tools", label: "Tools", icon: Wrench },
               { value: "analysis", label: "Analysis", icon: LineChart },
-              { value: "advanced", label: "Advanced", icon: Settings2 },
             ].map((t) => (
               <TabsTrigger
                 key={t.value}
@@ -1214,10 +1213,6 @@ function AssistantDetailPage() {
           </TabsContent>
           <TabsContent value="analysis" className="mt-0">
             <AnalysisTab assistantId={id} />
-          </TabsContent>
-
-          <TabsContent value="advanced" className="mt-0">
-            <AdvancedTab />
           </TabsContent>
         </Tabs>
       </div>
