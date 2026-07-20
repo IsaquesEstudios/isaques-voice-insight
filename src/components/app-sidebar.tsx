@@ -28,7 +28,7 @@ import {
 type NavItem = {
   title: string;
   url: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   activePaths?: string[];
 };
 
