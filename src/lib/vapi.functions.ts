@@ -2083,13 +2083,27 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
       }))
       .filter((f) => f.name.length > 0);
 
-    const properties: Record<string, { type: string; description: string }> = {};
-    for (const f of cleaned) {
-      properties[f.name] = { type: f.type, description: f.description };
-    }
-
     const analysisPlan: Record<string, unknown> = { ...ANALYSIS_PLAN_SAME_LANGUAGE };
+
+    // Vapi dashboard reads from analysisPlan.structuredDataMultiPlan[]
+    // (one entry per field). Write to that format so fields appear in the panel
+    // and are extracted at end-of-call.
     if (cleaned.length > 0) {
+      analysisPlan.structuredDataMultiPlan = cleaned.map((f) => ({
+        key: f.name,
+        plan: {
+          enabled: true,
+          schema: {
+            type: f.type,
+            description: f.description || `Extraia o valor de ${f.name} a partir da conversa.`,
+          },
+        },
+      }));
+      // Keep legacy plan in sync for older consumers / analytics.
+      const properties: Record<string, { type: string; description: string }> = {};
+      for (const f of cleaned) {
+        properties[f.name] = { type: f.type, description: f.description };
+      }
       analysisPlan.structuredDataPlan = {
         enabled: true,
         schema: {
@@ -2099,6 +2113,7 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
         },
       };
     } else {
+      analysisPlan.structuredDataMultiPlan = [];
       analysisPlan.structuredDataPlan = { enabled: false };
     }
 
