@@ -480,7 +480,7 @@ function AssistentesPage() {
               value: isLoading ? "—" : totalCalls.toLocaleString("pt-BR"),
               icon: MessageSquare,
             },
-            { label: "Taxa média", value: isLoading ? "—" : `${avgSuccess}%`, icon: Clock },
+            { label: "Taxa média", value: isLoading ? "—" : avgSuccess != null ? `${avgSuccess}%` : "—", icon: Clock },
           ].map((k) => (
             <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
               <CardContent className="flex items-center justify-between p-4">
