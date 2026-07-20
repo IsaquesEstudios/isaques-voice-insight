@@ -64,7 +64,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => {
-                const active = pathname.startsWith(item.url);
+                const active = (item.activePaths ?? [item.url]).some((path) =>
+                  pathname.startsWith(path)
+                );
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
