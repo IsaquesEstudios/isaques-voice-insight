@@ -108,6 +108,8 @@ import {
   listVapiVoices,
   saveVapiAssistantConfig,
   fetchRecordingAsDataUrl,
+  getAssistantStructuredSchema,
+  updateAssistantStructuredSchema,
   type AssistantCallLog,
   type VapiVoiceOption,
 } from "@/lib/vapi.functions";
