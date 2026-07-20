@@ -24,7 +24,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const nav = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  activePaths?: string[];
+};
+
+const nav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   {
     title: "Assistentes Virtuais",
@@ -37,7 +44,7 @@ const nav = [
   { title: "CRM & Leads", url: "/crm", icon: Inbox },
   { title: "Histórico de Chamadas", url: "/historico", icon: ListChecks },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
-] as const;
+];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
