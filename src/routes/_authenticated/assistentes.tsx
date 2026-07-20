@@ -243,8 +243,11 @@ function AssistentesPage() {
   const deleteAssistant = useServerFn(deleteVapiAssistant);
   const duplicateAssistant = useServerFn(duplicateVapiAssistant);
 
+  const fetchSummary = useServerFn(getAssistantCardSummary);
+
   const [assistants, setAssistants] = useState<VapiAssistant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [summaries, setSummaries] = useState<Record<string, AssistantCardSummary>>({});
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VapiAssistant | null>(null);
@@ -272,23 +275,63 @@ function AssistentesPage() {
     };
   }, [refresh]);
 
+  // Fetch per-assistant real metrics from Vapi call logs, in parallel.
+  useEffect(() => {
+    if (assistants.length === 0) return;
+    let cancelled = false;
+    const ids = assistants.map((a) => a.id).filter((id): id is string => Boolean(id));
+    Promise.all(
+      ids.map(async (id) => {
+        try {
+          const s = await fetchSummary({ data: { assistantId: id } });
+          return [id, s] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Record<string, AssistantCardSummary> = {};
+      for (const r of results) if (r) next[r[0]] = r[1];
+      setSummaries((prev) => ({ ...prev, ...next }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [assistants, fetchSummary]);
+
   const enriched = useMemo(
     () =>
-      assistants.map((a, i) => ({
-        raw: a,
-        gradient: gradients[i % gradients.length],
-        metrics: mockMetrics(a.id ?? String(i)),
-      })),
-    [assistants],
+      assistants.map((a, i) => {
+        const id = a.id ?? String(i);
+        const summary = summaries[id];
+        const status: AssistantStatus = "Ativo";
+        return {
+          raw: a,
+          gradient: gradients[hashSeed(id) % gradients.length],
+          metrics: {
+            calls: summary?.callCount ?? 0,
+            successRate: summary?.successRate ?? null,
+            avgDuration: formatDuration(summary?.avgDurationSec ?? null),
+            status,
+            updatedAgo: relativeFromNow(summary?.lastCallAt ?? null),
+            loaded: Boolean(summary),
+          },
+        };
+      }),
+    [assistants, summaries],
   );
 
   const total = enriched.length;
   const active = enriched.filter((a) => a.metrics.status === "Ativo").length;
   const totalCalls = enriched.reduce((s, a) => s + a.metrics.calls, 0);
-  const withRate = enriched.filter((a) => a.metrics.successRate > 0);
+  const withRate = enriched.filter((a) => a.metrics.successRate != null);
   const avgSuccess = withRate.length
-    ? Math.round(withRate.reduce((s, a) => s + a.metrics.successRate, 0) / withRate.length)
-    : 0;
+    ? Math.round(
+        withRate.reduce((s, a) => s + (a.metrics.successRate ?? 0), 0) / withRate.length,
+      )
+    : null;
+
 
   function openCreate() {
     setForm({
