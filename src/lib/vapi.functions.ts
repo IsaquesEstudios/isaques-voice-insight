@@ -2009,10 +2009,14 @@ async function listVapiStructuredOutputs(assistantId: string): Promise<VapiStruc
   );
 }
 
-function buildStructuredOutputPayload(field: StructuredSchemaField, assistantId: string, assistantIds: string[] = []) {
+function buildStructuredOutputPayload(
+  field: StructuredSchemaField,
+  assistantId: string,
+  assistantIds: string[] = [],
+  opts: { includeType?: boolean } = {},
+) {
   const description = field.description || `Extraia o valor de ${field.name} a partir da conversa.`;
-  return {
-    type: "ai",
+  const payload: Record<string, unknown> = {
     name: field.name,
     description,
     schema: {
@@ -2021,7 +2025,10 @@ function buildStructuredOutputPayload(field: StructuredSchemaField, assistantId:
     },
     assistantIds: Array.from(new Set([...assistantIds, assistantId])),
   };
+  if (opts.includeType) payload.type = "ai";
+  return payload;
 }
+
 
 export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
@@ -2183,17 +2190,25 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
     const savedStructuredOutputIds: string[] = [];
     for (const field of cleaned) {
       const existing = outputsByName.get(field.name);
-      const payload = buildStructuredOutputPayload(field, data.assistantId, existing?.assistantIds ?? []);
       const saved = existing?.id
         ? ((await vapiFetch(`/structured-output/${existing.id}?schemaOverride=true`, {
             method: "PATCH",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(
+              buildStructuredOutputPayload(field, data.assistantId, existing.assistantIds ?? [], {
+                includeType: false,
+              }),
+            ),
           })) as VapiStructuredOutput | null)
         : ((await vapiFetch("/structured-output", {
             method: "POST",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(
+              buildStructuredOutputPayload(field, data.assistantId, existing?.assistantIds ?? [], {
+                includeType: true,
+              }),
+            ),
           })) as VapiStructuredOutput | null);
       if (saved?.id) savedStructuredOutputIds.push(saved.id);
+
     }
 
     const wantedNames = new Set(cleaned.map((f) => f.name));
