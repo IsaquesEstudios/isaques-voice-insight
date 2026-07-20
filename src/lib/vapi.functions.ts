@@ -2034,6 +2034,7 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
       | null;
     const analysisPlan = (raw?.analysisPlan as Record<string, unknown> | undefined) ?? {};
     const metadata = (raw?.metadata as Record<string, unknown> | undefined) ?? {};
+    const artifactPlan = (raw?.artifactPlan as Record<string, unknown> | undefined) ?? {};
 
     const fields: StructuredSchemaField[] = [];
     const seen = new Set<string>();
@@ -2080,13 +2081,19 @@ export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
       }
     }
 
-    // 3) New reusable Structured Outputs referenced by metadata.structuredOutputIds
-    const ids = metadata.structuredOutputIds as unknown;
+    // 3) Reusable Structured Outputs attached to the assistant.
+    // Vapi processes extraction from artifactPlan.structuredOutputIds; metadata
+    // is read only for compatibility with older local saves.
+    const ids = Array.from(
+      new Set(
+        [artifactPlan.structuredOutputIds, metadata.structuredOutputIds]
+          .flatMap((value) => (Array.isArray(value) ? value : []))
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    );
     if (Array.isArray(ids) && ids.length > 0) {
       const results = await Promise.allSettled(
-        ids
-          .filter((v): v is string => typeof v === "string" && v.length > 0)
-          .map((id) => vapiFetch(`/structured-output/${id}`, { method: "GET" })),
+        ids.map((id) => vapiFetch(`/structured-output/${id}`, { method: "GET" })),
       );
       for (const r of results) {
         if (r.status !== "fulfilled" || !r.value || typeof r.value !== "object") continue;
@@ -2139,13 +2146,21 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
       .filter((f) => f.name.length > 0);
 
     const metadata = ((raw?.metadata as Record<string, unknown> | undefined) ?? {}) as Record<string, unknown>;
-    const metadataIds = Array.isArray(metadata.structuredOutputIds)
-      ? metadata.structuredOutputIds.filter((id): id is string => typeof id === "string" && id.length > 0)
-      : [];
+    const artifactPlan = ((raw?.artifactPlan as Record<string, unknown> | undefined) ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const attachedIds = Array.from(
+      new Set(
+        [artifactPlan.structuredOutputIds, metadata.structuredOutputIds]
+          .flatMap((value) => (Array.isArray(value) ? value : []))
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
 
     const [listedOutputs, metadataOutputs] = await Promise.all([
       listVapiStructuredOutputs(data.assistantId),
-      Promise.allSettled(metadataIds.map((id) => vapiFetch(`/structured-output/${id}`, { method: "GET" }))),
+      Promise.allSettled(attachedIds.map((id) => vapiFetch(`/structured-output/${id}`, { method: "GET" }))),
     ]);
 
     const existingOutputs = new Map<string, VapiStructuredOutput>();
@@ -2242,6 +2257,10 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
       method: "PATCH",
       body: JSON.stringify({
         analysisPlan,
+        artifactPlan: {
+          ...artifactPlan,
+          structuredOutputIds: savedStructuredOutputIds,
+        },
         metadata: {
           ...metadata,
           structuredOutputIds: savedStructuredOutputIds,
