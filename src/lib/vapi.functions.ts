@@ -2009,10 +2009,14 @@ async function listVapiStructuredOutputs(assistantId: string): Promise<VapiStruc
   );
 }
 
-function buildStructuredOutputPayload(field: StructuredSchemaField, assistantId: string, assistantIds: string[] = []) {
+function buildStructuredOutputPayload(
+  field: StructuredSchemaField,
+  assistantId: string,
+  assistantIds: string[] = [],
+  opts: { includeType?: boolean } = {},
+) {
   const description = field.description || `Extraia o valor de ${field.name} a partir da conversa.`;
-  return {
-    type: "ai",
+  const payload: Record<string, unknown> = {
     name: field.name,
     description,
     schema: {
@@ -2021,7 +2025,10 @@ function buildStructuredOutputPayload(field: StructuredSchemaField, assistantId:
     },
     assistantIds: Array.from(new Set([...assistantIds, assistantId])),
   };
+  if (opts.includeType) payload.type = "ai";
+  return payload;
 }
+
 
 export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
