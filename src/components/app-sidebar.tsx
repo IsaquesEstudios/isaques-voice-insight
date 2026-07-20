@@ -26,7 +26,12 @@ import {
 
 const nav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Assistentes Virtuais", url: "/assistentes", icon: Bot },
+  {
+    title: "Assistentes Virtuais",
+    url: "/assistentes",
+    icon: Bot,
+    activePaths: ["/assistentes", "/assistants/"],
+  },
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
   { title: "CRM & Leads", url: "/crm", icon: Inbox },
