@@ -1,22 +1,46 @@
-Vou corrigir o player de gravações mantendo a tela atual de Logs.
+## Plano
 
-O que está acontecendo:
-- Os áudios existem, porque você consegue ouvir no painel da Vapi.
-- O erro atual não diz que o áudio não existe. Ele vem do nosso proxy: a URL da gravação está em um host `r2.cloudflarestorage.com`, e a validação atual só permite Vapi/Daily/Google/AWS.
-- Como o navegador também pode bloquear o download direto por CORS, precisamos permitir esse host no proxy seguro.
+1. **Trocar o método de salvamento**
+   - Parar de tentar salvar os campos apenas dentro de `analysisPlan.structuredDataMultiPlan`.
+   - Usar o fluxo oficial da Vapi para Structured Outputs: `POST /structured-output` e `PATCH /structured-output/{id}`.
+   - Vincular cada Structured Output ao assistente com `assistantIds: [assistantId]`, para aparecer no painel da Vapi em **Analysis / Structured Outputs** e funcionar na extração pós-ligação.
 
-Plano de implementação:
-1. Atualizar `fetchRecordingAsDataUrl` em `src/lib/vapi.functions.ts`
-   - Permitir URLs oficiais usadas pela Vapi em Cloudflare R2: `*.r2.cloudflarestorage.com`.
-   - Manter a proteção contra URLs arbitrárias para evitar uso indevido do proxy.
-   - Melhorar a mensagem de erro para ficar clara quando a gravação existir, mas o host ainda não estiver liberado.
+2. **Manter compatibilidade com campos já existentes**
+   - Continuar lendo os formatos já suportados: `analysisPlan.structuredDataPlan`, `analysisPlan.structuredDataMultiPlan` e Structured Outputs reutilizáveis.
+   - Ajustar a leitura para priorizar os Structured Outputs oficiais vinculados ao assistente, preservando `id`, `name`, `type` e `description`.
 
-2. Melhorar o `RecordingPlayer` em `src/routes/_authenticated/assistants.$id.tsx`
-   - Continuar tentando carregar direto primeiro.
-   - Se falhar por CORS, usar o proxy do servidor automaticamente.
-   - Mostrar uma mensagem mais amigável: “A gravação existe, mas precisa ser carregada pelo servidor” apenas se ainda houver erro real.
-   - Manter o link “Abrir/baixar áudio original”.
+3. **Atualizar sem duplicar**
+   - Quando o usuário salvar um campo que já existe na Vapi, atualizar o Structured Output existente em vez de criar outro duplicado.
+   - Quando criar um campo novo, criar um Structured Output oficial do tipo `ai` com schema simples do campo.
+   - Se um campo for removido da interface, desvincular/remover da lista vinculada ao assistente conforme a API permitir, evitando que continue ativo sem aparecer na plataforma.
 
-3. Verificar o resultado
-   - Confirmar que o host R2 deixa de ser bloqueado.
-   - Confirmar que o player recebe uma URL/data URL válida para o `<audio>` exibir duração e tocar.
+4. **Melhorar retorno de erro**
+   - Mostrar mensagens claras quando a Vapi recusar o payload, incluindo o motivo real retornado pela API.
+   - Após salvar, recarregar os dados direto da Vapi para confirmar que o que aparece na tela é o que está salvo lá.
+
+## Detalhes técnicos
+
+- Arquivo principal: `src/lib/vapi.functions.ts`.
+- Ajustar `StructuredSchemaField` para carregar também o `id` do Structured Output quando existir.
+- Criar helpers internos para montar o payload oficial:
+
+```ts
+{
+  name: field.name,
+  type: "ai",
+  description: field.description,
+  schema: {
+    type: "object",
+    properties: {
+      [field.name]: {
+        type: field.type,
+        description: field.description
+      }
+    },
+    required: [field.name]
+  },
+  assistantIds: [assistantId]
+}
+```
+
+- Ajustar `src/routes/_authenticated/assistants.$id.tsx` apenas se necessário para preservar o `id` dos campos carregados e reenviar no save.
