@@ -176,91 +176,127 @@ function OnboardingPage() {
               ) : null}
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground mb-1.5">
-                  Como encontrar sua chave Vapi
-                </p>
-                <ol className="list-decimal space-y-1 pl-4">
-                  <li>
-                    Acesse{" "}
-                    <a
-                      href="https://dashboard.vapi.ai/org/api-keys"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-0.5 text-primary hover:underline"
+              {vapiReady && !editVapi ? (
+                <>
+                  <div className="rounded-xl border border-success/25 bg-success/10 p-3 text-xs text-success-foreground">
+                    Sua conta Vapi já está conectada. Suas chaves ficam salvas e
+                    você não precisa preencher de novo a cada login.
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setEditVapi(true)}
+                      className="text-muted-foreground"
                     >
-                      dashboard.vapi.ai <ExternalLink className="h-3 w-3" />
-                    </a>{" "}
-                    e faça login.
-                  </li>
-                  <li>
-                    No menu lateral, clique em <span className="text-foreground">Organization</span> → <span className="text-foreground">API Keys</span>.
-                  </li>
-                  <li>
-                    Copie a <span className="text-foreground">Private Key</span> (começa com <code className="rounded bg-background/60 px-1">vapi_sk_…</code>) — usada para gerenciar assistentes.
-                  </li>
-                  <li>
-                    Copie também a <span className="text-foreground">Public Key</span> — necessária para o botão <span className="text-foreground">Testar no navegador</span>.
-                  </li>
-                </ol>
-              </div>
-
-              {vapiHasPrivateOnly ? (
-                <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
-                  Sua Private Key já está salva. Falta apenas a{" "}
-                  <span className="font-semibold">Public Key</span> para liberar o
-                  teste no navegador e concluir o onboarding.
-                </div>
+                      Trocar chaves
+                    </Button>
+                    <Button onClick={() => setStep(2)} className="gap-2 shadow-glow">
+                      Próximo <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </>
               ) : (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Vapi Private Key</Label>
-                  <Input
-                    type="password"
-                    placeholder="vapi_sk_…"
-                    value={vapiKey}
-                    onChange={(e) => setVapiKey(e.target.value)}
-                    className="bg-background/50 font-mono text-xs"
-                  />
-                </div>
+                <>
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground mb-1.5">
+                      Como encontrar sua chave Vapi
+                    </p>
+                    <ol className="list-decimal space-y-1 pl-4">
+                      <li>
+                        Acesse{" "}
+                        <a
+                          href="https://dashboard.vapi.ai/org/api-keys"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                        >
+                          dashboard.vapi.ai <ExternalLink className="h-3 w-3" />
+                        </a>{" "}
+                        e faça login.
+                      </li>
+                      <li>
+                        No menu lateral, clique em <span className="text-foreground">Organization</span> → <span className="text-foreground">API Keys</span>.
+                      </li>
+                      <li>
+                        Copie a <span className="text-foreground">Private Key</span> (começa com <code className="rounded bg-background/60 px-1">vapi_sk_…</code>) — usada para gerenciar assistentes.
+                      </li>
+                      <li>
+                        Copie também a <span className="text-foreground">Public Key</span> — necessária para o botão <span className="text-foreground">Testar no navegador</span>.
+                      </li>
+                    </ol>
+                  </div>
+
+                  {vapiHasPrivateOnly ? (
+                    <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+                      Sua Private Key já está salva. Falta apenas a{" "}
+                      <span className="font-semibold">Public Key</span> para liberar o
+                      teste no navegador e concluir o onboarding.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Vapi Private Key</Label>
+                      <Input
+                        type="password"
+                        placeholder="vapi_sk_…"
+                        value={vapiKey}
+                        onChange={(e) => setVapiKey(e.target.value)}
+                        className="bg-background/50 font-mono text-xs"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Vapi Public Key</Label>
+                    <Input
+                      placeholder="ex.: 4c1a2f…"
+                      value={vapiPublicKey}
+                      onChange={(e) => setVapiPublicKey(e.target.value)}
+                      className="bg-background/50 font-mono text-xs"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Obrigatória — é a chave usada pelo botão “Testar no navegador”.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
+                      Sair
+                    </Button>
+                    <div className="flex gap-2">
+                      {vapiReady && editVapi ? (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setEditVapi(false);
+                            setVapiKey("");
+                            setVapiPublicKey("");
+                          }}
+                          className="text-muted-foreground"
+                        >
+                          Cancelar
+                        </Button>
+                      ) : null}
+                      <Button
+                        disabled={
+                          saveVapi.isPending ||
+                          vapiPublicKey.trim().length < 20 ||
+                          (!vapiHasPrivateOnly && vapiKey.trim().length < 20)
+                        }
+                        onClick={() =>
+                          saveVapi.mutate({
+                            privateKey: vapiKey.trim(),
+                            publicKey: vapiPublicKey.trim(),
+                          })
+                        }
+                        className="gap-2 shadow-glow"
+                      >
+                        {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Próximo <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">Vapi Public Key</Label>
-                <Input
-                  placeholder="ex.: 4c1a2f…"
-                  value={vapiPublicKey}
-                  onChange={(e) => setVapiPublicKey(e.target.value)}
-                  className="bg-background/50 font-mono text-xs"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Obrigatória — é a chave usada pelo botão “Testar no navegador”.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
-                  Sair
-                </Button>
-                <div className="flex gap-2">
-                  <Button
-                    disabled={
-                      saveVapi.isPending ||
-                      vapiPublicKey.trim().length < 20 ||
-                      (!vapiHasPrivateOnly && vapiKey.trim().length < 20)
-                    }
-                    onClick={() =>
-                      saveVapi.mutate({
-                        privateKey: vapiKey.trim(),
-                        publicKey: vapiPublicKey.trim(),
-                      })
-                    }
-                    className="gap-2 shadow-glow"
-                  >
-                    {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Próximo <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         ) : (
