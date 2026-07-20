@@ -6118,7 +6118,12 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
             </Button>
           </div>
 
-          {fields.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-background/20 p-10 text-center">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Carregando campos da Vapi…</span>
+            </div>
+          ) : fields.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-background/20 p-10 text-center">
               <FileText className="h-5 w-5 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">Nenhum campo sendo extraído ainda</p>
@@ -6129,53 +6134,79 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="hidden grid-cols-[1fr_140px_1.5fr_40px] gap-2 px-1 text-[10px] uppercase tracking-wide text-muted-foreground md:grid">
+              <div className="hidden grid-cols-[1fr_140px_1.5fr_80px] gap-2 px-1 text-[10px] uppercase tracking-wide text-muted-foreground md:grid">
                 <span>Nome do campo</span>
                 <span>Tipo</span>
                 <span>Descrição</span>
                 <span />
               </div>
-              {fields.map((field) => (
-                <div
-                  key={field.id}
-                  className="grid grid-cols-1 gap-2 rounded-xl border border-white/[0.06] bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_40px]"
-                >
-                  <Input
-                    value={field.name}
-                    onChange={(e) => updateField(field.id, { name: e.target.value })}
-                    placeholder="ex: telefone"
-                    className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                  />
-                  <Select
-                    value={field.type}
-                    onValueChange={(v) => updateField(field.id, { type: v as SchemaField["type"] })}
+              {fields.map((field) => {
+                const isDirty = !!dirty[field.id];
+                return (
+                  <div
+                    key={field.id}
+                    className="grid grid-cols-1 gap-2 rounded-xl border border-white/[0.06] bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_80px]"
                   >
-                    <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
-                      <SelectItem value="string">string</SelectItem>
-                      <SelectItem value="number">number</SelectItem>
-                      <SelectItem value="boolean">boolean</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={field.description}
-                    onChange={(e) => updateField(field.id, { description: e.target.value })}
-                    placeholder="Explique o que a IA deve capturar"
-                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => removeField(field.id)}
-                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                    aria-label="Remover campo"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                    <Input
+                      value={field.name}
+                      onChange={(e) => updateField(field.id, { name: e.target.value })}
+                      placeholder="ex: telefone"
+                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                    />
+                    <Select
+                      value={field.type}
+                      onValueChange={(v) =>
+                        updateField(field.id, { type: v as SchemaField["type"] })
+                      }
+                    >
+                      <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                        <SelectItem value="string">string</SelectItem>
+                        <SelectItem value="number">number</SelectItem>
+                        <SelectItem value="boolean">boolean</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={field.description}
+                      onChange={(e) => updateField(field.id, { description: e.target.value })}
+                      placeholder="Explique o que a IA deve capturar"
+                      className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => confirmField(field.id)}
+                        disabled={savingAll || !field.name.trim()}
+                        aria-label="Salvar campo"
+                        title={isDirty ? "Salvar alterações na Vapi" : "Sincronizar com a Vapi"}
+                        className={cn(
+                          "h-9 w-9 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300",
+                          isDirty && "ring-2 ring-emerald-500/40",
+                        )}
+                      >
+                        {savingAll ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removeField(field.id)}
+                        disabled={savingAll}
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                        aria-label="Remover campo"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
