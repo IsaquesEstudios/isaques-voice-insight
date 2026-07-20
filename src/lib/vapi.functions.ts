@@ -2190,17 +2190,25 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
     const savedStructuredOutputIds: string[] = [];
     for (const field of cleaned) {
       const existing = outputsByName.get(field.name);
-      const payload = buildStructuredOutputPayload(field, data.assistantId, existing?.assistantIds ?? []);
       const saved = existing?.id
         ? ((await vapiFetch(`/structured-output/${existing.id}?schemaOverride=true`, {
             method: "PATCH",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(
+              buildStructuredOutputPayload(field, data.assistantId, existing.assistantIds ?? [], {
+                includeType: false,
+              }),
+            ),
           })) as VapiStructuredOutput | null)
         : ((await vapiFetch("/structured-output", {
             method: "POST",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(
+              buildStructuredOutputPayload(field, data.assistantId, existing?.assistantIds ?? [], {
+                includeType: true,
+              }),
+            ),
           })) as VapiStructuredOutput | null);
       if (saved?.id) savedStructuredOutputIds.push(saved.id);
+
     }
 
     const wantedNames = new Set(cleaned.map((f) => f.name));
