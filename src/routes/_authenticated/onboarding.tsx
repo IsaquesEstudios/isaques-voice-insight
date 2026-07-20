@@ -62,6 +62,7 @@ function OnboardingPage() {
   const [vapiPublicKey, setVapiPublicKey] = useState("");
   const [twilioSid, setTwilioSid] = useState("");
   const [twilioToken, setTwilioToken] = useState("");
+  const [editVapi, setEditVapi] = useState(false);
 
   // Se Vapi está totalmente conectada (com public key) e Twilio não, pula para o passo 2.
   useEffect(() => {
@@ -69,6 +70,13 @@ function OnboardingPage() {
       setStep(2);
     }
   }, [status.data?.vapi, status.data?.twilio]);
+
+  // Se ambos já estão conectados, mandar direto para o dashboard.
+  useEffect(() => {
+    if (status.data?.vapi && status.data?.twilio) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [status.data?.vapi, status.data?.twilio, navigate]);
 
   const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
 
