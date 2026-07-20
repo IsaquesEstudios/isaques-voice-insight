@@ -1963,3 +1963,76 @@ export const getSetupStatus = createServerFn({ method: "GET" })
       vapiPrivateOnly: !!vapiRes.data && !hasVapiPublicKey,
     };
   });
+
+/* --------------- Structured Outputs (analysisPlan.structuredDataPlan) --------------- */
+
+export interface StructuredSchemaField {
+  name: string;
+  type: "string" | "number" | "boolean";
+  description: string;
+}
+
+export const getAssistantStructuredSchema = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((data: { assistantId: string }) => data)
+  .handler(async ({ data, context }): Promise<{ fields: StructuredSchemaField[] }> => {
+    if (!data.assistantId) return { fields: [] };
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+    const raw = (await vapiFetch(`/assistant/${data.assistantId}`, { method: "GET" })) as
+      | Record<string, unknown>
+      | null;
+    const plan = (raw?.analysisPlan as Record<string, unknown> | undefined)?.structuredDataPlan as
+      | Record<string, unknown>
+      | undefined;
+    const schema = plan?.schema as Record<string, unknown> | undefined;
+    const properties = (schema?.properties ?? {}) as Record<string, { type?: string; description?: string }>;
+    const fields: StructuredSchemaField[] = Object.entries(properties).map(([name, def]) => ({
+      name,
+      type: (def?.type === "number" || def?.type === "boolean" ? def.type : "string") as StructuredSchemaField["type"],
+      description: typeof def?.description === "string" ? def.description : "",
+    }));
+    return { fields };
+  });
+
+export const updateAssistantStructuredSchema = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator(
+    (data: { assistantId: string; fields: StructuredSchemaField[] }) => data,
+  )
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    if (!data.assistantId) throw new Error("assistantId é obrigatório");
+    await assertOwnership(context.supabase, context.userId, data.assistantId);
+
+    const cleaned = (data.fields ?? [])
+      .map((f) => ({
+        name: (f.name ?? "").trim(),
+        type: f.type,
+        description: (f.description ?? "").trim(),
+      }))
+      .filter((f) => f.name.length > 0);
+
+    const properties: Record<string, { type: string; description: string }> = {};
+    for (const f of cleaned) {
+      properties[f.name] = { type: f.type, description: f.description };
+    }
+
+    const analysisPlan: Record<string, unknown> = { ...ANALYSIS_PLAN_SAME_LANGUAGE };
+    if (cleaned.length > 0) {
+      analysisPlan.structuredDataPlan = {
+        enabled: true,
+        schema: {
+          type: "object",
+          properties,
+          required: cleaned.map((f) => f.name),
+        },
+      };
+    } else {
+      analysisPlan.structuredDataPlan = { enabled: false };
+    }
+
+    await vapiFetch(`/assistant/${data.assistantId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ analysisPlan }),
+    });
+    return { ok: true };
+  });
