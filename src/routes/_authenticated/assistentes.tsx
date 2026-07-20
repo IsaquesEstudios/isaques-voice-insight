@@ -64,8 +64,11 @@ import {
   updateVapiAssistant,
   deleteVapiAssistant,
   duplicateVapiAssistant,
+  getAssistantCardSummary,
   type VapiAssistantDTO,
+  type AssistantCardSummary,
 } from "@/lib/vapi.functions";
+
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/assistentes")({
@@ -93,24 +96,34 @@ const statusStyles: Record<AssistantStatus, string> = {
   Pausado: "bg-chart-3/15 text-chart-3",
 };
 
-function mockMetrics(seed: string) {
+function hashSeed(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const calls = 200 + (h % 3200);
-  const success = 60 + (h % 36);
-  const secs = 60 + (h % 240);
-  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
-  const ss = String(secs % 60).padStart(2, "0");
-  const statuses: AssistantStatus[] = ["Ativo", "Ativo", "Ativo", "Pausado", "Rascunho"];
-  const status = statuses[h % statuses.length];
-  return {
-    calls,
-    successRate: status === "Rascunho" ? 0 : success,
-    avgDuration: status === "Rascunho" ? "—" : `${mm}:${ss}`,
-    status,
-    updatedAgo: `há ${1 + (h % 48)}h`,
-  };
+  return h;
 }
+
+function formatDuration(sec: number | null): string {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return "—";
+  const s = Math.round(sec);
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function relativeFromNow(iso: string | null): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "—";
+  const diff = Date.now() - t;
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `há ${mins}min`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `há ${hours}h`;
+  const days = Math.round(hours / 24);
+  return `há ${days}d`;
+}
+
 
 function formatVoice(a: VapiAssistant) {
   const provider = a.voice?.provider;
@@ -230,8 +243,11 @@ function AssistentesPage() {
   const deleteAssistant = useServerFn(deleteVapiAssistant);
   const duplicateAssistant = useServerFn(duplicateVapiAssistant);
 
+  const fetchSummary = useServerFn(getAssistantCardSummary);
+
   const [assistants, setAssistants] = useState<VapiAssistant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [summaries, setSummaries] = useState<Record<string, AssistantCardSummary>>({});
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VapiAssistant | null>(null);
@@ -259,23 +275,63 @@ function AssistentesPage() {
     };
   }, [refresh]);
 
+  // Fetch per-assistant real metrics from Vapi call logs, in parallel.
+  useEffect(() => {
+    if (assistants.length === 0) return;
+    let cancelled = false;
+    const ids = assistants.map((a) => a.id).filter((id): id is string => Boolean(id));
+    Promise.all(
+      ids.map(async (id) => {
+        try {
+          const s = await fetchSummary({ data: { assistantId: id } });
+          return [id, s] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Record<string, AssistantCardSummary> = {};
+      for (const r of results) if (r) next[r[0]] = r[1];
+      setSummaries((prev) => ({ ...prev, ...next }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [assistants, fetchSummary]);
+
   const enriched = useMemo(
     () =>
-      assistants.map((a, i) => ({
-        raw: a,
-        gradient: gradients[i % gradients.length],
-        metrics: mockMetrics(a.id ?? String(i)),
-      })),
-    [assistants],
+      assistants.map((a, i) => {
+        const id = a.id ?? String(i);
+        const summary = summaries[id];
+        const status: AssistantStatus = "Ativo";
+        return {
+          raw: a,
+          gradient: gradients[hashSeed(id) % gradients.length],
+          metrics: {
+            calls: summary?.callCount ?? 0,
+            successRate: summary?.successRate ?? null,
+            avgDuration: formatDuration(summary?.avgDurationSec ?? null),
+            status,
+            updatedAgo: relativeFromNow(summary?.lastCallAt ?? null),
+            loaded: Boolean(summary),
+          },
+        };
+      }),
+    [assistants, summaries],
   );
 
   const total = enriched.length;
   const active = enriched.filter((a) => a.metrics.status === "Ativo").length;
   const totalCalls = enriched.reduce((s, a) => s + a.metrics.calls, 0);
-  const withRate = enriched.filter((a) => a.metrics.successRate > 0);
+  const withRate = enriched.filter((a) => a.metrics.successRate != null);
   const avgSuccess = withRate.length
-    ? Math.round(withRate.reduce((s, a) => s + a.metrics.successRate, 0) / withRate.length)
-    : 0;
+    ? Math.round(
+        withRate.reduce((s, a) => s + (a.metrics.successRate ?? 0), 0) / withRate.length,
+      )
+    : null;
+
 
   function openCreate() {
     setForm({
@@ -424,7 +480,7 @@ function AssistentesPage() {
               value: isLoading ? "—" : totalCalls.toLocaleString("pt-BR"),
               icon: MessageSquare,
             },
-            { label: "Taxa média", value: isLoading ? "—" : `${avgSuccess}%`, icon: Clock },
+            { label: "Taxa média", value: isLoading ? "—" : avgSuccess != null ? `${avgSuccess}%` : "—", icon: Clock },
           ].map((k) => (
             <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
               <CardContent className="flex items-center justify-between p-4">
@@ -565,7 +621,7 @@ function AssistentesPage() {
                         Sucesso
                       </p>
                       <p className="mt-0.5 text-sm font-semibold text-foreground">
-                        {metrics.successRate > 0 ? `${metrics.successRate}%` : "—"}
+                        {metrics.successRate != null ? `${metrics.successRate}%` : "—"}
                       </p>
                     </div>
                     <div>

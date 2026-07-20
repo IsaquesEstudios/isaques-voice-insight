@@ -1363,6 +1363,91 @@ export const getAssistantCallStats = createServerFn({ method: "POST" })
     };
   });
 
+/* --------------------- Assistant card summary --------------------- */
+
+export interface AssistantCardSummary {
+  callCount: number;
+  successRate: number | null;
+  avgDurationSec: number | null;
+  lastCallAt: string | null;
+}
+
+export const getAssistantCardSummary = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((data: { assistantId: string }) => data)
+  .handler(async ({ data }): Promise<AssistantCardSummary> => {
+    const empty: AssistantCardSummary = {
+      callCount: 0,
+      successRate: null,
+      avgDurationSec: null,
+      lastCallAt: null,
+    };
+    if (!data.assistantId) return empty;
+    let raw: unknown;
+    try {
+      raw = await vapiFetch(
+        `/call?assistantId=${encodeURIComponent(data.assistantId)}&limit=100`,
+        { method: "GET" },
+      );
+    } catch {
+      return empty;
+    }
+    if (!Array.isArray(raw)) return empty;
+    const calls = raw as Array<Record<string, unknown>>;
+
+    let durationSamples = 0;
+    let durationTotal = 0;
+    let evaluated = 0;
+    let successful = 0;
+    let lastMs: number | null = null;
+
+    const truthy = (s: string) => {
+      const v = s.trim().toLowerCase();
+      return v === "true" || v === "pass" || v === "passed" || v === "success" || v === "successful" || v === "yes";
+    };
+    const falsy = (s: string) => {
+      const v = s.trim().toLowerCase();
+      return v === "false" || v === "fail" || v === "failed" || v === "unsuccessful" || v === "no";
+    };
+
+    for (const c of calls) {
+      const startedAt = typeof c.startedAt === "string" ? Date.parse(c.startedAt) : NaN;
+      const endedAt = typeof c.endedAt === "string" ? Date.parse(c.endedAt) : NaN;
+      if (Number.isFinite(startedAt)) {
+        if (lastMs == null || startedAt > lastMs) lastMs = startedAt;
+      }
+      if (Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt > startedAt) {
+        durationTotal += (endedAt - startedAt) / 1000;
+        durationSamples += 1;
+      }
+      const analysis = c.analysis && typeof c.analysis === "object" ? (c.analysis as Record<string, unknown>) : null;
+      const se = analysis?.successEvaluation;
+      if (typeof se === "boolean") {
+        evaluated += 1;
+        if (se) successful += 1;
+      } else if (typeof se === "string" && se.length > 0) {
+        if (truthy(se)) {
+          evaluated += 1;
+          successful += 1;
+        } else if (falsy(se)) {
+          evaluated += 1;
+        }
+      } else if (typeof se === "number" && Number.isFinite(se)) {
+        evaluated += 1;
+        if (se >= 0.5) successful += 1;
+      }
+    }
+
+    return {
+      callCount: calls.length,
+      successRate: evaluated > 0 ? Math.round((successful / evaluated) * 100) : null,
+      avgDurationSec: durationSamples > 0 ? durationTotal / durationSamples : null,
+      lastCallAt: lastMs != null ? new Date(lastMs).toISOString() : null,
+    };
+  });
+
+
+
 
 /* --------------------- Logs (call list) --------------------- */
 
