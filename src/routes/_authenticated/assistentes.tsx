@@ -96,24 +96,34 @@ const statusStyles: Record<AssistantStatus, string> = {
   Pausado: "bg-chart-3/15 text-chart-3",
 };
 
-function mockMetrics(seed: string) {
+function hashSeed(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const calls = 200 + (h % 3200);
-  const success = 60 + (h % 36);
-  const secs = 60 + (h % 240);
-  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
-  const ss = String(secs % 60).padStart(2, "0");
-  const statuses: AssistantStatus[] = ["Ativo", "Ativo", "Ativo", "Pausado", "Rascunho"];
-  const status = statuses[h % statuses.length];
-  return {
-    calls,
-    successRate: status === "Rascunho" ? 0 : success,
-    avgDuration: status === "Rascunho" ? "—" : `${mm}:${ss}`,
-    status,
-    updatedAgo: `há ${1 + (h % 48)}h`,
-  };
+  return h;
 }
+
+function formatDuration(sec: number | null): string {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return "—";
+  const s = Math.round(sec);
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function relativeFromNow(iso: string | null): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "—";
+  const diff = Date.now() - t;
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `há ${mins}min`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `há ${hours}h`;
+  const days = Math.round(hours / 24);
+  return `há ${days}d`;
+}
+
 
 function formatVoice(a: VapiAssistant) {
   const provider = a.voice?.provider;
