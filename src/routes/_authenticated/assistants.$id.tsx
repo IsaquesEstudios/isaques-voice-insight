@@ -2922,23 +2922,37 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                               <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                                 {d.type === "number" ? "Phone" : "SIP"}
                               </span>
-                              <Input
-                                value={d.type === "number" ? d.number : d.sipUri}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setTcDestinations((prev) =>
-                                    prev.map((it, i) =>
-                                      i !== idx
-                                        ? it
-                                        : it.type === "number"
-                                          ? { ...it, number: val }
+                              {d.type === "number" ? (
+                                <PhoneNumberInput
+                                  value={d.number}
+                                  onChange={(val) =>
+                                    setTcDestinations((prev) =>
+                                      prev.map((it, i) =>
+                                        i !== idx || it.type !== "number"
+                                          ? it
+                                          : { ...it, number: val },
+                                      ),
+                                    )
+                                  }
+                                  className="flex-1"
+                                />
+                              ) : (
+                                <Input
+                                  value={d.sipUri}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setTcDestinations((prev) =>
+                                      prev.map((it, i) =>
+                                        i !== idx || it.type !== "sip"
+                                          ? it
                                           : { ...it, sipUri: val },
-                                    ),
-                                  );
-                                }}
-                                placeholder={d.type === "number" ? "+5511999999999" : "sip:user@domain.com"}
-                                className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                              />
+                                      ),
+                                    );
+                                  }}
+                                  placeholder="sip:user@domain.com"
+                                  className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                />
+                              )}
                               <Button
                                 size="icon"
                                 variant="ghost"
