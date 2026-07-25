@@ -2813,6 +2813,24 @@ function ToolsTab({
                   </p>
                   <p className="text-xs text-muted-foreground">{meta.label}</p>
                 </div>
+                {tool.type === "transferCall" && (
+                  <div className="space-y-2 rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      A IA só transfere quando o System Prompt diz em quais situações fazer isso.
+                      Insira a regra automaticamente:
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isInsertingRule}
+                      onClick={() => handleInsertPromptRule(tool)}
+                      className="h-7 w-full gap-1.5 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      {isInsertingRule ? "Inserindo..." : "Inserir regra no prompt"}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
