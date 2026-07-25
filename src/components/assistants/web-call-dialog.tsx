@@ -113,6 +113,16 @@ function formatCallError(error: unknown): string {
       `Detalhe técnico: ${detail}`,
     ].join("\n");
   }
+  if (n.includes("meeting has ended") || n.includes("meeting ended")) {
+    // Limitação oficial da Vapi: chamadas web não podem ser transferidas para
+    // números de telefone — ao acionar o transferCall a sala é encerrada.
+    return [
+      "Problema: a sala do teste no navegador foi encerrada.",
+      "Causa mais comum: a assistente acionou a ferramenta de transferência (transferCall). A Vapi NÃO permite transferir uma chamada web para um número de telefone — a sala cai na hora.",
+      "Como resolver: para validar a transferência, ligue de um telefone real usando um número da aba Telefonia. A configuração do transferCall está correta e funciona em ligações telefônicas.",
+      `Detalhe técnico: ${detail}`,
+    ].join("\n");
+  }
   return [
     "Problema: a ligação de teste não pôde ser iniciada.",
     "Como resolver: confira modelo, voz e transcriber da assistente e tente novamente.",
