@@ -1859,9 +1859,61 @@ interface ToolsTabProps {
   isLoading: boolean;
 }
 
+type TransferMode =
+  | "blind-transfer"
+  | "blind-transfer-add-summary-to-sip-header"
+  | "warm-transfer-say-message"
+  | "warm-transfer-say-summary"
+  | "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+
+const TRANSFER_MODE_OPTIONS: { value: TransferMode; label: string; hint: string }[] = [
+  {
+    value: "blind-transfer",
+    label: "Transferência direta (blind)",
+    hint: "Passa a ligação imediatamente, sem avisar quem recebe.",
+  },
+  {
+    value: "blind-transfer-add-summary-to-sip-header",
+    label: "Direta + resumo no cabeçalho SIP",
+    hint: "Igual à direta, mas envia um resumo da conversa no header SIP.",
+  },
+  {
+    value: "warm-transfer-say-message",
+    label: "Assistida — falar mensagem",
+    hint: "A IA fala uma mensagem para quem recebe antes de conectar.",
+  },
+  {
+    value: "warm-transfer-say-summary",
+    label: "Assistida — falar resumo",
+    hint: "A IA resume a conversa para quem recebe antes de conectar.",
+  },
+  {
+    value: "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message",
+    label: "Assistida — esperar o atendente falar",
+    hint: "Aguarda o atendente atender e falar, depois a IA passa a mensagem.",
+  },
+];
+
+interface TransferDestinationBase {
+  /** Condição em linguagem natural que a IA avalia para disparar a transferência. */
+  description: string;
+  /** O que a IA fala para o cliente antes de transferir. */
+  message: string;
+  mode: TransferMode;
+  /** Mensagem dita para quem recebe (modos warm que exigem mensagem). */
+  warmMessage: string;
+}
+
 type TransferDestination =
-  | { type: "number"; number: string }
-  | { type: "sip"; sipUri: string };
+  | ({ type: "number"; number: string } & TransferDestinationBase)
+  | ({ type: "sip"; sipUri: string } & TransferDestinationBase);
+
+const EMPTY_TRANSFER_FIELDS: TransferDestinationBase = {
+  description: "",
+  message: "",
+  mode: "blind-transfer",
+  warmMessage: "",
+};
 
 type TransferMessageType =
   | "request-start"
