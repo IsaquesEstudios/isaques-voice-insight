@@ -321,7 +321,9 @@ function sanitizeModelTool(tool: any): any {
   if (tool.type === "transferCall") {
     return {
       type: "transferCall",
-      ...(Array.isArray(tool.destinations) ? { destinations: tool.destinations } : {}),
+      ...(Array.isArray(tool.destinations)
+        ? { destinations: tool.destinations.map(sanitizeTransferDestination) }
+        : {}),
       ...(Array.isArray(tool.messages) && tool.messages.length > 0
         ? { messages: tool.messages.map(sanitizeToolMessage) }
         : {}),
