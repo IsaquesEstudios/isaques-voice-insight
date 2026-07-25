@@ -2239,11 +2239,23 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       const tool: VapiTool = {
         type: "transferCall",
         name,
-        destinations: tcDestinations.map((d) =>
-          d.type === "number"
-            ? { type: "number", number: d.number.trim() }
-            : { type: "sip", sipUri: d.sipUri.trim() },
-        ),
+        destinations: tcDestinations.map((d) => {
+          const needsWarmMessage =
+            d.mode === "warm-transfer-say-message" ||
+            d.mode === "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+          const transferPlan: Record<string, unknown> = { mode: d.mode };
+          if (needsWarmMessage && d.warmMessage.trim()) {
+            transferPlan.message = d.warmMessage.trim();
+          }
+          return {
+            ...(d.type === "number"
+              ? { type: "number" as const, number: d.number.trim() }
+              : { type: "sip" as const, sipUri: d.sipUri.trim() }),
+            ...(d.description.trim() ? { description: d.description.trim() } : {}),
+            ...(d.message.trim() ? { message: d.message.trim() } : {}),
+            transferPlan,
+          };
+        }),
       };
       if (tcDescription.trim()) tool.description = tcDescription.trim();
       if (tcMessages.length > 0) {
