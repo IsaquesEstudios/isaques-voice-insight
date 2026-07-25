@@ -1210,6 +1210,8 @@ function AssistantDetailPage() {
               tools={tools}
               onToolsChange={setTools}
               isLoading={isLoading}
+              systemPrompt={form.systemPrompt}
+              onSystemPromptChange={(value) => setForm((f) => ({ ...f, systemPrompt: value }))}
             />
           </TabsContent>
           <TabsContent value="analysis" className="mt-0">
@@ -1857,11 +1859,65 @@ interface ToolsTabProps {
   tools: VapiTool[];
   onToolsChange: (tools: VapiTool[]) => void;
   isLoading: boolean;
+  systemPrompt: string;
+  onSystemPromptChange: (value: string) => void;
+}
+
+type TransferMode =
+  | "blind-transfer"
+  | "blind-transfer-add-summary-to-sip-header"
+  | "warm-transfer-say-message"
+  | "warm-transfer-say-summary"
+  | "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+
+const TRANSFER_MODE_OPTIONS: { value: TransferMode; label: string; hint: string }[] = [
+  {
+    value: "blind-transfer",
+    label: "Transferência direta (blind)",
+    hint: "Passa a ligação imediatamente, sem avisar quem recebe.",
+  },
+  {
+    value: "blind-transfer-add-summary-to-sip-header",
+    label: "Direta + resumo no cabeçalho SIP",
+    hint: "Igual à direta, mas envia um resumo da conversa no header SIP.",
+  },
+  {
+    value: "warm-transfer-say-message",
+    label: "Assistida — falar mensagem",
+    hint: "A IA fala uma mensagem para quem recebe antes de conectar.",
+  },
+  {
+    value: "warm-transfer-say-summary",
+    label: "Assistida — falar resumo",
+    hint: "A IA resume a conversa para quem recebe antes de conectar.",
+  },
+  {
+    value: "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message",
+    label: "Assistida — esperar o atendente falar",
+    hint: "Aguarda o atendente atender e falar, depois a IA passa a mensagem.",
+  },
+];
+
+interface TransferDestinationBase {
+  /** Condição em linguagem natural que a IA avalia para disparar a transferência. */
+  description: string;
+  /** O que a IA fala para o cliente antes de transferir. */
+  message: string;
+  mode: TransferMode;
+  /** Mensagem dita para quem recebe (modos warm que exigem mensagem). */
+  warmMessage: string;
 }
 
 type TransferDestination =
-  | { type: "number"; number: string }
-  | { type: "sip"; sipUri: string };
+  | ({ type: "number"; number: string } & TransferDestinationBase)
+  | ({ type: "sip"; sipUri: string } & TransferDestinationBase);
+
+const EMPTY_TRANSFER_FIELDS: TransferDestinationBase = {
+  description: "",
+  message: "",
+  mode: "blind-transfer",
+  warmMessage: "",
+};
 
 type TransferMessageType =
   | "request-start"
@@ -1910,8 +1966,16 @@ interface VoicemailMessage {
   content: string;
 }
 
-function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
+function ToolsTab({
+  id,
+  tools,
+  onToolsChange,
+  isLoading,
+  systemPrompt,
+  onSystemPromptChange,
+}: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
+  const [isInsertingRule, setIsInsertingRule] = useState(false);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"select" | "configure">("select");
   const [selected, setSelected] = useState<CatalogItem | null>(null);
@@ -2187,11 +2251,23 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
       const tool: VapiTool = {
         type: "transferCall",
         name,
-        destinations: tcDestinations.map((d) =>
-          d.type === "number"
-            ? { type: "number", number: d.number.trim() }
-            : { type: "sip", sipUri: d.sipUri.trim() },
-        ),
+        destinations: tcDestinations.map((d) => {
+          const needsWarmMessage =
+            d.mode === "warm-transfer-say-message" ||
+            d.mode === "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+          const transferPlan: Record<string, unknown> = { mode: d.mode };
+          if (needsWarmMessage && d.warmMessage.trim()) {
+            transferPlan.message = d.warmMessage.trim();
+          }
+          return {
+            ...(d.type === "number"
+              ? { type: "number" as const, number: d.number.trim() }
+              : { type: "sip" as const, sipUri: d.sipUri.trim() }),
+            ...(d.description.trim() ? { description: d.description.trim() } : {}),
+            ...(d.message.trim() ? { message: d.message.trim() } : {}),
+            transferPlan,
+          };
+        }),
       };
       if (tcDescription.trim()) tool.description = tcDescription.trim();
       if (tcMessages.length > 0) {
@@ -2627,6 +2703,55 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
     }
   }
 
+  // A Vapi nunca transfere "sozinha": o modelo precisa decidir chamar a tool.
+  // Esta função gera a regra em texto e injeta no System Prompt, que é o que
+  // realmente faz a transferência acontecer durante a ligação.
+  function buildTransferPromptRule(tool: VapiTool): string {
+    const destinations = Array.isArray(tool.destinations) ? tool.destinations : [];
+    const lines = destinations.map((d) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dest = d as any;
+      const target = dest.type === "sip" ? dest.sipUri : dest.number;
+      const when = dest.description?.trim() || "o cliente pedir para falar com um atendente humano";
+      const say = dest.message?.trim();
+      return `- Se ${when}, transfira a ligação para ${target} usando a ferramenta "${tool.name ?? "transferCall"}".${
+        say ? ` Antes de transferir, diga: "${say}".` : ""
+      }`;
+    });
+    return [
+      "## Regras de transferência",
+      ...lines,
+      "Nunca invente números: use apenas os destinos configurados. Se nenhuma condição acima for atendida, continue o atendimento normalmente.",
+    ].join("\n");
+  }
+
+  async function handleInsertPromptRule(tool: VapiTool) {
+    const rule = buildTransferPromptRule(tool);
+    if (systemPrompt.includes("## Regras de transferência")) {
+      toast.info("O prompt já contém uma seção de regras de transferência.", {
+        description: "Edite manualmente na aba Assistente para evitar regras duplicadas.",
+      });
+      return;
+    }
+    const next = systemPrompt.trim() ? `${systemPrompt.trim()}\n\n${rule}` : rule;
+    setIsInsertingRule(true);
+    try {
+      await saveConfig({ data: { id, systemPrompt: next } });
+      onSystemPromptChange(next);
+      toast.success("Regra inserida no System Prompt.", {
+        description: "O assistente agora sabe quando acionar a transferência.",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao inserir a regra no prompt.", {
+        description: err instanceof Error ? err.message.slice(0, 300) : undefined,
+      });
+    } finally {
+      setIsInsertingRule(false);
+    }
+  }
+
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2688,6 +2813,24 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                   </p>
                   <p className="text-xs text-muted-foreground">{meta.label}</p>
                 </div>
+                {tool.type === "transferCall" && (
+                  <div className="space-y-2 rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      A IA só transfere quando o System Prompt diz em quais situações fazer isso.
+                      Insira a regra automaticamente:
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isInsertingRule}
+                      onClick={() => handleInsertPromptRule(tool)}
+                      className="h-7 w-full gap-1.5 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      {isInsertingRule ? "Inserindo..." : "Inserir regra no prompt"}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
@@ -2887,7 +3030,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                           <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                             <DropdownMenuItem
                               onClick={() =>
-                                setTcDestinations((p) => [...p, { type: "number", number: "" }])
+                                setTcDestinations((p) => [
+                                  ...p,
+                                  { type: "number", number: "", ...EMPTY_TRANSFER_FIELDS },
+                                ])
                               }
                             >
                               <Phone className="mr-2 h-3.5 w-3.5" />
@@ -2895,7 +3041,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                setTcDestinations((p) => [...p, { type: "sip", sipUri: "" }])
+                                setTcDestinations((p) => [
+                                  ...p,
+                                  { type: "sip", sipUri: "", ...EMPTY_TRANSFER_FIELDS },
+                                ])
                               }
                             >
                               <Radio className="mr-2 h-3.5 w-3.5" />
@@ -2913,59 +3062,125 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          {tcDestinations.map((d, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-background/40 p-2 backdrop-blur-xl"
-                            >
-                              <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                {d.type === "number" ? "Phone" : "SIP"}
-                              </span>
-                              {d.type === "number" ? (
-                                <PhoneNumberInput
-                                  value={d.number}
-                                  onChange={(val) =>
-                                    setTcDestinations((prev) =>
-                                      prev.map((it, i) =>
-                                        i !== idx || it.type !== "number"
-                                          ? it
-                                          : { ...it, number: val },
-                                      ),
-                                    )
-                                  }
-                                  className="flex-1"
-                                />
-                              ) : (
-                                <Input
-                                  value={d.sipUri}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setTcDestinations((prev) =>
-                                      prev.map((it, i) =>
-                                        i !== idx || it.type !== "sip"
-                                          ? it
-                                          : { ...it, sipUri: val },
-                                      ),
-                                    );
-                                  }}
-                                  placeholder="sip:user@domain.com"
-                                  className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                                />
-                              )}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() =>
-                                  setTcDestinations((prev) => prev.filter((_, i) => i !== idx))
-                                }
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                aria-label="Remover destino"
+                        <div className="space-y-3">
+                          {tcDestinations.map((d, idx) => {
+                            const patch = (fields: Partial<TransferDestination>) =>
+                              setTcDestinations((prev) =>
+                                prev.map((it, i) =>
+                                  i !== idx ? it : ({ ...it, ...fields } as TransferDestination),
+                                ),
+                              );
+                            const needsWarmMessage =
+                              d.mode === "warm-transfer-say-message" ||
+                              d.mode ===
+                                "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+                            return (
+                              <div
+                                key={idx}
+                                className="space-y-3 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
                               >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {d.type === "number" ? "Phone" : "SIP"}
+                                  </span>
+                                  {d.type === "number" ? (
+                                    <PhoneNumberInput
+                                      value={d.number}
+                                      onChange={(val) => patch({ number: val } as Partial<TransferDestination>)}
+                                      className="flex-1"
+                                    />
+                                  ) : (
+                                    <Input
+                                      value={d.sipUri}
+                                      onChange={(e) =>
+                                        patch({ sipUri: e.target.value } as Partial<TransferDestination>)
+                                      }
+                                      placeholder="sip:user@domain.com"
+                                      className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                    />
+                                  )}
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      setTcDestinations((prev) => prev.filter((_, i) => i !== idx))
+                                    }
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    aria-label="Remover destino"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-medium text-muted-foreground">
+                                    Quando transferir (condição)
+                                  </Label>
+                                  <Textarea
+                                    value={d.description}
+                                    onChange={(e) => patch({ description: e.target.value })}
+                                    rows={2}
+                                    placeholder="Ex.: quando o cliente pedir para falar com um humano, ou quando perguntar sobre cobrança/financeiro."
+                                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                  />
+                                  <p className="text-[10px] text-muted-foreground/70">
+                                    É esta descrição que a IA usa para decidir sozinha quando chamar a
+                                    transferência. Sem ela, a transferência nunca dispara.
+                                  </p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-medium text-muted-foreground">
+                                    Mensagem ao cliente antes de transferir
+                                  </Label>
+                                  <Input
+                                    value={d.message}
+                                    onChange={(e) => patch({ message: e.target.value })}
+                                    placeholder="Só um momento, vou te transferir para um especialista."
+                                    className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                  />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-medium text-muted-foreground">
+                                    Modo de transferência
+                                  </Label>
+                                  <Select
+                                    value={d.mode}
+                                    onValueChange={(v) => patch({ mode: v as TransferMode })}
+                                  >
+                                    <SelectTrigger className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                      {TRANSFER_MODE_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                          {opt.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-[10px] text-muted-foreground/70">
+                                    {TRANSFER_MODE_OPTIONS.find((o) => o.value === d.mode)?.hint}
+                                  </p>
+                                </div>
+
+                                {needsWarmMessage && (
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[11px] font-medium text-muted-foreground">
+                                      Mensagem para quem recebe a ligação
+                                    </Label>
+                                    <Input
+                                      value={d.warmMessage}
+                                      onChange={(e) => patch({ warmMessage: e.target.value })}
+                                      placeholder="Olá, estou passando um cliente interessado no plano premium."
+                                      className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

@@ -301,6 +301,58 @@ function sanitizeToolMessage(message: any): any {
   return sanitized;
 }
 
+// A transferCall destination carries the routing target plus the fields the
+// LLM uses to decide *when* to transfer (`description`), what it says to the
+// caller right before transferring (`message`), and how the handoff happens
+// (`transferPlan`). Passing the array through raw dropped these, so the model
+// had no trigger condition and never fired the tool on its own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sanitizeTransferDestination(destination: any): any {
+  if (!destination || typeof destination !== "object") return destination;
+  const isSip = destination.type === "sip";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const out: any = isSip
+    ? { type: "sip", sipUri: destination.sipUri }
+    : { type: "number", number: destination.number };
+
+  if (!isSip && typeof destination.numberE164CheckEnabled === "boolean") {
+    out.numberE164CheckEnabled = destination.numberE164CheckEnabled;
+  }
+  if (typeof destination.extension === "string" && destination.extension.trim()) {
+    out.extension = destination.extension.trim();
+  }
+  if (typeof destination.description === "string" && destination.description.trim()) {
+    out.description = destination.description.trim();
+  }
+  if (typeof destination.message === "string" && destination.message.trim()) {
+    out.message = destination.message.trim();
+  }
+  if (destination.transferPlan && typeof destination.transferPlan === "object") {
+    const mode = destination.transferPlan.mode;
+    if (typeof mode === "string" && mode) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const plan: any = { mode };
+      const planMessage = destination.transferPlan.message;
+      const needsMessage =
+        mode === "warm-transfer-say-message" ||
+        mode === "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+      if (needsMessage && typeof planMessage === "string" && planMessage.trim()) {
+        plan.message = planMessage.trim();
+      }
+      if (
+        mode === "warm-transfer-say-summary" ||
+        mode === "blind-transfer-add-summary-to-sip-header"
+      ) {
+        const summaryPlan = destination.transferPlan.summaryPlan;
+        if (summaryPlan && typeof summaryPlan === "object") plan.summaryPlan = summaryPlan;
+      }
+      out.transferPlan = plan;
+    }
+  }
+  return out;
+}
+
+
 // Vapi's transient tools inside assistant.model.tools are strict. Some native
 // dashboard controls expose display fields, but built-in tools reject them in
 // the API payload (ex: endCall/transferCall reject top-level name/description).
@@ -321,7 +373,9 @@ function sanitizeModelTool(tool: any): any {
   if (tool.type === "transferCall") {
     return {
       type: "transferCall",
-      ...(Array.isArray(tool.destinations) ? { destinations: tool.destinations } : {}),
+      ...(Array.isArray(tool.destinations)
+        ? { destinations: tool.destinations.map(sanitizeTransferDestination) }
+        : {}),
       ...(Array.isArray(tool.messages) && tool.messages.length > 0
         ? { messages: tool.messages.map(sanitizeToolMessage) }
         : {}),
