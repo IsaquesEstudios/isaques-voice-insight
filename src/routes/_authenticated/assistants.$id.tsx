@@ -2703,6 +2703,55 @@ function ToolsTab({
     }
   }
 
+  // A Vapi nunca transfere "sozinha": o modelo precisa decidir chamar a tool.
+  // Esta função gera a regra em texto e injeta no System Prompt, que é o que
+  // realmente faz a transferência acontecer durante a ligação.
+  function buildTransferPromptRule(tool: VapiTool): string {
+    const destinations = Array.isArray(tool.destinations) ? tool.destinations : [];
+    const lines = destinations.map((d) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dest = d as any;
+      const target = dest.type === "sip" ? dest.sipUri : dest.number;
+      const when = dest.description?.trim() || "o cliente pedir para falar com um atendente humano";
+      const say = dest.message?.trim();
+      return `- Se ${when}, transfira a ligação para ${target} usando a ferramenta "${tool.name ?? "transferCall"}".${
+        say ? ` Antes de transferir, diga: "${say}".` : ""
+      }`;
+    });
+    return [
+      "## Regras de transferência",
+      ...lines,
+      "Nunca invente números: use apenas os destinos configurados. Se nenhuma condição acima for atendida, continue o atendimento normalmente.",
+    ].join("\n");
+  }
+
+  async function handleInsertPromptRule(tool: VapiTool) {
+    const rule = buildTransferPromptRule(tool);
+    if (systemPrompt.includes("## Regras de transferência")) {
+      toast.info("O prompt já contém uma seção de regras de transferência.", {
+        description: "Edite manualmente na aba Assistente para evitar regras duplicadas.",
+      });
+      return;
+    }
+    const next = systemPrompt.trim() ? `${systemPrompt.trim()}\n\n${rule}` : rule;
+    setIsInsertingRule(true);
+    try {
+      await saveConfig({ data: { id, systemPrompt: next } });
+      onSystemPromptChange(next);
+      toast.success("Regra inserida no System Prompt.", {
+        description: "O assistente agora sabe quando acionar a transferência.",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao inserir a regra no prompt.", {
+        description: err instanceof Error ? err.message.slice(0, 300) : undefined,
+      });
+    } finally {
+      setIsInsertingRule(false);
+    }
+  }
+
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
