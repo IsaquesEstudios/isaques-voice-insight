@@ -1210,6 +1210,8 @@ function AssistantDetailPage() {
               tools={tools}
               onToolsChange={setTools}
               isLoading={isLoading}
+              systemPrompt={form.systemPrompt}
+              onSystemPromptChange={(value) => setForm((f) => ({ ...f, systemPrompt: value }))}
             />
           </TabsContent>
           <TabsContent value="analysis" className="mt-0">
