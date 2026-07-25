@@ -1966,8 +1966,16 @@ interface VoicemailMessage {
   content: string;
 }
 
-function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
+function ToolsTab({
+  id,
+  tools,
+  onToolsChange,
+  isLoading,
+  systemPrompt,
+  onSystemPromptChange,
+}: ToolsTabProps) {
   const saveConfig = useServerFn(saveVapiAssistantConfig);
+  const [isInsertingRule, setIsInsertingRule] = useState(false);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"select" | "configure">("select");
   const [selected, setSelected] = useState<CatalogItem | null>(null);
