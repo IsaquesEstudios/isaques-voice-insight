@@ -1857,6 +1857,8 @@ interface ToolsTabProps {
   tools: VapiTool[];
   onToolsChange: (tools: VapiTool[]) => void;
   isLoading: boolean;
+  systemPrompt: string;
+  onSystemPromptChange: (value: string) => void;
 }
 
 type TransferMode =
