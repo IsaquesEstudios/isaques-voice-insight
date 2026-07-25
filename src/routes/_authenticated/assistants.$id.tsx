@@ -2994,6 +2994,13 @@ function ToolsTab({
                           Padrão da Vapi é <span className="font-mono">transferCall</span>. Edite se necessário.
                         </p>
                       </div>
+
+                      <p className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-2.5 text-[11px] leading-relaxed text-amber-300/90">
+                        A Vapi não permite transferir chamadas de teste no navegador para números de
+                        telefone — a sala é encerrada assim que a IA aciona a transferência. Valide
+                        a transferência ligando de um telefone real, usando um número da aba
+                        Telefonia.
+                      </p>
                       <div className="space-y-2">
                         <Label htmlFor="tc-desc" className="text-xs">Description</Label>
                         <Textarea
