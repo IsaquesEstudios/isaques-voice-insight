@@ -2939,7 +2939,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                           <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
                             <DropdownMenuItem
                               onClick={() =>
-                                setTcDestinations((p) => [...p, { type: "number", number: "" }])
+                                setTcDestinations((p) => [
+                                  ...p,
+                                  { type: "number", number: "", ...EMPTY_TRANSFER_FIELDS },
+                                ])
                               }
                             >
                               <Phone className="mr-2 h-3.5 w-3.5" />
@@ -2947,7 +2950,10 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() =>
-                                setTcDestinations((p) => [...p, { type: "sip", sipUri: "" }])
+                                setTcDestinations((p) => [
+                                  ...p,
+                                  { type: "sip", sipUri: "", ...EMPTY_TRANSFER_FIELDS },
+                                ])
                               }
                             >
                               <Radio className="mr-2 h-3.5 w-3.5" />
@@ -2965,59 +2971,125 @@ function ToolsTab({ id, tools, onToolsChange, isLoading }: ToolsTabProps) {
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          {tcDestinations.map((d, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-background/40 p-2 backdrop-blur-xl"
-                            >
-                              <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                {d.type === "number" ? "Phone" : "SIP"}
-                              </span>
-                              {d.type === "number" ? (
-                                <PhoneNumberInput
-                                  value={d.number}
-                                  onChange={(val) =>
-                                    setTcDestinations((prev) =>
-                                      prev.map((it, i) =>
-                                        i !== idx || it.type !== "number"
-                                          ? it
-                                          : { ...it, number: val },
-                                      ),
-                                    )
-                                  }
-                                  className="flex-1"
-                                />
-                              ) : (
-                                <Input
-                                  value={d.sipUri}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setTcDestinations((prev) =>
-                                      prev.map((it, i) =>
-                                        i !== idx || it.type !== "sip"
-                                          ? it
-                                          : { ...it, sipUri: val },
-                                      ),
-                                    );
-                                  }}
-                                  placeholder="sip:user@domain.com"
-                                  className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
-                                />
-                              )}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() =>
-                                  setTcDestinations((prev) => prev.filter((_, i) => i !== idx))
-                                }
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                aria-label="Remover destino"
+                        <div className="space-y-3">
+                          {tcDestinations.map((d, idx) => {
+                            const patch = (fields: Partial<TransferDestination>) =>
+                              setTcDestinations((prev) =>
+                                prev.map((it, i) =>
+                                  i !== idx ? it : ({ ...it, ...fields } as TransferDestination),
+                                ),
+                              );
+                            const needsWarmMessage =
+                              d.mode === "warm-transfer-say-message" ||
+                              d.mode ===
+                                "warm-transfer-wait-for-operator-to-speak-first-and-then-say-message";
+                            return (
+                              <div
+                                key={idx}
+                                className="space-y-3 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
                               >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {d.type === "number" ? "Phone" : "SIP"}
+                                  </span>
+                                  {d.type === "number" ? (
+                                    <PhoneNumberInput
+                                      value={d.number}
+                                      onChange={(val) => patch({ number: val } as Partial<TransferDestination>)}
+                                      className="flex-1"
+                                    />
+                                  ) : (
+                                    <Input
+                                      value={d.sipUri}
+                                      onChange={(e) =>
+                                        patch({ sipUri: e.target.value } as Partial<TransferDestination>)
+                                      }
+                                      placeholder="sip:user@domain.com"
+                                      className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                    />
+                                  )}
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      setTcDestinations((prev) => prev.filter((_, i) => i !== idx))
+                                    }
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    aria-label="Remover destino"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-medium text-muted-foreground">
+                                    Quando transferir (condição)
+                                  </Label>
+                                  <Textarea
+                                    value={d.description}
+                                    onChange={(e) => patch({ description: e.target.value })}
+                                    rows={2}
+                                    placeholder="Ex.: quando o cliente pedir para falar com um humano, ou quando perguntar sobre cobrança/financeiro."
+                                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                  />
+                                  <p className="text-[10px] text-muted-foreground/70">
+                                    É esta descrição que a IA usa para decidir sozinha quando chamar a
+                                    transferência. Sem ela, a transferência nunca dispara.
+                                  </p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-medium text-muted-foreground">
+                                    Mensagem ao cliente antes de transferir
+                                  </Label>
+                                  <Input
+                                    value={d.message}
+                                    onChange={(e) => patch({ message: e.target.value })}
+                                    placeholder="Só um momento, vou te transferir para um especialista."
+                                    className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                  />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-medium text-muted-foreground">
+                                    Modo de transferência
+                                  </Label>
+                                  <Select
+                                    value={d.mode}
+                                    onValueChange={(v) => patch({ mode: v as TransferMode })}
+                                  >
+                                    <SelectTrigger className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                      {TRANSFER_MODE_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                          {opt.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-[10px] text-muted-foreground/70">
+                                    {TRANSFER_MODE_OPTIONS.find((o) => o.value === d.mode)?.hint}
+                                  </p>
+                                </div>
+
+                                {needsWarmMessage && (
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[11px] font-medium text-muted-foreground">
+                                      Mensagem para quem recebe a ligação
+                                    </Label>
+                                    <Input
+                                      value={d.warmMessage}
+                                      onChange={(e) => patch({ warmMessage: e.target.value })}
+                                      placeholder="Olá, estou passando um cliente interessado no plano premium."
+                                      className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
