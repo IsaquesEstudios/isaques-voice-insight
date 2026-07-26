@@ -1144,10 +1144,33 @@ function TelefoniaPage() {
                             </AlertDescription>
                           </Alert>
                         ) : (
-                          <p className="text-[11px] text-muted-foreground">
-                            Origem automática: <span className="font-mono">{from}</span>
-                          </p>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Número de origem
+                            </Label>
+                            <Select
+                              value={from}
+                              onValueChange={(v) =>
+                                setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
+                              }
+                            >
+                              <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                                <SelectValue placeholder="Selecione o número de origem" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {numbers.map((n) => (
+                                  <SelectItem key={n.id} value={n.phone_number}>
+                                    <span className="font-mono">{n.phone_number}</span>
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {n.provider}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
+
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                             Assistente
