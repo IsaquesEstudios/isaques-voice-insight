@@ -28,7 +28,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { getTwilioConnection, getTwilioBalance } from "@/lib/twilio.functions";
-import { getVapiCredits } from "@/lib/vapi.functions";
+import { getVapiEstimatedCredits } from "@/lib/vapi.functions";
 
 type NavItem = {
   title: string;
