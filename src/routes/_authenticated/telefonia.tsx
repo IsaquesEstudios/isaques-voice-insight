@@ -88,6 +88,8 @@ import {
   attachAssistantToNumber,
   createOutboundTestCall,
   detachAssistantFromNumber,
+  resyncVapiNumberCredentials,
+
   getVapiCallStatus,
 
   listVapiAssistants,
@@ -436,6 +438,17 @@ function TelefoniaPage() {
 
 
   const callStatusFn = useServerFn(getVapiCallStatus);
+  const resyncFn = useServerFn(resyncVapiNumberCredentials);
+  const resyncMutation = useMutation({
+    mutationFn: (phoneNumberE164: string) => resyncFn({ data: { phoneNumberE164 } }),
+    onSuccess: (res) => {
+      if (res.ok) toast.success(res.message);
+      else toast.error(res.message);
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao ressincronizar."),
+  });
+
   const [lastCallDiag, setLastCallDiag] = useState<{
     status: string | null;
     endedReason: string | null;
@@ -989,6 +1002,13 @@ function TelefoniaPage() {
                                     Remover atendente
                                   </DropdownMenuItem>
                                 ) : null}
+                                <DropdownMenuItem
+                                  onClick={() => resyncMutation.mutate(n.phone_number)}
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Ressincronizar credenciais Twilio
+                                </DropdownMenuItem>
+
                                 <DropdownMenuItem
                                   onClick={() => setReleaseTarget(n)}
                                   className="text-destructive focus:text-destructive"
