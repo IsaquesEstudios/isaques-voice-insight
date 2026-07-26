@@ -3025,7 +3025,16 @@ function ToolsTab({
           return (
             <Card
               key={index}
-              className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+              role="button"
+              tabIndex={0}
+              onClick={() => openEditDialog(tool, index)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openEditDialog(tool, index);
+                }
+              }}
+              className="group relative cursor-pointer overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
             >
               <CardContent className="relative space-y-4 p-5">
                 <div className="flex items-start justify-between">
@@ -3038,16 +3047,25 @@ function ToolsTab({
                   >
                     <Icon className="h-5 w-5" />
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDelete(index)}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    aria-label="Excluir ferramenta"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                      Editar
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(index);
+                      }}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      aria-label="Excluir ferramenta"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
+
                 <div className="space-y-1">
                   <p className="font-mono text-sm font-semibold text-foreground">
                     {toolTitle(tool)}
