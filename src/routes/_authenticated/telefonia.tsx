@@ -433,6 +433,30 @@ function TelefoniaPage() {
 
 
 
+  const callStatusFn = useServerFn(getVapiCallStatus);
+  const [lastCallDiag, setLastCallDiag] = useState<{
+    status: string | null;
+    endedReason: string | null;
+  } | null>(null);
+
+  const watchCall = async (callId: string) => {
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        const s = await callStatusFn({ data: { callId } });
+        setLastCallDiag({ status: s.status, endedReason: s.endedReason });
+        if (s.endedReason || s.status === "ended") {
+          if (s.endedReason && !/customer-ended-call|assistant-ended-call/.test(s.endedReason)) {
+            toast.error(`Chamada encerrada pela Vapi: ${s.endedReason}`);
+          }
+          return;
+        }
+      } catch {
+        return;
+      }
+    }
+  };
+
   const testCallMutation = useMutation({
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
@@ -448,6 +472,7 @@ function TelefoniaPage() {
           new Error("Conecte um número em 'Conectar Número' antes de testar a ligação."),
         );
       }
+      setLastCallDiag(null);
       return outboundCallFn({
         data: {
           assistantId,
@@ -456,14 +481,17 @@ function TelefoniaPage() {
         },
       });
     },
-    onSuccess: () =>
+    onSuccess: (res) => {
       toast.success(
         "Chamada iniciada! Atenda o celular e, se solicitado, pressione qualquer tecla.",
-      ),
+      );
+      if (res?.callId) void watchCall(res.callId);
+    },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada"),
     onSettled: () => setCallingContactId(null),
   });
+
 
 
 
