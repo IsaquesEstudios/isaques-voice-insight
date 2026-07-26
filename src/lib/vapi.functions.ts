@@ -1129,6 +1129,48 @@ export const detachAssistantFromNumber = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+// Reaplica as credenciais Twilio atuais do usuário no número já cadastrado na
+// Vapi. Corrige "call.start.error-get-transport", que acontece quando o
+// número foi importado com um Account SID / Auth Token antigo ou inválido.
+export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { phoneNumberE164: string }) => {
+    if (!input?.phoneNumberE164) throw new Error("phoneNumberE164 é obrigatório");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
+    if (!creds)
+      return {
+        ok: false as const,
+        message: "Conecte sua conta Twilio antes de ressincronizar o número.",
+      };
+
+    const all = (await vapiFetch("/phone-number", { method: "GET" })) as
+      | VapiPhoneNumberRaw[]
+      | null;
+    const existing = Array.isArray(all)
+      ? all.find((n) => (n.number as string | undefined) === data.phoneNumberE164)
+      : undefined;
+    if (!existing)
+      return { ok: false as const, message: "Número não encontrado na sua conta Vapi." };
+
+    try {
+      await vapiFetch(`/phone-number/${existing.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          twilioAccountSid: creds.accountSid,
+          twilioAuthToken: creds.authToken,
+        }),
+      });
+      return { ok: true as const, message: "Credenciais Twilio ressincronizadas." };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao ressincronizar.";
+      return { ok: false as const, message: msg };
+    }
+  });
+
+
 // Outbound test call — POST /call. Accepts either an existing Vapi
 // phone-number id OR an E.164 number (imports it via the user's Twilio
 // creds if not yet on Vapi).
