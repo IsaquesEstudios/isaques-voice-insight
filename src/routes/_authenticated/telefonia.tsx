@@ -88,6 +88,7 @@ import {
   attachAssistantToNumber,
   createOutboundTestCall,
   detachAssistantFromNumber,
+  deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
 
   getVapiCallStatus,
