@@ -1738,7 +1738,7 @@ const TOOL_CATALOG: CatalogSection[] = [
     title: "Phone Call Tools",
     items: [
       { key: "transferCall", label: "Transfer Call", description: "Encaminha a ligação para um número externo.", icon: PhoneForwarded, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "transferCall", vapiType: "transferCall", beta: true },
-      { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall", locked: true },
+      { key: "endCall", label: "Finalizar Chamada", description: "Permite que a IA encerre a ligação quando a conversa terminar.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall", beta: true },
       { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "voicemail", vapiType: "voicemail", locked: true },
       { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf", locked: true },
       { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "sms", vapiType: "sms", locked: true },
