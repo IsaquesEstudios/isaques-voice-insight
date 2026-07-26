@@ -31,7 +31,8 @@ import {
   getVapiConnection,
   saveVapiCredentials,
   updateVapiPublicKey,
-  getVapiCredits,
+  getVapiEstimatedCredits,
+  saveVapiBudget,
 } from "@/lib/vapi.functions";
 import {
   getTwilioConnection,
