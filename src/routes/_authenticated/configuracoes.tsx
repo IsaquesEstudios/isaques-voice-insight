@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/shell";
