@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  RefreshCw,
 } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -30,10 +31,12 @@ import {
   getVapiConnection,
   saveVapiCredentials,
   updateVapiPublicKey,
+  getVapiCredits,
 } from "@/lib/vapi.functions";
 import {
   getTwilioConnection,
   saveTwilioCredentials,
+  getTwilioBalance,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
