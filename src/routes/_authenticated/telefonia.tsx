@@ -530,6 +530,33 @@ function TelefoniaPage() {
     }
   };
 
+  // ---- Número gratuito da Vapi ----
+  const provisionFreeVapiNumberFn = useServerFn(provisionFreeVapiNumber);
+  const [vapiAreaCode, setVapiAreaCode] = useState("");
+  const [provisioningVapi, setProvisioningVapi] = useState(false);
+
+  const handleProvisionVapiNumber = async () => {
+    setProvisioningVapi(true);
+    try {
+      const res = await provisionFreeVapiNumberFn({
+        data: { areaCode: vapiAreaCode.trim() || undefined },
+      });
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(`Número Vapi criado: ${res.number ?? res.id}`);
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setOpen(false);
+      resetModal();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao criar número Vapi.");
+    } finally {
+      setProvisioningVapi(false);
+    }
+  };
+
   const resetModal = () => {
     setTab("twilio");
     setTwilioForm({ accountSid: "", authToken: "" });
