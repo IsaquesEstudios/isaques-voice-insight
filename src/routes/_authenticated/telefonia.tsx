@@ -94,7 +94,6 @@ import {
 
   listVapiAssistants,
   listVapiPhoneNumbers,
-  provisionFreeVapiNumber,
 } from "@/lib/vapi.functions";
 
 import {
