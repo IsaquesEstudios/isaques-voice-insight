@@ -990,6 +990,13 @@ function TelefoniaPage() {
                                   </DropdownMenuItem>
                                 ) : null}
                                 <DropdownMenuItem
+                                  onClick={() => resyncMutation.mutate(n.phone_number)}
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Ressincronizar credenciais Twilio
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
                                   onClick={() => setReleaseTarget(n)}
                                   className="text-destructive focus:text-destructive"
                                 >
