@@ -3412,7 +3412,12 @@ function ToolsTab({
                                     placeholder="Só um momento, vou te transferir para um especialista."
                                     className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                                   />
+                                  <p className="text-[10px] text-muted-foreground/70">
+                                    É exatamente esta frase que a IA fala em voz alta antes de
+                                    encaminhar a ligação para este destino.
+                                  </p>
                                 </div>
+
 
                                 <div className="space-y-1.5">
                                   <Label className="text-[11px] font-medium text-muted-foreground">
