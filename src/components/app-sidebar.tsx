@@ -149,8 +149,10 @@ function SidebarCredits() {
         title="Vapi"
         value={vapiValue}
         currency="USD"
-        badge={vapiCredits.data?.plan ?? undefined}
+        badge={vapiCredits.data?.ok ? "estimado" : undefined}
         loading={vapiCredits.isLoading}
+        usageRatio={vapiCredits.data?.usageRatio}
+        lowBalance={vapiCredits.data?.lowBalance}
       />
     </div>
   );
