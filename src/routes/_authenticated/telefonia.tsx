@@ -921,11 +921,12 @@ function TelefoniaPage() {
                               <p className="font-mono text-xs font-medium text-foreground">
                                 {n.phone_number}
                               </p>
-                              {n.isTest && (
+                              {(n.isTest || /gratuito/i.test(n.provider)) && (
                                 <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                  Teste
+                                  Demo
                                 </span>
                               )}
+
                             </div>
                             <p className="text-[10px] text-muted-foreground capitalize">
                               {n.provider}
