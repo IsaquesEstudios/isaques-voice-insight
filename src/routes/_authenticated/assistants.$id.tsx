@@ -2912,21 +2912,25 @@ function ToolsTab({
   async function handleSubmit() {
     const newTool = buildTool();
     if (!newTool) return;
+    const isEditing = editIndex !== null;
     setIsSubmitting(true);
     try {
-      const nextTools = [...tools, newTool];
+      const nextTools = isEditing
+        ? tools.map((t, i) => (i === editIndex ? newTool : t))
+        : [...tools, newTool];
       await saveConfig({ data: { id, tools: nextTools } });
       onToolsChange(nextTools);
-      toast.success("Ferramenta adicionada.");
+      toast.success(isEditing ? "Ferramenta atualizada." : "Ferramenta adicionada.");
       setOpen(false);
       backToSelect();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao adicionar ferramenta.");
+      toast.error(isEditing ? "Erro ao atualizar ferramenta." : "Erro ao adicionar ferramenta.");
     } finally {
       setIsSubmitting(false);
     }
   }
+
 
   async function handleDelete(index: number) {
     const nextTools = tools.filter((_, i) => i !== index);
