@@ -361,8 +361,27 @@ function sanitizeModelTool(tool: any): any {
   if (!tool || typeof tool !== "object") return tool;
 
   if (tool.type === "endCall") {
+    // Vapi rejects top-level name/description on built-in tools, but accepts an
+    // OpenAI-style `function` block — that's how the LLM learns when to hang up.
+    const fnName =
+      typeof tool.function?.name === "string" && tool.function.name.trim()
+        ? tool.function.name.trim()
+        : typeof tool.name === "string" && tool.name.trim()
+          ? tool.name.trim()
+          : "";
+    const fnDescription =
+      typeof tool.function?.description === "string" && tool.function.description.trim()
+        ? tool.function.description.trim()
+        : typeof tool.description === "string" && tool.description.trim()
+          ? tool.description.trim()
+          : "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fn: any = {};
+    if (fnName) fn.name = fnName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+    if (fnDescription) fn.description = fnDescription.slice(0, 1000);
     return {
       type: "endCall",
+      ...(Object.keys(fn).length > 0 ? { function: fn } : {}),
       ...(Array.isArray(tool.messages) && tool.messages.length > 0
         ? { messages: tool.messages.map(sanitizeToolMessage) }
         : {}),
