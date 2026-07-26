@@ -10,7 +10,6 @@ import {
   Webhook,
   User,
   Check,
-  Shield,
   KeyRound,
   Phone,
   Loader2,
