@@ -3200,15 +3200,17 @@ function ToolsTab({
           ) : (
             <div className="flex max-h-[85vh] flex-col">
               <div className="border-b border-white/[0.06] px-6 py-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={backToSelect}
-                  className="mb-2 -ml-2 h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Voltar
-                </Button>
+                {editIndex === null && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={backToSelect}
+                    className="mb-2 -ml-2 h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Voltar
+                  </Button>
+                )}
                 <div className="flex items-center gap-3">
                   {selected && (
                     <div
@@ -3223,8 +3225,10 @@ function ToolsTab({
                   )}
                   <div>
                     <DialogTitle className="text-base">
+                      {editIndex !== null ? "Editar: " : ""}
                       {selected?.label ?? "Configurar Ferramenta"}
                     </DialogTitle>
+
                     <DialogDescription className="text-xs">
                       {selected?.description}
                     </DialogDescription>
