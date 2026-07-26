@@ -930,6 +930,17 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
     }));
   });
 
+// Deletes a phone number from the Vapi account (used for the free test number).
+export const deleteVapiPhoneNumber = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { id: string }) => ({ id: input.id }))
+  .handler(async ({ data }) => {
+    await vapiFetch(`/phone-number/${data.id}`, { method: "DELETE" });
+    return { ok: true as const };
+  });
+
+
+
 // Provisions a FREE phone number issued by Vapi itself (provider "vapi",
 // US numbers only). Useful for outbound test calls without owning a DID.
 export const provisionFreeVapiNumber = createServerFn({ method: "POST" })
