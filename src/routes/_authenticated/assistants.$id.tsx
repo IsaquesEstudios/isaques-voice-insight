@@ -2212,13 +2212,245 @@ function ToolsTab({
 
   function openDialog() {
     resetForm();
+    setEditIndex(null);
     setSelected(null);
     setStep("select");
     setOpen(true);
   }
 
+  // Preenche o formulário com os dados da ferramenta já salva na Vapi para edição.
+  function openEditDialog(tool: VapiTool, index: number) {
+    const item = findCatalogItemByVapiType(tool.type);
+    if (!item) {
+      toast.error("Este tipo de ferramenta não pode ser editado aqui.");
+      return;
+    }
+    resetForm();
+    const name = typeof tool.name === "string" ? tool.name : "";
+    const desc = typeof tool.description === "string" ? tool.description : "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawMessages: any[] = Array.isArray(tool.messages) ? tool.messages : [];
+    const simpleMessages: VoicemailMessage[] = rawMessages.map((m) => ({
+      type: (m?.type ?? "request-start") as TransferMessageType,
+      content: typeof m?.content === "string" ? m.content : "",
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const metadata: Record<string, any> =
+      tool.metadata && typeof tool.metadata === "object" ? tool.metadata : {};
+
+    switch (item.kind) {
+      case "transferCall": {
+        if (name) setTcName(name);
+        setTcDescription(desc);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dests: any[] = Array.isArray(tool.destinations) ? tool.destinations : [];
+        setTcDestinations(
+          dests.map((d) => {
+            const base: TransferDestinationBase = {
+              description: typeof d?.description === "string" ? d.description : "",
+              message: typeof d?.message === "string" ? d.message : "",
+              mode: (d?.transferPlan?.mode ?? "blind-transfer") as TransferMode,
+              warmMessage:
+                typeof d?.transferPlan?.message === "string" ? d.transferPlan.message : "",
+            };
+            return d?.type === "sip"
+              ? { type: "sip", sipUri: String(d.sipUri ?? ""), ...base }
+              : { type: "number", number: String(d?.number ?? ""), ...base };
+          }),
+        );
+        setTcMessages(
+          simpleMessages.map((m) => ({ type: m.type, content: m.content }) as TransferMessage),
+        );
+        break;
+      }
+      case "endCall": {
+        if (name) setEcName(name);
+        setEcDescription(desc);
+        setEcMessages(
+          rawMessages.map((m) => ({
+            type: (m?.type ?? "request-start") as EndCallMessageType,
+            mode: (typeof m?.content === "string" && m.content ? "custom" : "none") as EndCallMessageMode,
+            content: typeof m?.content === "string" ? m.content : "",
+            blocking: m?.blocking === true,
+          })),
+        );
+        break;
+      }
+      case "voicemail": {
+        if (name) setVmName(name);
+        setVmDescription(desc);
+        setVmScriptMode((metadata.voicemailScriptMode ?? "assistant") as VoicemailScriptMode);
+        setVmScriptContent(
+          typeof metadata.voicemailScript === "string" ? metadata.voicemailScript : "",
+        );
+        setVmBeepDetection(metadata.beepDetectionEnabled === true);
+        setVmMessages(simpleMessages);
+        break;
+      }
+      case "dtmf": {
+        if (name) setDtName(name);
+        setDtDescription(desc);
+        setDtSipInfo(tool.sipInfoDtmfEnabled === true);
+        setDtMessages(simpleMessages);
+        break;
+      }
+      case "sms": {
+        if (name) setSmsName(name);
+        setSmsDescription(desc);
+        setSmsToPreset(typeof metadata.toPreset === "string" ? metadata.toPreset : "");
+        setSmsBodyPreset(typeof metadata.bodyPreset === "string" ? metadata.bodyPreset : "");
+        setSmsMessages(simpleMessages);
+        break;
+      }
+      case "sipRequest": {
+        if (name) setSrName(name);
+        if (desc) setSrDescription(desc);
+        setSrAsync(tool.async === true);
+        setSrStrict(tool.strict === true);
+        if (tool.parameters) {
+          setSrParamsMode("json");
+          setSrParamsJson(JSON.stringify(tool.parameters, null, 2));
+        }
+        setSrSipVerb((tool.sipVerb ?? "INFO") as "INFO" | "MESSAGE" | "NOTIFY");
+        if (typeof tool.body === "string") {
+          setSrBodyMode("raw");
+          setSrBodyRaw(tool.body);
+        }
+        setSrMessages(simpleMessages);
+        break;
+      }
+      case "handoff": {
+        if (name) setHoName(name);
+        setHoDescription(desc);
+        setHoAsync(tool.async === true);
+        setHoStrict(tool.strict === true);
+        if (tool.parameters) {
+          setHoParamsMode("json");
+          setHoParamsJson(JSON.stringify(tool.parameters, null, 2));
+        }
+        setHoDestinations(
+          (Array.isArray(tool.destinations) ? tool.destinations : []).map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (d: any) => ({
+              assistantId: String(d?.assistantId ?? ""),
+              description: typeof d?.description === "string" ? d.description : "",
+            }),
+          ),
+        );
+        setHoMessages(simpleMessages);
+        break;
+      }
+      case "query": {
+        if (name) setQName(name);
+        setQDescription(desc);
+        setQKnowledgeBases(
+          (Array.isArray(tool.knowledgeBases) ? tool.knowledgeBases : []).map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (kb: any) => ({ fileId: String(kb?.fileIds?.[0] ?? "") }),
+          ),
+        );
+        setQMessages(simpleMessages);
+        break;
+      }
+      case "apiRequest": {
+        setArName(name);
+        setArDescription(desc);
+        setArUrl(typeof tool.url === "string" ? tool.url : "");
+        setArMethod((tool.method ?? "GET") as typeof arMethod);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headerProps: Record<string, any> = tool.headers?.properties ?? {};
+        setArHeaders(
+          Object.entries(headerProps).map(([key, v]) => ({
+            key,
+            value: typeof v?.default === "string" ? v.default : "",
+          })),
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const bodyProps: Record<string, any> = tool.body?.properties ?? {};
+        setArStaticFields(
+          Object.entries(bodyProps).map(([key, v]) => ({
+            key,
+            value: typeof v?.default === "string" ? v.default : "",
+          })),
+        );
+        setArBodyLocked(tool.body?.additionalProperties === false);
+        setArMessages(simpleMessages);
+        break;
+      }
+      case "mcp": {
+        if (name) setMcpName(name);
+        setMcpDescription(desc);
+        setMcpServerUrl(typeof tool.server?.url === "string" ? tool.server.url : "");
+        if (typeof tool.server?.timeoutSeconds === "number") {
+          setMcpTimeout(tool.server.timeoutSeconds);
+        }
+        setMcpHeaders(
+          Object.entries(tool.server?.headers ?? {}).map(([key, value]) => ({
+            key,
+            value: String(value ?? ""),
+          })),
+        );
+        setMcpProtocol((tool.protocol ?? "shttp") as "shttp" | "sse");
+        setMcpMessages(simpleMessages);
+        break;
+      }
+      case "slack": {
+        if (name) setSlName(name);
+        setSlDescription(desc);
+        setSlMessages(simpleMessages);
+        break;
+      }
+      case "sheets": {
+        if (name) setGsName(name);
+        setGsDescription(desc);
+        setGsSpreadsheetId(typeof tool.spreadsheetId === "string" ? tool.spreadsheetId : "");
+        setGsRange(typeof tool.range === "string" ? tool.range : "");
+        setGsMessages(simpleMessages);
+        break;
+      }
+      case "gcalCreate":
+      case "gcalCheck": {
+        if (name) setGcName(name);
+        setGcDescription(desc);
+        setGcCalendarId(typeof tool.calendarId === "string" ? tool.calendarId : "");
+        setGcTimezone(typeof tool.timezone === "string" ? tool.timezone : "");
+        setGcMessages(simpleMessages);
+        break;
+      }
+      case "ghlCalCreate":
+      case "ghlCalCheck":
+      case "ghlContactCreate":
+      case "ghlContactGet": {
+        setGhlName(name);
+        setGhlDescription(desc);
+        setGhlCalendarId(typeof tool.calendarId === "string" ? tool.calendarId : "");
+        setGhlMessages(simpleMessages);
+        break;
+      }
+      case "function": {
+        setFnName(typeof tool.function?.name === "string" ? tool.function.name : name);
+        setFnDescription(
+          typeof tool.function?.description === "string" ? tool.function.description : desc,
+        );
+        setServerUrl(typeof tool.server?.url === "string" ? tool.server.url : "");
+        if (tool.function?.parameters) {
+          setFnParams(JSON.stringify(tool.function.parameters, null, 2));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    setSelected(item);
+    setEditIndex(index);
+    setStep("configure");
+    setOpen(true);
+  }
+
   function pickItem(item: CatalogItem) {
     setSelected(item);
+    setEditIndex(null);
     // Set contextual default name for GHL variants
     if (item.kind === "ghlCalCreate") setGhlName("ghl_calendar_create_event_tool");
     else if (item.kind === "ghlCalCheck") setGhlName("ghl_calendar_check_availability_tool");
@@ -2230,8 +2462,10 @@ function ToolsTab({
   function backToSelect() {
     setStep("select");
     setSelected(null);
+    setEditIndex(null);
     resetForm();
   }
+
 
   function buildTool(): VapiTool | null {
     if (!selected) return null;
