@@ -3142,12 +3142,23 @@ function ToolsTab({
                                 {item.description}
                               </p>
                             </div>
+                            {item.beta && (
+                              <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                                Beta
+                              </span>
+                            )}
+                            {item.locked && (
+                              <span className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                <Lock className="h-3 w-3" />
+                                Bloqueado
+                              </span>
+                            )}
                             {item.kind === "comingSoon" && (
                               <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                 Em breve
                               </span>
                             )}
-                            {item.subItems && (
+                            {item.subItems && !item.locked && (
                               <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                 {item.subItems.length} opções
                               </span>
@@ -3155,6 +3166,18 @@ function ToolsTab({
                           </>
                         );
                         const btnClass = "group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-background/30 p-3 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-background/50";
+                        if (item.locked) {
+                          return (
+                            <div
+                              key={item.key}
+                              aria-disabled
+                              title="Em desenvolvimento — disponível em breve"
+                              className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl border border-white/[0.06] bg-background/20 p-3 text-left opacity-50 backdrop-blur-xl"
+                            >
+                              {buttonInner}
+                            </div>
+                          );
+                        }
                         if (item.subItems && item.subItems.length > 0) {
                           return (
                             <DropdownMenu key={item.key}>
@@ -3169,6 +3192,7 @@ function ToolsTab({
                                   return (
                                     <DropdownMenuItem
                                       key={sub.key}
+                                      disabled={sub.locked}
                                       onClick={() => pickItem(sub)}
                                       className="gap-3 py-2"
                                     >
@@ -3196,6 +3220,7 @@ function ToolsTab({
                             {buttonInner}
                           </button>
                         );
+
                       })}
                     </div>
                   </div>
