@@ -1315,7 +1315,10 @@ function TelefoniaPage() {
             )}
           </CardContent>
         </Card>
+
+        <CreditsCard twilioConnected={isTwilioConnected} />
       </div>
+
 
 
 
