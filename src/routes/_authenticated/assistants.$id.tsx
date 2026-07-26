@@ -3082,7 +3082,10 @@ function ToolsTab({
                       size="sm"
                       variant="outline"
                       disabled={isInsertingRule}
-                      onClick={() => handleInsertPromptRule(tool)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleInsertPromptRule(tool);
+                      }}
                       className="h-7 w-full gap-1.5 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                     >
                       <Sparkles className="h-3 w-3" />
