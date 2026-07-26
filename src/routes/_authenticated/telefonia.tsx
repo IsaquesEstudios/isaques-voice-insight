@@ -897,13 +897,21 @@ function TelefoniaPage() {
                           className="border-border/50 transition-colors hover:bg-primary/5"
                         >
                           <TableCell className="px-6">
-                            <p className="font-mono text-xs font-medium text-foreground">
-                              {n.phone_number}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-xs font-medium text-foreground">
+                                {n.phone_number}
+                              </p>
+                              {n.isTest && (
+                                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                  Teste
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-muted-foreground capitalize">
                               {n.provider}
                             </p>
                           </TableCell>
+
                           <TableCell className="text-xs text-muted-foreground">
                             {n.region ?? "—"}
                           </TableCell>
