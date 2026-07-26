@@ -2536,7 +2536,11 @@ export const getVapiCredits = createServerFn({ method: "GET" })
       const o = (first ?? {}) as Record<string, unknown>;
       return {
         ok: true as const,
-        credits: pickNumber(o.credits),
+        credits:
+          pickNumber(o.credits) ??
+          pickNumber((o as { credit?: unknown }).credit) ??
+          pickNumber((o as { creditsRemaining?: unknown }).creditsRemaining) ??
+          pickNumber((o as { balance?: unknown }).balance),
         billingLimit: pickNumber(o.billingLimit),
         name: (o.name as string | undefined) ?? null,
         plan: (o.plan as string | undefined) ?? null,
