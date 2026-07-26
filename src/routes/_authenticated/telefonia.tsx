@@ -320,8 +320,9 @@ function TelefoniaPage() {
   const [verifyChecking, setVerifyChecking] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
 
-  // Per-row call controls (assistant only; origin number chosen automatically)
+  // Per-row call controls (assistant + origin number)
   const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
+  const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
 
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
@@ -476,7 +477,8 @@ function TelefoniaPage() {
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
       const assistantId = rowCallAssistant[contact.id];
-      const fromNumberE164 = numbers[0]?.phone_number ?? "";
+      const fromNumberE164 =
+        rowCallFrom[contact.id] || numbers[0]?.phone_number || "";
       if (!assistantId) {
         setCallingContactId(null);
         return Promise.reject(new Error("Selecione uma assistente."));
@@ -1089,7 +1091,7 @@ function TelefoniaPage() {
                 </div>
               ) : (
                 testContacts.map((c) => {
-                  const from = numbers[0]?.phone_number ?? "";
+                  const from = rowCallFrom[c.id] || numbers[0]?.phone_number || "";
                   const assistantId = rowCallAssistant[c.id] ?? "";
                   return (
                     <div
@@ -1142,10 +1144,33 @@ function TelefoniaPage() {
                             </AlertDescription>
                           </Alert>
                         ) : (
-                          <p className="text-[11px] text-muted-foreground">
-                            Origem automática: <span className="font-mono">{from}</span>
-                          </p>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Número de origem
+                            </Label>
+                            <Select
+                              value={from}
+                              onValueChange={(v) =>
+                                setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
+                              }
+                            >
+                              <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                                <SelectValue placeholder="Selecione o número de origem" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {numbers.map((n) => (
+                                  <SelectItem key={n.id} value={n.phone_number}>
+                                    <span className="font-mono">{n.phone_number}</span>
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {n.provider}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
+
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                             Assistente
