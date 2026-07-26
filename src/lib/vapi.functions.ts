@@ -957,14 +957,21 @@ export const provisionFreeVapiNumber = createServerFn({ method: "POST" })
         if (!created?.id) return { ok: false, message: "Vapi não retornou o número criado." };
         return { ok: true, id: created.id, number: created.number ?? null };
       } catch (err) {
-        return {
-          ok: false,
-          message:
-            err instanceof Error
-              ? err.message
-              : "Não foi possível provisionar um número gratuito da Vapi.",
-        };
+        const raw =
+          err instanceof Error
+            ? err.message
+            : "Não foi possível provisionar um número gratuito da Vapi.";
+        // Vapi só libera números gratuitos para algumas organizações/planos.
+        if (/403|not available for this organization/i.test(raw)) {
+          return {
+            ok: false,
+            message:
+              "Sua organização na Vapi não tem liberação para números gratuitos. Use um número Twilio (comprar ou conectar) como origem das ligações.",
+          };
+        }
+        return { ok: false, message: raw };
       }
+
     },
   );
 

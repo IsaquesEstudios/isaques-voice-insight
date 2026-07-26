@@ -552,14 +552,17 @@ function TelefoniaPage() {
   const provisionFreeVapiNumberFn = useServerFn(provisionFreeVapiNumber);
   const [vapiAreaCode, setVapiAreaCode] = useState("");
   const [provisioningVapi, setProvisioningVapi] = useState(false);
+  const [vapiProvisionError, setVapiProvisionError] = useState<string | null>(null);
 
   const handleProvisionVapiNumber = async () => {
     setProvisioningVapi(true);
+    setVapiProvisionError(null);
     try {
       const res = await provisionFreeVapiNumberFn({
         data: { areaCode: vapiAreaCode.trim() || "415" },
       });
       if (!res.ok) {
+        setVapiProvisionError(res.message);
         toast.error(res.message);
         return;
       }
@@ -569,11 +572,14 @@ function TelefoniaPage() {
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao criar número Vapi.");
+      const msg = err instanceof Error ? err.message : "Falha ao criar número Vapi.";
+      setVapiProvisionError(msg);
+      toast.error(msg);
     } finally {
       setProvisioningVapi(false);
     }
   };
+
 
   const resetModal = () => {
     setTab("twilio");
@@ -1177,7 +1183,26 @@ function TelefoniaPage() {
                 )}
                 Obter número gratuito da Vapi
               </Button>
+              {vapiProvisionError && (
+                <Alert className="border-warning/30 bg-warning/10 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                  <AlertDescription className="text-[11px] text-muted-foreground">
+                    {vapiProvisionError}{" "}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => {
+                        setTab(isTwilioConnected ? "buy" : "twilio");
+                        setOpen(true);
+                      }}
+                    >
+                      {isTwilioConnected ? "Comprar número na Twilio" : "Conectar Twilio"}
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
+
           </Card>
         </div>
 
