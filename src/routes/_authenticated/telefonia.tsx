@@ -1183,7 +1183,26 @@ function TelefoniaPage() {
                 )}
                 Obter número gratuito da Vapi
               </Button>
+              {vapiProvisionError && (
+                <Alert className="border-warning/30 bg-warning/10 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                  <AlertDescription className="text-[11px] text-muted-foreground">
+                    {vapiProvisionError}{" "}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => {
+                        setTab(isTwilioConnected ? "buy" : "twilio");
+                        setOpen(true);
+                      }}
+                    >
+                      {isTwilioConnected ? "Comprar número na Twilio" : "Conectar Twilio"}
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
+
           </Card>
         </div>
 
