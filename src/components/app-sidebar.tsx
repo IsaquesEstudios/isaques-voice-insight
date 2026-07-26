@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -9,7 +10,9 @@ import {
   ListChecks,
   Settings,
   Sparkles,
+  Phone,
   AudioLines,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -24,6 +27,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { getTwilioConnection, getTwilioBalance } from "@/lib/twilio.functions";
+import { getVapiCredits } from "@/lib/vapi.functions";
 
 type NavItem = {
   title: string;
@@ -97,19 +102,112 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        <div className="rounded-xl border border-sidebar-border bg-gradient-to-br from-primary/15 to-transparent p-3 group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <p className="text-xs font-semibold text-sidebar-foreground">Plano Growth</p>
-          </div>
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            Você usou 62% dos créditos deste ciclo.
-          </p>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sidebar-accent">
-            <div className="h-full w-[62%] rounded-full bg-primary" />
-          </div>
-        </div>
+        <SidebarCredits />
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function SidebarCredits() {
+  const twilioConn = useQuery({
+    queryKey: ["twilio-connection"],
+    queryFn: () => getTwilioConnection(),
+  });
+  const twilioBalance = useQuery({
+    queryKey: ["twilio-balance"],
+    queryFn: () => getTwilioBalance(),
+    enabled: !!twilioConn.data?.connected,
+    staleTime: 60_000,
+  });
+  const vapiCredits = useQuery({
+    queryKey: ["vapi-credits"],
+    queryFn: () => getVapiCredits(),
+    staleTime: 60_000,
+  });
+
+  const fmt = (v: number | null | undefined, currency: string) =>
+    typeof v === "number"
+      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v)
+      : "—";
+
+  const twilioValue =
+    twilioBalance.data?.connected && twilioBalance.data.balance !== null
+      ? twilioBalance.data.balance
+      : null;
+  const vapiValue =
+    vapiCredits.data?.ok && vapiCredits.data.credits !== null
+      ? vapiCredits.data.credits
+      : null;
+
+  return (
+    <div className="space-y-3 group-data-[collapsible=icon]:hidden">
+      <SidebarCreditRow
+        icon={Phone}
+        title="Twilio"
+        value={twilioValue}
+        currency={twilioBalance.data?.currency || "USD"}
+        badge={twilioBalance.data?.accountType ?? undefined}
+        loading={twilioBalance.isLoading}
+      />
+      <SidebarCreditRow
+        icon={Sparkles}
+        title="Vapi"
+        value={vapiValue}
+        currency="USD"
+        badge={vapiCredits.data?.plan ?? undefined}
+        loading={vapiCredits.isLoading}
+      />
+    </div>
+  );
+}
+
+function SidebarCreditRow({
+  icon: Icon,
+  title,
+  value,
+  currency,
+  badge,
+  loading,
+}: {
+  icon: typeof Phone;
+  title: string;
+  value: number | null;
+  currency: string;
+  badge?: string;
+  loading: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-sidebar-border bg-gradient-to-br from-primary/10 to-transparent p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon className="h-3.5 w-3.5 text-primary" />
+          <p className="text-xs font-semibold text-sidebar-foreground">{title}</p>
+        </div>
+        {badge ? (
+          <span className="rounded-full bg-primary/15 px-1.5 py-0 text-[9px] font-semibold text-primary">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-1.5">
+        {loading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+        ) : typeof value === "number" ? (
+          <p className="text-sm font-bold text-sidebar-foreground">
+            {new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value)}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Não conectado</p>
+        )}
+      </div>
+      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-sidebar-accent">
+        <div
+          className={
+            "h-full rounded-full bg-primary transition-all " +
+            (typeof value === "number" ? "w-[65%]" : "w-0")
+          }
+        />
+      </div>
+    </div>
   );
 }
