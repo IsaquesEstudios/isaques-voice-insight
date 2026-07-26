@@ -557,7 +557,7 @@ function TelefoniaPage() {
     setProvisioningVapi(true);
     try {
       const res = await provisionFreeVapiNumberFn({
-        data: { areaCode: vapiAreaCode.trim() || undefined },
+        data: { areaCode: vapiAreaCode.trim() || "415" },
       });
       if (!res.ok) {
         toast.error(res.message);
