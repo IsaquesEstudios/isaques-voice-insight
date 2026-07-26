@@ -282,14 +282,17 @@ function TelefoniaPage() {
   // imported into Vapi) is usable as origin — append the ones not listed yet.
   for (const n of vapiPhoneNumbersQuery.data ?? []) {
     if (!n.number) continue;
-    const isTest = n.provider === "vapi" || /teste|test/i.test(n.name ?? "");
+    const isTest =
+      n.provider === "vapi" || /teste|test|demo|gratuit/i.test(n.name ?? "");
     const existingRow = numbers.find((row) => row.phone_number === n.number);
     if (existingRow) {
+      existingRow.vapiId = n.id;
       if (isTest) existingRow.isTest = true;
       continue;
     }
     numbers.push({
       id: n.id,
+      vapiId: n.id,
       phone_number: n.number,
       region: null,
       provider:
@@ -303,6 +306,7 @@ function TelefoniaPage() {
       isTest,
     });
   }
+
 
 
 
