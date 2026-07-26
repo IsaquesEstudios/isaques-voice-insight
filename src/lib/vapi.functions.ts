@@ -2528,29 +2528,80 @@ export const getVapiCredits = createServerFn({ method: "GET" })
   .middleware([withVapiCredentials])
   .handler(async () => {
     const pickNumber = (v: unknown): number | null =>
-      typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : null;
+      typeof v === "number"
+        ? v
+        : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
+          ? Number(v)
+          : null;
 
-    try {
-      const org = (await vapiFetch("/org", { method: "GET" })) as unknown;
-      const first = Array.isArray(org) ? org[0] : org;
-      const o = (first ?? {}) as Record<string, unknown>;
-      return {
-        ok: true as const,
-        credits:
-          pickNumber(o.credits) ??
-          pickNumber((o as { credit?: unknown }).credit) ??
-          pickNumber((o as { creditsRemaining?: unknown }).creditsRemaining) ??
-          pickNumber((o as { balance?: unknown }).balance),
-        billingLimit: pickNumber(o.billingLimit),
-        name: (o.name as string | undefined) ?? null,
-        plan: (o.plan as string | undefined) ?? null,
-      };
-    } catch (err) {
-      return {
-        ok: false as const,
-        credits: null,
-        billingLimit: null,
-        error: err instanceof Error ? err.message : String(err),
-      };
+    const CREDIT_KEYS = ["credits", "credit", "creditsremaining", "creditbalance", "balance"];
+    const LIMIT_KEYS = ["billinglimit", "monthlylimit", "limit"];
+
+    // procura recursivamente por chaves de crédito em qualquer nível
+    const deepFind = (input: unknown, keys: string[], depth = 0): number | null => {
+      if (!input || depth > 4) return null;
+      if (Array.isArray(input)) {
+        for (const item of input) {
+          const found = deepFind(item, keys, depth + 1);
+          if (found !== null) return found;
+        }
+        return null;
+      }
+      if (typeof input !== "object") return null;
+      const obj = input as Record<string, unknown>;
+      for (const [k, v] of Object.entries(obj)) {
+        if (keys.includes(k.toLowerCase())) {
+          const n = pickNumber(v);
+          if (n !== null) return n;
+        }
+      }
+      for (const v of Object.values(obj)) {
+        const found = deepFind(v, keys, depth + 1);
+        if (found !== null) return found;
+      }
+      return null;
+    };
+
+    const errors: string[] = [];
+    let credits: number | null = null;
+    let billingLimit: number | null = null;
+    let name: string | null = null;
+    let plan: string | null = null;
+
+    const endpoints = ["/org", "/subscription"];
+    for (const path of endpoints) {
+      try {
+        const res = (await vapiFetch(path, { method: "GET" })) as unknown;
+        const first = Array.isArray(res) ? res[0] : res;
+        const o = (first ?? {}) as Record<string, unknown>;
+        if (!name && typeof o.name === "string") name = o.name;
+        if (!plan && typeof o.plan === "string") plan = o.plan;
+        if (!plan && typeof o.type === "string" && path === "/subscription") plan = o.type;
+        if (credits === null) credits = deepFind(first, CREDIT_KEYS);
+        if (billingLimit === null) billingLimit = deepFind(first, LIMIT_KEYS);
+
+        // /org pode exigir buscar a org específica pelo id
+        if (credits === null && path === "/org" && typeof o.id === "string") {
+          try {
+            const one = (await vapiFetch(`/org/${o.id}`, { method: "GET" })) as unknown;
+            credits = deepFind(one, CREDIT_KEYS);
+            if (billingLimit === null) billingLimit = deepFind(one, LIMIT_KEYS);
+          } catch (e) {
+            errors.push(e instanceof Error ? e.message : String(e));
+          }
+        }
+        if (credits !== null) break;
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
     }
+
+    return {
+      ok: credits !== null,
+      credits,
+      billingLimit,
+      name,
+      plan,
+      error: credits === null ? (errors[0] ?? "Créditos não disponíveis nesta conta Vapi.") : null,
+    };
   });
