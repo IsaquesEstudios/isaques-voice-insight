@@ -272,21 +272,26 @@ function TelefoniaPage() {
         return { ...n, assistant: assistantName ?? n.assistant };
       });
 
-  // Numbers issued by Vapi itself (provider "vapi") aren't on Twilio — append them.
+  // Any number registered inside Vapi (free Vapi numbers or Twilio numbers
+  // imported into Vapi) is usable as origin — append the ones not listed yet.
   for (const n of vapiPhoneNumbersQuery.data ?? []) {
-    if (n.provider !== "vapi" || !n.number) continue;
+    if (!n.number) continue;
     if (numbers.some((row) => row.phone_number === n.number)) continue;
     numbers.push({
       id: n.id,
       phone_number: n.number,
       region: null,
-      provider: "Vapi (gratuito)",
+      provider:
+        n.provider === "vapi"
+          ? "Vapi (gratuito)"
+          : `${n.provider ?? "Vapi"} (via Vapi)`,
       assistant: n.assistantId ? assistantById.get(n.assistantId) ?? null : null,
       calls_today: 0,
       answer_rate: 0,
       health: "Seguro" as Health,
     });
   }
+
 
 
 
