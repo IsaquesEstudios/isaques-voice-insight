@@ -477,7 +477,8 @@ function TelefoniaPage() {
     mutationFn: (contact: { id: string; phone_e164: string }) => {
       setCallingContactId(contact.id);
       const assistantId = rowCallAssistant[contact.id];
-      const fromNumberE164 = numbers[0]?.phone_number ?? "";
+      const fromNumberE164 =
+        rowCallFrom[contact.id] || numbers[0]?.phone_number || "";
       if (!assistantId) {
         setCallingContactId(null);
         return Promise.reject(new Error("Selecione uma assistente."));
