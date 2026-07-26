@@ -1207,6 +1207,29 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
     return { ok: true as const, callId: res?.id ?? null };
   });
 
+// Consulta o status/motivo de encerramento de uma chamada (diagnóstico de teste).
+export const getVapiCallStatus = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { callId: string }) => {
+    if (!input?.callId) throw new Error("callId obrigatório");
+    return input;
+  })
+  .handler(async ({ data }) => {
+    const call = (await vapiFetch(`/call/${data.callId}`, { method: "GET" })) as {
+      status?: string;
+      endedReason?: string;
+      startedAt?: string;
+      endedAt?: string;
+    } | null;
+    return {
+      status: call?.status ?? null,
+      endedReason: call?.endedReason ?? null,
+      startedAt: call?.startedAt ?? null,
+      endedAt: call?.endedAt ?? null,
+    };
+  });
+
+
 // Cria uma chamada web oficial na Vapi.
 // A documentação do Web SDK mostra que o fluxo real faz POST /call/web e
 // retorna `webCallUrl`; o navegador deve entrar nessa sala para ouvir/falar.
