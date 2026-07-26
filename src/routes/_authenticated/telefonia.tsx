@@ -88,6 +88,7 @@ import {
   attachAssistantToNumber,
   createOutboundTestCall,
   detachAssistantFromNumber,
+  deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
 
   getVapiCallStatus,
@@ -135,7 +136,9 @@ interface NumberRow {
   answer_rate: number;
   health: Health;
   isTest?: boolean;
+  vapiId?: string;
 }
+
 
 const healthStyles: Record<Health, string> = {
   Seguro: "bg-success/15 text-success",
@@ -168,6 +171,8 @@ function TelefoniaPage() {
   const listVapiPhoneNumbersFn = useServerFn(listVapiPhoneNumbers);
   const attachAssistantFn = useServerFn(attachAssistantToNumber);
   const detachAssistantFn = useServerFn(detachAssistantFromNumber);
+  const deleteVapiNumberFn = useServerFn(deleteVapiPhoneNumber);
+
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
@@ -280,14 +285,17 @@ function TelefoniaPage() {
   // imported into Vapi) is usable as origin — append the ones not listed yet.
   for (const n of vapiPhoneNumbersQuery.data ?? []) {
     if (!n.number) continue;
-    const isTest = n.provider === "vapi" || /teste|test/i.test(n.name ?? "");
+    const isTest =
+      n.provider === "vapi" || /teste|test|demo|gratuit/i.test(n.name ?? "");
     const existingRow = numbers.find((row) => row.phone_number === n.number);
     if (existingRow) {
+      existingRow.vapiId = n.id;
       if (isTest) existingRow.isTest = true;
       continue;
     }
     numbers.push({
       id: n.id,
+      vapiId: n.id,
       phone_number: n.number,
       region: null,
       provider:
@@ -301,6 +309,7 @@ function TelefoniaPage() {
       isTest,
     });
   }
+
 
 
 
@@ -456,6 +465,18 @@ function TelefoniaPage() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Falha ao ressincronizar."),
   });
+
+  const deleteVapiNumberMutation = useMutation({
+    mutationFn: (id: string) => deleteVapiNumberFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Número removido da Vapi.");
+      queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao remover número."),
+  });
+
+
 
   const [lastCallDiag, setLastCallDiag] = useState<{
     status: string | null;
@@ -900,11 +921,12 @@ function TelefoniaPage() {
                               <p className="font-mono text-xs font-medium text-foreground">
                                 {n.phone_number}
                               </p>
-                              {n.isTest && (
+                              {(n.isTest || /gratuito/i.test(n.provider)) && (
                                 <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                  Teste
+                                  Demo
                                 </span>
                               )}
+
                             </div>
                             <p className="text-[10px] text-muted-foreground capitalize">
                               {n.provider}
@@ -997,6 +1019,19 @@ function TelefoniaPage() {
                                   Ressincronizar credenciais Twilio
                                 </DropdownMenuItem>
 
+                                {n.vapiId ? (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      deleteVapiNumberMutation.mutate(n.vapiId!)
+                                    }
+                                    disabled={deleteVapiNumberMutation.isPending}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remover número da Vapi
+                                  </DropdownMenuItem>
+                                ) : null}
+
                                 <DropdownMenuItem
                                   onClick={() => setReleaseTarget(n)}
                                   className="text-destructive focus:text-destructive"
@@ -1004,6 +1039,7 @@ function TelefoniaPage() {
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Liberar número
                                 </DropdownMenuItem>
+
                               </DropdownMenuContent>
 
                             </DropdownMenu>
