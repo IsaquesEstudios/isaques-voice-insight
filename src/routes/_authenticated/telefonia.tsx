@@ -1019,6 +1019,19 @@ function TelefoniaPage() {
                                   Ressincronizar credenciais Twilio
                                 </DropdownMenuItem>
 
+                                {n.vapiId ? (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      deleteVapiNumberMutation.mutate(n.vapiId!)
+                                    }
+                                    disabled={deleteVapiNumberMutation.isPending}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remover número da Vapi
+                                  </DropdownMenuItem>
+                                ) : null}
+
                                 <DropdownMenuItem
                                   onClick={() => setReleaseTarget(n)}
                                   className="text-destructive focus:text-destructive"
@@ -1026,6 +1039,7 @@ function TelefoniaPage() {
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Liberar número
                                 </DropdownMenuItem>
+
                               </DropdownMenuContent>
 
                             </DropdownMenu>
