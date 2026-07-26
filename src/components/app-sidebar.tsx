@@ -120,23 +120,18 @@ function SidebarCredits() {
     staleTime: 60_000,
   });
   const vapiCredits = useQuery({
-    queryKey: ["vapi-credits"],
-    queryFn: () => getVapiCredits(),
+    queryKey: ["vapi-estimated-credits"],
+    queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
-
-  const fmt = (v: number | null | undefined, currency: string) =>
-    typeof v === "number"
-      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v)
-      : "—";
 
   const twilioValue =
     twilioBalance.data?.connected && twilioBalance.data.balance !== null
       ? twilioBalance.data.balance
       : null;
   const vapiValue =
-    vapiCredits.data?.ok && vapiCredits.data.credits !== null
-      ? vapiCredits.data.credits
+    vapiCredits.data?.ok && vapiCredits.data?.balance !== null
+      ? vapiCredits.data.balance
       : null;
 
   return (
