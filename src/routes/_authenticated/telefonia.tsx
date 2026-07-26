@@ -557,7 +557,7 @@ function TelefoniaPage() {
     setProvisioningVapi(true);
     try {
       const res = await provisionFreeVapiNumberFn({
-        data: { areaCode: vapiAreaCode.trim() || undefined },
+        data: { areaCode: vapiAreaCode.trim() || "415" },
       });
       if (!res.ok) {
         toast.error(res.message);
@@ -1137,7 +1137,50 @@ function TelefoniaPage() {
               )}
             </CardContent>
           </Card>
+
+          <Card className="border-primary/20 bg-card/20 backdrop-blur-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">
+                Número gratuito da Vapi
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A Vapi emite números dos EUA sem custo usando a sua própria chave de API.
+                Use como <b>origem</b> para ligar ao seu número verificado sem comprar um
+                DID na Twilio.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-1">
+                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Area code (EUA)
+                </Label>
+                <Input
+                  value={vapiAreaCode}
+                  maxLength={3}
+                  onChange={(e) => setVapiAreaCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="415"
+                  className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Se deixar em branco, usamos <span className="font-mono">415</span>.
+                </p>
+              </div>
+              <Button
+                className="w-full gap-2 shadow-glow"
+                onClick={handleProvisionVapiNumber}
+                disabled={provisioningVapi}
+              >
+                {provisioningVapi ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Obter número gratuito da Vapi
+              </Button>
+            </CardContent>
+          </Card>
         </div>
+
 
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
@@ -1358,53 +1401,17 @@ function TelefoniaPage() {
             value={tab}
             onValueChange={(v) => setTab(v as "twilio" | "buy" | "vapi" | "sip")}
           >
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="twilio">Credenciais</TabsTrigger>
               <TabsTrigger value="buy" disabled={!isTwilioConnected}>
                 Comprar número
               </TabsTrigger>
-              <TabsTrigger value="vapi">Número Vapi</TabsTrigger>
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
+
             </TabsList>
 
-            <TabsContent value="vapi" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  A Vapi emite números gratuitos (EUA) usando a sua própria chave de
-                  API. Eles servem como <b>origem</b> para ligações de teste — ideal para
-                  ligar para o seu número verificado sem precisar comprar um DID na
-                  Twilio.
-                </AlertDescription>
-              </Alert>
 
-              <div className="grid gap-1">
-                <Label className="text-[11px] text-muted-foreground">
-                  Area code desejado (opcional, EUA)
-                </Label>
-                <Input
-                  value={vapiAreaCode}
-                  maxLength={3}
-                  onChange={(e) => setVapiAreaCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="415"
-                />
-              </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleProvisionVapiNumber}
-                  disabled={provisioningVapi}
-                  className="gap-2"
-                >
-                  {provisioningVapi ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  Obter número gratuito da Vapi
-                </Button>
-              </div>
-            </TabsContent>
 
 
             <TabsContent value="buy" className="mt-4 space-y-4">
