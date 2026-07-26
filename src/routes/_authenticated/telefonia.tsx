@@ -96,7 +96,9 @@ import {
 
   listVapiAssistants,
   listVapiPhoneNumbers,
+  getVapiCredits,
 } from "@/lib/vapi.functions";
+
 
 import {
   Select,
