@@ -1980,6 +1980,9 @@ function ToolsTab({
   const [step, setStep] = useState<"select" | "configure">("select");
   const [selected, setSelected] = useState<CatalogItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // null = criando uma nova ferramenta; número = editando a ferramenta desse índice.
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
 
   const [transferNumber, setTransferNumber] = useState("");
   const [fnName, setFnName] = useState("");
@@ -2209,13 +2212,245 @@ function ToolsTab({
 
   function openDialog() {
     resetForm();
+    setEditIndex(null);
     setSelected(null);
     setStep("select");
     setOpen(true);
   }
 
+  // Preenche o formulário com os dados da ferramenta já salva na Vapi para edição.
+  function openEditDialog(tool: VapiTool, index: number) {
+    const item = findCatalogItemByVapiType(tool.type);
+    if (!item) {
+      toast.error("Este tipo de ferramenta não pode ser editado aqui.");
+      return;
+    }
+    resetForm();
+    const name = typeof tool.name === "string" ? tool.name : "";
+    const desc = typeof tool.description === "string" ? tool.description : "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawMessages: any[] = Array.isArray(tool.messages) ? tool.messages : [];
+    const simpleMessages: VoicemailMessage[] = rawMessages.map((m) => ({
+      type: (m?.type ?? "request-start") as TransferMessageType,
+      content: typeof m?.content === "string" ? m.content : "",
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const metadata: Record<string, any> =
+      tool.metadata && typeof tool.metadata === "object" ? tool.metadata : {};
+
+    switch (item.kind) {
+      case "transferCall": {
+        if (name) setTcName(name);
+        setTcDescription(desc);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dests: any[] = Array.isArray(tool.destinations) ? tool.destinations : [];
+        setTcDestinations(
+          dests.map((d) => {
+            const base: TransferDestinationBase = {
+              description: typeof d?.description === "string" ? d.description : "",
+              message: typeof d?.message === "string" ? d.message : "",
+              mode: (d?.transferPlan?.mode ?? "blind-transfer") as TransferMode,
+              warmMessage:
+                typeof d?.transferPlan?.message === "string" ? d.transferPlan.message : "",
+            };
+            return d?.type === "sip"
+              ? { type: "sip", sipUri: String(d.sipUri ?? ""), ...base }
+              : { type: "number", number: String(d?.number ?? ""), ...base };
+          }),
+        );
+        setTcMessages(
+          simpleMessages.map((m) => ({ type: m.type, content: m.content }) as TransferMessage),
+        );
+        break;
+      }
+      case "endCall": {
+        if (name) setEcName(name);
+        setEcDescription(desc);
+        setEcMessages(
+          rawMessages.map((m) => ({
+            type: (m?.type ?? "request-start") as EndCallMessageType,
+            mode: (typeof m?.content === "string" && m.content ? "custom" : "none") as EndCallMessageMode,
+            content: typeof m?.content === "string" ? m.content : "",
+            blocking: m?.blocking === true,
+          })),
+        );
+        break;
+      }
+      case "voicemail": {
+        if (name) setVmName(name);
+        setVmDescription(desc);
+        setVmScriptMode((metadata.voicemailScriptMode ?? "assistant") as VoicemailScriptMode);
+        setVmScriptContent(
+          typeof metadata.voicemailScript === "string" ? metadata.voicemailScript : "",
+        );
+        setVmBeepDetection(metadata.beepDetectionEnabled === true);
+        setVmMessages(simpleMessages);
+        break;
+      }
+      case "dtmf": {
+        if (name) setDtName(name);
+        setDtDescription(desc);
+        setDtSipInfo(tool.sipInfoDtmfEnabled === true);
+        setDtMessages(simpleMessages);
+        break;
+      }
+      case "sms": {
+        if (name) setSmsName(name);
+        setSmsDescription(desc);
+        setSmsToPreset(typeof metadata.toPreset === "string" ? metadata.toPreset : "");
+        setSmsBodyPreset(typeof metadata.bodyPreset === "string" ? metadata.bodyPreset : "");
+        setSmsMessages(simpleMessages);
+        break;
+      }
+      case "sipRequest": {
+        if (name) setSrName(name);
+        if (desc) setSrDescription(desc);
+        setSrAsync(tool.async === true);
+        setSrStrict(tool.strict === true);
+        if (tool.parameters) {
+          setSrParamsMode("json");
+          setSrParamsJson(JSON.stringify(tool.parameters, null, 2));
+        }
+        setSrSipVerb((tool.sipVerb ?? "INFO") as "INFO" | "MESSAGE" | "NOTIFY");
+        if (typeof tool.body === "string") {
+          setSrBodyMode("raw");
+          setSrBodyRaw(tool.body);
+        }
+        setSrMessages(simpleMessages);
+        break;
+      }
+      case "handoff": {
+        if (name) setHoName(name);
+        setHoDescription(desc);
+        setHoAsync(tool.async === true);
+        setHoStrict(tool.strict === true);
+        if (tool.parameters) {
+          setHoParamsMode("json");
+          setHoParamsJson(JSON.stringify(tool.parameters, null, 2));
+        }
+        setHoDestinations(
+          (Array.isArray(tool.destinations) ? tool.destinations : []).map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (d: any) => ({
+              assistantId: String(d?.assistantId ?? ""),
+              description: typeof d?.description === "string" ? d.description : "",
+            }),
+          ),
+        );
+        setHoMessages(simpleMessages);
+        break;
+      }
+      case "query": {
+        if (name) setQName(name);
+        setQDescription(desc);
+        setQKnowledgeBases(
+          (Array.isArray(tool.knowledgeBases) ? tool.knowledgeBases : []).map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (kb: any) => ({ fileId: String(kb?.fileIds?.[0] ?? "") }),
+          ),
+        );
+        setQMessages(simpleMessages);
+        break;
+      }
+      case "apiRequest": {
+        setArName(name);
+        setArDescription(desc);
+        setArUrl(typeof tool.url === "string" ? tool.url : "");
+        setArMethod((tool.method ?? "GET") as typeof arMethod);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headerProps: Record<string, any> = tool.headers?.properties ?? {};
+        setArHeaders(
+          Object.entries(headerProps).map(([key, v]) => ({
+            key,
+            value: typeof v?.default === "string" ? v.default : "",
+          })),
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const bodyProps: Record<string, any> = tool.body?.properties ?? {};
+        setArStaticFields(
+          Object.entries(bodyProps).map(([key, v]) => ({
+            key,
+            value: typeof v?.default === "string" ? v.default : "",
+          })),
+        );
+        setArBodyLocked(tool.body?.additionalProperties === false);
+        setArMessages(simpleMessages);
+        break;
+      }
+      case "mcp": {
+        if (name) setMcpName(name);
+        setMcpDescription(desc);
+        setMcpServerUrl(typeof tool.server?.url === "string" ? tool.server.url : "");
+        if (typeof tool.server?.timeoutSeconds === "number") {
+          setMcpTimeout(tool.server.timeoutSeconds);
+        }
+        setMcpHeaders(
+          Object.entries(tool.server?.headers ?? {}).map(([key, value]) => ({
+            key,
+            value: String(value ?? ""),
+          })),
+        );
+        setMcpProtocol((tool.protocol ?? "shttp") as "shttp" | "sse");
+        setMcpMessages(simpleMessages);
+        break;
+      }
+      case "slack": {
+        if (name) setSlName(name);
+        setSlDescription(desc);
+        setSlMessages(simpleMessages);
+        break;
+      }
+      case "sheets": {
+        if (name) setGsName(name);
+        setGsDescription(desc);
+        setGsSpreadsheetId(typeof tool.spreadsheetId === "string" ? tool.spreadsheetId : "");
+        setGsRange(typeof tool.range === "string" ? tool.range : "");
+        setGsMessages(simpleMessages);
+        break;
+      }
+      case "gcalCreate":
+      case "gcalCheck": {
+        if (name) setGcName(name);
+        setGcDescription(desc);
+        setGcCalendarId(typeof tool.calendarId === "string" ? tool.calendarId : "");
+        setGcTimezone(typeof tool.timezone === "string" ? tool.timezone : "");
+        setGcMessages(simpleMessages);
+        break;
+      }
+      case "ghlCalCreate":
+      case "ghlCalCheck":
+      case "ghlContactCreate":
+      case "ghlContactGet": {
+        setGhlName(name);
+        setGhlDescription(desc);
+        setGhlCalendarId(typeof tool.calendarId === "string" ? tool.calendarId : "");
+        setGhlMessages(simpleMessages);
+        break;
+      }
+      case "function": {
+        setFnName(typeof tool.function?.name === "string" ? tool.function.name : name);
+        setFnDescription(
+          typeof tool.function?.description === "string" ? tool.function.description : desc,
+        );
+        setServerUrl(typeof tool.server?.url === "string" ? tool.server.url : "");
+        if (tool.function?.parameters) {
+          setFnParams(JSON.stringify(tool.function.parameters, null, 2));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    setSelected(item);
+    setEditIndex(index);
+    setStep("configure");
+    setOpen(true);
+  }
+
   function pickItem(item: CatalogItem) {
     setSelected(item);
+    setEditIndex(null);
     // Set contextual default name for GHL variants
     if (item.kind === "ghlCalCreate") setGhlName("ghl_calendar_create_event_tool");
     else if (item.kind === "ghlCalCheck") setGhlName("ghl_calendar_check_availability_tool");
@@ -2227,8 +2462,10 @@ function ToolsTab({
   function backToSelect() {
     setStep("select");
     setSelected(null);
+    setEditIndex(null);
     resetForm();
   }
+
 
   function buildTool(): VapiTool | null {
     if (!selected) return null;
@@ -2675,21 +2912,25 @@ function ToolsTab({
   async function handleSubmit() {
     const newTool = buildTool();
     if (!newTool) return;
+    const isEditing = editIndex !== null;
     setIsSubmitting(true);
     try {
-      const nextTools = [...tools, newTool];
+      const nextTools = isEditing
+        ? tools.map((t, i) => (i === editIndex ? newTool : t))
+        : [...tools, newTool];
       await saveConfig({ data: { id, tools: nextTools } });
       onToolsChange(nextTools);
-      toast.success("Ferramenta adicionada.");
+      toast.success(isEditing ? "Ferramenta atualizada." : "Ferramenta adicionada.");
       setOpen(false);
       backToSelect();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao adicionar ferramenta.");
+      toast.error(isEditing ? "Erro ao atualizar ferramenta." : "Erro ao adicionar ferramenta.");
     } finally {
       setIsSubmitting(false);
     }
   }
+
 
   async function handleDelete(index: number) {
     const nextTools = tools.filter((_, i) => i !== index);
@@ -2784,7 +3025,16 @@ function ToolsTab({
           return (
             <Card
               key={index}
-              className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+              role="button"
+              tabIndex={0}
+              onClick={() => openEditDialog(tool, index)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openEditDialog(tool, index);
+                }
+              }}
+              className="group relative cursor-pointer overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
             >
               <CardContent className="relative space-y-4 p-5">
                 <div className="flex items-start justify-between">
@@ -2797,16 +3047,25 @@ function ToolsTab({
                   >
                     <Icon className="h-5 w-5" />
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDelete(index)}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    aria-label="Excluir ferramenta"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                      Editar
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(index);
+                      }}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      aria-label="Excluir ferramenta"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
+
                 <div className="space-y-1">
                   <p className="font-mono text-sm font-semibold text-foreground">
                     {toolTitle(tool)}
@@ -2823,7 +3082,10 @@ function ToolsTab({
                       size="sm"
                       variant="outline"
                       disabled={isInsertingRule}
-                      onClick={() => handleInsertPromptRule(tool)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleInsertPromptRule(tool);
+                      }}
                       className="h-7 w-full gap-1.5 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                     >
                       <Sparkles className="h-3 w-3" />
@@ -2938,15 +3200,17 @@ function ToolsTab({
           ) : (
             <div className="flex max-h-[85vh] flex-col">
               <div className="border-b border-white/[0.06] px-6 py-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={backToSelect}
-                  className="mb-2 -ml-2 h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Voltar
-                </Button>
+                {editIndex === null && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={backToSelect}
+                    className="mb-2 -ml-2 h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Voltar
+                  </Button>
+                )}
                 <div className="flex items-center gap-3">
                   {selected && (
                     <div
@@ -2961,8 +3225,10 @@ function ToolsTab({
                   )}
                   <div>
                     <DialogTitle className="text-base">
+                      {editIndex !== null ? "Editar: " : ""}
                       {selected?.label ?? "Configurar Ferramenta"}
                     </DialogTitle>
+
                     <DialogDescription className="text-xs">
                       {selected?.description}
                     </DialogDescription>
@@ -3146,7 +3412,12 @@ function ToolsTab({
                                     placeholder="Só um momento, vou te transferir para um especialista."
                                     className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                                   />
+                                  <p className="text-[10px] text-muted-foreground/70">
+                                    É exatamente esta frase que a IA fala em voz alta antes de
+                                    encaminhar a ligação para este destino.
+                                  </p>
                                 </div>
+
 
                                 <div className="space-y-1.5">
                                   <Label className="text-[11px] font-medium text-muted-foreground">
