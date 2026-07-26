@@ -135,6 +135,7 @@ interface NumberRow {
   calls_today: number;
   answer_rate: number;
   health: Health;
+  isTest?: boolean;
 }
 
 const healthStyles: Record<Health, string> = {
