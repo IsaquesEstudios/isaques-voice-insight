@@ -1724,6 +1724,8 @@ interface CatalogItem {
   kind: CatalogKind;
   vapiType?: VapiToolType;
   subItems?: CatalogItem[];
+  locked?: boolean;
+  beta?: boolean;
 }
 
 interface CatalogSection {
