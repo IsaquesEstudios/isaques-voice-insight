@@ -79,6 +79,7 @@ import {
   saveTwilioCredentials,
   searchAvailableTwilioNumbers,
   sendVerifyOtp,
+  getTwilioBalance,
 } from "@/lib/twilio.functions";
 
 
@@ -95,7 +96,9 @@ import {
 
   listVapiAssistants,
   listVapiPhoneNumbers,
+  getVapiCredits,
 } from "@/lib/vapi.functions";
+
 
 import {
   Select,
@@ -1315,7 +1318,10 @@ function TelefoniaPage() {
             )}
           </CardContent>
         </Card>
+
+        <CreditsCard twilioConnected={isTwilioConnected} />
       </div>
+
 
 
 
@@ -1968,5 +1974,121 @@ function AssistantCombobox({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function CreditsCard({ twilioConnected }: { twilioConnected: boolean }) {
+  const twilioBalanceQuery = useQuery({
+    queryKey: ["twilio-balance"],
+    queryFn: () => getTwilioBalance(),
+    enabled: twilioConnected,
+    staleTime: 60_000,
+  });
+  const vapiCreditsQuery = useQuery({
+    queryKey: ["vapi-credits"],
+    queryFn: () => getVapiCredits(),
+    staleTime: 60_000,
+  });
+
+  const fmt = (v: number | null | undefined, currency: string) =>
+    typeof v === "number"
+      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v)
+      : "—";
+
+  const twilio = twilioBalanceQuery.data;
+  const vapi = vapiCreditsQuery.data;
+
+  const refreshing =
+    twilioBalanceQuery.isFetching || vapiCreditsQuery.isFetching;
+
+  return (
+    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <div>
+          <CardTitle className="text-base font-semibold">Créditos & saldo</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Saldo disponível nas suas contas Twilio e Vapi.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="gap-1.5"
+          disabled={refreshing}
+          onClick={() => {
+            twilioBalanceQuery.refetch();
+            vapiCreditsQuery.refetch();
+          }}
+          title="Atualizar saldos"
+        >
+          <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+        </Button>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur-xl">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Twilio
+            </p>
+            {twilio?.connected && twilio.accountType ? (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                {twilio.accountType === "Trial" ? "Trial" : "Full"}
+              </span>
+            ) : null}
+          </div>
+          {!twilioConnected ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Conecte sua conta Twilio para ver o saldo.
+            </p>
+          ) : twilioBalanceQuery.isLoading ? (
+            <div className="mt-3 h-7 w-32 animate-pulse rounded-md bg-white/[0.06]" />
+          ) : twilio?.connected && twilio.balance !== null ? (
+            <>
+              <p className="mt-2 text-2xl font-bold text-foreground">
+                {fmt(twilio.balance, twilio.currency || "USD")}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {twilio.friendlyName ?? "Conta Twilio"}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Não foi possível ler o saldo Twilio.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur-xl">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Vapi
+            </p>
+            {vapi?.ok && vapi.plan ? (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                {vapi.plan}
+              </span>
+            ) : null}
+          </div>
+          {vapiCreditsQuery.isLoading ? (
+            <div className="mt-3 h-7 w-32 animate-pulse rounded-md bg-white/[0.06]" />
+          ) : vapi?.ok && vapi.credits !== null ? (
+            <>
+              <p className="mt-2 text-2xl font-bold text-foreground">
+                {fmt(vapi.credits, "USD")}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {vapi.billingLimit !== null && vapi.billingLimit !== undefined
+                  ? `Limite mensal: ${fmt(vapi.billingLimit, "USD")}`
+                  : (vapi.name ?? "Organização Vapi")}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Não foi possível ler os créditos da Vapi.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

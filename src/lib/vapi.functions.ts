@@ -2521,3 +2521,36 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
     });
     return { ok: true };
   });
+
+// ---------- créditos da organização ----------
+
+export const getVapiCredits = createServerFn({ method: "GET" })
+  .middleware([withVapiCredentials])
+  .handler(async () => {
+    const pickNumber = (v: unknown): number | null =>
+      typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : null;
+
+    try {
+      const org = (await vapiFetch("/org", { method: "GET" })) as unknown;
+      const first = Array.isArray(org) ? org[0] : org;
+      const o = (first ?? {}) as Record<string, unknown>;
+      return {
+        ok: true as const,
+        credits:
+          pickNumber(o.credits) ??
+          pickNumber((o as { credit?: unknown }).credit) ??
+          pickNumber((o as { creditsRemaining?: unknown }).creditsRemaining) ??
+          pickNumber((o as { balance?: unknown }).balance),
+        billingLimit: pickNumber(o.billingLimit),
+        name: (o.name as string | undefined) ?? null,
+        plan: (o.plan as string | undefined) ?? null,
+      };
+    } catch (err) {
+      return {
+        ok: false as const,
+        credits: null,
+        billingLimit: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  });

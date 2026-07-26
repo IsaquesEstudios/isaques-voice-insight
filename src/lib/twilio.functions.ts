@@ -1027,3 +1027,38 @@ export const purchaseTwilioNumber = createServerFn({ method: "POST" })
       throw err;
     }
   });
+
+// ---------- saldo ----------
+
+export const getTwilioBalance = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const creds = await loadCreds(context as never);
+    if (!creds) return { connected: false as const };
+    try {
+      const json = (await twilioAccountGet(creds, "/Balance.json")) as {
+        balance?: string;
+        currency?: string;
+      };
+      const account = (await twilioAccountGet(creds, ".json")) as {
+        type?: string;
+        status?: string;
+        friendly_name?: string;
+      };
+      return {
+        connected: true as const,
+        balance: json.balance ? Number(json.balance) : null,
+        currency: json.currency ?? "USD",
+        accountType: account.type ?? null,
+        status: account.status ?? null,
+        friendlyName: account.friendly_name ?? null,
+      };
+    } catch (err) {
+      return {
+        connected: true as const,
+        balance: null,
+        currency: "USD",
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  });
