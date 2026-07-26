@@ -170,6 +170,8 @@ function TelefoniaPage() {
   const listVapiPhoneNumbersFn = useServerFn(listVapiPhoneNumbers);
   const attachAssistantFn = useServerFn(attachAssistantToNumber);
   const detachAssistantFn = useServerFn(detachAssistantFromNumber);
+  const deleteVapiNumberFn = useServerFn(deleteVapiPhoneNumber);
+
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
