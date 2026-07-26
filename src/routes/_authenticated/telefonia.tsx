@@ -598,37 +598,8 @@ function TelefoniaPage() {
     }
   };
 
-  // ---- Número gratuito da Vapi ----
-  const provisionFreeVapiNumberFn = useServerFn(provisionFreeVapiNumber);
-  const [vapiAreaCode, setVapiAreaCode] = useState("");
-  const [provisioningVapi, setProvisioningVapi] = useState(false);
-  const [vapiProvisionError, setVapiProvisionError] = useState<string | null>(null);
 
-  const handleProvisionVapiNumber = async () => {
-    setProvisioningVapi(true);
-    setVapiProvisionError(null);
-    try {
-      const res = await provisionFreeVapiNumberFn({
-        data: { areaCode: vapiAreaCode.trim() || "415" },
-      });
-      if (!res.ok) {
-        setVapiProvisionError(res.message);
-        toast.error(res.message);
-        return;
-      }
-      toast.success(`Número Vapi criado: ${res.number ?? res.id}`);
-      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      setOpen(false);
-      resetModal();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha ao criar número Vapi.";
-      setVapiProvisionError(msg);
-      toast.error(msg);
-    } finally {
-      setProvisioningVapi(false);
-    }
-  };
+
 
 
   const resetModal = () => {
