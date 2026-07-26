@@ -90,6 +90,7 @@ import {
   detachAssistantFromNumber,
   listVapiAssistants,
   listVapiPhoneNumbers,
+  provisionFreeVapiNumber,
 } from "@/lib/vapi.functions";
 
 import {
