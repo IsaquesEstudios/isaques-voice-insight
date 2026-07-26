@@ -135,7 +135,9 @@ interface NumberRow {
   answer_rate: number;
   health: Health;
   isTest?: boolean;
+  vapiId?: string;
 }
+
 
 const healthStyles: Record<Health, string> = {
   Seguro: "bg-success/15 text-success",
