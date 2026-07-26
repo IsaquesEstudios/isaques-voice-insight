@@ -677,6 +677,7 @@ function CompactCreditCard({
   badge,
   loading,
   progress,
+  lowBalance,
 }: {
   icon: typeof Phone;
   title: string;
@@ -686,9 +687,16 @@ function CompactCreditCard({
   badge?: string;
   loading: boolean;
   progress: number;
+  lowBalance?: boolean;
 }) {
   const fmt = (v: number, c: string) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: c }).format(v);
+
+  const barColor = lowBalance
+    ? "bg-destructive"
+    : progress > 0.8
+      ? "bg-amber-500"
+      : "bg-gradient-to-r from-primary to-success";
 
   return (
     <Card className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-card/20 p-5 backdrop-blur-2xl">
@@ -716,7 +724,7 @@ function CompactCreditCard({
 
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-primary to-success transition-all"
+          className={`h-full rounded-full ${barColor} transition-all`}
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
