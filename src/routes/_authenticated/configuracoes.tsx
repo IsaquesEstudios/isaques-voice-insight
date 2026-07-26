@@ -488,6 +488,7 @@ function NotificacoesSection() {
 }
 
 function FaturamentoSection() {
+  const qc = useQueryClient();
   const twilioConn = useQuery({
     queryKey: ["twilio-connection"],
     queryFn: () => getTwilioConnection(),
@@ -499,24 +500,29 @@ function FaturamentoSection() {
     staleTime: 60_000,
   });
   const vapiCreditsQuery = useQuery({
-    queryKey: ["vapi-credits"],
-    queryFn: () => getVapiCredits(),
+    queryKey: ["vapi-estimated-credits"],
+    queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
 
-  const fmt = (v: number | null | undefined, currency: string) =>
-    typeof v === "number"
-      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v)
-      : "—";
+  const [budgetInput, setBudgetInput] = useState<string>("");
 
-  const twilio = twilioBalanceQuery.data;
   const vapi = vapiCreditsQuery.data;
-  const refreshing = twilioBalanceQuery.isFetching || vapiCreditsQuery.isFetching;
+  const vapiConnected = vapi?.ok === true;
+  const vapiValue = vapi?.ok && vapi.balance !== null ? vapi.balance : null;
 
-  const twilioConnected = !!twilioConn.data?.connected;
-  const twilioValue = twilio?.connected && twilio.balance !== null ? twilio.balance : null;
-  const vapiValue = vapi?.ok && vapi.credits !== null ? vapi.credits : null;
-  const vapiLimit = vapi?.ok && vapi.billingLimit !== null ? vapi.billingLimit : null;
+  const saveBudget = useMutation({
+    mutationFn: (budget: number) =>
+      saveVapiBudget({ data: { budget, lowBalanceThreshold: 0.2 } }),
+    onSuccess: () => {
+      toast.success("Orçamento Vapi salvo!");
+      setBudgetInput("");
+      qc.invalidateQueries({ queryKey: ["vapi-estimated-credits"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar orçamento"),
+  });
+
+  const refreshing = twilioBalanceQuery.isFetching || vapiCreditsQuery.isFetching;
 
   return (
     <div className="space-y-6">
@@ -525,7 +531,7 @@ function FaturamentoSection() {
           <div>
             <CardTitle className="text-base font-semibold">Faturamento</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Saldo disponível nas suas contas Twilio e Vapi.
+              Saldo disponível na Twilio e saldo estimado na Vapi (baseado nas chamadas).
             </p>
           </div>
           <Button
@@ -549,40 +555,115 @@ function FaturamentoSection() {
           icon={Phone}
           title="Twilio"
           subtitle={
-            twilioConnected
-              ? twilio?.balance !== null && twilio?.balance !== undefined
+            twilioConn.data?.connected
+              ? twilioBalanceQuery.data?.balance !== null && twilioBalanceQuery.data?.balance !== undefined
                 ? "Saldo disponível na conta"
                 : "Não foi possível ler o saldo"
               : "Conecte sua conta Twilio"
           }
-          value={twilioValue}
-          currency={twilio?.currency || "USD"}
-          badge={twilio?.accountType === "Trial" ? "Trial" : twilio?.accountType === "Full" ? "Full" : undefined}
+          value={
+            twilioBalanceQuery.data?.connected && twilioBalanceQuery.data.balance !== null
+              ? twilioBalanceQuery.data.balance
+              : null
+          }
+          currency={twilioBalanceQuery.data?.currency || "USD"}
+          badge={
+            twilioBalanceQuery.data?.accountType === "Trial"
+              ? "Trial"
+              : twilioBalanceQuery.data?.accountType === "Full"
+                ? "Full"
+                : undefined
+          }
           loading={twilioBalanceQuery.isLoading}
-          progress={twilioConnected && typeof twilioValue === "number" ? 0.65 : 0}
+          progress={twilioConn.data?.connected ? 0.65 : 0}
         />
 
         <CompactCreditCard
           icon={Sparkles}
           title="Vapi"
           subtitle={
-            vapi?.ok
-              ? vapi.credits !== null && vapi.credits !== undefined
-                ? "Créditos disponíveis"
-                : "Créditos não expostos pela conta"
+            vapiConnected
+              ? vapiValue !== null
+                ? "Saldo estimado (orçamento − gastos)"
+                : "Configure um orçamento para ver o saldo"
               : "Conecte sua conta Vapi"
           }
           value={vapiValue}
           currency="USD"
-          badge={vapi?.plan ?? undefined}
+          badge={vapi?.ok ? "estimado" : undefined}
           loading={vapiCreditsQuery.isLoading}
-          progress={
-            vapi?.ok && typeof vapiValue === "number" && typeof vapiLimit === "number" && vapiLimit > 0
-              ? Math.min(1, Math.max(0, (vapiLimit - vapiValue) / vapiLimit))
-              : 0
-          }
+          progress={vapi?.ok ? vapi.usageRatio : 0}
+          lowBalance={vapi?.lowBalance}
         />
       </div>
+
+      {vapiConnected && (
+        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Orçamento Vapi</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              A Vapi não expõe um endpoint de créditos. Informe seu crédito/orçamento para calcularmos o saldo estimado.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Crédito/orçamento (USD)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={budgetInput}
+                  onChange={(e) => setBudgetInput(e.target.value)}
+                  placeholder={
+                    typeof vapi?.budget === "number"
+                      ? new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "USD",
+                        }).format(vapi.budget)
+                      : "Ex: 100.00"
+                  }
+                  className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Gasto acumulado (90 dias)</Label>
+                <div className="flex h-9 items-center rounded-md border border-white/[0.08] bg-white/[0.03] px-3 text-sm text-foreground">
+                  {typeof vapi?.spent === "number"
+                    ? new Intl.NumberFormat("pt-BR", {
+                        style: "currency",
+                        currency: "USD",
+                      }).format(vapi.spent)
+                    : "—"}
+                </div>
+              </div>
+            </div>
+
+            {vapi?.lowBalance && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                Seu saldo estimado atingiu o limite de alerta. Considere recarregar seus créditos na Vapi.
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => saveBudget.mutate(Number(budgetInput))}
+                disabled={
+                  saveBudget.isPending || budgetInput === "" || Number.isNaN(Number(budgetInput))
+                }
+                className="gap-2 shadow-glow"
+              >
+                {saveBudget.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Salvar orçamento
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
