@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -9,7 +10,9 @@ import {
   ListChecks,
   Settings,
   Sparkles,
+  Phone,
   AudioLines,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -24,6 +27,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { getTwilioConnection, getTwilioBalance } from "@/lib/twilio.functions";
+import { getVapiCredits } from "@/lib/vapi.functions";
 
 type NavItem = {
   title: string;
