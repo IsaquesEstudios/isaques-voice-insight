@@ -90,6 +90,7 @@ import {
   detachAssistantFromNumber,
   listVapiAssistants,
   listVapiPhoneNumbers,
+  provisionFreeVapiNumber,
 } from "@/lib/vapi.functions";
 
 import {
@@ -271,9 +272,27 @@ function TelefoniaPage() {
         return { ...n, assistant: assistantName ?? n.assistant };
       });
 
+  // Numbers issued by Vapi itself (provider "vapi") aren't on Twilio — append them.
+  for (const n of vapiPhoneNumbersQuery.data ?? []) {
+    if (n.provider !== "vapi" || !n.number) continue;
+    if (numbers.some((row) => row.phone_number === n.number)) continue;
+    numbers.push({
+      id: n.id,
+      phone_number: n.number,
+      region: null,
+      provider: "Vapi (gratuito)",
+      assistant: n.assistantId ? assistantById.get(n.assistantId) ?? null : null,
+      calls_today: 0,
+      answer_rate: 0,
+      health: "Seguro" as Health,
+    });
+  }
+
+
+
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"twilio" | "buy" | "sip">("twilio");
+  const [tab, setTab] = useState<"twilio" | "buy" | "vapi" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
@@ -529,6 +548,33 @@ function TelefoniaPage() {
     }
   };
 
+  // ---- Número gratuito da Vapi ----
+  const provisionFreeVapiNumberFn = useServerFn(provisionFreeVapiNumber);
+  const [vapiAreaCode, setVapiAreaCode] = useState("");
+  const [provisioningVapi, setProvisioningVapi] = useState(false);
+
+  const handleProvisionVapiNumber = async () => {
+    setProvisioningVapi(true);
+    try {
+      const res = await provisionFreeVapiNumberFn({
+        data: { areaCode: vapiAreaCode.trim() || undefined },
+      });
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(`Número Vapi criado: ${res.number ?? res.id}`);
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      setOpen(false);
+      resetModal();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao criar número Vapi.");
+    } finally {
+      setProvisioningVapi(false);
+    }
+  };
+
   const resetModal = () => {
     setTab("twilio");
     setTwilioForm({ accountSid: "", authToken: "" });
@@ -536,6 +582,7 @@ function TelefoniaPage() {
     setCopied(false);
     setBuyResults([]);
     setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
+    setVapiAreaCode("");
   };
 
   const handleCopySip = async () => {
@@ -1307,14 +1354,58 @@ function TelefoniaPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as "twilio" | "buy" | "sip")}>
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setTab(v as "twilio" | "buy" | "vapi" | "sip")}
+          >
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="twilio">Credenciais</TabsTrigger>
               <TabsTrigger value="buy" disabled={!isTwilioConnected}>
                 Comprar número
               </TabsTrigger>
+              <TabsTrigger value="vapi">Número Vapi</TabsTrigger>
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="vapi" className="mt-4 space-y-4">
+              <Alert className="border-primary/30 bg-primary/10 text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  A Vapi emite números gratuitos (EUA) usando a sua própria chave de
+                  API. Eles servem como <b>origem</b> para ligações de teste — ideal para
+                  ligar para o seu número verificado sem precisar comprar um DID na
+                  Twilio.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid gap-1">
+                <Label className="text-[11px] text-muted-foreground">
+                  Area code desejado (opcional, EUA)
+                </Label>
+                <Input
+                  value={vapiAreaCode}
+                  maxLength={3}
+                  onChange={(e) => setVapiAreaCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="415"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleProvisionVapiNumber}
+                  disabled={provisioningVapi}
+                  className="gap-2"
+                >
+                  {provisioningVapi ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Obter número gratuito da Vapi
+                </Button>
+              </div>
+            </TabsContent>
+
 
             <TabsContent value="buy" className="mt-4 space-y-4">
               <Alert className="border-primary/30 bg-primary/10 text-foreground">

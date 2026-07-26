@@ -930,6 +930,44 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
     }));
   });
 
+// Provisions a FREE phone number issued by Vapi itself (provider "vapi",
+// US numbers only). Useful for outbound test calls without owning a DID.
+export const provisionFreeVapiNumber = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { areaCode?: string; name?: string } | undefined) => ({
+    areaCode: input?.areaCode?.replace(/\D/g, "").slice(0, 3) || undefined,
+    name: input?.name?.slice(0, 40) || undefined,
+  }))
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      | { ok: true; id: string; number: string | null }
+      | { ok: false; message: string }
+    > => {
+      try {
+        const created = (await vapiFetch("/phone-number", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: "vapi",
+            name: data.name ?? "Número de teste Vapi",
+            ...(data.areaCode ? { numberDesiredAreaCode: data.areaCode } : {}),
+          }),
+        })) as { id: string; number?: string } | null;
+        if (!created?.id) return { ok: false, message: "Vapi não retornou o número criado." };
+        return { ok: true, id: created.id, number: created.number ?? null };
+      } catch (err) {
+        return {
+          ok: false,
+          message:
+            err instanceof Error
+              ? err.message
+              : "Não foi possível provisionar um número gratuito da Vapi.",
+        };
+      }
+    },
+  );
+
 // Attaches (or replaces) the assistant on a given phone number. Imports the
 // number on Vapi if it isn't there yet, using the user's own Twilio creds.
 export const attachAssistantToNumber = createServerFn({ method: "POST" })
