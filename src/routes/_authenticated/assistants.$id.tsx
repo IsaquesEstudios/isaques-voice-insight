@@ -1737,28 +1737,28 @@ const TOOL_CATALOG: CatalogSection[] = [
   {
     title: "Phone Call Tools",
     items: [
-      { key: "transferCall", label: "Transfer Call", description: "Encaminha a ligação para um número externo.", icon: PhoneForwarded, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "transferCall", vapiType: "transferCall" },
-      { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall" },
-      { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "voicemail", vapiType: "voicemail" },
-      { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf" },
-      { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "sms", vapiType: "sms" },
-      { key: "sip", label: "SIP Request", description: "Executa requisições SIP customizadas.", icon: Radio, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "sipRequest", vapiType: "sipRequest" },
+      { key: "transferCall", label: "Transfer Call", description: "Encaminha a ligação para um número externo.", icon: PhoneForwarded, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "transferCall", vapiType: "transferCall", beta: true },
+      { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall", locked: true },
+      { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "voicemail", vapiType: "voicemail", locked: true },
+      { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf", locked: true },
+      { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "sms", vapiType: "sms", locked: true },
+      { key: "sip", label: "SIP Request", description: "Executa requisições SIP customizadas.", icon: Radio, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "sipRequest", vapiType: "sipRequest", locked: true },
     ],
   },
   {
     title: "Assistant Tools",
     items: [
-      { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "handoff", vapiType: "handoff" },
-      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "query", vapiType: "query" },
+      { key: "handoff", label: "Handoff", description: "Transfere a conversa para outro assistente.", icon: Shuffle, iconColor: "text-orange-400", iconBg: "bg-orange-500/10", kind: "handoff", vapiType: "handoff", locked: true },
+      { key: "query", label: "Query", description: "Consulta base de conhecimento indexada.", icon: Search, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "query", vapiType: "query", locked: true },
     ],
   },
   {
     title: "Integrations",
     items: [
-      { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest" },
-      { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "mcp", vapiType: "mcp" },
-      { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "slack", vapiType: "slack" },
-      { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "sheets", vapiType: "sheets" },
+      { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest", locked: true },
+      { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "mcp", vapiType: "mcp", locked: true },
+      { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "slack", vapiType: "slack", locked: true },
+      { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "sheets", vapiType: "sheets", locked: true },
       {
         key: "gcal",
         label: "Google Calendar",
@@ -1767,9 +1767,10 @@ const TOOL_CATALOG: CatalogSection[] = [
         iconColor: "text-blue-500",
         iconBg: "bg-blue-500/10",
         kind: "gcalParent",
+        locked: true,
         subItems: [
-          { key: "gcalCreate", label: "Create Event", description: "Cria um novo evento no Google Calendar.", icon: CalendarPlus, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCreate", vapiType: "gcalCreate" },
-          { key: "gcalCheck", label: "Check Availability", description: "Verifica disponibilidade em um Google Calendar.", icon: CalendarCheck, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCheck", vapiType: "gcalCheck" },
+          { key: "gcalCreate", label: "Create Event", description: "Cria um novo evento no Google Calendar.", icon: CalendarPlus, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCreate", vapiType: "gcalCreate", locked: true },
+          { key: "gcalCheck", label: "Check Availability", description: "Verifica disponibilidade em um Google Calendar.", icon: CalendarCheck, iconColor: "text-blue-500", iconBg: "bg-blue-500/10", kind: "gcalCheck", vapiType: "gcalCheck", locked: true },
         ],
       },
       {
@@ -1780,17 +1781,19 @@ const TOOL_CATALOG: CatalogSection[] = [
         iconColor: "text-amber-500",
         iconBg: "bg-amber-500/10",
         kind: "ghlParent",
+        locked: true,
         subItems: [
-          { key: "ghlCalCreate", label: "Calendar Create Event", description: "Cria um novo evento no calendário do GHL.", icon: CalendarPlus, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCreate", vapiType: "ghlCalCreate" },
-          { key: "ghlCalCheck", label: "Calendar Check Availability", description: "Verifica disponibilidade no calendário do GHL.", icon: CalendarCheck, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCheck", vapiType: "ghlCalCheck" },
-          { key: "ghlContactCreate", label: "Contact Create", description: "Cria um novo contato no GoHighLevel.", icon: UserPlus, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactCreate", vapiType: "ghlContactCreate" },
-          { key: "ghlContactGet", label: "Contact Get", description: "Busca informações de um contato do GoHighLevel.", icon: UserRound, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactGet", vapiType: "ghlContactGet" },
+          { key: "ghlCalCreate", label: "Calendar Create Event", description: "Cria um novo evento no calendário do GHL.", icon: CalendarPlus, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCreate", vapiType: "ghlCalCreate", locked: true },
+          { key: "ghlCalCheck", label: "Calendar Check Availability", description: "Verifica disponibilidade no calendário do GHL.", icon: CalendarCheck, iconColor: "text-orange-500", iconBg: "bg-orange-500/10", kind: "ghlCalCheck", vapiType: "ghlCalCheck", locked: true },
+          { key: "ghlContactCreate", label: "Contact Create", description: "Cria um novo contato no GoHighLevel.", icon: UserPlus, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactCreate", vapiType: "ghlContactCreate", locked: true },
+          { key: "ghlContactGet", label: "Contact Get", description: "Busca informações de um contato do GoHighLevel.", icon: UserRound, iconColor: "text-amber-400", iconBg: "bg-amber-400/10", kind: "ghlContactGet", vapiType: "ghlContactGet", locked: true },
         ],
       },
-      { key: "customTool", label: "Custom Tool", description: "Ferramenta customizada via function calling.", icon: Code2, iconColor: "text-yellow-400", iconBg: "bg-yellow-400/10", kind: "function", vapiType: "function" },
+      { key: "customTool", label: "Custom Tool", description: "Ferramenta customizada via function calling.", icon: Code2, iconColor: "text-yellow-400", iconBg: "bg-yellow-400/10", kind: "function", vapiType: "function", locked: true },
     ],
   },
 ];
+
 
 const DEFAULT_FN_PARAMS = `{
   "type": "object",
