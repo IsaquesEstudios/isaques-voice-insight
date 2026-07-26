@@ -94,7 +94,6 @@ import {
 
   listVapiAssistants,
   listVapiPhoneNumbers,
-  provisionFreeVapiNumber,
 } from "@/lib/vapi.functions";
 
 import {
@@ -135,6 +134,7 @@ interface NumberRow {
   calls_today: number;
   answer_rate: number;
   health: Health;
+  isTest?: boolean;
 }
 
 const healthStyles: Record<Health, string> = {
@@ -280,7 +280,12 @@ function TelefoniaPage() {
   // imported into Vapi) is usable as origin — append the ones not listed yet.
   for (const n of vapiPhoneNumbersQuery.data ?? []) {
     if (!n.number) continue;
-    if (numbers.some((row) => row.phone_number === n.number)) continue;
+    const isTest = n.provider === "vapi" || /teste|test/i.test(n.name ?? "");
+    const existingRow = numbers.find((row) => row.phone_number === n.number);
+    if (existingRow) {
+      if (isTest) existingRow.isTest = true;
+      continue;
+    }
     numbers.push({
       id: n.id,
       phone_number: n.number,
@@ -293,8 +298,10 @@ function TelefoniaPage() {
       calls_today: 0,
       answer_rate: 0,
       health: "Seguro" as Health,
+      isTest,
     });
   }
+
 
 
 
@@ -598,37 +605,8 @@ function TelefoniaPage() {
     }
   };
 
-  // ---- Número gratuito da Vapi ----
-  const provisionFreeVapiNumberFn = useServerFn(provisionFreeVapiNumber);
-  const [vapiAreaCode, setVapiAreaCode] = useState("");
-  const [provisioningVapi, setProvisioningVapi] = useState(false);
-  const [vapiProvisionError, setVapiProvisionError] = useState<string | null>(null);
 
-  const handleProvisionVapiNumber = async () => {
-    setProvisioningVapi(true);
-    setVapiProvisionError(null);
-    try {
-      const res = await provisionFreeVapiNumberFn({
-        data: { areaCode: vapiAreaCode.trim() || "415" },
-      });
-      if (!res.ok) {
-        setVapiProvisionError(res.message);
-        toast.error(res.message);
-        return;
-      }
-      toast.success(`Número Vapi criado: ${res.number ?? res.id}`);
-      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      setOpen(false);
-      resetModal();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha ao criar número Vapi.";
-      setVapiProvisionError(msg);
-      toast.error(msg);
-    } finally {
-      setProvisioningVapi(false);
-    }
-  };
+
 
 
   const resetModal = () => {
@@ -638,7 +616,7 @@ function TelefoniaPage() {
     setCopied(false);
     setBuyResults([]);
     setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
-    setVapiAreaCode("");
+    
   };
 
   const handleCopySip = async () => {
@@ -918,13 +896,21 @@ function TelefoniaPage() {
                           className="border-border/50 transition-colors hover:bg-primary/5"
                         >
                           <TableCell className="px-6">
-                            <p className="font-mono text-xs font-medium text-foreground">
-                              {n.phone_number}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-xs font-medium text-foreground">
+                                {n.phone_number}
+                              </p>
+                              {n.isTest && (
+                                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                  Teste
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-muted-foreground capitalize">
                               {n.provider}
                             </p>
                           </TableCell>
+
                           <TableCell className="text-xs text-muted-foreground">
                             {n.region ?? "—"}
                           </TableCell>
@@ -1223,68 +1209,8 @@ function TelefoniaPage() {
               )}
             </CardContent>
           </Card>
-
-          <Card className="border-primary/20 bg-card/20 backdrop-blur-2xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">
-                Número gratuito da Vapi
-              </CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                A Vapi emite números dos EUA sem custo usando a sua própria chave de API.
-                Use como <b>origem</b> para ligar ao seu número verificado sem comprar um
-                DID na Twilio.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-1">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Area code (EUA)
-                </Label>
-                <Input
-                  value={vapiAreaCode}
-                  maxLength={3}
-                  onChange={(e) => setVapiAreaCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="415"
-                  className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Se deixar em branco, usamos <span className="font-mono">415</span>.
-                </p>
-              </div>
-              <Button
-                className="w-full gap-2 shadow-glow"
-                onClick={handleProvisionVapiNumber}
-                disabled={provisioningVapi}
-              >
-                {provisioningVapi ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                Obter número gratuito da Vapi
-              </Button>
-              {vapiProvisionError && (
-                <Alert className="border-warning/30 bg-warning/10 py-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                  <AlertDescription className="text-[11px] text-muted-foreground">
-                    {vapiProvisionError}{" "}
-                    <button
-                      type="button"
-                      className="underline underline-offset-2 hover:text-foreground"
-                      onClick={() => {
-                        setTab(isTwilioConnected ? "buy" : "twilio");
-                        setOpen(true);
-                      }}
-                    >
-                      {isTwilioConnected ? "Comprar número na Twilio" : "Conectar Twilio"}
-                    </button>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-
-          </Card>
         </div>
+
 
 
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">

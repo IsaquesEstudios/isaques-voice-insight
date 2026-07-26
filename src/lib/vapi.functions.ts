@@ -1936,8 +1936,51 @@ export const saveVapiCredentials = createServerFn({ method: "POST" })
       { onConflict: "user_id" },
     );
     if (error) throw new Error(`DB upsert failed: ${error.message}`);
-    return { ok: true };
+    // Best-effort: garante um número de teste gratuito da Vapi já no onboarding.
+    const testNumber = await ensureFreeVapiTestNumber(data.privateKey);
+    return { ok: true, testNumber };
   });
+
+// Creates a free Vapi-issued number (US) if the account doesn't have one yet.
+// Never throws — provisioning isn't available on every Vapi organization.
+async function ensureFreeVapiTestNumber(
+  privateKey: string,
+): Promise<{ id: string; number: string | null } | null> {
+  const headers = {
+    Authorization: `Bearer ${privateKey}`,
+    "Content-Type": "application/json",
+  };
+  try {
+    const listRes = await fetch("https://api.vapi.ai/phone-number?limit=100", {
+      headers,
+    });
+    if (listRes.ok) {
+      const list = (await listRes.json()) as
+        | { id: string; provider?: string; number?: string }[]
+        | null;
+      const existing = Array.isArray(list)
+        ? list.find((n) => n.provider === "vapi")
+        : undefined;
+      if (existing) return { id: existing.id, number: existing.number ?? null };
+    }
+    const createRes = await fetch("https://api.vapi.ai/phone-number", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        provider: "vapi",
+        name: "Número de teste Vapi",
+        numberDesiredAreaCode: "415",
+      }),
+    });
+    if (!createRes.ok) return null;
+    const created = (await createRes.json()) as { id?: string; number?: string } | null;
+    if (!created?.id) return null;
+    return { id: created.id, number: created.number ?? null };
+  } catch {
+    return null;
+  }
+}
+
 
 export const updateVapiPublicKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
