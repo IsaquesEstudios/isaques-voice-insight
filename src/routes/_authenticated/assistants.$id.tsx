@@ -2231,8 +2231,20 @@ function ToolsTab({
       return;
     }
     resetForm();
-    const name = typeof tool.name === "string" ? tool.name : "";
-    const desc = typeof tool.description === "string" ? tool.description : "";
+    // Built-in tools (endCall etc.) guardam nome/descrição dentro de `function`,
+    // pois a Vapi rejeita essas chaves no nível raiz do tool.
+    const name =
+      typeof tool.name === "string" && tool.name
+        ? tool.name
+        : typeof tool.function?.name === "string"
+          ? tool.function.name
+          : "";
+    const desc =
+      typeof tool.description === "string" && tool.description
+        ? tool.description
+        : typeof tool.function?.description === "string"
+          ? tool.function.description
+          : "";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawMessages: any[] = Array.isArray(tool.messages) ? tool.messages : [];
     const simpleMessages: VoicemailMessage[] = rawMessages.map((m) => ({
