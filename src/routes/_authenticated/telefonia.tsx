@@ -1358,13 +1358,13 @@ function TelefoniaPage() {
             value={tab}
             onValueChange={(v) => setTab(v as "twilio" | "buy" | "vapi" | "sip")}
           >
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="twilio">Credenciais</TabsTrigger>
               <TabsTrigger value="buy" disabled={!isTwilioConnected}>
                 Comprar número
               </TabsTrigger>
-              <TabsTrigger value="vapi">Número Vapi</TabsTrigger>
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
+
             </TabsList>
 
 
