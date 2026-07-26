@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  RefreshCw,
 } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -30,10 +31,12 @@ import {
   getVapiConnection,
   saveVapiCredentials,
   updateVapiPublicKey,
+  getVapiCredits,
 } from "@/lib/vapi.functions";
 import {
   getTwilioConnection,
   saveTwilioCredentials,
+  getTwilioBalance,
 } from "@/lib/twilio.functions";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -484,45 +487,152 @@ function NotificacoesSection() {
 }
 
 function FaturamentoSection() {
+  const twilioConn = useQuery({
+    queryKey: ["twilio-connection"],
+    queryFn: () => getTwilioConnection(),
+  });
+  const twilioBalanceQuery = useQuery({
+    queryKey: ["twilio-balance"],
+    queryFn: () => getTwilioBalance(),
+    enabled: !!twilioConn.data?.connected,
+    staleTime: 60_000,
+  });
+  const vapiCreditsQuery = useQuery({
+    queryKey: ["vapi-credits"],
+    queryFn: () => getVapiCredits(),
+    staleTime: 60_000,
+  });
+
+  const fmt = (v: number | null | undefined, currency: string) =>
+    typeof v === "number"
+      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v)
+      : "—";
+
+  const twilio = twilioBalanceQuery.data;
+  const vapi = vapiCreditsQuery.data;
+  const refreshing = twilioBalanceQuery.isFetching || vapiCreditsQuery.isFetching;
+
   return (
     <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">Plano & Faturamento</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/15 to-transparent p-4">
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-primary" />
-            <p className="text-sm font-semibold text-foreground">Plano Growth</p>
-          </div>
-          <p className="mt-1 text-2xl font-bold text-foreground">
-            R$ 897<span className="text-sm text-muted-foreground">/mês</span>
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Renova em 12/04/2026
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="text-base font-semibold">Créditos & saldo</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Saldo disponível nas suas contas Twilio e Vapi.
           </p>
         </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="gap-1.5"
+          disabled={refreshing}
+          onClick={() => {
+            twilioBalanceQuery.refetch();
+            vapiCreditsQuery.refetch();
+          }}
+          title="Atualizar saldos"
+        >
+          <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur-xl">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Twilio
+              </p>
+              {twilio?.connected && twilio.accountType ? (
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {twilio.accountType === "Trial" ? "Trial" : "Full"}
+                </span>
+              ) : null}
+            </div>
+            {!twilioConn.data?.connected ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Conecte sua conta Twilio para ver o saldo.
+              </p>
+            ) : twilioBalanceQuery.isLoading ? (
+              <div className="mt-3 h-7 w-32 animate-pulse rounded-md bg-white/[0.06]" />
+            ) : twilio?.connected && twilio.balance !== null ? (
+              <>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {fmt(twilio.balance, twilio.currency || "USD")}
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {twilio.friendlyName ?? "Conta Twilio"}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Não foi possível ler o saldo Twilio.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur-xl">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Vapi
+              </p>
+              {vapi?.ok && vapi.plan ? (
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {vapi.plan}
+                </span>
+              ) : null}
+            </div>
+            {vapiCreditsQuery.isLoading ? (
+              <div className="mt-3 h-7 w-32 animate-pulse rounded-md bg-white/[0.06]" />
+            ) : vapi?.ok && vapi.credits !== null ? (
+              <>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {fmt(vapi.credits, "USD")}
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {vapi.billingLimit !== null && vapi.billingLimit !== undefined
+                    ? `Limite mensal: ${fmt(vapi.billingLimit, "USD")}`
+                    : (vapi.name ?? "Organização Vapi")}
+                </p>
+              </>
+            ) : (
+              <div className="mt-2 space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  Créditos não disponíveis nesta conta.
+                </p>
+                <a
+                  href="https://dashboard.vapi.ai/org/billing"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-0.5 text-[11px] text-primary hover:underline"
+                >
+                  Ver no dashboard da Vapi <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
               <CreditCard className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Visa •••• 4210</p>
-              <p className="text-[11px] text-muted-foreground">Expira 09/28</p>
+              <p className="text-sm font-medium text-foreground">
+                Recarregue direto nas plataformas
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Os saldos acima são das suas próprias contas Twilio e Vapi.
+              </p>
             </div>
           </div>
-          <Button size="sm" variant="ghost" className="hover:text-primary">
-            Alterar
-          </Button>
+          <Shield className="h-4 w-4 text-muted-foreground" />
         </div>
-        <Button variant="outline" className="w-full border-white/[0.08] bg-background/40 backdrop-blur-xl">
-          Fazer upgrade do plano
-        </Button>
       </CardContent>
     </Card>
   );
 }
+
 
 function PlaceholderSection({ title, desc }: { title: string; desc: string }) {
   return (
