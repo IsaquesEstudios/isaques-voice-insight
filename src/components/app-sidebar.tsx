@@ -165,6 +165,8 @@ function SidebarCreditRow({
   currency,
   badge,
   loading,
+  usageRatio,
+  lowBalance,
 }: {
   icon: typeof Phone;
   title: string;
@@ -172,7 +174,13 @@ function SidebarCreditRow({
   currency: string;
   badge?: string;
   loading: boolean;
+  usageRatio?: number;
+  lowBalance?: boolean;
 }) {
+  const ratio = typeof usageRatio === "number" ? usageRatio : typeof value === "number" ? 0.65 : 0;
+  const barColor =
+    lowBalance ? "bg-destructive" : ratio > 0.8 ? "bg-amber-500" : "bg-primary";
+
   return (
     <div className="rounded-xl border border-sidebar-border bg-gradient-to-br from-primary/10 to-transparent p-3">
       <div className="flex items-center justify-between gap-2">
@@ -199,10 +207,8 @@ function SidebarCreditRow({
       </div>
       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-sidebar-accent">
         <div
-          className={
-            "h-full rounded-full bg-primary transition-all " +
-            (typeof value === "number" ? "w-[65%]" : "w-0")
-          }
+          className={`h-full rounded-full ${barColor} transition-all`}
+          style={{ width: `${Math.round(ratio * 100)}%` }}
         />
       </div>
     </div>
