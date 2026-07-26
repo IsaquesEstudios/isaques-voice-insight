@@ -88,6 +88,8 @@ import {
   attachAssistantToNumber,
   createOutboundTestCall,
   detachAssistantFromNumber,
+  resyncVapiNumberCredentials,
+
   getVapiCallStatus,
 
   listVapiAssistants,
