@@ -463,6 +463,18 @@ function TelefoniaPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao ressincronizar."),
   });
 
+  const deleteVapiNumberMutation = useMutation({
+    mutationFn: (id: string) => deleteVapiNumberFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Número removido da Vapi.");
+      queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Falha ao remover número."),
+  });
+
+
+
   const [lastCallDiag, setLastCallDiag] = useState<{
     status: string | null;
     endedReason: string | null;
