@@ -1980,6 +1980,9 @@ function ToolsTab({
   const [step, setStep] = useState<"select" | "configure">("select");
   const [selected, setSelected] = useState<CatalogItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // null = criando uma nova ferramenta; número = editando a ferramenta desse índice.
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+
 
   const [transferNumber, setTransferNumber] = useState("");
   const [fnName, setFnName] = useState("");
