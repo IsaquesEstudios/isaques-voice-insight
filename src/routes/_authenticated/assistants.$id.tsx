@@ -1738,7 +1738,7 @@ const TOOL_CATALOG: CatalogSection[] = [
     title: "Phone Call Tools",
     items: [
       { key: "transferCall", label: "Transfer Call", description: "Encaminha a ligação para um número externo.", icon: PhoneForwarded, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "transferCall", vapiType: "transferCall", beta: true },
-      { key: "endCall", label: "Hang Up", description: "Permite que a IA finalize a chamada.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall", locked: true },
+      { key: "endCall", label: "Finalizar Chamada", description: "Permite que a IA encerre a ligação quando a conversa terminar.", icon: PhoneOff, iconColor: "text-rose-400", iconBg: "bg-rose-500/10", kind: "endCall", vapiType: "endCall", beta: true },
       { key: "voicemail", label: "Leave Voicemail", description: "Deixa uma mensagem quando ninguém atender.", icon: Voicemail, iconColor: "text-violet-400", iconBg: "bg-violet-500/10", kind: "voicemail", vapiType: "voicemail", locked: true },
       { key: "dtmf", label: "DTMF", description: "Envia tons DTMF durante a chamada.", icon: Hash, iconColor: "text-amber-400", iconBg: "bg-amber-500/10", kind: "dtmf", vapiType: "dtmf", locked: true },
       { key: "sendText", label: "Send Text", description: "Envia SMS durante ou após a chamada.", icon: MessageSquare, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10", kind: "sms", vapiType: "sms", locked: true },
@@ -2231,8 +2231,20 @@ function ToolsTab({
       return;
     }
     resetForm();
-    const name = typeof tool.name === "string" ? tool.name : "";
-    const desc = typeof tool.description === "string" ? tool.description : "";
+    // Built-in tools (endCall etc.) guardam nome/descrição dentro de `function`,
+    // pois a Vapi rejeita essas chaves no nível raiz do tool.
+    const name =
+      typeof tool.name === "string" && tool.name
+        ? tool.name
+        : typeof tool.function?.name === "string"
+          ? tool.function.name
+          : "";
+    const desc =
+      typeof tool.description === "string" && tool.description
+        ? tool.description
+        : typeof tool.function?.description === "string"
+          ? tool.function.description
+          : "";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawMessages: any[] = Array.isArray(tool.messages) ? tool.messages : [];
     const simpleMessages: VoicemailMessage[] = rawMessages.map((m) => ({
@@ -3721,30 +3733,38 @@ function ToolsTab({
                         </h3>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="ec-name" className="text-xs">Tool Name</Label>
+                        <Label htmlFor="ec-name" className="text-xs">Nome da ferramenta</Label>
                         <Input
                           id="ec-name"
                           value={ecName}
                           onChange={(e) => setEcName(e.target.value)}
-                          placeholder="end_call_tool"
+                          placeholder="finalizar_chamada"
                           className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
+                        <p className="text-[10px] text-muted-foreground">
+                          Somente letras, números, hífen e underline (máx. 64 caracteres).
+                        </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="ec-desc" className="text-xs">Description</Label>
+                        <Label htmlFor="ec-desc" className="text-xs">Quando encerrar a chamada</Label>
                         <Textarea
                           id="ec-desc"
                           rows={3}
                           maxLength={1000}
                           value={ecDescription}
                           onChange={(e) => setEcDescription(e.target.value)}
-                          placeholder="Describe the tool in a few sentences"
+                          placeholder="Ex.: encerre a ligação quando o cliente se despedir, disser que não tem interesse ou quando o atendimento for concluído."
                           className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                         />
+                        <p className="text-[10px] text-muted-foreground">
+                          Esta é a condição que a IA avalia para chamar a ferramenta. Sem ela, o
+                          modelo raramente desliga sozinho.
+                        </p>
                         <p className="text-right text-[10px] text-muted-foreground">
                           {ecDescription.length}/1000
                         </p>
                       </div>
+
                     </div>
 
                     {/* Panel 2 — Messages */}
