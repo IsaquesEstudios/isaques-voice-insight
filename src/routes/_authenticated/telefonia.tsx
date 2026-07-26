@@ -564,6 +564,7 @@ function TelefoniaPage() {
     setCopied(false);
     setBuyResults([]);
     setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
+    setVapiAreaCode("");
   };
 
   const handleCopySip = async () => {
