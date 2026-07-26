@@ -1367,44 +1367,8 @@ function TelefoniaPage() {
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="vapi" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  A Vapi emite números gratuitos (EUA) usando a sua própria chave de
-                  API. Eles servem como <b>origem</b> para ligações de teste — ideal para
-                  ligar para o seu número verificado sem precisar comprar um DID na
-                  Twilio.
-                </AlertDescription>
-              </Alert>
 
-              <div className="grid gap-1">
-                <Label className="text-[11px] text-muted-foreground">
-                  Area code desejado (opcional, EUA)
-                </Label>
-                <Input
-                  value={vapiAreaCode}
-                  maxLength={3}
-                  onChange={(e) => setVapiAreaCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="415"
-                />
-              </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleProvisionVapiNumber}
-                  disabled={provisioningVapi}
-                  className="gap-2"
-                >
-                  {provisioningVapi ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  Obter número gratuito da Vapi
-                </Button>
-              </div>
-            </TabsContent>
 
 
             <TabsContent value="buy" className="mt-4 space-y-4">
