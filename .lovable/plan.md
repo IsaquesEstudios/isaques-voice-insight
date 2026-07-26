@@ -1,46 +1,62 @@
-## Por que hoje não transfere "automaticamente"
+## Contexto
 
-Na Vapi o `transferCall` é uma **ferramenta que a IA decide chamar**. Não existe transferência automática por si só — ela acontece quando:
+A Vapi **não expõe um endpoint oficial de saldo/créditos** na sua API pública. A documentação oficial (`docs.vapi.ai/api-reference.md`) não contém rotas de `/org`, `/subscription`, `/credit`, `/billing` ou `/balance`, e posts na comunidade da Vapi confirmam que não há endpoint direto para consultar créditos restantes.
 
-1. o destino tem uma **condição/descrição** ("quando o cliente pedir para falar com um humano"), e
-2. o **prompt do assistente** manda usar a ferramenta nessa situação.
+Hoje o app tenta adivinhar créditos via `/org` e `/subscription`, mas essas rotas não existem na API documentada, então o card de Vapi fica sem valor real.
 
-Hoje o formulário salva apenas `type` + `number`/`sipUri` no destino, e nada é escrito no prompt. Por isso a IA quase nunca dispara a transferência.
+## Objetivo
 
-## O que vou construir
+Implementar uma gestão de créditos Vapi baseada em **dados reais que a API fornece**: o histórico de chamadas (`GET /call`). O usuário informa seu crédito/orçamento Vapi e o app calcula o saldo estimado subtraindo os gastos reais das chamadas.
 
-### 1. Campos por destino (aba Tools → Transfer Call)
-Para cada destino adicionado:
-- **Quando transferir** (`description`) — a condição em linguagem natural que a IA avalia. Ex.: "quando o cliente pedir atendimento humano ou falar de cancelamento".
-- **Mensagem antes de transferir** (`message`) — o que a IA fala antes de passar a ligação. Ex.: "Só um momento, vou te transferir para um especialista."
-- **Modo de transferência** (`transferPlan.mode`) — dropdown:
-  - `blind-transfer` (padrão, passa a ligação direto)
-  - `blind-transfer-add-summary-to-sip-header`
-  - `warm-transfer-say-message` (fala uma mensagem para quem recebe)
-  - `warm-transfer-say-summary` (resume a conversa para quem recebe)
-  - `warm-transfer-wait-for-operator-to-speak-first-and-then-say-message`
-  - com o campo extra de mensagem/summary quando o modo exigir.
+## Plano de implementação
 
-### 2. Passagem correta para a Vapi
-Ajustar o sanitizador em `src/lib/vapi.functions.ts` para preservar `description`, `message`, `transferPlan` e `number`/`sipUri` (+ `numberE164CheckEnabled`) dentro de cada item de `destinations`, em vez de repassar o array cru.
+### 1. Schema e persistência
+- Criar migration `docs/migrations/20260726_user_vapi_settings.sql`.
+- Tabela `public.user_vapi_settings`:
+  - `user_id uuid PK` (referência `auth.users`).
+  - `credits_budget numeric` — crédito/orçamento que o usuário informa ter na Vapi.
+  - `low_balance_threshold numeric` — percentual (0–1) para alerta visual (default 0.2).
+  - `created_at`, `updated_at`.
+- GRANTs e RLS padrão (usuário vê/altera só o próprio registro).
 
-### 3. Ajuda no prompt (a peça que faz "acontecer sozinho")
-No card do transferCall, um botão **"Inserir regra no prompt"** que adiciona ao System Prompt do assistente um bloco gerado a partir dos destinos, por exemplo:
+### 2. Server function de créditos estimados
+- No `src/lib/vapi.functions.ts`, substituir/adicionar `getVapiEstimatedCredits`:
+  - Lê `credits_budget` e `low_balance_threshold` de `user_vapi_settings`.
+  - Chama `GET /call` da Vapi (já autenticado com a chave do usuário) e busca as chamadas dos últimos 90 dias.
+  - Soma o campo `cost` de cada chamada (quando presente); se ausente, estima por `durationMinutes * tarifa_padrão`.
+  - Retorna DTO: `{ ok, budget, spent, balance, currency, usageRatio, lowBalance, callsCount, lastCallAt, error }`.
+- Manter `getVapiCredits` como fallback com mensagem clara de que a API não expõe saldo, ou removê-lo se não for mais usado.
 
-```text
-## Transferência
-Se o cliente pedir para falar com um humano ou mencionar cancelamento,
-chame a ferramenta transferCall com o destino +55 11 99999-9999.
-Nunca prometa transferir sem chamar a ferramenta.
-```
+### 3. UI de configuração do orçamento
+- Em `src/routes/_authenticated/configuracoes.tsx`, na aba Faturamento:
+  - Adicionar um pequeno formulário no card da Vapi para o usuário informar seu crédito/orçamento.
+  - Campo numérico em USD.
+  - Slider ou input para percentual de alerta de saldo baixo.
+  - Botão "Salvar orçamento".
+- Mostrar no card:
+  - Orçamento configurado.
+  - Gasto acumulado (estimado).
+  - Saldo restante.
+  - Barra de progresso baseada em `usageRatio`.
+  - Badge/alerta quando `lowBalance` for verdadeiro.
 
-Isso é salvo junto no `model.messages[0].content` via o fluxo de salvar que já existe.
+### 4. Atualizar o sidebar
+- Em `src/components/app-sidebar.tsx`, substituir `getVapiCredits` por `getVapiEstimatedCredits`.
+- Mostrar o saldo estimado (`balance`) e, quando colapsado, um indicador de cor (verde/amarelo/vermelho) conforme o percentual de uso.
 
-### 4. Aviso na UI
-Se um destino não tiver "Quando transferir" preenchido, mostrar um aviso discreto: "sem condição, a IA raramente vai transferir".
+### 5. Segurança e validações
+- A server function deve usar `withVapiCredentials` para garantir que só usuários com Vapi configurado acessem.
+- RLS na tabela `user_vapi_settings`.
+- Arredondar valores para 4 casas decimais.
 
-## Detalhes técnicos
+## Resultado esperado
 
-- `src/routes/_authenticated/assistants.$id.tsx`: estender `tcDestinations` (state) com `description`, `message`, `mode`, `warmMessage`; ampliar `buildTool()` para montar `destinations[].transferPlan`; ler esses campos ao editar uma tool existente.
-- `src/lib/vapi.functions.ts`: mapear cada destino explicitamente no sanitizador do `transferCall` (e do `handoff`).
-- Nada de mudança de banco de dados; tudo continua salvando direto na Vapi.
+- O card de Vapi passa a mostrar um **saldo estimado real** baseado nas chamadas feitas.
+- O usuário tem controle sobre seu orçamento e recebe alerta visual de saldo baixo.
+- Removemos a dependência de endpoints inexistentes da Vapi.
+
+## Notas técnicas
+
+- A Vapi retorna `cost` em dólares no objeto de call; usaremos isso como fonte primária.
+- Se `cost` não estiver presente, usaremos uma estimativa conservadora baseada em minutos.
+- A recarga de créditos continua sendo feita diretamente no dashboard da Vapi; o app só lê e projeta o saldo.

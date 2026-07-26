@@ -28,7 +28,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { getTwilioConnection, getTwilioBalance } from "@/lib/twilio.functions";
-import { getVapiCredits } from "@/lib/vapi.functions";
+import { getVapiEstimatedCredits } from "@/lib/vapi.functions";
 
 type NavItem = {
   title: string;
@@ -120,23 +120,18 @@ function SidebarCredits() {
     staleTime: 60_000,
   });
   const vapiCredits = useQuery({
-    queryKey: ["vapi-credits"],
-    queryFn: () => getVapiCredits(),
+    queryKey: ["vapi-estimated-credits"],
+    queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
-
-  const fmt = (v: number | null | undefined, currency: string) =>
-    typeof v === "number"
-      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(v)
-      : "—";
 
   const twilioValue =
     twilioBalance.data?.connected && twilioBalance.data.balance !== null
       ? twilioBalance.data.balance
       : null;
   const vapiValue =
-    vapiCredits.data?.ok && vapiCredits.data.credits !== null
-      ? vapiCredits.data.credits
+    vapiCredits.data?.ok && vapiCredits.data?.balance !== null
+      ? vapiCredits.data.balance
       : null;
 
   return (
@@ -154,8 +149,10 @@ function SidebarCredits() {
         title="Vapi"
         value={vapiValue}
         currency="USD"
-        badge={vapiCredits.data?.plan ?? undefined}
+        badge={vapiCredits.data?.ok ? "estimado" : undefined}
         loading={vapiCredits.isLoading}
+        usageRatio={vapiCredits.data?.usageRatio}
+        lowBalance={vapiCredits.data?.lowBalance}
       />
     </div>
   );
@@ -168,6 +165,8 @@ function SidebarCreditRow({
   currency,
   badge,
   loading,
+  usageRatio,
+  lowBalance,
 }: {
   icon: typeof Phone;
   title: string;
@@ -175,7 +174,13 @@ function SidebarCreditRow({
   currency: string;
   badge?: string;
   loading: boolean;
+  usageRatio?: number;
+  lowBalance?: boolean;
 }) {
+  const ratio = typeof usageRatio === "number" ? usageRatio : typeof value === "number" ? 0.65 : 0;
+  const barColor =
+    lowBalance ? "bg-destructive" : ratio > 0.8 ? "bg-amber-500" : "bg-primary";
+
   return (
     <div className="rounded-xl border border-sidebar-border bg-gradient-to-br from-primary/10 to-transparent p-3">
       <div className="flex items-center justify-between gap-2">
@@ -202,10 +207,8 @@ function SidebarCreditRow({
       </div>
       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-sidebar-accent">
         <div
-          className={
-            "h-full rounded-full bg-primary transition-all " +
-            (typeof value === "number" ? "w-[65%]" : "w-0")
-          }
+          className={`h-full rounded-full ${barColor} transition-all`}
+          style={{ width: `${Math.round(ratio * 100)}%` }}
         />
       </div>
     </div>

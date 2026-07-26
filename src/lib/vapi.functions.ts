@@ -2522,86 +2522,165 @@ export const updateAssistantStructuredSchema = createServerFn({ method: "POST" }
     return { ok: true };
   });
 
-// ---------- créditos da organização ----------
+// ---------- gestão estimada de créditos Vapi ----------
+// A Vapi não expõe endpoint oficial de saldo/créditos. Calculamos o saldo
+// estimado a partir do orçamento informado pelo usuário menos o gasto real
+// das chamadas (campo `cost` do objeto call).
 
-export const getVapiCredits = createServerFn({ method: "GET" })
+export interface VapiEstimatedCreditsDTO {
+  ok: boolean;
+  budget: number | null;
+  spent: number | null;
+  balance: number | null;
+  currency: string;
+  usageRatio: number;
+  lowBalance: boolean;
+  lowBalanceThreshold: number;
+  callsCount: number;
+  lastCallAt: string | null;
+  error: string | null;
+}
+
+export const getVapiEstimatedCredits = createServerFn({ method: "GET" })
   .middleware([withVapiCredentials])
-  .handler(async () => {
-    const pickNumber = (v: unknown): number | null =>
-      typeof v === "number"
-        ? v
-        : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
-          ? Number(v)
-          : null;
+  .handler(async ({ context }): Promise<VapiEstimatedCreditsDTO> => {
+    const { supabase, userId } = context;
 
-    const CREDIT_KEYS = ["credits", "credit", "creditsremaining", "creditbalance", "balance"];
-    const LIMIT_KEYS = ["billinglimit", "monthlylimit", "limit"];
+    const { data: settings, error: settingsError } = await supabase
+      .from("user_vapi_settings")
+      .select("credits_budget, low_balance_threshold")
+      .eq("user_id", userId)
+      .maybeSingle();
 
-    // procura recursivamente por chaves de crédito em qualquer nível
-    const deepFind = (input: unknown, keys: string[], depth = 0): number | null => {
-      if (!input || depth > 4) return null;
-      if (Array.isArray(input)) {
-        for (const item of input) {
-          const found = deepFind(item, keys, depth + 1);
-          if (found !== null) return found;
-        }
-        return null;
+    if (settingsError) {
+      return {
+        ok: false,
+        budget: null,
+        spent: null,
+        balance: null,
+        currency: "USD",
+        usageRatio: 0,
+        lowBalance: false,
+        lowBalanceThreshold: 0.2,
+        callsCount: 0,
+        lastCallAt: null,
+        error: `Falha ao carregar configurações: ${settingsError.message}`,
+      };
+    }
+
+    const budget =
+      typeof settings?.credits_budget === "number" ? settings.credits_budget : null;
+    const lowBalanceThreshold =
+      typeof settings?.low_balance_threshold === "number"
+        ? Math.min(1, Math.max(0, settings.low_balance_threshold))
+        : 0.2;
+
+    const since = new Date();
+    since.setDate(since.getDate() - 90);
+    const sinceIso = since.toISOString();
+
+    let calls: Array<Record<string, unknown>> = [];
+    try {
+      const res = (await vapiFetch(
+        `/call?createdAtGe=${encodeURIComponent(sinceIso)}&limit=100`,
+        { method: "GET" },
+      )) as unknown;
+      calls = Array.isArray(res) ? res : [];
+    } catch (err) {
+      return {
+        ok: false,
+        budget,
+        spent: null,
+        balance: budget,
+        currency: "USD",
+        usageRatio: 0,
+        lowBalance: false,
+        lowBalanceThreshold,
+        callsCount: 0,
+        lastCallAt: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && Number.isFinite(v) ? v : null;
+
+    let spent = 0;
+    let callsCount = 0;
+    let lastCallAt: string | null = null;
+
+    for (const c of calls) {
+      const cost = num(c.cost);
+      if (cost != null && cost > 0) {
+        spent += cost;
+        callsCount++;
       }
-      if (typeof input !== "object") return null;
-      const obj = input as Record<string, unknown>;
-      for (const [k, v] of Object.entries(obj)) {
-        if (keys.includes(k.toLowerCase())) {
-          const n = pickNumber(v);
-          if (n !== null) return n;
-        }
-      }
-      for (const v of Object.values(obj)) {
-        const found = deepFind(v, keys, depth + 1);
-        if (found !== null) return found;
-      }
-      return null;
-    };
-
-    const errors: string[] = [];
-    let credits: number | null = null;
-    let billingLimit: number | null = null;
-    let name: string | null = null;
-    let plan: string | null = null;
-
-    const endpoints = ["/org", "/subscription"];
-    for (const path of endpoints) {
-      try {
-        const res = (await vapiFetch(path, { method: "GET" })) as unknown;
-        const first = Array.isArray(res) ? res[0] : res;
-        const o = (first ?? {}) as Record<string, unknown>;
-        if (!name && typeof o.name === "string") name = o.name;
-        if (!plan && typeof o.plan === "string") plan = o.plan;
-        if (!plan && typeof o.type === "string" && path === "/subscription") plan = o.type;
-        if (credits === null) credits = deepFind(first, CREDIT_KEYS);
-        if (billingLimit === null) billingLimit = deepFind(first, LIMIT_KEYS);
-
-        // /org pode exigir buscar a org específica pelo id
-        if (credits === null && path === "/org" && typeof o.id === "string") {
-          try {
-            const one = (await vapiFetch(`/org/${o.id}`, { method: "GET" })) as unknown;
-            credits = deepFind(one, CREDIT_KEYS);
-            if (billingLimit === null) billingLimit = deepFind(one, LIMIT_KEYS);
-          } catch (e) {
-            errors.push(e instanceof Error ? e.message : String(e));
-          }
-        }
-        if (credits !== null) break;
-      } catch (err) {
-        errors.push(err instanceof Error ? err.message : String(err));
+      const endedAt = typeof c.endedAt === "string" ? c.endedAt : null;
+      if (endedAt && (!lastCallAt || endedAt > lastCallAt)) {
+        lastCallAt = endedAt;
       }
     }
 
+    const roundedSpent = Math.round(spent * 10000) / 10000;
+    const balance =
+      typeof budget === "number" ? Math.max(0, budget - roundedSpent) : null;
+    const usageRatio =
+      typeof budget === "number" && budget > 0
+        ? Math.min(1, Math.max(0, roundedSpent / budget))
+        : 0;
+    const lowBalance = usageRatio >= 1 - lowBalanceThreshold;
+
     return {
-      ok: credits !== null,
-      credits,
-      billingLimit,
-      name,
-      plan,
-      error: credits === null ? (errors[0] ?? "Créditos não disponíveis nesta conta Vapi.") : null,
+      ok: true,
+      budget,
+      spent: roundedSpent,
+      balance,
+      currency: "USD",
+      usageRatio,
+      lowBalance,
+      lowBalanceThreshold,
+      callsCount,
+      lastCallAt,
+      error: null,
+    };
+  });
+
+export const saveVapiBudget = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { budget: number; lowBalanceThreshold?: number }) => data)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const budget = Math.max(0, Number(data.budget) || 0);
+    const threshold =
+      typeof data.lowBalanceThreshold === "number"
+        ? Math.min(1, Math.max(0, data.lowBalanceThreshold))
+        : 0.2;
+
+    const { error } = await supabase.from("user_vapi_settings").upsert(
+      {
+        user_id: userId,
+        credits_budget: budget,
+        low_balance_threshold: threshold,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+
+    if (error) throw new Error(`Falha ao salvar orçamento: ${error.message}`);
+    return { ok: true, budget, lowBalanceThreshold: threshold };
+  });
+
+// Mantido para compatibilidade; retorna aviso de que a Vapi não expõe saldo.
+export const getVapiCredits = createServerFn({ method: "GET" })
+  .middleware([withVapiCredentials])
+  .handler(async () => {
+    return {
+      ok: false,
+      credits: null,
+      billingLimit: null,
+      name: null,
+      plan: null,
+      error:
+        "A Vapi não disponibiliza um endpoint oficial de créditos. Use a gestão estimada baseada nas chamadas.",
     };
   });
