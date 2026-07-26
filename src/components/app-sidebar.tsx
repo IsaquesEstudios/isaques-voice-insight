@@ -146,7 +146,7 @@ function SidebarCredits() {
         title="Twilio"
         value={twilioValue}
         currency={twilioBalance.data?.currency || "USD"}
-        badge={twilioBalance.data?.accountType}
+        badge={twilioBalance.data?.accountType ?? undefined}
         loading={twilioBalance.isLoading}
       />
       <SidebarCreditRow
