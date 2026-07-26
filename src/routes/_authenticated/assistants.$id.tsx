@@ -3733,30 +3733,38 @@ function ToolsTab({
                         </h3>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="ec-name" className="text-xs">Tool Name</Label>
+                        <Label htmlFor="ec-name" className="text-xs">Nome da ferramenta</Label>
                         <Input
                           id="ec-name"
                           value={ecName}
                           onChange={(e) => setEcName(e.target.value)}
-                          placeholder="end_call_tool"
+                          placeholder="finalizar_chamada"
                           className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
+                        <p className="text-[10px] text-muted-foreground">
+                          Somente letras, números, hífen e underline (máx. 64 caracteres).
+                        </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="ec-desc" className="text-xs">Description</Label>
+                        <Label htmlFor="ec-desc" className="text-xs">Quando encerrar a chamada</Label>
                         <Textarea
                           id="ec-desc"
                           rows={3}
                           maxLength={1000}
                           value={ecDescription}
                           onChange={(e) => setEcDescription(e.target.value)}
-                          placeholder="Describe the tool in a few sentences"
+                          placeholder="Ex.: encerre a ligação quando o cliente se despedir, disser que não tem interesse ou quando o atendimento for concluído."
                           className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
                         />
+                        <p className="text-[10px] text-muted-foreground">
+                          Esta é a condição que a IA avalia para chamar a ferramenta. Sem ela, o
+                          modelo raramente desliga sozinho.
+                        </p>
                         <p className="text-right text-[10px] text-muted-foreground">
                           {ecDescription.length}/1000
                         </p>
                       </div>
+
                     </div>
 
                     {/* Panel 2 — Messages */}
