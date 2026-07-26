@@ -274,7 +274,7 @@ function TelefoniaPage() {
 
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"twilio" | "buy" | "sip">("twilio");
+  const [tab, setTab] = useState<"twilio" | "buy" | "vapi" | "sip">("twilio");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
