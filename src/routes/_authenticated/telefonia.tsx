@@ -1091,7 +1091,7 @@ function TelefoniaPage() {
                 </div>
               ) : (
                 testContacts.map((c) => {
-                  const from = numbers[0]?.phone_number ?? "";
+                  const from = rowCallFrom[c.id] || numbers[0]?.phone_number || "";
                   const assistantId = rowCallAssistant[c.id] ?? "";
                   return (
                     <div
