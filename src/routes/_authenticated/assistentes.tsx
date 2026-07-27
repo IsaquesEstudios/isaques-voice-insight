@@ -245,9 +245,19 @@ function AssistentesPage() {
 
   const fetchSummary = useServerFn(getAssistantCardSummary);
 
-  const [assistants, setAssistants] = useState<VapiAssistant[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [summaries, setSummaries] = useState<Record<string, AssistantCardSummary>>({});
+  const queryClient = useQueryClient();
+
+  // Lista cacheada: ao voltar para a página, renderiza na hora e revalida em background.
+  const { data: assistantsData, isLoading } = useQuery({
+    queryKey: ["assistants", "list"],
+    queryFn: async () => {
+      const data = await fetchAssistants();
+      return Array.isArray(data) ? (data as VapiAssistant[]) : [];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const assistants = useMemo(() => assistantsData ?? [], [assistantsData]);
+
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VapiAssistant | null>(null);
@@ -256,49 +266,41 @@ function AssistentesPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await fetchAssistants();
-      setAssistants(Array.isArray(data) ? data : []);
+      await queryClient.invalidateQueries({ queryKey: ["assistants", "list"] });
     } catch (err) {
       console.error(err);
       toast.error("Não foi possível carregar os assistentes da Vapi.");
     }
-  }, [fetchAssistants]);
+  }, [queryClient]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await refresh();
-      if (!cancelled) setIsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [refresh]);
+  // Métricas reais por assistente (Vapi call logs), também cacheadas.
+  const assistantIds = useMemo(
+    () => assistants.map((a) => a.id).filter((id): id is string => Boolean(id)),
+    [assistants],
+  );
 
-  // Fetch per-assistant real metrics from Vapi call logs, in parallel.
-  useEffect(() => {
-    if (assistants.length === 0) return;
-    let cancelled = false;
-    const ids = assistants.map((a) => a.id).filter((id): id is string => Boolean(id));
-    Promise.all(
-      ids.map(async (id) => {
-        try {
-          const s = await fetchSummary({ data: { assistantId: id } });
-          return [id, s] as const;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
-      if (cancelled) return;
+  const { data: summariesData } = useQuery({
+    queryKey: ["assistants", "summaries", assistantIds],
+    enabled: assistantIds.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const results = await Promise.all(
+        assistantIds.map(async (id) => {
+          try {
+            const s = await fetchSummary({ data: { assistantId: id } });
+            return [id, s] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
       const next: Record<string, AssistantCardSummary> = {};
       for (const r of results) if (r) next[r[0]] = r[1];
-      setSummaries((prev) => ({ ...prev, ...next }));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [assistants, fetchSummary]);
+      return next;
+    },
+  });
+  const summaries = useMemo(() => summariesData ?? {}, [summariesData]);
+
 
   const enriched = useMemo(
     () =>
