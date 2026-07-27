@@ -5425,13 +5425,16 @@ function ToolsTab({
                           Request Body
                         </AccordionTrigger>
                         <AccordionContent className="space-y-3 pb-4">
-                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
-                              <Plus className="h-3 w-3" />
-                              Add Property
-                            </Button>
-                            <p className="mt-3 text-[11px] text-muted-foreground">No parameters defined</p>
-                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Propriedades que a IA preenche em tempo real e envia no corpo da requisição.
+                          </p>
+                          <ApiSchemaFieldsEditor
+                            fields={arBodyParams}
+                            onChange={setArBodyParams}
+                            emptyLabel="Nenhum parâmetro definido."
+                            addLabel="Add Property"
+                          />
+
                           <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
                             <Checkbox checked={arBodyLocked} onCheckedChange={(v) => setArBodyLocked(v === true)} />
                             Lock schema (no additional properties)
