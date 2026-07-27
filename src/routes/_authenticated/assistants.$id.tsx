@@ -5259,12 +5259,36 @@ function ToolsTab({
                         <AccordionContent className="space-y-4 pb-4">
                           <div className="space-y-2">
                             <p className="text-xs font-semibold text-foreground">Authorization</p>
-                            <p className="text-[11px] text-muted-foreground">Configure authentication for API requests</p>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
-                              <Plus className="h-3 w-3" />
-                              Add Auth
-                            </Button>
+                            <p className="text-[11px] text-muted-foreground">Configure a autenticação enviada no header da requisição.</p>
+                            <Select value={arAuthType} onValueChange={(v) => setArAuthType(v as typeof arAuthType)}>
+                              <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sem autenticação</SelectItem>
+                                <SelectItem value="bearer">Bearer Token</SelectItem>
+                                <SelectItem value="apiKey">API Key (header)</SelectItem>
+                                <SelectItem value="basic">Basic (base64)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {arAuthType === "apiKey" && (
+                              <Input
+                                value={arAuthHeaderName}
+                                onChange={(e) => setArAuthHeaderName(e.target.value)}
+                                placeholder="x-api-key"
+                                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                              />
+                            )}
+                            {arAuthType !== "none" && (
+                              <Input
+                                value={arAuthToken}
+                                onChange={(e) => setArAuthToken(e.target.value)}
+                                placeholder={arAuthType === "basic" ? "base64(user:senha)" : "Token / chave"}
+                                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                              />
+                            )}
                           </div>
+
                           <div className="space-y-2 border-t border-white/[0.06] pt-3">
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-semibold text-foreground">Request Headers</p>
