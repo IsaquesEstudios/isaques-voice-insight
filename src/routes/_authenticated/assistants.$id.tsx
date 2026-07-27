@@ -2084,6 +2084,17 @@ function ToolsTab({
   const [arBodyLocked, setArBodyLocked] = useState(false);
   const [arStaticFields, setArStaticFields] = useState<Array<{ key: string; value: string }>>([]);
   const [arMessages, setArMessages] = useState<VoicemailMessage[]>([]);
+  const [arAuthType, setArAuthType] = useState<"none" | "bearer" | "apiKey" | "basic">("none");
+  const [arAuthToken, setArAuthToken] = useState("");
+  const [arAuthHeaderName, setArAuthHeaderName] = useState("x-api-key");
+  const [arTimeoutSeconds, setArTimeoutSeconds] = useState(20);
+  const [arRetries, setArRetries] = useState(0);
+  const [arBackoffType, setArBackoffType] = useState<"fixed" | "exponential">("fixed");
+  const [arBackoffBaseDelay, setArBackoffBaseDelay] = useState(1000);
+  const [arBodyParams, setArBodyParams] = useState<ApiSchemaField[]>([]);
+  const [arResponseVars, setArResponseVars] = useState<ApiSchemaField[]>([]);
+  const [arAliases, setArAliases] = useState<Array<{ name: string; value: string }>>([]);
+
 
   // mcp configuration state
   const [mcpName, setMcpName] = useState("mcp_tool");
