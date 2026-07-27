@@ -2281,6 +2281,17 @@ function ToolsTab({
     setArBodyLocked(false);
     setArStaticFields([]);
     setArMessages([]);
+    setArAuthType("none");
+    setArAuthToken("");
+    setArAuthHeaderName("x-api-key");
+    setArTimeoutSeconds(20);
+    setArRetries(0);
+    setArBackoffType("fixed");
+    setArBackoffBaseDelay(1000);
+    setArBodyParams([]);
+    setArResponseVars([]);
+    setArAliases([]);
+
     setMcpName("mcp_tool");
     setMcpDescription("");
     setMcpServerUrl("");
