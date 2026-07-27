@@ -1733,6 +1733,14 @@ interface CatalogSection {
   items: CatalogItem[];
 }
 
+interface ApiSchemaField {
+  key: string;
+  type: "string" | "number" | "boolean" | "object" | "array";
+  description: string;
+  required: boolean;
+}
+
+
 const TOOL_CATALOG: CatalogSection[] = [
   {
     title: "Phone Call Tools",
