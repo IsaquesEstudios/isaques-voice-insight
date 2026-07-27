@@ -2764,21 +2764,52 @@ export const getDashboardOverview = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .inputValidator((data: { rangeDays?: number } | undefined) => data ?? {})
   .handler(async ({ data }): Promise<DashboardOverview> => {
-    const rangeDays = Math.min(Math.max(data.rangeDays ?? 30, 1), 90);
+    let rangeDays = Math.min(Math.max(data.rangeDays ?? 30, 1), 90);
     const now = Date.now();
-    const startCurrent = now - rangeDays * 86400000;
-    const startPrevious = now - rangeDays * 2 * 86400000;
+    let startCurrent = now - rangeDays * 86400000;
+    let startPrevious = now - rangeDays * 2 * 86400000;
+    let notice: string | null = null;
+
+    const fetchCalls = async (sinceMs: number | null) =>
+      vapiFetch(
+        sinceMs == null
+          ? `/call?limit=1000`
+          : `/call?limit=1000&createdAtGe=${encodeURIComponent(new Date(sinceMs).toISOString())}`,
+        { method: "GET" },
+      );
 
     let raw: unknown;
     try {
-      raw = await vapiFetch(
-        `/call?limit=1000&createdAtGe=${encodeURIComponent(new Date(startPrevious).toISOString())}`,
-        { method: "GET" },
-      );
+      raw = await fetchCalls(startPrevious);
     } catch (e) {
-      return emptyDashboard(rangeDays, e instanceof Error ? e.message : "Erro ao consultar a Vapi");
+      // O plano da Vapi pode limitar a janela de retenção do histórico de chamadas.
+      const msg = e instanceof Error ? e.message : "";
+      const match = msg.match(/adjust your date filter to ([A-Za-z]{3} [A-Za-z]{3} \d{1,2} \d{4})/i);
+      const suggested = match ? Date.parse(match[1]) : NaN;
+      const earliest = Number.isFinite(suggested) ? suggested + 86400000 : now - 13 * 86400000;
+      const availableDays = Math.max(1, Math.floor((now - earliest) / 86400000));
+      const effective = Math.max(1, Math.min(rangeDays, Math.floor(availableDays / 2) || 1));
+      try {
+        raw = await fetchCalls(earliest);
+      } catch {
+        try {
+          raw = await fetchCalls(null);
+        } catch (e2) {
+          return emptyDashboard(
+            rangeDays,
+            e2 instanceof Error ? e2.message : "Erro ao consultar a Vapi",
+          );
+        }
+      }
+      if (effective < rangeDays) {
+        notice = `Seu plano da Vapi retém apenas ${availableDays} dias de histórico. As métricas usam os últimos ${effective} dias.`;
+        rangeDays = effective;
+        startCurrent = now - rangeDays * 86400000;
+        startPrevious = now - rangeDays * 2 * 86400000;
+      }
     }
-    if (!Array.isArray(raw)) return emptyDashboard(rangeDays, null);
+    if (!Array.isArray(raw)) return emptyDashboard(rangeDays, notice);
+
 
     let assistantNames = new Map<string, string>();
     try {
@@ -2979,7 +3010,7 @@ export const getDashboardOverview = createServerFn({ method: "POST" })
 
     return {
       configured: true,
-      error: null,
+      error: notice,
       rangeDays,
       totals,
       deltas: {
