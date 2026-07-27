@@ -1740,6 +1740,81 @@ interface ApiSchemaField {
   required: boolean;
 }
 
+function ApiSchemaFieldsEditor({
+  fields,
+  onChange,
+  emptyLabel,
+  addLabel,
+}: {
+  fields: ApiSchemaField[];
+  onChange: (next: ApiSchemaField[]) => void;
+  emptyLabel: string;
+  addLabel: string;
+}) {
+  const patch = (idx: number, p: Partial<ApiSchemaField>) =>
+    onChange(fields.map((f, i) => (i === idx ? { ...f, ...p } : f)));
+  return (
+    <div className="space-y-2">
+      {fields.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+          {emptyLabel}
+        </p>
+      ) : (
+        fields.map((f, idx) => (
+          <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+            <div className="flex items-center gap-2">
+              <Input
+                value={f.key}
+                onChange={(e) => patch(idx, { key: e.target.value.replace(/\s+/g, "") })}
+                placeholder="nome_da_propriedade"
+                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+              />
+              <Select value={f.type} onValueChange={(v) => patch(idx, { type: v as ApiSchemaField["type"] })}>
+                <SelectTrigger className="w-32 border-white/[0.08] bg-background/40 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["string", "number", "boolean", "object", "array"] as const).map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onChange(fields.filter((_, i) => i !== idx))}
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                aria-label="Remover propriedade"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+            <Input
+              value={f.description}
+              onChange={(e) => patch(idx, { description: e.target.value })}
+              placeholder="Descrição (ajuda a IA a preencher o valor)"
+              className="border-white/[0.08] bg-background/40 text-xs"
+            />
+            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Checkbox checked={f.required} onCheckedChange={(v) => patch(idx, { required: v === true })} />
+              Obrigatório
+            </label>
+          </div>
+        ))
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onChange([...fields, { key: "", type: "string", description: "", required: false }])}
+        className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+      >
+        <Plus className="h-3 w-3" />
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
+
 
 const TOOL_CATALOG: CatalogSection[] = [
   {
