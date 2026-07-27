@@ -2691,3 +2691,316 @@ export const getVapiCredits = createServerFn({ method: "GET" })
         "A Vapi não disponibiliza um endpoint oficial de créditos. Use a gestão estimada baseada nas chamadas.",
     };
   });
+
+/* --------------------- Dashboard overview --------------------- */
+
+export interface DashboardCallRow {
+  id: string;
+  startedAt: string | null;
+  direction: "inbound" | "outbound" | "web";
+  phone: string | null;
+  durationSec: number | null;
+  cost: number | null;
+  endedReason: string | null;
+  status: string | null;
+  assistantName: string | null;
+  successEvaluation: boolean | null;
+}
+
+export interface DashboardOverview {
+  configured: boolean;
+  error: string | null;
+  rangeDays: number;
+  totals: {
+    calls: number;
+    cost: number;
+    minutes: number;
+    qualified: number;
+    answered: number;
+    answerRate: number | null;
+    avgDurationSec: number | null;
+    inbound: number;
+    outbound: number;
+  };
+  deltas: {
+    calls: number | null;
+    cost: number | null;
+    qualified: number | null;
+    answerRate: number | null;
+  };
+  daily: Array<{ date: string; label: string; inbound: number; outbound: number; cost: number }>;
+  costBreakdown: { stt: number; llm: number; tts: number; vapi: number; transport: number };
+  endedReasons: Array<{ reason: string; count: number }>;
+  topAssistants: Array<{ id: string; name: string; calls: number; cost: number; minutes: number }>;
+  recent: DashboardCallRow[];
+}
+
+function emptyDashboard(rangeDays: number, error: string | null): DashboardOverview {
+  return {
+    configured: true,
+    error,
+    rangeDays,
+    totals: {
+      calls: 0,
+      cost: 0,
+      minutes: 0,
+      qualified: 0,
+      answered: 0,
+      answerRate: null,
+      avgDurationSec: null,
+      inbound: 0,
+      outbound: 0,
+    },
+    deltas: { calls: null, cost: null, qualified: null, answerRate: null },
+    daily: [],
+    costBreakdown: { stt: 0, llm: 0, tts: 0, vapi: 0, transport: 0 },
+    endedReasons: [],
+    topAssistants: [],
+    recent: [],
+  };
+}
+
+export const getDashboardOverview = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((data: { rangeDays?: number } | undefined) => data ?? {})
+  .handler(async ({ data }): Promise<DashboardOverview> => {
+    const rangeDays = Math.min(Math.max(data.rangeDays ?? 30, 1), 90);
+    const now = Date.now();
+    const startCurrent = now - rangeDays * 86400000;
+    const startPrevious = now - rangeDays * 2 * 86400000;
+
+    let raw: unknown;
+    try {
+      raw = await vapiFetch(
+        `/call?limit=1000&createdAtGe=${encodeURIComponent(new Date(startPrevious).toISOString())}`,
+        { method: "GET" },
+      );
+    } catch (e) {
+      return emptyDashboard(rangeDays, e instanceof Error ? e.message : "Erro ao consultar a Vapi");
+    }
+    if (!Array.isArray(raw)) return emptyDashboard(rangeDays, null);
+
+    let assistantNames = new Map<string, string>();
+    try {
+      const list = await vapiFetch("/assistant?limit=100", { method: "GET" });
+      if (Array.isArray(list)) {
+        assistantNames = new Map(
+          (list as Array<Record<string, unknown>>)
+            .filter((a) => typeof a.id === "string")
+            .map((a) => [String(a.id), String(a.name ?? "Sem nome")]),
+        );
+      }
+    } catch {
+      /* nomes são opcionais */
+    }
+
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    const str = (v: unknown) => (typeof v === "string" && v.length ? v : null);
+    const truthy = (s: string) => {
+      const v = s.trim().toLowerCase();
+      return ["true", "pass", "passed", "success", "successful", "yes"].includes(v);
+    };
+
+    interface Norm {
+      id: string;
+      ms: number;
+      startedAt: string | null;
+      direction: "inbound" | "outbound" | "web";
+      phone: string | null;
+      durationSec: number | null;
+      cost: number;
+      breakdown: { stt: number; llm: number; tts: number; vapi: number; transport: number };
+      endedReason: string | null;
+      status: string | null;
+      assistantId: string | null;
+      assistantName: string | null;
+      success: boolean | null;
+    }
+
+    const calls: Norm[] = (raw as Array<Record<string, unknown>>).map((c) => {
+      const createdAt = str(c.createdAt) ?? str(c.startedAt);
+      const ms = createdAt ? Date.parse(createdAt) : NaN;
+      const startMs = str(c.startedAt) ? Date.parse(String(c.startedAt)) : NaN;
+      const endMs = str(c.endedAt) ? Date.parse(String(c.endedAt)) : NaN;
+      const durationSec =
+        Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+          ? (endMs - startMs) / 1000
+          : null;
+      const b =
+        c.costBreakdown && typeof c.costBreakdown === "object"
+          ? (c.costBreakdown as Record<string, unknown>)
+          : {};
+      const customer =
+        c.customer && typeof c.customer === "object" ? (c.customer as Record<string, unknown>) : null;
+      const phoneObj =
+        c.phoneNumber && typeof c.phoneNumber === "object"
+          ? (c.phoneNumber as Record<string, unknown>)
+          : null;
+      const analysis =
+        c.analysis && typeof c.analysis === "object" ? (c.analysis as Record<string, unknown>) : null;
+      const se = analysis?.successEvaluation;
+      const success =
+        typeof se === "boolean"
+          ? se
+          : typeof se === "string" && se.length
+            ? truthy(se)
+            : typeof se === "number" && Number.isFinite(se)
+              ? se >= 0.5
+              : null;
+      const type = (str(c.type) ?? "").toLowerCase();
+      const direction: "inbound" | "outbound" | "web" = type.includes("inbound")
+        ? "inbound"
+        : type.includes("web")
+          ? "web"
+          : "outbound";
+      const assistantId = str(c.assistantId);
+      return {
+        id: String(c.id ?? ""),
+        ms: Number.isFinite(ms) ? ms : 0,
+        startedAt: str(c.startedAt) ?? createdAt,
+        direction,
+        phone: (customer ? str(customer.number) : null) ?? (phoneObj ? str(phoneObj.number) : null),
+        durationSec,
+        cost: num(c.cost),
+        breakdown: {
+          stt: num(b.stt),
+          llm: num(b.llm),
+          tts: num(b.tts),
+          vapi: num(b.vapi),
+          transport: num(b.transport),
+        },
+        endedReason: str(c.endedReason),
+        status: str(c.status),
+        assistantId,
+        assistantName: assistantId ? (assistantNames.get(assistantId) ?? null) : null,
+        success,
+      };
+    });
+
+    const current = calls.filter((c) => c.ms >= startCurrent);
+    const previous = calls.filter((c) => c.ms >= startPrevious && c.ms < startCurrent);
+
+    const agg = (rows: Norm[]) => {
+      let cost = 0;
+      let seconds = 0;
+      let qualified = 0;
+      let answered = 0;
+      let inbound = 0;
+      let outbound = 0;
+      for (const r of rows) {
+        cost += r.cost;
+        seconds += r.durationSec ?? 0;
+        if (r.success === true) qualified += 1;
+        if ((r.durationSec ?? 0) > 5) answered += 1;
+        if (r.direction === "inbound") inbound += 1;
+        else outbound += 1;
+      }
+      const answerRate = rows.length > 0 ? (answered / rows.length) * 100 : null;
+      return {
+        calls: rows.length,
+        cost,
+        minutes: seconds / 60,
+        qualified,
+        answered,
+        answerRate,
+        avgDurationSec: rows.length > 0 ? seconds / rows.length : null,
+        inbound,
+        outbound,
+      };
+    };
+
+    const totals = agg(current);
+    const prev = agg(previous);
+    const pct = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : null);
+
+    // Série diária (últimos N dias, no máximo 30 pontos)
+    const points = Math.min(rangeDays, 30);
+    const daily: DashboardOverview["daily"] = [];
+    for (let i = points - 1; i >= 0; i--) {
+      const d = new Date(now - i * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      daily.push({
+        date: key,
+        label: `${key.slice(8, 10)}/${key.slice(5, 7)}`,
+        inbound: 0,
+        outbound: 0,
+        cost: 0,
+      });
+    }
+    const dayIndex = new Map(daily.map((d, i) => [d.date, i]));
+    for (const c of current) {
+      const key = new Date(c.ms).toISOString().slice(0, 10);
+      const idx = dayIndex.get(key);
+      if (idx == null) continue;
+      if (c.direction === "inbound") daily[idx].inbound += 1;
+      else daily[idx].outbound += 1;
+      daily[idx].cost += c.cost;
+    }
+
+    const costBreakdown = { stt: 0, llm: 0, tts: 0, vapi: 0, transport: 0 };
+    const reasonMap = new Map<string, number>();
+    const assistantMap = new Map<string, { name: string; calls: number; cost: number; minutes: number }>();
+    for (const c of current) {
+      costBreakdown.stt += c.breakdown.stt;
+      costBreakdown.llm += c.breakdown.llm;
+      costBreakdown.tts += c.breakdown.tts;
+      costBreakdown.vapi += c.breakdown.vapi;
+      costBreakdown.transport += c.breakdown.transport;
+      if (c.endedReason) reasonMap.set(c.endedReason, (reasonMap.get(c.endedReason) ?? 0) + 1);
+      if (c.assistantId) {
+        const entry = assistantMap.get(c.assistantId) ?? {
+          name: c.assistantName ?? "Sem nome",
+          calls: 0,
+          cost: 0,
+          minutes: 0,
+        };
+        entry.calls += 1;
+        entry.cost += c.cost;
+        entry.minutes += (c.durationSec ?? 0) / 60;
+        assistantMap.set(c.assistantId, entry);
+      }
+    }
+
+    const recent: DashboardCallRow[] = [...current]
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, 8)
+      .map((c) => ({
+        id: c.id,
+        startedAt: c.startedAt,
+        direction: c.direction,
+        phone: c.phone,
+        durationSec: c.durationSec,
+        cost: c.cost,
+        endedReason: c.endedReason,
+        status: c.status,
+        assistantName: c.assistantName,
+        successEvaluation: c.success,
+      }));
+
+    return {
+      configured: true,
+      error: null,
+      rangeDays,
+      totals,
+      deltas: {
+        calls: pct(totals.calls, prev.calls),
+        cost: pct(totals.cost, prev.cost),
+        qualified: pct(totals.qualified, prev.qualified),
+        answerRate:
+          totals.answerRate != null && prev.answerRate != null
+            ? totals.answerRate - prev.answerRate
+            : null,
+      },
+      daily,
+      costBreakdown,
+      endedReasons: [...reasonMap.entries()]
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6),
+      topAssistants: [...assistantMap.entries()]
+        .map(([id, v]) => ({ id, ...v }))
+        .sort((a, b) => b.calls - a.calls)
+        .slice(0, 5),
+      recent,
+    };
+  });
