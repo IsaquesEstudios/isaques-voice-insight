@@ -3010,7 +3010,7 @@ export const getDashboardOverview = createServerFn({ method: "POST" })
 
     return {
       configured: true,
-      error: null,
+      error: notice,
       rangeDays,
       totals,
       deltas: {
