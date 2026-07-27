@@ -7,9 +7,10 @@ export const getRouter = () => {
     defaultOptions: {
       queries: {
         // Show cached data instantly on navigation, then refetch in background
-        staleTime: 30_000,
-        gcTime: 30 * 60_000,
-        refetchOnMount: "always",
+        staleTime: 5 * 60_000,
+        gcTime: 24 * 60 * 60_000,
+        refetchOnMount: true,
+        refetchOnReconnect: true,
         refetchOnWindowFocus: false,
         placeholderData: (previousData: unknown) => previousData,
         retry: 1,
@@ -21,6 +22,8 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    defaultPreload: "intent",
+    defaultPreloadDelay: 50,
     defaultPreloadStaleTime: 0,
   });
 
