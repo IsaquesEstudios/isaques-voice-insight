@@ -497,6 +497,13 @@ function sanitizeModelTool(tool: any): any {
       ...(typeof tool.method === "string" ? { method: tool.method } : {}),
       ...(tool.headers !== undefined ? { headers: tool.headers } : {}),
       ...(tool.body !== undefined ? { body: tool.body } : {}),
+      ...(tool.variableExtractionPlan !== undefined
+        ? { variableExtractionPlan: tool.variableExtractionPlan }
+        : {}),
+      ...(typeof tool.timeoutSeconds === "number" ? { timeoutSeconds: tool.timeoutSeconds } : {}),
+      ...(tool.backoffPlan !== undefined ? { backoffPlan: tool.backoffPlan } : {}),
+      ...(typeof tool.credentialId === "string" ? { credentialId: tool.credentialId } : {}),
+
       ...(Array.isArray(tool.messages) && tool.messages.length > 0
         ? { messages: tool.messages.map(sanitizeToolMessage) }
         : {}),

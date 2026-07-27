@@ -1733,6 +1733,89 @@ interface CatalogSection {
   items: CatalogItem[];
 }
 
+interface ApiSchemaField {
+  key: string;
+  type: "string" | "number" | "boolean" | "object" | "array";
+  description: string;
+  required: boolean;
+}
+
+function ApiSchemaFieldsEditor({
+  fields,
+  onChange,
+  emptyLabel,
+  addLabel,
+}: {
+  fields: ApiSchemaField[];
+  onChange: (next: ApiSchemaField[]) => void;
+  emptyLabel: string;
+  addLabel: string;
+}) {
+  const patch = (idx: number, p: Partial<ApiSchemaField>) =>
+    onChange(fields.map((f, i) => (i === idx ? { ...f, ...p } : f)));
+  return (
+    <div className="space-y-2">
+      {fields.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+          {emptyLabel}
+        </p>
+      ) : (
+        fields.map((f, idx) => (
+          <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+            <div className="flex items-center gap-2">
+              <Input
+                value={f.key}
+                onChange={(e) => patch(idx, { key: e.target.value.replace(/\s+/g, "") })}
+                placeholder="nome_da_propriedade"
+                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+              />
+              <Select value={f.type} onValueChange={(v) => patch(idx, { type: v as ApiSchemaField["type"] })}>
+                <SelectTrigger className="w-32 border-white/[0.08] bg-background/40 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["string", "number", "boolean", "object", "array"] as const).map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onChange(fields.filter((_, i) => i !== idx))}
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                aria-label="Remover propriedade"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+            <Input
+              value={f.description}
+              onChange={(e) => patch(idx, { description: e.target.value })}
+              placeholder="Descrição (ajuda a IA a preencher o valor)"
+              className="border-white/[0.08] bg-background/40 text-xs"
+            />
+            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Checkbox checked={f.required} onCheckedChange={(v) => patch(idx, { required: v === true })} />
+              Obrigatório
+            </label>
+          </div>
+        ))
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onChange([...fields, { key: "", type: "string", description: "", required: false }])}
+        className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+      >
+        <Plus className="h-3 w-3" />
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
+
+
 const TOOL_CATALOG: CatalogSection[] = [
   {
     title: "Phone Call Tools",
@@ -1755,7 +1838,7 @@ const TOOL_CATALOG: CatalogSection[] = [
   {
     title: "Integrations",
     items: [
-      { key: "apiRequest", label: "API Request", description: "Chama seu webhook com parâmetros customizados.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest", locked: true },
+      { key: "apiRequest", label: "API Request", description: "Faz uma requisição HTTP para seu endpoint durante a chamada.", icon: Plug, iconColor: "text-sky-400", iconBg: "bg-sky-500/10", kind: "apiRequest", vapiType: "apiRequest", beta: true },
       { key: "mcp", label: "MCP", description: "Conecta a um servidor Model Context Protocol.", icon: ServerCog, iconColor: "text-red-400", iconBg: "bg-red-500/10", kind: "mcp", vapiType: "mcp", locked: true },
       { key: "slack", label: "Slack", description: "Envia mensagens e notificações para o Slack.", icon: Slack, iconColor: "text-purple-500", iconBg: "bg-purple-500/10", kind: "slack", vapiType: "slack", locked: true },
       { key: "sheets", label: "Google Sheets", description: "Lê e escreve em planilhas do Google.", icon: Sheet, iconColor: "text-green-500", iconBg: "bg-green-500/10", kind: "sheets", vapiType: "sheets", locked: true },
@@ -2076,6 +2159,7 @@ function ToolsTab({
   const [qMessages, setQMessages] = useState<VoicemailMessage[]>([]);
 
   // apiRequest configuration state
+
   const [arName, setArName] = useState("");
   const [arDescription, setArDescription] = useState("");
   const [arUrl, setArUrl] = useState("");
@@ -2084,6 +2168,17 @@ function ToolsTab({
   const [arBodyLocked, setArBodyLocked] = useState(false);
   const [arStaticFields, setArStaticFields] = useState<Array<{ key: string; value: string }>>([]);
   const [arMessages, setArMessages] = useState<VoicemailMessage[]>([]);
+  const [arAuthType, setArAuthType] = useState<"none" | "bearer" | "apiKey" | "basic">("none");
+  const [arAuthToken, setArAuthToken] = useState("");
+  const [arAuthHeaderName, setArAuthHeaderName] = useState("x-api-key");
+  const [arTimeoutSeconds, setArTimeoutSeconds] = useState(20);
+  const [arRetries, setArRetries] = useState(0);
+  const [arBackoffType, setArBackoffType] = useState<"fixed" | "exponential">("fixed");
+  const [arBackoffBaseDelay, setArBackoffBaseDelay] = useState(1000);
+  const [arBodyParams, setArBodyParams] = useState<ApiSchemaField[]>([]);
+  const [arResponseVars, setArResponseVars] = useState<ApiSchemaField[]>([]);
+  const [arAliases, setArAliases] = useState<Array<{ name: string; value: string }>>([]);
+
 
   // mcp configuration state
   const [mcpName, setMcpName] = useState("mcp_tool");
@@ -2186,6 +2281,17 @@ function ToolsTab({
     setArBodyLocked(false);
     setArStaticFields([]);
     setArMessages([]);
+    setArAuthType("none");
+    setArAuthToken("");
+    setArAuthHeaderName("x-api-key");
+    setArTimeoutSeconds(20);
+    setArRetries(0);
+    setArBackoffType("fixed");
+    setArBackoffBaseDelay(1000);
+    setArBodyParams([]);
+    setArResponseVars([]);
+    setArAliases([]);
+
     setMcpName("mcp_tool");
     setMcpDescription("");
     setMcpServerUrl("");
@@ -2376,24 +2482,88 @@ function ToolsTab({
         setArMethod((tool.method ?? "GET") as typeof arMethod);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const headerProps: Record<string, any> = tool.headers?.properties ?? {};
-        setArHeaders(
-          Object.entries(headerProps).map(([key, v]) => ({
-            key,
-            value: typeof v?.default === "string" ? v.default : "",
-          })),
-        );
+        const plainHeaders: Array<{ key: string; value: string }> = [];
+        let authType: "none" | "bearer" | "apiKey" | "basic" = "none";
+        let authToken = "";
+        let authHeaderName = "x-api-key";
+        for (const [key, v] of Object.entries(headerProps)) {
+          const value = typeof v?.default === "string" ? v.default : "";
+          if (key.toLowerCase() === "authorization" && value.startsWith("Bearer ")) {
+            authType = "bearer";
+            authToken = value.slice(7);
+            continue;
+          }
+          if (key.toLowerCase() === "authorization" && value.startsWith("Basic ")) {
+            authType = "basic";
+            authToken = value.slice(6);
+            continue;
+          }
+          if (key.toLowerCase() === "x-api-key" || key.toLowerCase() === "api-key") {
+            authType = "apiKey";
+            authHeaderName = key;
+            authToken = value;
+            continue;
+          }
+          plainHeaders.push({ key, value });
+        }
+        setArHeaders(plainHeaders);
+        setArAuthType(authType);
+        setArAuthToken(authToken);
+        setArAuthHeaderName(authHeaderName);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bodyProps: Record<string, any> = tool.body?.properties ?? {};
-        setArStaticFields(
-          Object.entries(bodyProps).map(([key, v]) => ({
+        const bodyRequired: string[] = Array.isArray(tool.body?.required) ? tool.body.required : [];
+        const statics: Array<{ key: string; value: string }> = [];
+        const dynamics: ApiSchemaField[] = [];
+        for (const [key, v] of Object.entries(bodyProps)) {
+          if (typeof v?.default === "string") {
+            statics.push({ key, value: v.default });
+          } else {
+            dynamics.push({
+              key,
+              type: (v?.type ?? "string") as ApiSchemaField["type"],
+              description: typeof v?.description === "string" ? v.description : "",
+              required: bodyRequired.includes(key),
+            });
+          }
+        }
+        setArStaticFields(statics);
+        setArBodyParams(dynamics);
+        setArBodyLocked(tool.body?.additionalProperties === false);
+        setArTimeoutSeconds(typeof tool.timeoutSeconds === "number" ? tool.timeoutSeconds : 20);
+        setArRetries(typeof tool.backoffPlan?.maxRetries === "number" ? tool.backoffPlan.maxRetries : 0);
+        setArBackoffType((tool.backoffPlan?.type ?? "fixed") as "fixed" | "exponential");
+        setArBackoffBaseDelay(
+          typeof tool.backoffPlan?.baseDelaySeconds === "number"
+            ? tool.backoffPlan.baseDelaySeconds * 1000
+            : 1000,
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const respProps: Record<string, any> = tool.variableExtractionPlan?.schema?.properties ?? {};
+        const respRequired: string[] = Array.isArray(tool.variableExtractionPlan?.schema?.required)
+          ? tool.variableExtractionPlan.schema.required
+          : [];
+        setArResponseVars(
+          Object.entries(respProps).map(([key, v]) => ({
             key,
-            value: typeof v?.default === "string" ? v.default : "",
+            type: (v?.type ?? "string") as ApiSchemaField["type"],
+            description: typeof v?.description === "string" ? v.description : "",
+            required: respRequired.includes(key),
           })),
         );
-        setArBodyLocked(tool.body?.additionalProperties === false);
+        setArAliases(
+          (Array.isArray(tool.variableExtractionPlan?.aliases)
+            ? tool.variableExtractionPlan.aliases
+            : []
+          ).map((a: { key?: string; name?: string; value?: string }) => ({
+            name: String(a?.key ?? a?.name ?? ""),
+            value: String(a?.value ?? ""),
+          })),
+        );
         setArMessages(simpleMessages);
         break;
       }
+
       case "mcp": {
         if (name) setMcpName(name);
         setMcpDescription(desc);
@@ -2742,9 +2912,21 @@ function ToolsTab({
         url,
       };
       if (arDescription.trim()) tool.description = arDescription.trim();
-      if (arHeaders.length > 0) {
+      {
         const props: Record<string, unknown> = {};
         const required: string[] = [];
+        const token = arAuthToken.trim();
+        if (arAuthType === "bearer" && token) {
+          props["Authorization"] = { type: "string", default: `Bearer ${token}` };
+          required.push("Authorization");
+        } else if (arAuthType === "basic" && token) {
+          props["Authorization"] = { type: "string", default: `Basic ${token}` };
+          required.push("Authorization");
+        } else if (arAuthType === "apiKey" && token) {
+          const hn = arAuthHeaderName.trim() || "x-api-key";
+          props[hn] = { type: "string", default: token };
+          required.push(hn);
+        }
         for (const h of arHeaders) {
           const k = h.key.trim();
           if (!k) continue;
@@ -2755,26 +2937,70 @@ function ToolsTab({
           tool.headers = { type: "object", properties: props, required };
         }
       }
-      if (arStaticFields.length > 0) {
+      {
         const props: Record<string, unknown> = {};
+        const required: string[] = [];
+        for (const f of arBodyParams) {
+          const k = f.key.trim();
+          if (!k) continue;
+          props[k] = {
+            type: f.type,
+            ...(f.description.trim() ? { description: f.description.trim() } : {}),
+          };
+          if (f.required) required.push(k);
+        }
         for (const f of arStaticFields) {
           const k = f.key.trim();
           if (!k) continue;
           props[k] = { type: "string", ...(f.value.trim() ? { default: f.value.trim() } : {}) };
+          if (!required.includes(k)) required.push(k);
         }
         if (Object.keys(props).length > 0) {
           tool.body = {
             type: "object",
             properties: props,
-            required: Object.keys(props),
+            required,
             ...(arBodyLocked ? { additionalProperties: false } : {}),
           };
         }
+      }
+      {
+        const props: Record<string, unknown> = {};
+        const required: string[] = [];
+        for (const f of arResponseVars) {
+          const k = f.key.trim();
+          if (!k) continue;
+          props[k] = {
+            type: f.type,
+            ...(f.description.trim() ? { description: f.description.trim() } : {}),
+          };
+          if (f.required) required.push(k);
+        }
+        const aliases = arAliases
+          .filter((a) => a.name.trim() && a.value.trim())
+          .map((a) => ({ key: a.name.trim(), value: a.value.trim() }));
+        if (Object.keys(props).length > 0 || aliases.length > 0) {
+          tool.variableExtractionPlan = {
+            ...(Object.keys(props).length > 0
+              ? { schema: { type: "object", properties: props, required } }
+              : {}),
+            ...(aliases.length > 0 ? { aliases } : {}),
+          };
+        }
+      }
+      if (arTimeoutSeconds > 0) tool.timeoutSeconds = arTimeoutSeconds;
+      if (arRetries > 0) {
+        tool.backoffPlan = {
+          type: arBackoffType,
+          maxRetries: arRetries,
+          baseDelaySeconds: Math.max(1, Math.round(arBackoffBaseDelay / 1000)),
+        };
       }
       if (arMessages.length > 0) {
         tool.messages = arMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
+
     }
     if (selected.kind === "mcp") {
       const url = mcpServerUrl.trim();
@@ -5119,12 +5345,36 @@ function ToolsTab({
                         <AccordionContent className="space-y-4 pb-4">
                           <div className="space-y-2">
                             <p className="text-xs font-semibold text-foreground">Authorization</p>
-                            <p className="text-[11px] text-muted-foreground">Configure authentication for API requests</p>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
-                              <Plus className="h-3 w-3" />
-                              Add Auth
-                            </Button>
+                            <p className="text-[11px] text-muted-foreground">Configure a autenticação enviada no header da requisição.</p>
+                            <Select value={arAuthType} onValueChange={(v) => setArAuthType(v as typeof arAuthType)}>
+                              <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sem autenticação</SelectItem>
+                                <SelectItem value="bearer">Bearer Token</SelectItem>
+                                <SelectItem value="apiKey">API Key (header)</SelectItem>
+                                <SelectItem value="basic">Basic (base64)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {arAuthType === "apiKey" && (
+                              <Input
+                                value={arAuthHeaderName}
+                                onChange={(e) => setArAuthHeaderName(e.target.value)}
+                                placeholder="x-api-key"
+                                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                              />
+                            )}
+                            {arAuthType !== "none" && (
+                              <Input
+                                value={arAuthToken}
+                                onChange={(e) => setArAuthToken(e.target.value)}
+                                placeholder={arAuthType === "basic" ? "base64(user:senha)" : "Token / chave"}
+                                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                              />
+                            )}
                           </div>
+
                           <div className="space-y-2 border-t border-white/[0.06] pt-3">
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-semibold text-foreground">Request Headers</p>
@@ -5186,13 +5436,16 @@ function ToolsTab({
                           Request Body
                         </AccordionTrigger>
                         <AccordionContent className="space-y-3 pb-4">
-                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
-                              <Plus className="h-3 w-3" />
-                              Add Property
-                            </Button>
-                            <p className="mt-3 text-[11px] text-muted-foreground">No parameters defined</p>
-                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Propriedades que a IA preenche em tempo real e envia no corpo da requisição.
+                          </p>
+                          <ApiSchemaFieldsEditor
+                            fields={arBodyParams}
+                            onChange={setArBodyParams}
+                            emptyLabel="Nenhum parâmetro definido."
+                            addLabel="Add Property"
+                          />
+
                           <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
                             <Checkbox checked={arBodyLocked} onCheckedChange={(v) => setArBodyLocked(v === true)} />
                             Lock schema (no additional properties)
@@ -5261,17 +5514,60 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="encryption" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="settings" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
-                          Encryption Settings
+                          Timeout &amp; Retries
                         </AccordionTrigger>
-                        <AccordionContent className="space-y-2 pb-4">
-                          <p className="text-[11px] text-muted-foreground">
-                            Configure which request body fields should be encrypted.
-                          </p>
-                          <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
-                            No encrypted fields configured.
-                          </p>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Timeout (segundos)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={300}
+                              value={arTimeoutSeconds}
+                              onChange={(e) => setArTimeoutSeconds(Number(e.target.value) || 0)}
+                              className="border-white/[0.08] bg-background/40 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Máximo de tentativas (retries)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={10}
+                              value={arRetries}
+                              onChange={(e) => setArRetries(Number(e.target.value) || 0)}
+                              className="border-white/[0.08] bg-background/40 text-xs"
+                            />
+                          </div>
+                          {arRetries > 0 && (
+                            <>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Estratégia de backoff</Label>
+                                <Select value={arBackoffType} onValueChange={(v) => setArBackoffType(v as typeof arBackoffType)}>
+                                  <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="fixed">Fixed</SelectItem>
+                                    <SelectItem value="exponential">Exponential</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Delay base (ms)</Label>
+                                <Input
+                                  type="number"
+                                  min={1000}
+                                  step={1000}
+                                  value={arBackoffBaseDelay}
+                                  onChange={(e) => setArBackoffBaseDelay(Number(e.target.value) || 1000)}
+                                  className="border-white/[0.08] bg-background/40 text-xs"
+                                />
+                              </div>
+                            </>
+                          )}
                         </AccordionContent>
                       </AccordionItem>
 
@@ -5281,31 +5577,14 @@ function ToolsTab({
                         </AccordionTrigger>
                         <AccordionContent className="space-y-3 pb-4">
                           <p className="text-[11px] text-muted-foreground">
-                            Assign dynamic variables extracted from the API response data.
+                            Variáveis extraídas da resposta da API e disponibilizadas para a IA.
                           </p>
-                          <div className="overflow-hidden rounded-lg border border-white/[0.06]">
-                            <table className="w-full text-[11px]">
-                              <thead className="bg-background/40">
-                                <tr className="text-left text-muted-foreground">
-                                  <th className="px-3 py-2 font-medium">Variable</th>
-                                  <th className="px-3 py-2 font-medium">Type</th>
-                                  <th className="px-3 py-2 font-medium">Required</th>
-                                  <th className="px-3 py-2 font-medium">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
-                                    No response variables defined.
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
-                            <Plus className="h-3 w-3" />
-                            Add Property
-                          </Button>
+                          <ApiSchemaFieldsEditor
+                            fields={arResponseVars}
+                            onChange={setArResponseVars}
+                            emptyLabel="Nenhuma variável de resposta definida."
+                            addLabel="Add Property"
+                          />
                         </AccordionContent>
                       </AccordionItem>
 
@@ -5315,17 +5594,59 @@ function ToolsTab({
                         </AccordionTrigger>
                         <AccordionContent className="space-y-3 pb-4">
                           <p className="text-[11px] text-muted-foreground">
-                            Define aliases for response fields to expose simpler variable names to the model.
+                            Crie nomes simples para caminhos da resposta (ex.: <code>{"{{ output.data.name }}"}</code>).
                           </p>
-                          <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
-                            No aliases configured. Click &apos;Add Alias&apos; to add one.
-                          </p>
-                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                          {arAliases.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                              Nenhum alias configurado.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {arAliases.map((a, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <Input
+                                    value={a.name}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\s+/g, "");
+                                      setArAliases((prev) => prev.map((it, i) => (i === idx ? { ...it, name: val } : it)));
+                                    }}
+                                    placeholder="nomeDoAlias"
+                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                  />
+                                  <Input
+                                    value={a.value}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setArAliases((prev) => prev.map((it, i) => (i === idx ? { ...it, value: val } : it)));
+                                    }}
+                                    placeholder="{{ output.data.name }}"
+                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                  />
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setArAliases((prev) => prev.filter((_, i) => i !== idx))}
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    aria-label="Remover alias"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setArAliases((p) => [...p, { name: "", value: "" }])}
+                            className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                          >
                             <Plus className="h-3 w-3" />
                             Add Alias
                           </Button>
                         </AccordionContent>
                       </AccordionItem>
+
 
                       <AccordionItem value="messages" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
