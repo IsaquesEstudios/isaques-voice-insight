@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
 import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/client";
 import { RouteProgress } from "@/components/route-progress";
+import { useQueryCachePersistence } from "@/components/query-persist";
 
 function NotFoundComponent() {
   return (
@@ -144,6 +145,9 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { supabase: cfg } = Route.useLoaderData();
   const router = useRouter();
+
+  // Keep the query cache in localStorage for instant repeat navigation.
+  useQueryCachePersistence(queryClient);
 
   // Initialize the browser Supabase client as early as possible.
   initSupabaseBrowser(cfg.url, cfg.anonKey);
