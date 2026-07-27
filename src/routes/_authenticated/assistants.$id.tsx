@@ -2396,24 +2396,88 @@ function ToolsTab({
         setArMethod((tool.method ?? "GET") as typeof arMethod);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const headerProps: Record<string, any> = tool.headers?.properties ?? {};
-        setArHeaders(
-          Object.entries(headerProps).map(([key, v]) => ({
-            key,
-            value: typeof v?.default === "string" ? v.default : "",
-          })),
-        );
+        const plainHeaders: Array<{ key: string; value: string }> = [];
+        let authType: "none" | "bearer" | "apiKey" | "basic" = "none";
+        let authToken = "";
+        let authHeaderName = "x-api-key";
+        for (const [key, v] of Object.entries(headerProps)) {
+          const value = typeof v?.default === "string" ? v.default : "";
+          if (key.toLowerCase() === "authorization" && value.startsWith("Bearer ")) {
+            authType = "bearer";
+            authToken = value.slice(7);
+            continue;
+          }
+          if (key.toLowerCase() === "authorization" && value.startsWith("Basic ")) {
+            authType = "basic";
+            authToken = value.slice(6);
+            continue;
+          }
+          if (key.toLowerCase() === "x-api-key" || key.toLowerCase() === "api-key") {
+            authType = "apiKey";
+            authHeaderName = key;
+            authToken = value;
+            continue;
+          }
+          plainHeaders.push({ key, value });
+        }
+        setArHeaders(plainHeaders);
+        setArAuthType(authType);
+        setArAuthToken(authToken);
+        setArAuthHeaderName(authHeaderName);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bodyProps: Record<string, any> = tool.body?.properties ?? {};
-        setArStaticFields(
-          Object.entries(bodyProps).map(([key, v]) => ({
+        const bodyRequired: string[] = Array.isArray(tool.body?.required) ? tool.body.required : [];
+        const statics: Array<{ key: string; value: string }> = [];
+        const dynamics: ApiSchemaField[] = [];
+        for (const [key, v] of Object.entries(bodyProps)) {
+          if (typeof v?.default === "string") {
+            statics.push({ key, value: v.default });
+          } else {
+            dynamics.push({
+              key,
+              type: (v?.type ?? "string") as ApiSchemaField["type"],
+              description: typeof v?.description === "string" ? v.description : "",
+              required: bodyRequired.includes(key),
+            });
+          }
+        }
+        setArStaticFields(statics);
+        setArBodyParams(dynamics);
+        setArBodyLocked(tool.body?.additionalProperties === false);
+        setArTimeoutSeconds(typeof tool.timeoutSeconds === "number" ? tool.timeoutSeconds : 20);
+        setArRetries(typeof tool.backoffPlan?.maxRetries === "number" ? tool.backoffPlan.maxRetries : 0);
+        setArBackoffType((tool.backoffPlan?.type ?? "fixed") as "fixed" | "exponential");
+        setArBackoffBaseDelay(
+          typeof tool.backoffPlan?.baseDelaySeconds === "number"
+            ? tool.backoffPlan.baseDelaySeconds * 1000
+            : 1000,
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const respProps: Record<string, any> = tool.variableExtractionPlan?.schema?.properties ?? {};
+        const respRequired: string[] = Array.isArray(tool.variableExtractionPlan?.schema?.required)
+          ? tool.variableExtractionPlan.schema.required
+          : [];
+        setArResponseVars(
+          Object.entries(respProps).map(([key, v]) => ({
             key,
-            value: typeof v?.default === "string" ? v.default : "",
+            type: (v?.type ?? "string") as ApiSchemaField["type"],
+            description: typeof v?.description === "string" ? v.description : "",
+            required: respRequired.includes(key),
           })),
         );
-        setArBodyLocked(tool.body?.additionalProperties === false);
+        setArAliases(
+          (Array.isArray(tool.variableExtractionPlan?.aliases)
+            ? tool.variableExtractionPlan.aliases
+            : []
+          ).map((a: { key?: string; name?: string; value?: string }) => ({
+            name: String(a?.key ?? a?.name ?? ""),
+            value: String(a?.value ?? ""),
+          })),
+        );
         setArMessages(simpleMessages);
         break;
       }
+
       case "mcp": {
         if (name) setMcpName(name);
         setMcpDescription(desc);
