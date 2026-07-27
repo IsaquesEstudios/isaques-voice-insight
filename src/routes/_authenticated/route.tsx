@@ -12,28 +12,41 @@ async function ensureSupabaseBrowser() {
   }
 }
 
+// Cache do status de setup: evita um roundtrip ao servidor a cada navegação.
+let setupCache: { ok: boolean; at: number } | null = null;
+const SETUP_TTL = 5 * 60_000;
+
 export const Route = createFileRoute("/_authenticated")({
   // Session lives in browser localStorage — skip SSR gating to avoid loops.
   ssr: false,
   beforeLoad: async ({ location }) => {
     const supabase = await ensureSupabaseBrowser();
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    // getSession() lê do localStorage (instantâneo); getUser() faria rede a cada navegação.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (!user) {
       throw redirect({ to: "/" });
     }
     // Onboarding gate: exige Vapi e Twilio configurados antes de acessar o app.
     if (location.pathname !== "/onboarding") {
-      try {
-        const status = await getSetupStatus();
-        if (!status.vapi || !status.twilio) {
-          throw redirect({ to: "/onboarding" });
+      const fresh = setupCache && Date.now() - setupCache.at < SETUP_TTL;
+      if (fresh) {
+        if (!setupCache!.ok) throw redirect({ to: "/onboarding" });
+      } else {
+        try {
+          const status = await getSetupStatus();
+          setupCache = { ok: Boolean(status.vapi && status.twilio), at: Date.now() };
+          if (!setupCache.ok) {
+            throw redirect({ to: "/onboarding" });
+          }
+        } catch (e) {
+          if (isRedirect(e)) throw e;
+          console.error("setup status check failed", e);
         }
-      } catch (e) {
-        if (isRedirect(e)) throw e;
-        console.error("setup status check failed", e);
       }
     }
-    return { user: data.user };
+    return { user };
   },
   component: () => <Outlet />,
 });
+
