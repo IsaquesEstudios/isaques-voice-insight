@@ -5503,17 +5503,60 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="encryption" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="settings" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
-                          Encryption Settings
+                          Timeout &amp; Retries
                         </AccordionTrigger>
-                        <AccordionContent className="space-y-2 pb-4">
-                          <p className="text-[11px] text-muted-foreground">
-                            Configure which request body fields should be encrypted.
-                          </p>
-                          <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
-                            No encrypted fields configured.
-                          </p>
+                        <AccordionContent className="space-y-3 pb-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Timeout (segundos)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={300}
+                              value={arTimeoutSeconds}
+                              onChange={(e) => setArTimeoutSeconds(Number(e.target.value) || 0)}
+                              className="border-white/[0.08] bg-background/40 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Máximo de tentativas (retries)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={10}
+                              value={arRetries}
+                              onChange={(e) => setArRetries(Number(e.target.value) || 0)}
+                              className="border-white/[0.08] bg-background/40 text-xs"
+                            />
+                          </div>
+                          {arRetries > 0 && (
+                            <>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Estratégia de backoff</Label>
+                                <Select value={arBackoffType} onValueChange={(v) => setArBackoffType(v as typeof arBackoffType)}>
+                                  <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="fixed">Fixed</SelectItem>
+                                    <SelectItem value="exponential">Exponential</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Delay base (ms)</Label>
+                                <Input
+                                  type="number"
+                                  min={1000}
+                                  step={1000}
+                                  value={arBackoffBaseDelay}
+                                  onChange={(e) => setArBackoffBaseDelay(Number(e.target.value) || 1000)}
+                                  className="border-white/[0.08] bg-background/40 text-xs"
+                                />
+                              </div>
+                            </>
+                          )}
                         </AccordionContent>
                       </AccordionItem>
 
@@ -5523,31 +5566,14 @@ function ToolsTab({
                         </AccordionTrigger>
                         <AccordionContent className="space-y-3 pb-4">
                           <p className="text-[11px] text-muted-foreground">
-                            Assign dynamic variables extracted from the API response data.
+                            Variáveis extraídas da resposta da API e disponibilizadas para a IA.
                           </p>
-                          <div className="overflow-hidden rounded-lg border border-white/[0.06]">
-                            <table className="w-full text-[11px]">
-                              <thead className="bg-background/40">
-                                <tr className="text-left text-muted-foreground">
-                                  <th className="px-3 py-2 font-medium">Variable</th>
-                                  <th className="px-3 py-2 font-medium">Type</th>
-                                  <th className="px-3 py-2 font-medium">Required</th>
-                                  <th className="px-3 py-2 font-medium">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
-                                    No response variables defined.
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
-                            <Plus className="h-3 w-3" />
-                            Add Property
-                          </Button>
+                          <ApiSchemaFieldsEditor
+                            fields={arResponseVars}
+                            onChange={setArResponseVars}
+                            emptyLabel="Nenhuma variável de resposta definida."
+                            addLabel="Add Property"
+                          />
                         </AccordionContent>
                       </AccordionItem>
 
@@ -5557,17 +5583,59 @@ function ToolsTab({
                         </AccordionTrigger>
                         <AccordionContent className="space-y-3 pb-4">
                           <p className="text-[11px] text-muted-foreground">
-                            Define aliases for response fields to expose simpler variable names to the model.
+                            Crie nomes simples para caminhos da resposta (ex.: <code>{"{{ output.data.name }}"}</code>).
                           </p>
-                          <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
-                            No aliases configured. Click &apos;Add Alias&apos; to add one.
-                          </p>
-                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                          {arAliases.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                              Nenhum alias configurado.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {arAliases.map((a, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <Input
+                                    value={a.name}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\s+/g, "");
+                                      setArAliases((prev) => prev.map((it, i) => (i === idx ? { ...it, name: val } : it)));
+                                    }}
+                                    placeholder="nomeDoAlias"
+                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                  />
+                                  <Input
+                                    value={a.value}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setArAliases((prev) => prev.map((it, i) => (i === idx ? { ...it, value: val } : it)));
+                                    }}
+                                    placeholder="{{ output.data.name }}"
+                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                  />
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setArAliases((prev) => prev.filter((_, i) => i !== idx))}
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    aria-label="Remover alias"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setArAliases((p) => [...p, { name: "", value: "" }])}
+                            className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                          >
                             <Plus className="h-3 w-3" />
                             Add Alias
                           </Button>
                         </AccordionContent>
                       </AccordionItem>
+
 
                       <AccordionItem value="messages" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
