@@ -2826,9 +2826,21 @@ function ToolsTab({
         url,
       };
       if (arDescription.trim()) tool.description = arDescription.trim();
-      if (arHeaders.length > 0) {
+      {
         const props: Record<string, unknown> = {};
         const required: string[] = [];
+        const token = arAuthToken.trim();
+        if (arAuthType === "bearer" && token) {
+          props["Authorization"] = { type: "string", default: `Bearer ${token}` };
+          required.push("Authorization");
+        } else if (arAuthType === "basic" && token) {
+          props["Authorization"] = { type: "string", default: `Basic ${token}` };
+          required.push("Authorization");
+        } else if (arAuthType === "apiKey" && token) {
+          const hn = arAuthHeaderName.trim() || "x-api-key";
+          props[hn] = { type: "string", default: token };
+          required.push(hn);
+        }
         for (const h of arHeaders) {
           const k = h.key.trim();
           if (!k) continue;
@@ -2839,26 +2851,70 @@ function ToolsTab({
           tool.headers = { type: "object", properties: props, required };
         }
       }
-      if (arStaticFields.length > 0) {
+      {
         const props: Record<string, unknown> = {};
+        const required: string[] = [];
+        for (const f of arBodyParams) {
+          const k = f.key.trim();
+          if (!k) continue;
+          props[k] = {
+            type: f.type,
+            ...(f.description.trim() ? { description: f.description.trim() } : {}),
+          };
+          if (f.required) required.push(k);
+        }
         for (const f of arStaticFields) {
           const k = f.key.trim();
           if (!k) continue;
           props[k] = { type: "string", ...(f.value.trim() ? { default: f.value.trim() } : {}) };
+          if (!required.includes(k)) required.push(k);
         }
         if (Object.keys(props).length > 0) {
           tool.body = {
             type: "object",
             properties: props,
-            required: Object.keys(props),
+            required,
             ...(arBodyLocked ? { additionalProperties: false } : {}),
           };
         }
+      }
+      {
+        const props: Record<string, unknown> = {};
+        const required: string[] = [];
+        for (const f of arResponseVars) {
+          const k = f.key.trim();
+          if (!k) continue;
+          props[k] = {
+            type: f.type,
+            ...(f.description.trim() ? { description: f.description.trim() } : {}),
+          };
+          if (f.required) required.push(k);
+        }
+        const aliases = arAliases
+          .filter((a) => a.name.trim() && a.value.trim())
+          .map((a) => ({ key: a.name.trim(), value: a.value.trim() }));
+        if (Object.keys(props).length > 0 || aliases.length > 0) {
+          tool.variableExtractionPlan = {
+            ...(Object.keys(props).length > 0
+              ? { schema: { type: "object", properties: props, required } }
+              : {}),
+            ...(aliases.length > 0 ? { aliases } : {}),
+          };
+        }
+      }
+      if (arTimeoutSeconds > 0) tool.timeoutSeconds = arTimeoutSeconds;
+      if (arRetries > 0) {
+        tool.backoffPlan = {
+          type: arBackoffType,
+          maxRetries: arRetries,
+          baseDelaySeconds: Math.max(1, Math.round(arBackoffBaseDelay / 1000)),
+        };
       }
       if (arMessages.length > 0) {
         tool.messages = arMessages.map((m) => ({ type: m.type, content: m.content }));
       }
       return tool;
+
     }
     if (selected.kind === "mcp") {
       const url = mcpServerUrl.trim();
