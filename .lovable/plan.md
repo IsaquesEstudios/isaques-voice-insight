@@ -1,62 +1,63 @@
-## Contexto
+## Diagnóstico: onde a Twilio está hoje
 
-A Vapi **não expõe um endpoint oficial de saldo/créditos** na sua API pública. A documentação oficial (`docs.vapi.ai/api-reference.md`) não contém rotas de `/org`, `/subscription`, `/credit`, `/billing` ou `/balance`, e posts na comunidade da Vapi confirmam que não há endpoint direto para consultar créditos restantes.
+A Twilio está espalhada por 7 arquivos (~350 referências):
 
-Hoje o app tenta adivinhar créditos via `/org` e `/subscription`, mas essas rotas não existem na API documentada, então o card de Vapi fica sem valor real.
+| Arquivo | Papel |
+|---|---|
+| `src/lib/twilio.functions.ts` (1.064 linhas) | 25 server functions: credenciais, busca/compra de DID, listar números, trunks, liberar número, endereços, bundles regulatórios, Verify (OTP), contatos de teste, caller IDs verificados, saldo |
+| `src/routes/_authenticated/telefonia.tsx` (1.976 linhas) | Toda a UI: modal comprar número, BYOC, contatos de teste, chamada rápida |
+| `src/routes/_authenticated/configuracoes.tsx` | Card de conexão + saldo Twilio |
+| `src/routes/_authenticated/onboarding.tsx` | Etapa 2 do onboarding (Account SID + Auth Token) |
+| `src/lib/vapi.functions.ts` | Importa número na Vapi com `provider: "twilio"` + SID/Token; resync de credenciais; `getSetupStatus` |
+| `src/routes/_authenticated/route.tsx` | Gate de onboarding exige `twilio: true` |
+| Banco | Tabela `user_twilio_credentials` (SID/token por usuário), `user_phone_numbers.provider = 'twilio'`, `twilio_sid` |
 
-## Objetivo
+## O ponto crítico: a Vapi não tem provider "nvoip"
 
-Implementar uma gestão de créditos Vapi baseada em **dados reais que a API fornece**: o histórico de chamadas (`GET /call`). O usuário informa seu crédito/orçamento Vapi e o app calcula o saldo estimado subtraindo os gastos reais das chamadas.
+A Vapi só aceita nativamente Twilio, Vonage, Telnyx e números próprios dela. Para usar a Nvoip é obrigatório o caminho **BYO SIP Trunk**:
 
-## Plano de implementação
+1. Criar na Vapi uma credencial `byo-sip-trunk` com o gateway SIP da Nvoip (host, usuário, senha).
+2. Criar o número com `provider: "byo-phone-number"`, apontando para essa credencial.
+3. **Entrada (inbound):** o DID da Nvoip precisa ser roteado no painel/API da Nvoip para o SIP URI da Vapi (`sip.vapi.ai`) ou para o trunk registrado.
+4. **Saída (outbound):** a Vapi disca via o trunk da Nvoip.
 
-### 1. Schema e persistência
-- Criar migration `docs/migrations/20260726_user_vapi_settings.sql`.
-- Tabela `public.user_vapi_settings`:
-  - `user_id uuid PK` (referência `auth.users`).
-  - `credits_budget numeric` — crédito/orçamento que o usuário informa ter na Vapi.
-  - `low_balance_threshold numeric` — percentual (0–1) para alerta visual (default 0.2).
-  - `created_at`, `updated_at`.
-- GRANTs e RLS padrão (usuário vê/altera só o próprio registro).
+Isso muda o modelo mental: hoje a plataforma "importa um número Twilio"; com a Nvoip ela passa a "registrar um tronco SIP e associar DIDs a ele".
 
-### 2. Server function de créditos estimados
-- No `src/lib/vapi.functions.ts`, substituir/adicionar `getVapiEstimatedCredits`:
-  - Lê `credits_budget` e `low_balance_threshold` de `user_vapi_settings`.
-  - Chama `GET /call` da Vapi (já autenticado com a chave do usuário) e busca as chamadas dos últimos 90 dias.
-  - Soma o campo `cost` de cada chamada (quando presente); se ausente, estima por `durationMinutes * tarifa_padrão`.
-  - Retorna DTO: `{ ok, budget, spent, balance, currency, usageRatio, lowBalance, callsCount, lastCallAt, error }`.
-- Manter `getVapiCredits` como fallback com mensagem clara de que a API não expõe saldo, ou removê-lo se não for mais usado.
+## O que a Nvoip oferece (API `https://api.nvoip.com.br/v2`, auth OAuth2 Bearer ou `Napikey`)
 
-### 3. UI de configuração do orçamento
-- Em `src/routes/_authenticated/configuracoes.tsx`, na aba Faturamento:
-  - Adicionar um pequeno formulário no card da Vapi para o usuário informar seu crédito/orçamento.
-  - Campo numérico em USD.
-  - Slider ou input para percentual de alerta de saldo baixo.
-  - Botão "Salvar orçamento".
-- Mostrar no card:
-  - Orçamento configurado.
-  - Gasto acumulado (estimado).
-  - Saldo restante.
-  - Barra de progresso baseada em `usageRatio`.
-  - Badge/alerta quando `lowBalance` for verdadeiro.
+Cobre: autenticação, chamadas, SMS, WhatsApp, contas SIP/ramais, provisionamento de trunk. **Precisa ser confirmado com o suporte/conta antes de codificar:**
+- existe endpoint para **buscar e comprar DIDs** por DDD via API? (se não, a compra vira processo manual no painel e nosso app só cadastra o número)
+- a Nvoip permite **rotear um DID para um SIP URI externo** (Vapi) ou exige registro SIP do lado deles?
+- existe endpoint de **saldo/créditos** (para substituir o card de saldo Twilio)?
+- existe **verificação de caller ID / OTP** equivalente ao Twilio Verify?
 
-### 4. Atualizar o sidebar
-- Em `src/components/app-sidebar.tsx`, substituir `getVapiCredits` por `getVapiEstimatedCredits`.
-- Mostrar o saldo estimado (`balance`) e, quando colapsado, um indicador de cor (verde/amarelo/vermelho) conforme o percentual de uso.
+## Plano de migração (em fases)
 
-### 5. Segurança e validações
-- A server function deve usar `withVapiCredentials` para garantir que só usuários com Vapi configurado acessem.
-- RLS na tabela `user_vapi_settings`.
-- Arredondar valores para 4 casas decimais.
+**Fase 1 — Camada de credenciais**
+- Nova tabela `user_nvoip_credentials` (api key / client id+secret, host SIP, usuário e senha do trunk) com RLS por usuário + GRANTs.
+- Novo `src/lib/nvoip.functions.ts` espelhando a interface pública do `twilio.functions.ts` (mesmos nomes de retorno) para minimizar mudanças na UI.
+- `getSetupStatus` passa a checar `nvoip` no lugar de `twilio`; gate em `_authenticated/route.tsx` acompanha.
 
-## Resultado esperado
+**Fase 2 — Ponte com a Vapi**
+- Nova função `ensureNvoipSipCredential`: cria/atualiza a credencial `byo-sip-trunk` na Vapi.
+- `attachAssistantToNumber` e `resyncVapiNumberCredentials` ganham o caminho `byo-phone-number` (mantendo o caminho Twilio enquanto houver números legados).
+- `provider` em `user_phone_numbers` passa a aceitar `'nvoip'`.
 
-- O card de Vapi passa a mostrar um **saldo estimado real** baseado nas chamadas feitas.
-- O usuário tem controle sobre seu orçamento e recebe alerta visual de saldo baixo.
-- Removemos a dependência de endpoints inexistentes da Vapi.
+**Fase 3 — UI**
+- Onboarding: etapa 2 vira "Nvoip" (API key + dados do trunk), com o passo a passo de onde achar no painel.
+- Telefonia: modal de aquisição vira busca de DID Nvoip (ou cadastro manual, conforme a resposta da API); BYOC/SIP simplificado; contatos de teste desacoplados do Twilio Verify (verificação por chamada da própria Nvoip ou lista simples).
+- Configurações + sidebar: card de saldo Nvoip (ou remoção do card se não houver endpoint).
 
-## Notas técnicas
+**Fase 4 — Convivência e limpeza**
+- Manter Twilio funcionando em paralelo por um período (usuários com números já importados), com o provedor escolhido por usuário.
+- Depois de migrados todos, remover `twilio.functions.ts` e as referências.
 
-- A Vapi retorna `cost` em dólares no objeto de call; usaremos isso como fonte primária.
-- Se `cost` não estiver presente, usaremos uma estimativa conservadora baseada em minutos.
-- A recarga de créditos continua sendo feita diretamente no dashboard da Vapi; o app só lê e projeta o saldo.
+## Recomendação
+
+Antes de escrever código, precisamos das respostas das 4 perguntas acima e de uma conta Nvoip de teste com um DID. Se a Nvoip não permitir rotear DID para SIP externo, a substituição não é viável com a Vapi e o caminho seria manter a Twilio como transporte.
+
+## Detalhes técnicos
+
+- Vapi: `POST /credential` (`provider: "byo-sip-trunk"`, `gateways: [{ ip: "sip.nvoip.com.br" }]`, `outboundAuthenticationPlan` com usuário/senha) e `POST /phone-number` (`provider: "byo-phone-number"`, `credentialId`, `number`, `numberE164CheckEnabled: false`).
+- Segredos: as credenciais Nvoip são por usuário (mesmo padrão atual), gravadas na tabela via server function autenticada — nunca em `.env`.
+- Nenhuma chamada à Nvoip pode sair do browser: tudo em `createServerFn` com `requireSupabaseAuth`.
