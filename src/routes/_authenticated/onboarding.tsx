@@ -24,9 +24,10 @@ import {
   updateVapiPublicKey,
 } from "@/lib/vapi.functions";
 import {
-  getTwilioConnection,
-  saveTwilioCredentials,
-} from "@/lib/twilio.functions";
+  getNvoipConnection,
+  saveNvoipCredentials,
+} from "@/lib/nvoip.functions";
+
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -64,16 +65,21 @@ function OnboardingPage() {
   });
   
 
-  const twilioConn = useQuery({
-    queryKey: ["twilio-connection"],
-    queryFn: () => getTwilioConnection(),
+  const nvoipConn = useQuery({
+    queryKey: ["nvoip-connection"],
+    queryFn: () => getNvoipConnection(),
   });
 
   const [step, setStep] = useState<1 | 2>(1);
   const [vapiKey, setVapiKey] = useState("");
   const [vapiPublicKey, setVapiPublicKey] = useState("");
-  const [twilioSid, setTwilioSid] = useState("");
-  const [twilioToken, setTwilioToken] = useState("");
+  const [nvoipForm, setNvoipForm] = useState({
+    apiKey: "",
+    sipHost: "sip.nvoip.com.br",
+    sipUsername: "",
+    sipPassword: "",
+  });
+
   const [editVapi, setEditVapi] = useState(false);
 
   // Se Vapi está totalmente conectada (com public key) e Twilio não, pula para o passo 2.
@@ -110,18 +116,26 @@ function OnboardingPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Vapi"),
   });
 
-  const saveTwilio = useMutation({
-    mutationFn: (v: { accountSid: string; authToken: string }) =>
-      saveTwilioCredentials({ data: v }),
+  const saveNvoip = useMutation({
+    mutationFn: (v: {
+      apiKey: string;
+      sipHost: string;
+      sipUsername: string;
+      sipPassword: string;
+    }) => saveNvoipCredentials({ data: v }),
     onSuccess: () => {
-      toast.success("Twilio conectada!");
-      setTwilioSid("");
-      setTwilioToken("");
-      qc.invalidateQueries({ queryKey: ["twilio-connection"] });
+      toast.success("Nvoip conectada!");
+      setNvoipForm({
+        apiKey: "",
+        sipHost: "sip.nvoip.com.br",
+        sipUsername: "",
+        sipPassword: "",
+      });
+      qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
       navigate({ to: "/telefonia" });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Twilio"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Nvoip"),
   });
 
   const handleLogout = async () => {
@@ -130,7 +144,8 @@ function OnboardingPage() {
   };
 
   const vapiReady = !!status.data?.vapi;
-  const twilioReady = twilioConn.data?.connected;
+  const telefoniaReady = nvoipConn.data?.connected;
+
 
   // Enquanto o status inicial não chega, evita renderizar o formulário errado
   // (pisca entre "só Public Key" e "os dois campos").
@@ -162,7 +177,7 @@ function OnboardingPage() {
         <div className="flex items-center justify-center gap-3">
           <StepDot n={1} active={step === 1} done={!!vapiReady} label="Vapi" />
           <div className="h-px w-10 bg-white/[0.08]" />
-          <StepDot n={2} active={step === 2} done={!!twilioReady} label="Twilio" />
+          <StepDot n={2} active={step === 2} done={!!telefoniaReady} label="Nvoip" />
         </div>
 
         {step === 1 ? (
@@ -320,14 +335,14 @@ function OnboardingPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold">
-                    Etapa 2 · Twilio (telefonia)
+                    Etapa 2 · Nvoip (telefonia)
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    Onde ficam seus números para chamadas reais.
+                    Onde ficam seus números e o tronco SIP das chamadas reais.
                   </p>
                 </div>
               </div>
-              {twilioReady ? (
+              {telefoniaReady ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
                   <Check className="h-3 w-3" /> Conectada
                 </span>
@@ -336,46 +351,74 @@ function OnboardingPage() {
             <CardContent className="space-y-4">
               <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
                 <p className="font-semibold text-foreground mb-1.5">
-                  Como encontrar suas credenciais Twilio
+                  Como encontrar suas credenciais Nvoip
                 </p>
                 <ol className="list-decimal space-y-1 pl-4">
                   <li>
                     Acesse{" "}
                     <a
-                      href="https://console.twilio.com/"
+                      href="https://app.nvoip.com.br/"
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-0.5 text-primary hover:underline"
                     >
-                      console.twilio.com <ExternalLink className="h-3 w-3" />
+                      app.nvoip.com.br <ExternalLink className="h-3 w-3" />
                     </a>{" "}
                     e faça login.
                   </li>
                   <li>
-                    Na tela inicial, procure o painel <span className="text-foreground">Account Info</span>.
+                    Em <span className="text-foreground">Integrações → API</span>, copie sua{" "}
+                    <span className="text-foreground">Napikey</span>.
                   </li>
                   <li>
-                    Copie o <span className="text-foreground">Account SID</span> (começa com <code className="rounded bg-background/60 px-1">AC…</code>) e o <span className="text-foreground">Auth Token</span>.
+                    Em <span className="text-foreground">Ramais / Tronco SIP</span>, copie o
+                    usuário e a senha SIP — é por ele que a IA fala.
                   </li>
                 </ol>
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Account SID</Label>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label className="text-xs">Napikey (API)</Label>
                   <Input
-                    placeholder="AC…"
-                    value={twilioSid}
-                    onChange={(e) => setTwilioSid(e.target.value)}
+                    type="password"
+                    placeholder="sua chave da API Nvoip"
+                    value={nvoipForm.apiKey}
+                    onChange={(e) =>
+                      setNvoipForm((f) => ({ ...f, apiKey: e.target.value }))
+                    }
+                    className="bg-background/50 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label className="text-xs">Servidor SIP</Label>
+                  <Input
+                    placeholder="sip.nvoip.com.br"
+                    value={nvoipForm.sipHost}
+                    onChange={(e) =>
+                      setNvoipForm((f) => ({ ...f, sipHost: e.target.value }))
+                    }
                     className="bg-background/50 font-mono text-xs"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Auth Token</Label>
+                  <Label className="text-xs">Usuário SIP</Label>
+                  <Input
+                    value={nvoipForm.sipUsername}
+                    onChange={(e) =>
+                      setNvoipForm((f) => ({ ...f, sipUsername: e.target.value }))
+                    }
+                    className="bg-background/50 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Senha SIP</Label>
                   <Input
                     type="password"
-                    value={twilioToken}
-                    onChange={(e) => setTwilioToken(e.target.value)}
+                    value={nvoipForm.sipPassword}
+                    onChange={(e) =>
+                      setNvoipForm((f) => ({ ...f, sipPassword: e.target.value }))
+                    }
                     className="bg-background/50 font-mono text-xs"
                   />
                 </div>
@@ -391,22 +434,27 @@ function OnboardingPage() {
                 </Button>
                 <Button
                   disabled={
-                    saveTwilio.isPending ||
-                    !/^AC[a-zA-Z0-9]{10,}$/.test(twilioSid.trim()) ||
-                    twilioToken.trim().length < 8
+                    saveNvoip.isPending ||
+                    nvoipForm.apiKey.trim().length < 8 ||
+                    nvoipForm.sipHost.trim().length < 4 ||
+                    nvoipForm.sipUsername.trim().length < 2 ||
+                    nvoipForm.sipPassword.trim().length < 4
                   }
                   onClick={() =>
-                    saveTwilio.mutate({
-                      accountSid: twilioSid.trim(),
-                      authToken: twilioToken.trim(),
+                    saveNvoip.mutate({
+                      apiKey: nvoipForm.apiKey.trim(),
+                      sipHost: nvoipForm.sipHost.trim(),
+                      sipUsername: nvoipForm.sipUsername.trim(),
+                      sipPassword: nvoipForm.sipPassword.trim(),
                     })
                   }
                   className="gap-2 shadow-glow"
                 >
-                  {saveTwilio.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {saveNvoip.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                   <Check className="h-4 w-4" /> Concluir e entrar
                 </Button>
               </div>
+
             </CardContent>
           </Card>
         )}

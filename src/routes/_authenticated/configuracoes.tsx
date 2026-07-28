@@ -39,6 +39,12 @@ import {
   saveTwilioCredentials,
   getTwilioBalance,
 } from "@/lib/twilio.functions";
+import {
+  getNvoipConnection,
+  saveNvoipCredentials,
+  getNvoipBalance,
+} from "@/lib/nvoip.functions";
+
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
@@ -165,6 +171,10 @@ function ApiKeysSection() {
     queryKey: ["twilio-connection"],
     queryFn: () => getTwilioConnection(),
   });
+  const nvoip = useQuery({
+    queryKey: ["nvoip-connection"],
+    queryFn: () => getNvoipConnection(),
+  });
 
   const [vapiPrivate, setVapiPrivate] = useState("");
   const [vapiPublic, setVapiPublic] = useState("");
@@ -174,6 +184,15 @@ function ApiKeysSection() {
   const [twilioSid, setTwilioSid] = useState("");
   const [twilioToken, setTwilioToken] = useState("");
   const [showTwilioTok, setShowTwilioTok] = useState(false);
+
+  const [nvoipForm, setNvoipForm] = useState({
+    apiKey: "",
+    sipHost: "sip.nvoip.com.br",
+    sipUsername: "",
+    sipPassword: "",
+  });
+  const [showNvoipSecrets, setShowNvoipSecrets] = useState(false);
+
 
   const saveVapi = useMutation({
     mutationFn: async () => {
@@ -213,8 +232,35 @@ function ApiKeysSection() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Twilio"),
   });
 
+  const saveNvoip = useMutation({
+    mutationFn: () =>
+      saveNvoipCredentials({
+        data: {
+          apiKey: nvoipForm.apiKey.trim(),
+          sipHost: nvoipForm.sipHost.trim(),
+          sipUsername: nvoipForm.sipUsername.trim(),
+          sipPassword: nvoipForm.sipPassword.trim(),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Credenciais Nvoip atualizadas!");
+      setNvoipForm({
+        apiKey: "",
+        sipHost: "sip.nvoip.com.br",
+        sipUsername: "",
+        sipPassword: "",
+      });
+      qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
+      qc.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      qc.invalidateQueries({ queryKey: ["setup-status"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Nvoip"),
+  });
+
   const vapiConnected = vapi.data?.connected;
   const twilioConnected = twilio.data?.connected;
+  const nvoipConnected = nvoip.data?.connected;
+
 
   return (
     <div className="space-y-6">
@@ -326,7 +372,7 @@ function ApiKeysSection() {
         </CardContent>
       </Card>
 
-      {/* TWILIO */}
+      {/* NVOIP */}
       <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
@@ -334,7 +380,130 @@ function ApiKeysSection() {
               <Phone className="h-4 w-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">Twilio (telefonia)</CardTitle>
+              <CardTitle className="text-base font-semibold">Nvoip (telefonia)</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Provedor padrão de telefonia — números DID e tronco SIP para as chamadas.
+              </p>
+            </div>
+          </div>
+          <StatusBadge loading={nvoip.isLoading} connected={!!nvoipConnected} />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {nvoipConnected && (
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground space-y-1">
+              <p>
+                <span className="text-foreground font-medium">Tronco SIP:</span>{" "}
+                <span className="font-mono">
+                  {nvoip.data?.sipUsername}@{nvoip.data?.sipHost}
+                </span>
+              </p>
+              <p>
+                <span className="text-foreground font-medium">Atualizado:</span>{" "}
+                {nvoip.data?.updatedAt
+                  ? new Date(nvoip.data.updatedAt).toLocaleString("pt-BR")
+                  : "—"}
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
+            Encontre sua Napikey e o tronco SIP em{" "}
+            <a
+              href="https://app.nvoip.com.br"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-0.5 text-primary hover:underline"
+            >
+              app.nvoip.com.br <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-1.5 md:col-span-2">
+              <Label className="text-xs">Napikey (API)</Label>
+              <div className="relative">
+                <Input
+                  type={showNvoipSecrets ? "text" : "password"}
+                  value={nvoipForm.apiKey}
+                  onChange={(e) => setNvoipForm((f) => ({ ...f, apiKey: e.target.value }))}
+                  placeholder="••••••••••••••••"
+                  className="pr-9 border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNvoipSecrets((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNvoipSecrets ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <Label className="text-xs">Servidor SIP</Label>
+              <Input
+                value={nvoipForm.sipHost}
+                onChange={(e) => setNvoipForm((f) => ({ ...f, sipHost: e.target.value }))}
+                placeholder="sip.nvoip.com.br"
+                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Usuário SIP</Label>
+              <Input
+                value={nvoipForm.sipUsername}
+                onChange={(e) => setNvoipForm((f) => ({ ...f, sipUsername: e.target.value }))}
+                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Senha SIP</Label>
+              <Input
+                type={showNvoipSecrets ? "text" : "password"}
+                value={nvoipForm.sipPassword}
+                onChange={(e) => setNvoipForm((f) => ({ ...f, sipPassword: e.target.value }))}
+                placeholder="••••••••"
+                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveNvoip.mutate()}
+              disabled={
+                saveNvoip.isPending ||
+                !nvoipForm.apiKey.trim() ||
+                !nvoipForm.sipHost.trim() ||
+                !nvoipForm.sipUsername.trim() ||
+                !nvoipForm.sipPassword.trim()
+              }
+              className="gap-2 shadow-glow"
+            >
+              {saveNvoip.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Salvar credenciais Nvoip
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* TWILIO (legado) */}
+
+      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Phone className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold">Twilio (legado)</CardTitle>
               <p className="text-xs text-muted-foreground">
                 Credenciais para comprar números, verificar caller IDs e realizar chamadas.
               </p>
@@ -499,11 +668,22 @@ function FaturamentoSection() {
     enabled: !!twilioConn.data?.connected,
     staleTime: 60_000,
   });
+  const nvoipConn = useQuery({
+    queryKey: ["nvoip-connection"],
+    queryFn: () => getNvoipConnection(),
+  });
+  const nvoipBalanceQuery = useQuery({
+    queryKey: ["nvoip-balance"],
+    queryFn: () => getNvoipBalance(),
+    enabled: !!nvoipConn.data?.connected,
+    staleTime: 60_000,
+  });
   const vapiCreditsQuery = useQuery({
     queryKey: ["vapi-estimated-credits"],
     queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
+
 
   const [budgetInput, setBudgetInput] = useState<string>("");
 
@@ -522,7 +702,10 @@ function FaturamentoSection() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar orçamento"),
   });
 
-  const refreshing = twilioBalanceQuery.isFetching || vapiCreditsQuery.isFetching;
+  const refreshing =
+    twilioBalanceQuery.isFetching ||
+    nvoipBalanceQuery.isFetching ||
+    vapiCreditsQuery.isFetching;
 
   return (
     <div className="space-y-6">
@@ -531,7 +714,7 @@ function FaturamentoSection() {
           <div>
             <CardTitle className="text-base font-semibold">Faturamento</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Saldo disponível na Twilio e saldo estimado na Vapi (baseado nas chamadas).
+              Saldo da telefonia (Nvoip) e saldo estimado na Vapi (baseado nas chamadas).
             </p>
           </div>
           <Button
@@ -540,6 +723,7 @@ function FaturamentoSection() {
             className="gap-1.5"
             disabled={refreshing}
             onClick={() => {
+              nvoipBalanceQuery.refetch();
               twilioBalanceQuery.refetch();
               vapiCreditsQuery.refetch();
             }}
@@ -553,13 +737,32 @@ function FaturamentoSection() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <CompactCreditCard
           icon={Phone}
-          title="Twilio"
+          title="Nvoip"
           subtitle={
-            twilioConn.data?.connected
-              ? twilioBalanceQuery.data?.balance !== null && twilioBalanceQuery.data?.balance !== undefined
+            nvoipConn.data?.connected
+              ? nvoipBalanceQuery.data?.available
                 ? "Saldo disponível na conta"
                 : "Não foi possível ler o saldo"
-              : "Conecte sua conta Twilio"
+              : "Conecte sua conta Nvoip"
+          }
+          value={nvoipBalanceQuery.data?.available ? nvoipBalanceQuery.data.balance : null}
+          currency={
+            (nvoipBalanceQuery.data?.available && nvoipBalanceQuery.data.currency) || "BRL"
+          }
+          loading={nvoipBalanceQuery.isLoading}
+          progress={nvoipConn.data?.connected ? 0.65 : 0}
+        />
+
+        <CompactCreditCard
+          icon={Phone}
+          title="Twilio (legado)"
+          subtitle={
+            twilioConn.data?.connected
+              ? twilioBalanceQuery.data?.balance !== null &&
+                twilioBalanceQuery.data?.balance !== undefined
+                ? "Saldo disponível na conta"
+                : "Não foi possível ler o saldo"
+              : "Não conectada"
           }
           value={
             twilioBalanceQuery.data?.connected && twilioBalanceQuery.data.balance !== null
@@ -577,6 +780,7 @@ function FaturamentoSection() {
           loading={twilioBalanceQuery.isLoading}
           progress={twilioConn.data?.connected ? 0.65 : 0}
         />
+
 
         <CompactCreditCard
           icon={Sparkles}

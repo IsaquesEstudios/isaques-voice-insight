@@ -940,6 +940,95 @@ async function loadTwilioCredsForVapi(
   };
 }
 
+/* ---------------- Nvoip (BYO SIP Trunk) ---------------- */
+
+type NvoipTrunk = {
+  sipHost: string;
+  sipUsername: string;
+  sipPassword: string;
+  vapiCredentialId: string | null;
+};
+
+async function loadNvoipTrunk(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<NvoipTrunk | null> {
+  const { data, error } = await supabase
+    .from("user_nvoip_credentials")
+    .select("sip_host, sip_username, sip_password, vapi_credential_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    sipHost: (data.sip_host as string) ?? "sip.nvoip.com.br",
+    sipUsername: data.sip_username as string,
+    sipPassword: data.sip_password as string,
+    vapiCredentialId: (data.vapi_credential_id as string | null) ?? null,
+  };
+}
+
+// Cria (ou reaproveita) a credencial `byo-sip-trunk` da Vapi apontando para o
+// tronco SIP da Nvoip. A Vapi não tem provider nativo "nvoip" — este é o
+// caminho oficial para provedores de telefonia externos.
+async function ensureNvoipCredentialId(
+  supabase: SupabaseClient,
+  userId: string,
+  trunk: NvoipTrunk,
+): Promise<string> {
+  if (trunk.vapiCredentialId) {
+    try {
+      await vapiFetch(`/credential/${trunk.vapiCredentialId}`, { method: "GET" });
+      return trunk.vapiCredentialId;
+    } catch {
+      // credencial removida na Vapi — recria abaixo
+    }
+  }
+  const created = (await vapiFetch("/credential", {
+    method: "POST",
+    body: JSON.stringify({
+      provider: "byo-sip-trunk",
+      name: `Nvoip (${trunk.sipUsername})`,
+      gateways: [{ ip: trunk.sipHost }],
+      outboundAuthenticationPlan: {
+        authUsername: trunk.sipUsername,
+        authPassword: trunk.sipPassword,
+        sipRegisterPlan: { realm: trunk.sipHost },
+      },
+    }),
+  })) as { id: string };
+
+  await supabase
+    .from("user_nvoip_credentials")
+    .update({ vapi_credential_id: created.id, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+
+  return created.id;
+}
+
+// Recria/atualiza a credencial SIP da Nvoip na Vapi sob demanda.
+export const ensureNvoipSipCredential = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .handler(async ({ context }) => {
+    const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+    if (!trunk)
+      return { ok: false as const, message: "Conecte sua conta Nvoip primeiro." };
+    try {
+      const credentialId = await ensureNvoipCredentialId(
+        context.supabase,
+        context.userId,
+        trunk,
+      );
+      return { ok: true as const, credentialId };
+    } catch (e) {
+      return {
+        ok: false as const,
+        message: e instanceof Error ? e.message : "Falha ao criar o tronco SIP na Vapi.",
+      };
+    }
+  });
+
+
 // Lists phone numbers imported on the Vapi account. Filtered/paginated by
 // caller — Vapi returns all numbers on the account.
 export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
@@ -1051,6 +1140,8 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
 
 
     let vapiNumberId: string;
+    let mirrorProvider = "twilio";
+
     if (existing) {
       const patched = (await vapiFetch(`/phone-number/${existing.id}`, {
         method: "PATCH",
@@ -1058,29 +1149,57 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
       })) as VapiPhoneNumberRaw;
       vapiNumberId = patched.id;
     } else {
-      const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
-      if (!creds) {
+      const safeName = (data.name ?? data.phoneNumberE164)
+        .replace(/[^a-zA-Z0-9 _-]/g, "")
+        .slice(0, 40) || "Numero";
+
+      // Preferência: Nvoip (BYO SIP Trunk). Fallback: Twilio (legado).
+      const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+      const creds = trunk
+        ? null
+        : await loadTwilioCredsForVapi(context.supabase, context.userId);
+      if (!trunk && !creds) {
         return {
           ok: false,
           reason: "twilio_not_connected",
-          message: "Conecte sua conta Twilio antes de vincular uma atendente a este número.",
+          message:
+            "Conecte sua conta Nvoip (ou Twilio) antes de vincular uma atendente a este número.",
         };
       }
-      const safeName = (data.name ?? data.phoneNumberE164)
-        .replace(/[^a-zA-Z0-9 _-]/g, "")
-        .slice(0, 40) || "Twilio number";
+
+      let body: Record<string, unknown>;
+      if (trunk) {
+        mirrorProvider = "nvoip";
+        const credentialId = await ensureNvoipCredentialId(
+          context.supabase,
+          context.userId,
+          trunk,
+        );
+
+        body = {
+          provider: "byo-phone-number",
+          number: data.phoneNumberE164,
+          credentialId,
+          numberE164CheckEnabled: false,
+          name: safeName,
+        };
+      } else {
+        body = {
+          provider: "twilio",
+          number: data.phoneNumberE164,
+          twilioAccountSid: creds!.accountSid,
+          twilioAuthToken: creds!.authToken,
+          name: safeName,
+        };
+      }
+
       let created: VapiPhoneNumberRaw;
       try {
         created = (await vapiFetch("/phone-number", {
           method: "POST",
-          body: JSON.stringify({
-            provider: "twilio",
-            number: data.phoneNumberE164,
-            twilioAccountSid: creds.accountSid,
-            twilioAuthToken: creds.authToken,
-            name: safeName,
-          }),
+          body: JSON.stringify(body),
         })) as VapiPhoneNumberRaw;
+
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (/already in use by another org/i.test(msg)) {
@@ -1121,7 +1240,8 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
         await context.supabase.from("user_phone_numbers").insert({
           user_id: context.userId,
           phone_number: data.phoneNumberE164,
-          provider: "twilio",
+          provider: mirrorProvider,
+
           assistant_id: data.assistantId,
           vapi_phone_number_id: vapiNumberId,
         });
@@ -2187,7 +2307,7 @@ export const getSetupStatus = createServerFn({ method: "GET" })
 
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [vapiRes, twilioRes] = await Promise.all([
+    const [vapiRes, twilioRes, nvoipRes] = await Promise.all([
       context.supabase
         .from("user_vapi_credentials")
         .select("user_id, public_key")
@@ -2198,14 +2318,26 @@ export const getSetupStatus = createServerFn({ method: "GET" })
         .select("user_id")
         .eq("user_id", context.userId)
         .maybeSingle(),
+      context.supabase
+        .from("user_nvoip_credentials")
+        .select("user_id")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
     ]);
     const vapiRow = vapiRes.data as { public_key: string | null } | null;
     const hasVapiPublicKey = !!(vapiRow?.public_key && vapiRow.public_key.trim().length > 0);
+    const nvoip = !!nvoipRes.data;
+    const twilioLegacy = !!twilioRes.data;
     return {
       vapi: !!vapiRes.data && hasVapiPublicKey,
-      twilio: !!twilioRes.data,
+      // `twilio` mantém o nome por compatibilidade: significa "telefonia
+      // configurada" (Nvoip é o provedor padrão, Twilio segue como legado).
+      twilio: nvoip || twilioLegacy,
+      nvoip,
+      twilioLegacy,
       vapiPrivateOnly: !!vapiRes.data && !hasVapiPublicKey,
     };
+
   });
 
 /* --------------- Structured Outputs (Vapi Structured Output API) --------------- */
