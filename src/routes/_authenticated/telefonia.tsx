@@ -1178,7 +1178,7 @@ function TelefoniaPage() {
                           size="sm"
                           className="w-full gap-1.5 shadow-glow"
                           disabled={
-                            !isTwilioConnected ||
+                            (!isNvoipConnected && !isTwilioConnected) ||
                             !from ||
                             !assistantId ||
                             callingContactId === c.id
