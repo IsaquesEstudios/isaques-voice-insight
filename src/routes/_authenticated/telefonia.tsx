@@ -734,11 +734,6 @@ function TelefoniaPage() {
               </DropdownMenu>
             ) : null}
 
-            {isTwilioConnected ? (
-              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[11px] text-muted-foreground">
-                Twilio (legado) ativo
-              </span>
-            ) : null}
 
             <Button
               className="gap-2 shadow-glow"
