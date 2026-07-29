@@ -1210,66 +1210,43 @@ function TelefoniaPage() {
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Rotas ativas (Twilio Trunks)
+              Rota ativa (SIP Trunk Nvoip)
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {!isTwilioConnected ? (
+            {!isNvoipConnected ? (
               <p className="text-xs text-muted-foreground">
-                Conecte sua conta Twilio para listar suas Elastic SIP Trunks.
-              </p>
-            ) : twilioTrunksQuery.isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-16 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
-                />
-              ))
-            ) : liveTrunks.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Nenhum trunk encontrado na sua conta Twilio.
+                Conecte sua conta Nvoip (revendedor) para exibir o tronco SIP usado
+                nas chamadas.
               </p>
             ) : (
-              liveTrunks.map((r) => {
-                const load = Math.min(100, r.numbersCount * 10);
-                return (
-                  <div
-                    key={r.sid}
-                    className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">
-                        {r.friendlyName}
-                      </p>
-                      <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                        {r.status}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {r.numbersCount} números vinculados
-                      {r.domainName ? ` • ${r.domainName}` : ""}
+              <>
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">
+                      {nvoipConn?.friendlyLabel || "Tronco Nvoip"}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            load > 85
-                              ? "bg-destructive"
-                              : load > 60
-                                ? "bg-chart-3"
-                                : "bg-primary",
-                          )}
-                          style={{ width: `${load}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {load}%
-                      </span>
-                    </div>
+                    <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                      ativo
+                    </span>
                   </div>
-                );
-              })
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    {nvoipConn?.sipUsername}@{nvoipConn?.sipHost}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {liveNvoip.length} DIDs na conta
+                    {nvoipConn?.vapiCredentialId ? " • credencial Vapi vinculada" : ""}
+                  </p>
+                </div>
+                {nvoipWarning ? (
+                  <Alert className="border-warning/30 bg-warning/10 md:col-span-2">
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                    <AlertDescription className="text-[11px] text-muted-foreground">
+                      Não foi possível listar os DIDs pela API da Nvoip: {nvoipWarning}
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+              </>
             )}
           </CardContent>
         </Card>
