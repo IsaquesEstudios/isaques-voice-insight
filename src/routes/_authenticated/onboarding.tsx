@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   ArrowRight,
   Check,
   ExternalLink,
@@ -82,9 +81,10 @@ function OnboardingPage() {
 
   const [editVapi, setEditVapi] = useState(false);
 
-  // Se Vapi está totalmente conectada (com public key) e a telefonia não, pula para o passo 2.
+  // Etapa 1 = Nvoip (telefonia), Etapa 2 = Vapi.
+  // Se a telefonia já está conectada e a Vapi não, pula para o passo 2.
   useEffect(() => {
-    if (status.data?.vapi && !status.data?.telefonia) {
+    if (status.data?.telefonia && !status.data?.vapi) {
       setStep(2);
     }
   }, [status.data?.vapi, status.data?.telefonia]);
@@ -95,6 +95,7 @@ function OnboardingPage() {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [status.data?.vapi, status.data?.telefonia, navigate]);
+
 
   const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
 
@@ -111,7 +112,8 @@ function OnboardingPage() {
       setVapiPublicKey("");
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
-      setStep(2);
+      navigate({ to: "/dashboard", replace: true });
+
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Vapi"),
   });
@@ -133,7 +135,7 @@ function OnboardingPage() {
       });
       qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
-      navigate({ to: "/telefonia" });
+      setStep(2);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Nvoip"),
   });
@@ -175,12 +177,13 @@ function OnboardingPage() {
 
         {/* Stepper */}
         <div className="flex items-center justify-center gap-3">
-          <StepDot n={1} active={step === 1} done={!!vapiReady} label="Vapi" />
+          <StepDot n={1} active={step === 1} done={!!telefoniaReady} label="Nvoip" />
           <div className="h-px w-10 bg-white/[0.08]" />
-          <StepDot n={2} active={step === 2} done={!!telefoniaReady} label="Nvoip" />
+          <StepDot n={2} active={step === 2} done={!!vapiReady} label="Vapi" />
         </div>
 
-        {step === 1 ? (
+        {step === 2 ? (
+
           <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
@@ -189,7 +192,7 @@ function OnboardingPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold">
-                    Etapa 1 · Vapi (voz + IA)
+                    Etapa 2 · Vapi (voz + IA)
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
                     Onde acontece a inteligência da sua assistente virtual.
@@ -217,9 +220,13 @@ function OnboardingPage() {
                     >
                       Trocar chaves
                     </Button>
-                    <Button onClick={() => setStep(2)} className="gap-2 shadow-glow">
-                      Próximo <ArrowRight className="h-4 w-4" />
+                    <Button
+                      onClick={() => navigate({ to: "/dashboard", replace: true })}
+                      className="gap-2 shadow-glow"
+                    >
+                      Ir para o painel <ArrowRight className="h-4 w-4" />
                     </Button>
+
                   </div>
                 </>
               ) : (
@@ -318,7 +325,7 @@ function OnboardingPage() {
                         className="gap-2 shadow-glow"
                       >
                         {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                        Próximo <ArrowRight className="h-4 w-4" />
+                        Concluir e entrar <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -335,7 +342,7 @@ function OnboardingPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold">
-                    Etapa 2 · Nvoip (telefonia)
+                    Etapa 1 · Nvoip (telefonia)
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
                     Onde ficam seus números e o tronco SIP das chamadas reais.
@@ -424,13 +431,13 @@ function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   variant="ghost"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(2)}
                   className="gap-2 text-muted-foreground"
                 >
-                  <ArrowLeft className="h-4 w-4" /> Voltar
+                  Concluir cadastro depois <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   disabled={
@@ -451,9 +458,15 @@ function OnboardingPage() {
                   className="gap-2 shadow-glow"
                 >
                   {saveNvoip.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <Check className="h-4 w-4" /> Concluir e entrar
+                  <Check className="h-4 w-4" /> Salvar e continuar
                 </Button>
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Você pode entrar no painel sem a Nvoip, mas as chamadas reais só
+                funcionam depois de finalizar este cadastro.
+              </p>
+
+
 
             </CardContent>
           </Card>
