@@ -223,14 +223,27 @@ function TelefoniaPage() {
   const twilioConn = twilioConnQuery.data;
   const isTwilioConnected = twilioConn?.connected === true;
 
+  const nvoipConnQuery = useQuery({
+    queryKey: ["nvoip-connection"],
+    queryFn: () => getNvoipConnFn(),
+  });
+  const nvoipConn = nvoipConnQuery.data;
+  const isNvoipConnected = nvoipConn?.connected === true;
+
+  const nvoipNumbersQuery = useQuery({
+    queryKey: ["nvoip-numbers-live"],
+    queryFn: () => listNvoipNumbersFn(),
+    enabled: isNvoipConnected,
+  });
+  const nvoipBalanceQuery = useQuery({
+    queryKey: ["nvoip-balance"],
+    queryFn: () => getNvoipBalanceFn(),
+    enabled: isNvoipConnected,
+  });
+
   const twilioNumbersQuery = useQuery({
     queryKey: ["twilio-numbers-live"],
     queryFn: () => listTwilioNumbersFn(),
-    enabled: isTwilioConnected,
-  });
-  const twilioTrunksQuery = useQuery({
-    queryKey: ["twilio-trunks-live"],
-    queryFn: () => listTwilioTrunksFn(),
     enabled: isTwilioConnected,
   });
 
