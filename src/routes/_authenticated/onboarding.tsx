@@ -432,13 +432,13 @@ function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   variant="ghost"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(2)}
                   className="gap-2 text-muted-foreground"
                 >
-                  <ArrowLeft className="h-4 w-4" /> Voltar
+                  Concluir cadastro depois <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   disabled={
@@ -459,8 +459,14 @@ function OnboardingPage() {
                   className="gap-2 shadow-glow"
                 >
                   {saveNvoip.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <Check className="h-4 w-4" /> Concluir e entrar
+                  <Check className="h-4 w-4" /> Salvar e continuar
                 </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Você pode entrar no painel sem a Nvoip, mas as chamadas reais só
+                funcionam depois de finalizar este cadastro.
+              </p>
+
               </div>
 
             </CardContent>
