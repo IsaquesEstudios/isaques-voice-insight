@@ -52,7 +52,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
@@ -333,7 +332,6 @@ function TelefoniaPage() {
 
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"nvoip" | "did" | "twilio" | "sip">("nvoip");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
@@ -599,7 +597,6 @@ function TelefoniaPage() {
     onSuccess: () => {
       toast.success("Número liberado da sua conta.");
       queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
       setReleaseTarget(null);
     },
     onError: (err) =>
@@ -1039,7 +1036,6 @@ function TelefoniaPage() {
                                 type="button"
                                 className="underline underline-offset-2 hover:text-foreground"
                                 onClick={() => {
-                                  setOpen(true);
                                   setOpen(true);
                                 }}
                               >
