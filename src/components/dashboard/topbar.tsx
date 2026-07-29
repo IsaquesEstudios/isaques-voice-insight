@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getSupabaseBrowser } from "@/integrations/supabase/client";
+import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 
 export function Topbar() {
   const navigate = useNavigate();
