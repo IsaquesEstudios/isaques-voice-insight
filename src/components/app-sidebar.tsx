@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Bot,
   PhoneCall,
+  Megaphone,
   Video,
   Settings,
   Sparkles,
