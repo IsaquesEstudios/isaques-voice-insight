@@ -42,6 +42,7 @@ const nav: NavItem[] = [
     icon: Bot,
     activePaths: ["/assistentes", "/assistants/"],
   },
+  { title: "Campanhas", url: "/campanhas", icon: Megaphone },
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
