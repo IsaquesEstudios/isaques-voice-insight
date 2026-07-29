@@ -256,7 +256,7 @@ function TelefoniaPage() {
     return map;
   }, [vapiPhoneNumbersQuery.data]);
 
-  const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
+  const localNumbers = (numbersQuery.data ?? []) as unknown as NumberRow[];
   const liveNvoip = nvoipNumbersQuery.data?.connected
     ? nvoipNumbersQuery.data.numbers
     : [];
