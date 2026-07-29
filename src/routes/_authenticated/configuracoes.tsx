@@ -35,11 +35,6 @@ import {
   saveVapiBudget,
 } from "@/lib/vapi.functions";
 import {
-  getTwilioConnection,
-  saveTwilioCredentials,
-  getTwilioBalance,
-} from "@/lib/twilio.functions";
-import {
   getNvoipConnection,
   saveNvoipCredentials,
   getNvoipBalance,
@@ -167,10 +162,6 @@ function ApiKeysSection() {
     queryKey: ["vapi-connection"],
     queryFn: () => getVapiConnection(),
   });
-  const twilio = useQuery({
-    queryKey: ["twilio-connection"],
-    queryFn: () => getTwilioConnection(),
-  });
   const nvoip = useQuery({
     queryKey: ["nvoip-connection"],
     queryFn: () => getNvoipConnection(),
@@ -180,10 +171,6 @@ function ApiKeysSection() {
   const [vapiPublic, setVapiPublic] = useState("");
   const [showVapiPriv, setShowVapiPriv] = useState(false);
   const [showVapiPub, setShowVapiPub] = useState(false);
-
-  const [twilioSid, setTwilioSid] = useState("");
-  const [twilioToken, setTwilioToken] = useState("");
-  const [showTwilioTok, setShowTwilioTok] = useState(false);
 
   const [nvoipForm, setNvoipForm] = useState({
     apiKey: "",
@@ -217,21 +204,6 @@ function ApiKeysSection() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Vapi"),
   });
 
-  const saveTwilio = useMutation({
-    mutationFn: () =>
-      saveTwilioCredentials({
-        data: { accountSid: twilioSid.trim(), authToken: twilioToken.trim() },
-      }),
-    onSuccess: () => {
-      toast.success("Credenciais Twilio atualizadas!");
-      setTwilioSid("");
-      setTwilioToken("");
-      qc.invalidateQueries({ queryKey: ["twilio-connection"] });
-      qc.invalidateQueries({ queryKey: ["setup-status"] });
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Twilio"),
-  });
-
   const saveNvoip = useMutation({
     mutationFn: () =>
       saveNvoipCredentials({
@@ -258,7 +230,6 @@ function ApiKeysSection() {
   });
 
   const vapiConnected = vapi.data?.connected;
-  const twilioConnected = twilio.data?.connected;
   const nvoipConnected = nvoip.data?.connected;
 
 
@@ -494,98 +465,6 @@ function ApiKeysSection() {
         </CardContent>
       </Card>
 
-      {/* TWILIO (legado) */}
-
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Phone className="h-4 w-4" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-semibold">Twilio (legado)</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Credenciais para comprar números, verificar caller IDs e realizar chamadas.
-              </p>
-            </div>
-          </div>
-          <StatusBadge loading={twilio.isLoading} connected={!!twilioConnected} />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {twilioConnected && (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground space-y-1">
-              <p>
-                <span className="text-foreground font-medium">Account SID:</span>{" "}
-                <span className="font-mono">
-                  {twilio.data?.accountSid.slice(0, 8)}••••••{twilio.data?.accountSid.slice(-4)}
-                </span>
-              </p>
-              <p>
-                <span className="text-foreground font-medium">Atualizado:</span>{" "}
-                {twilio.data?.updatedAt ? new Date(twilio.data.updatedAt).toLocaleString("pt-BR") : "—"}
-              </p>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
-            Encontre suas credenciais em{" "}
-            <a
-              href="https://console.twilio.com"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-0.5 text-primary hover:underline"
-            >
-              console.twilio.com <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Account SID</Label>
-              <Input
-                value={twilioSid}
-                onChange={(e) => setTwilioSid(e.target.value)}
-                placeholder="AC..."
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Auth Token</Label>
-              <div className="relative">
-                <Input
-                  type={showTwilioTok ? "text" : "password"}
-                  value={twilioToken}
-                  onChange={(e) => setTwilioToken(e.target.value)}
-                  placeholder="••••••••••••••••••••••••"
-                  className="pr-9 border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowTwilioTok((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showTwilioTok ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button
-              onClick={() => saveTwilio.mutate()}
-              disabled={saveTwilio.isPending || !twilioSid.trim() || !twilioToken.trim()}
-              className="gap-2 shadow-glow"
-            >
-              {saveTwilio.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
-              Salvar credenciais Twilio
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -658,16 +537,6 @@ function NotificacoesSection() {
 
 function FaturamentoSection() {
   const qc = useQueryClient();
-  const twilioConn = useQuery({
-    queryKey: ["twilio-connection"],
-    queryFn: () => getTwilioConnection(),
-  });
-  const twilioBalanceQuery = useQuery({
-    queryKey: ["twilio-balance"],
-    queryFn: () => getTwilioBalance(),
-    enabled: !!twilioConn.data?.connected,
-    staleTime: 60_000,
-  });
   const nvoipConn = useQuery({
     queryKey: ["nvoip-connection"],
     queryFn: () => getNvoipConnection(),
@@ -703,7 +572,6 @@ function FaturamentoSection() {
   });
 
   const refreshing =
-    twilioBalanceQuery.isFetching ||
     nvoipBalanceQuery.isFetching ||
     vapiCreditsQuery.isFetching;
 
@@ -724,7 +592,6 @@ function FaturamentoSection() {
             disabled={refreshing}
             onClick={() => {
               nvoipBalanceQuery.refetch();
-              twilioBalanceQuery.refetch();
               vapiCreditsQuery.refetch();
             }}
             title="Atualizar saldos"
@@ -751,34 +618,6 @@ function FaturamentoSection() {
           }
           loading={nvoipBalanceQuery.isLoading}
           progress={nvoipConn.data?.connected ? 0.65 : 0}
-        />
-
-        <CompactCreditCard
-          icon={Phone}
-          title="Twilio (legado)"
-          subtitle={
-            twilioConn.data?.connected
-              ? twilioBalanceQuery.data?.balance !== null &&
-                twilioBalanceQuery.data?.balance !== undefined
-                ? "Saldo disponível na conta"
-                : "Não foi possível ler o saldo"
-              : "Não conectada"
-          }
-          value={
-            twilioBalanceQuery.data?.connected && twilioBalanceQuery.data.balance !== null
-              ? twilioBalanceQuery.data.balance
-              : null
-          }
-          currency={twilioBalanceQuery.data?.currency || "USD"}
-          badge={
-            twilioBalanceQuery.data?.accountType === "Trial"
-              ? "Trial"
-              : twilioBalanceQuery.data?.accountType === "Full"
-                ? "Full"
-                : undefined
-          }
-          loading={twilioBalanceQuery.isLoading}
-          progress={twilioConn.data?.connected ? 0.65 : 0}
         />
 
 
