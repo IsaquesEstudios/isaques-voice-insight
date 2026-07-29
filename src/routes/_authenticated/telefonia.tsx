@@ -258,10 +258,6 @@ function TelefoniaPage() {
   }, [vapiPhoneNumbersQuery.data]);
 
   const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
-  const liveTwilio =
-    twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
-      ? twilioNumbersQuery.data.numbers
-      : [];
   const liveNvoip = nvoipNumbersQuery.data?.connected
     ? nvoipNumbersQuery.data.numbers
     : [];
@@ -270,26 +266,14 @@ function TelefoniaPage() {
       ? (nvoipNumbersQuery.data.warning as string | undefined)
       : undefined;
 
-  // Merge: Twilio live numbers are the source of truth for connected accounts;
-  // fall back to local rows (e.g. SIP BYOC) when no Twilio credentials.
-  const numbers: NumberRow[] = isTwilioConnected
-    ? liveTwilio.map((n) => {
-        const local = localNumbers.find((l) => l.phone_number === n.phoneNumber);
-        const assistantId = assistantByPhone.get(n.phoneNumber);
-        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
-        return {
-          id: local?.id ?? n.sid,
-          phone_number: n.phoneNumber,
-          region: local?.region ?? null,
-          provider: "Twilio (legado)",
-          assistant: assistantName ?? local?.assistant ?? null,
-          calls_today: local?.calls_today ?? 0,
-          answer_rate: local?.answer_rate ?? 0,
-          health: "Seguro" as Health,
-        };
-      })
-    : localNumbers.map((n) => {
-        const assistantId = assistantByPhone.get(n.phone_number);
+  // Só existe um provedor: o tronco SIP do próprio usuário. As linhas locais
+  // são a base; os DIDs retornados pela API entram logo abaixo.
+  const numbers: NumberRow[] = localNumbers.map((n) => {
+    const assistantId = assistantByPhone.get(n.phone_number);
+    const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
+    return { ...n, assistant: assistantName ?? n.assistant };
+  });
+
         const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
         return { ...n, assistant: assistantName ?? n.assistant };
       });
