@@ -113,7 +113,8 @@ function OnboardingPage() {
       setVapiPublicKey("");
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
-      setStep(2);
+      navigate({ to: "/dashboard", replace: true });
+
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Vapi"),
   });
@@ -135,7 +136,7 @@ function OnboardingPage() {
       });
       qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
-      navigate({ to: "/telefonia" });
+      setStep(2);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Nvoip"),
   });
