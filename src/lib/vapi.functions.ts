@@ -428,7 +428,7 @@ function sanitizeModelTool(tool: any): any {
 
   if (tool.type === "sms") {
     // Vapi's sms built-in tool accepts `type`, `messages`, and `metadata`
-    // (used for from/to/body config on the Twilio side). Strip top-level
+    // (used for from/to/body config on the provider side). Strip top-level
     // `name`/`description` which are rejected on built-in tools.
     return {
       type: "sms",
@@ -1021,7 +1021,7 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
     if (!Array.isArray(data)) return [];
     return (data as VapiPhoneNumberRaw[]).map((n) => ({
       id: n.id,
-      provider: (n.provider as string) ?? "twilio",
+      provider: (n.provider as string) ?? "nvoip",
       number: (n.number as string | undefined) ?? null,
       name: (n.name as string | undefined) ?? null,
       assistantId: (n.assistantId as string | undefined) ?? null,
@@ -1075,7 +1075,7 @@ export const provisionFreeVapiNumber = createServerFn({ method: "POST" })
           return {
             ok: false,
             message:
-              "Sua organização na Vapi não tem liberação para números gratuitos. Use um número Twilio (comprar ou conectar) como origem das ligações.",
+              "Sua organização na Vapi não tem liberação para números gratuitos. Conecte um número do seu tronco SIP como origem das ligações.",
           };
         }
         return { ok: false, message: raw };
@@ -1085,7 +1085,7 @@ export const provisionFreeVapiNumber = createServerFn({ method: "POST" })
   );
 
 // Attaches (or replaces) the assistant on a given phone number. Imports the
-// number on Vapi if it isn't there yet, using the user's own Twilio creds.
+// number on Vapi if it isn't there yet, using the user's own SIP trunk.
 export const attachAssistantToNumber = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .inputValidator(
@@ -1253,9 +1253,9 @@ export const detachAssistantFromNumber = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-// Reaplica as credenciais Twilio atuais do usuário no número já cadastrado na
-// Vapi. Corrige "call.start.error-get-transport", que acontece quando o
-// número foi importado com um Account SID / Auth Token antigo ou inválido.
+// Reaplica a credencial do tronco SIP atual do usuário no número já cadastrado
+// na Vapi. Corrige "call.start.error-get-transport", que acontece quando o
+// número foi importado com dados de tronco antigos ou inválidos.
 export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .inputValidator((input: { phoneNumberE164: string }) => {
@@ -1263,12 +1263,17 @@ export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
-    if (!creds)
+    const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+    if (!trunk)
       return {
         ok: false as const,
-        message: "Conecte sua conta Twilio antes de ressincronizar o número.",
+        message: "Conecte seu tronco SIP antes de ressincronizar o número.",
       };
+    const credentialId = await ensureNvoipCredentialId(
+      context.supabase,
+      context.userId,
+      trunk,
+    );
 
     const all = (await vapiFetch("/phone-number", { method: "GET" })) as
       | VapiPhoneNumberRaw[]
@@ -1282,12 +1287,9 @@ export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
     try {
       await vapiFetch(`/phone-number/${existing.id}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          twilioAccountSid: creds.accountSid,
-          twilioAuthToken: creds.authToken,
-        }),
+        body: JSON.stringify({ credentialId }),
       });
-      return { ok: true as const, message: "Credenciais Twilio ressincronizadas." };
+      return { ok: true as const, message: "Credenciais do tronco SIP ressincronizadas." };
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao ressincronizar.";
       return { ok: false as const, message: msg };
@@ -1296,8 +1298,8 @@ export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
 
 
 // Outbound test call — POST /call. Accepts either an existing Vapi
-// phone-number id OR an E.164 number (imports it via the user's Twilio
-// creds if not yet on Vapi).
+// phone-number id OR an E.164 number (imports it via the user's SIP trunk
+// if not yet on Vapi).
 export const createOutboundTestCall = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .inputValidator(
@@ -1340,21 +1342,26 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
       if (existing) {
         phoneNumberId = existing.id;
       } else {
-        const creds = await loadTwilioCredsForVapi(context.supabase, context.userId);
-        if (!creds)
+        const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+        if (!trunk)
           throw new Error(
-            "Conecte sua conta Twilio para usar este número como origem.",
+            "Conecte seu tronco SIP para usar este número como origem.",
           );
+        const credentialId = await ensureNvoipCredentialId(
+          context.supabase,
+          context.userId,
+          trunk,
+        );
         const safeName =
           data.fromNumberE164.replace(/[^a-zA-Z0-9 _-]/g, "").slice(0, 40) ||
-          "Twilio number";
+          "Numero SIP";
         const created = (await vapiFetch("/phone-number", {
           method: "POST",
           body: JSON.stringify({
-            provider: "twilio",
+            provider: "byo-phone-number",
             number: data.fromNumberE164,
-            twilioAccountSid: creds.accountSid,
-            twilioAuthToken: creds.authToken,
+            credentialId,
+            numberE164CheckEnabled: false,
             name: safeName,
           }),
         })) as VapiPhoneNumberRaw;
@@ -2274,15 +2281,10 @@ export const getSetupStatus = createServerFn({ method: "GET" })
 
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [vapiRes, twilioRes, nvoipRes] = await Promise.all([
+    const [vapiRes, nvoipRes] = await Promise.all([
       context.supabase
         .from("user_vapi_credentials")
         .select("user_id, public_key")
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-      context.supabase
-        .from("user_twilio_credentials")
-        .select("user_id")
         .eq("user_id", context.userId)
         .maybeSingle(),
       context.supabase
@@ -2294,14 +2296,11 @@ export const getSetupStatus = createServerFn({ method: "GET" })
     const vapiRow = vapiRes.data as { public_key: string | null } | null;
     const hasVapiPublicKey = !!(vapiRow?.public_key && vapiRow.public_key.trim().length > 0);
     const nvoip = !!nvoipRes.data;
-    const twilioLegacy = !!twilioRes.data;
     return {
       vapi: !!vapiRes.data && hasVapiPublicKey,
-      // `twilio` mantém o nome por compatibilidade: significa "telefonia
-      // configurada" (Nvoip é o provedor padrão, Twilio segue como legado).
-      twilio: nvoip || twilioLegacy,
+      // `telefonia`: tronco SIP do usuário configurado.
+      telefonia: nvoip,
       nvoip,
-      twilioLegacy,
       vapiPrivateOnly: !!vapiRes.data && !hasVapiPublicKey,
     };
 
