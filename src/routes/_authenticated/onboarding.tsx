@@ -82,9 +82,10 @@ function OnboardingPage() {
 
   const [editVapi, setEditVapi] = useState(false);
 
-  // Se Vapi está totalmente conectada (com public key) e a telefonia não, pula para o passo 2.
+  // Etapa 1 = Nvoip (telefonia), Etapa 2 = Vapi.
+  // Se a telefonia já está conectada e a Vapi não, pula para o passo 2.
   useEffect(() => {
-    if (status.data?.vapi && !status.data?.telefonia) {
+    if (status.data?.telefonia && !status.data?.vapi) {
       setStep(2);
     }
   }, [status.data?.vapi, status.data?.telefonia]);
@@ -95,6 +96,7 @@ function OnboardingPage() {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [status.data?.vapi, status.data?.telefonia, navigate]);
+
 
   const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
 
