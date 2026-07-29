@@ -918,27 +918,10 @@ export interface VapiPhoneNumberDTO {
 
 type AttachAssistantResult =
   | { ok: true; vapiNumberId: string; assistantId: string }
-  | { ok: false; reason: "already_in_use" | "twilio_not_connected"; message: string };
+  | { ok: false; reason: "already_in_use" | "sip_not_connected"; message: string };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiPhoneNumberRaw = Record<string, any> & { id: string };
-
-async function loadTwilioCredsForVapi(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<{ accountSid: string; authToken: string } | null> {
-  const { data, error } = await supabase
-    .from("user_twilio_credentials")
-    .select("account_sid, auth_token")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  return {
-    accountSid: data.account_sid as string,
-    authToken: data.auth_token as string,
-  };
-}
 
 /* ---------------- Nvoip (BYO SIP Trunk) ---------------- */
 
@@ -1140,7 +1123,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
 
 
     let vapiNumberId: string;
-    let mirrorProvider = "twilio";
+    let mirrorProvider = "nvoip";
 
     if (existing) {
       const patched = (await vapiFetch(`/phone-number/${existing.id}`, {
@@ -1153,45 +1136,29 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
         .replace(/[^a-zA-Z0-9 _-]/g, "")
         .slice(0, 40) || "Numero";
 
-      // Preferência: Nvoip (BYO SIP Trunk). Fallback: Twilio (legado).
+      // Único transporte: o tronco SIP do usuário (BYO SIP Trunk na Vapi).
       const trunk = await loadNvoipTrunk(context.supabase, context.userId);
-      const creds = trunk
-        ? null
-        : await loadTwilioCredsForVapi(context.supabase, context.userId);
-      if (!trunk && !creds) {
+      if (!trunk) {
         return {
           ok: false,
-          reason: "twilio_not_connected",
+          reason: "sip_not_connected",
           message:
-            "Conecte sua conta Nvoip (ou Twilio) antes de vincular uma atendente a este número.",
+            "Conecte seu tronco SIP antes de vincular uma atendente a este número.",
         };
       }
 
-      let body: Record<string, unknown>;
-      if (trunk) {
-        mirrorProvider = "nvoip";
-        const credentialId = await ensureNvoipCredentialId(
-          context.supabase,
-          context.userId,
-          trunk,
-        );
-
-        body = {
-          provider: "byo-phone-number",
-          number: data.phoneNumberE164,
-          credentialId,
-          numberE164CheckEnabled: false,
-          name: safeName,
-        };
-      } else {
-        body = {
-          provider: "twilio",
-          number: data.phoneNumberE164,
-          twilioAccountSid: creds!.accountSid,
-          twilioAuthToken: creds!.authToken,
-          name: safeName,
-        };
-      }
+      const credentialId = await ensureNvoipCredentialId(
+        context.supabase,
+        context.userId,
+        trunk,
+      );
+      const body: Record<string, unknown> = {
+        provider: "byo-phone-number",
+        number: data.phoneNumberE164,
+        credentialId,
+        numberE164CheckEnabled: false,
+        name: safeName,
+      };
 
       let created: VapiPhoneNumberRaw;
       try {
