@@ -182,15 +182,22 @@ function TelefoniaPage() {
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
   const connectSipFn = useServerFn(connectExternalNumber);
-  const saveCredsFn = useServerFn(saveTwilioCredentials);
   const getConnFn = useServerFn(getTwilioConnection);
   const disconnectFn = useServerFn(disconnectTwilio);
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
-  const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
-  const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
-  const deleteVerifiedCallerIdFn = useServerFn(deleteVerifiedCallerId);
-  const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
-  const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
+
+  // Nvoip (provedor principal — conta de revendedor)
+  const getNvoipConnFn = useServerFn(getNvoipConnection);
+  const saveNvoipCredsFn = useServerFn(saveNvoipCredentials);
+  const disconnectNvoipFn = useServerFn(disconnectNvoip);
+  const listNvoipNumbersFn = useServerFn(listNvoipNumbers);
+  const registerNvoipNumberFn = useServerFn(registerNvoipNumber);
+  const getNvoipBalanceFn = useServerFn(getNvoipBalance);
+
+  // Contatos de teste (armazenados localmente, sem depender de operadora)
+  const listTestContactsFn = useServerFn(listTestContacts);
+  const saveTestContactFn = useServerFn(saveTestContact);
+  const removeTestContactFn = useServerFn(removeTestContact);
 
 
 
