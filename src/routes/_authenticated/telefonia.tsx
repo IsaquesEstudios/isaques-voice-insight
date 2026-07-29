@@ -788,7 +788,7 @@ function TelefoniaPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {numbersQuery.isLoading || (isTwilioConnected && twilioNumbersQuery.isLoading) ? (
+                    {numbersQuery.isLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i} className="border-border/50">
                           <TableCell className="px-6">
