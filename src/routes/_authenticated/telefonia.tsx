@@ -1262,119 +1262,57 @@ function TelefoniaPage() {
         open={testContactOpen}
         onOpenChange={(o) => {
           setTestContactOpen(o);
-          if (!o) {
-            setTestContactForm({ label: "", phoneE164: "" });
-            resetVerification();
-          }
+          if (!o) setTestContactForm({ label: "", phoneE164: "" });
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              Enviaremos um SMS via Twilio Verify com um código de 6 dígitos.
-              Digite o código para confirmar que o número é seu.
+              Cadastre um número seu para receber as ligações de teste da assistente.
+              A Nvoip disca direto pelo tronco SIP, sem verificação por SMS.
             </DialogDescription>
           </DialogHeader>
 
-          {verifyStep === "form" ? (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Identificação</Label>
-                <Input
-                  placeholder="Ex: Meu celular"
-                  value={testContactForm.label}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                  }
-                  disabled={verifyStarting}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Número (E.164)</Label>
-                <Input
-                  placeholder="+5511999999999"
-                  value={testContactForm.phoneE164}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                  }
-                  disabled={verifyStarting}
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Inclua o código do país (+55 para Brasil).
-                </p>
-              </div>
-              <Button
-                className="w-full gap-2"
-                onClick={startVerification}
-                disabled={verifyStarting || !isTwilioConnected}
-              >
-                {verifyStarting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <PhoneCall className="h-4 w-4" />
-                )}
-                Enviar SMS de verificação
-              </Button>
-              {!isTwilioConnected && (
-                <p className="text-center text-[11px] text-warning">
-                  Conecte sua conta Twilio antes de verificar um número.
-                </p>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Identificação</Label>
+              <Input
+                placeholder="Ex: Meu celular"
+                value={testContactForm.label}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
+                }
+                disabled={savingContact}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Número (E.164)</Label>
+              <Input
+                placeholder="+5511999999999"
+                value={testContactForm.phoneE164}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                }
+                disabled={savingContact}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Inclua o código do país (+55 para Brasil).
+              </p>
+            </div>
+            <Button
+              className="w-full gap-2"
+              onClick={handleSaveTestContact}
+              disabled={savingContact}
+            >
+              {savingContact ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
               )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Enviamos um SMS para{" "}
-                  <span className="font-mono text-foreground">{verifyState?.phoneE164}</span>.
-                  Digite abaixo o código recebido.
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Código de verificação</Label>
-                <Input
-                  placeholder="123456"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  disabled={verifyChecking}
-                  className="font-mono text-center text-xl tracking-[0.4em]"
-                  maxLength={10}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={resetVerification}
-                  disabled={verifyChecking}
-                >
-                  Voltar
-                </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={confirmOtp}
-                  disabled={verifyChecking || otpCode.length < 4}
-                >
-                  {verifyChecking ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : null}
-                  Validar código
-                </Button>
-              </div>
-              <button
-                type="button"
-                onClick={startVerification}
-                disabled={verifyStarting}
-                className="w-full text-center text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                {verifyStarting ? "Reenviando..." : "Reenviar SMS"}
-              </button>
-            </div>
-          )}
+              Salvar contato
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
