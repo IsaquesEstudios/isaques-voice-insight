@@ -1631,11 +1631,11 @@ function TelefoniaPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desconectar conta Twilio?</AlertDialogTitle>
+            <AlertDialogTitle>Desconectar conta Nvoip?</AlertDialogTitle>
             <AlertDialogDescription>
-              Suas credenciais Twilio serão removidas deste app. Os números já
-              cadastrados continuam listados, mas novas buscas e compras ficarão
-              bloqueadas até você reconectar.
+              Suas credenciais Nvoip (API e tronco SIP) serão removidas deste app.
+              Os números continuam listados, mas as chamadas ficarão bloqueadas até
+              você reconectar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
