@@ -1271,247 +1271,122 @@ function TelefoniaPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs
-            value={tab}
-            onValueChange={(v) => setTab(v as "nvoip" | "did" | "twilio" | "sip")}
-          >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="nvoip">Nvoip</TabsTrigger>
-              <TabsTrigger value="did" disabled={!isNvoipConnected}>
-                Cadastrar DID
-              </TabsTrigger>
-              <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
-            </TabsList>
+          <div className="space-y-4">
+            <Alert className="border-primary/30 bg-primary/10 text-foreground">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-xs text-muted-foreground">
+                Informe os dados do seu tronco SIP (gateway, usuário e senha) e o número
+                (DID) que a IA vai usar. Com isso criamos o tronco na Vapi e associamos o
+                número automaticamente.
+              </AlertDescription>
+            </Alert>
 
-            <TabsContent value="nvoip" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Conecte sua conta Nvoip (revendedor). A Napikey fica em{" "}
-                  <b>Painel Nvoip → Integrações → API</b>; usuário e senha SIP ficam em{" "}
-                  <b>Ramais / Contas SIP</b>. As chamadas passam a sair pelo seu tronco.
-                </AlertDescription>
-              </Alert>
+            <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label>Nome da conexão (opcional)</Label>
+                <Input
+                  placeholder="Ex: Tronco principal"
+                  value={sipForm.label}
+                  onChange={(e) => setSipForm({ ...sipForm, label: e.target.value })}
+                />
+              </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label>Gateway / Host SIP</Label>
+                <Input
+                  placeholder="ex: sip.suaoperadora.com.br"
+                  value={sipForm.sipHost}
+                  onChange={(e) => setSipForm({ ...sipForm, sipHost: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Napikey (API)</Label>
+                  <Label>Usuário SIP</Label>
+                  <Input
+                    placeholder="ex: 1001"
+                    value={sipForm.sipUsername}
+                    onChange={(e) =>
+                      setSipForm({ ...sipForm, sipUsername: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Senha SIP</Label>
                   <Input
                     type="password"
-                    placeholder="••••••••••••••••"
-                    value={nvoipForm.apiKey}
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    onChange={(e) => setNvoipForm({ ...nvoipForm, apiKey: e.target.value })}
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Se sua conta usa OAuth2, deixe em branco e preencha Client ID + Secret.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Client ID (opcional)</Label>
-                    <Input
-                      value={nvoipForm.clientId}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, clientId: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Client Secret (opcional)</Label>
-                    <Input
-                      type="password"
-                      value={nvoipForm.clientSecret}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, clientSecret: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Host SIP</Label>
-                    <Input
-                      value={nvoipForm.sipHost}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, sipHost: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Usuário SIP</Label>
-                    <Input
-                      value={nvoipForm.sipUsername}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, sipUsername: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Senha SIP</Label>
-                    <Input
-                      type="password"
-                      value={nvoipForm.sipPassword}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, sipPassword: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label className="text-xs">Apelido da conta (opcional)</Label>
-                  <Input
-                    placeholder="Ex: Revenda Isaques"
-                    value={nvoipForm.friendlyLabel}
+                    placeholder="••••••••"
+                    value={sipForm.sipPassword}
                     onChange={(e) =>
-                      setNvoipForm({ ...nvoipForm, friendlyLabel: e.target.value })
+                      setSipForm({ ...sipForm, sipPassword: e.target.value })
                     }
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleConnectNvoip}
-                  disabled={
-                    connecting ||
-                    nvoipForm.sipUsername.trim().length < 2 ||
-                    nvoipForm.sipPassword.trim().length < 4 ||
-                    (!nvoipForm.apiKey.trim() &&
-                      !(nvoipForm.clientId.trim() && nvoipForm.clientSecret.trim()))
-                  }
-                  className="gap-2"
-                >
-                  {connecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Link2 className="h-4 w-4" />
-                  )}
-                  Conectar Nvoip
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="did" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Contrate o DID no painel da Nvoip (revendedor) e cadastre-o aqui para
-                  vinculá-lo a uma assistente. Os DIDs já listados pela API aparecem
-                  automaticamente na tabela.
-                </AlertDescription>
-              </Alert>
-
-              <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Número (DID)</Label>
+                  <Label>Número (DID) em E.164</Label>
                   <Input
                     placeholder="+551140028922"
-                    value={didForm.phoneNumber}
+                    value={sipForm.phoneNumber}
                     onChange={(e) =>
-                      setDidForm({ ...didForm, phoneNumber: e.target.value })
+                      setSipForm({ ...sipForm, phoneNumber: e.target.value })
                     }
                   />
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Nome do número</Label>
                   <Input
-                    placeholder="Ex: Central de Vendas SP"
-                    value={didForm.friendlyName}
-                    maxLength={80}
+                    placeholder="Ex: Comercial SP"
+                    value={sipForm.friendlyName}
                     onChange={(e) =>
-                      setDidForm({ ...didForm, friendlyName: e.target.value })
+                      setSipForm({ ...sipForm, friendlyName: e.target.value })
                     }
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleRegisterDid}
-                  disabled={registeringDid}
-                  className="gap-2"
-                >
-                  {registeringDid ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  Cadastrar DID
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="sip" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Aponte o tráfego da sua operadora atual (Zenvia, Vonage, PABX) para
-                  o nosso SIP URI.
-                </AlertDescription>
-              </Alert>
-
               <div className="grid gap-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  Seu SIP URI de Destino
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input readOnly value={sipUri} className="font-mono text-xs" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleCopySip}
-                    className="shrink-0"
-                    aria-label="Copiar SIP URI"
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-success" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Nome da Rota</Label>
+                <Label>Chave de API da operadora (opcional)</Label>
                 <Input
-                  placeholder="Ex: Central de Vendas SP"
-                  value={sipForm.routeName}
-                  maxLength={80}
-                  onChange={(e) => setSipForm({ routeName: e.target.value })}
+                  type="password"
+                  placeholder="Usada apenas para listar DIDs e saldo, se houver"
+                  value={sipForm.apiKey}
+                  onChange={(e) => setSipForm({ ...sipForm, apiKey: e.target.value })}
                 />
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleConnectSip}
-                  disabled={connecting || sipForm.routeName.trim().length < 2}
-                  className="gap-2"
-                >
-                  {connecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Link2 className="h-4 w-4" />
-                  )}
-                  Gerar SIP URI
-                </Button>
+              <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Encaminhe o DID, no painel da sua operadora, para este SIP URI:
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-black/30 px-2 py-1 font-mono text-xs">
+                    {sipUri}
+                  </code>
+                  <Button size="sm" variant="outline" onClick={handleCopySip}>
+                    {copied ? "Copiado" : "Copiar"}
+                  </Button>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleConnectSipTrunk} disabled={connecting} className="gap-2">
+                {connecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Link2 className="h-4 w-4" />
+                )}
+                Conectar tronco SIP
+              </Button>
+            </div>
+          </div>
+
         </DialogContent>
       </Dialog>
 
