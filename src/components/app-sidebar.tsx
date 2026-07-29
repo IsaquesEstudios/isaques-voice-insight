@@ -47,8 +47,6 @@ const nav: NavItem[] = [
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
-
-  { title: "Configurações / API", url: "/configuracoes", icon: Settings },
 ];
 
 export function AppSidebar() {
