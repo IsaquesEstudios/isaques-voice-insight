@@ -1107,18 +1107,18 @@ function TelefoniaPage() {
                           <Alert className="border-warning/30 bg-warning/10 py-2">
                             <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                             <AlertDescription className="text-[11px] text-muted-foreground">
-                              Nenhum número Twilio disponível.{" "}
+                              Nenhum número de origem disponível.{" "}
                               <button
                                 type="button"
                                 className="underline underline-offset-2 hover:text-foreground"
                                 onClick={() => {
-                                  setTab(isTwilioConnected ? "buy" : "twilio");
+                                  setTab(isNvoipConnected ? "did" : "nvoip");
                                   setOpen(true);
                                 }}
                               >
-                                {isTwilioConnected
-                                  ? "Comprar número na Twilio"
-                                  : "Conectar Twilio"}
+                                {isNvoipConnected
+                                  ? "Cadastrar DID Nvoip"
+                                  : "Conectar Nvoip"}
                               </button>{" "}
                               para poder disparar testes.
                             </AlertDescription>
