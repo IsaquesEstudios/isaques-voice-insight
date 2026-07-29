@@ -131,15 +131,11 @@ export const saveNvoipCredentials = createServerFn({ method: "POST" })
         apiKey: z.string().trim().max(400).optional().or(z.literal("")),
         clientId: z.string().trim().max(200).optional().or(z.literal("")),
         clientSecret: z.string().trim().max(400).optional().or(z.literal("")),
-        sipHost: z.string().trim().min(4).max(120).default("sip.nvoip.com.br"),
+        sipHost: z.string().trim().min(4, "Host SIP obrigatório").max(120),
         sipUsername: z.string().trim().min(2, "Usuário SIP obrigatório").max(120),
         sipPassword: z.string().trim().min(4, "Senha SIP obrigatória").max(200),
         friendlyLabel: z.string().trim().max(80).optional(),
       })
-      .refine(
-        (v) => !!v.apiKey || (!!v.clientId && !!v.clientSecret),
-        "Informe a Napikey ou o par Client ID + Client Secret.",
-      )
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -153,18 +149,23 @@ export const saveNvoipCredentials = createServerFn({ method: "POST" })
       vapiCredentialId: null,
     };
 
-    // Validação leve: se a conta responder 401/403 as credenciais estão erradas.
-    const probe = await nvoipTry<unknown>(creds, [
-      "/account",
-      "/users/me",
-      "/dids",
-      "/callhistory?page=0&size=1",
-    ]);
-    if (!probe.ok && (probe.status === 401 || probe.status === 403)) {
+    // A API REST é opcional: um tronco SIP puro só precisa de host/usuário/senha.
+    // Quando há Napikey/OAuth validamos a conta; 401/403 significa credencial errada.
+    const hasApi = Boolean(creds.apiKey || (creds.clientId && creds.clientSecret));
+    const probe = hasApi
+      ? await nvoipTry<unknown>(creds, [
+          "/account",
+          "/users/me",
+          "/dids",
+          "/callhistory?page=0&size=1",
+        ])
+      : ({ ok: false, status: null, message: "sem api" } as const);
+    if (hasApi && !probe.ok && (probe.status === 401 || probe.status === 403)) {
       throw new Error(
-        "Credenciais Nvoip recusadas (401/403). Confira a Napikey ou o Client ID/Secret no painel da Nvoip.",
+        "Credenciais de API recusadas (401/403). Confira a chave ou o Client ID/Secret no painel da operadora.",
       );
     }
+
 
     const { error } = await context.supabase.from("user_nvoip_credentials").upsert(
       {
