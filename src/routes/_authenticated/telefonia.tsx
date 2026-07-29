@@ -1341,144 +1341,110 @@ function TelefoniaPage() {
 
           <Tabs
             value={tab}
-            onValueChange={(v) => setTab(v as "twilio" | "buy" | "vapi" | "sip")}
+            onValueChange={(v) => setTab(v as "nvoip" | "did" | "twilio" | "sip")}
           >
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="twilio">Credenciais</TabsTrigger>
-              <TabsTrigger value="buy" disabled={!isTwilioConnected}>
-                Comprar número
+              <TabsTrigger value="nvoip">Nvoip</TabsTrigger>
+              <TabsTrigger value="did" disabled={!isNvoipConnected}>
+                Cadastrar DID
               </TabsTrigger>
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
-
             </TabsList>
 
-
-
-
-
-            <TabsContent value="buy" className="mt-4 space-y-4">
+            <TabsContent value="nvoip" className="mt-4 space-y-4">
               <Alert className="border-primary/30 bg-primary/10 text-foreground">
                 <Info className="h-4 w-4 text-primary" />
                 <AlertDescription className="text-xs text-muted-foreground">
-                  Pesquise e compre um número na sua conta Twilio. Contas trial só podem
-                  usar o número gratuito emitido no cadastro — para adquirir novos,
-                  faça upgrade da conta Twilio.
-                </AlertDescription>
-              </Alert>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="grid gap-1">
-                  <Label className="text-[11px] text-muted-foreground">País (ISO-2)</Label>
-                  <Input
-                    value={buyForm.countryCode}
-                    maxLength={2}
-                    onChange={(e) =>
-                      setBuyForm({ ...buyForm, countryCode: e.target.value.toUpperCase() })
-                    }
-                    placeholder="US"
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-[11px] text-muted-foreground">DDD / Area code</Label>
-                  <Input
-                    value={buyForm.areaCode}
-                    onChange={(e) => setBuyForm({ ...buyForm, areaCode: e.target.value })}
-                    placeholder="415"
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-[11px] text-muted-foreground">Contém dígitos</Label>
-                  <Input
-                    value={buyForm.contains}
-                    onChange={(e) => setBuyForm({ ...buyForm, contains: e.target.value })}
-                    placeholder="7777"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSearchTwilio}
-                  disabled={buySearching}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {buySearching ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Signal className="h-4 w-4" />
-                  )}
-                  Pesquisar
-                </Button>
-              </div>
-
-              {buyResults.length > 0 && (
-                <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-white/[0.08] bg-background/40 p-2">
-                  {buyResults.map((n) => (
-                    <div
-                      key={n.phoneNumber}
-                      className="flex items-center justify-between gap-3 rounded-md border border-white/[0.06] bg-card/40 p-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-mono text-sm">{n.phoneNumber}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {[n.locality, n.region, n.country].filter(Boolean).join(" · ") || "—"}
-                          {n.voice ? " · Voz" : ""}
-                          {n.sms ? " · SMS" : ""}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleBuyTwilio(n.phoneNumber)}
-                        disabled={buyingNumber !== null}
-                        className="gap-1.5"
-                      >
-                        {buyingNumber === n.phoneNumber ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Plus className="h-3.5 w-3.5" />
-                        )}
-                        Comprar
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-
-            <TabsContent value="twilio" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Conecte sua conta Twilio. Os custos de telefonia e a titularidade dos
-                  números serão gerenciados diretamente no seu painel da Twilio.
+                  Conecte sua conta Nvoip (revendedor). A Napikey fica em{" "}
+                  <b>Painel Nvoip → Integrações → API</b>; usuário e senha SIP ficam em{" "}
+                  <b>Ramais / Contas SIP</b>. As chamadas passam a sair pelo seu tronco.
                 </AlertDescription>
               </Alert>
 
               <div className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Twilio Account SID</Label>
-                  <Input
-                    placeholder="AC..."
-                    value={twilioForm.accountSid}
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    onChange={(e) =>
-                      setTwilioForm({ ...twilioForm, accountSid: e.target.value.trim() })
-                    }
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Twilio Auth Token</Label>
+                  <Label>Napikey (API)</Label>
                   <Input
                     type="password"
                     placeholder="••••••••••••••••"
-                    value={twilioForm.authToken}
+                    value={nvoipForm.apiKey}
                     autoCapitalize="none"
                     spellCheck={false}
+                    onChange={(e) => setNvoipForm({ ...nvoipForm, apiKey: e.target.value })}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Se sua conta usa OAuth2, deixe em branco e preencha Client ID + Secret.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Client ID (opcional)</Label>
+                    <Input
+                      value={nvoipForm.clientId}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, clientId: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Client Secret (opcional)</Label>
+                    <Input
+                      type="password"
+                      value={nvoipForm.clientSecret}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, clientSecret: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Host SIP</Label>
+                    <Input
+                      value={nvoipForm.sipHost}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, sipHost: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Usuário SIP</Label>
+                    <Input
+                      value={nvoipForm.sipUsername}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, sipUsername: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Senha SIP</Label>
+                    <Input
+                      type="password"
+                      value={nvoipForm.sipPassword}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, sipPassword: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Apelido da conta (opcional)</Label>
+                  <Input
+                    placeholder="Ex: Revenda Isaques"
+                    value={nvoipForm.friendlyLabel}
                     onChange={(e) =>
-                      setTwilioForm({ ...twilioForm, authToken: e.target.value })
+                      setNvoipForm({ ...nvoipForm, friendlyLabel: e.target.value })
                     }
                   />
                 </div>
@@ -1486,21 +1452,72 @@ function TelefoniaPage() {
 
               <div className="flex justify-end">
                 <Button
-                  onClick={handleConnectTwilio}
+                  onClick={handleConnectNvoip}
                   disabled={
                     connecting ||
-                    !/^AC[a-zA-Z0-9]{10,}$/.test(twilioForm.accountSid) ||
-                    twilioForm.authToken.length < 8
+                    nvoipForm.sipUsername.trim().length < 2 ||
+                    nvoipForm.sipPassword.trim().length < 4 ||
+                    (!nvoipForm.apiKey.trim() &&
+                      !(nvoipForm.clientId.trim() && nvoipForm.clientSecret.trim()))
                   }
                   className="gap-2"
                 >
-
                   {connecting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Link2 className="h-4 w-4" />
                   )}
-                  Conectar Twilio
+                  Conectar Nvoip
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="did" className="mt-4 space-y-4">
+              <Alert className="border-primary/30 bg-primary/10 text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Contrate o DID no painel da Nvoip (revendedor) e cadastre-o aqui para
+                  vinculá-lo a uma assistente. Os DIDs já listados pela API aparecem
+                  automaticamente na tabela.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Número (DID)</Label>
+                  <Input
+                    placeholder="+551140028922"
+                    value={didForm.phoneNumber}
+                    onChange={(e) =>
+                      setDidForm({ ...didForm, phoneNumber: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Nome do número</Label>
+                  <Input
+                    placeholder="Ex: Central de Vendas SP"
+                    value={didForm.friendlyName}
+                    maxLength={80}
+                    onChange={(e) =>
+                      setDidForm({ ...didForm, friendlyName: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleRegisterDid}
+                  disabled={registeringDid}
+                  className="gap-2"
+                >
+                  {registeringDid ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Cadastrar DID
                 </Button>
               </div>
             </TabsContent>
