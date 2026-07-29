@@ -3133,3 +3133,144 @@ export const getDashboardOverview = createServerFn({ method: "POST" })
       recent,
     };
   });
+
+// --- Campanhas (outbound em massa) -----------------------------------------
+// Documentação: https://docs.vapi.ai/api-reference/campaigns
+
+export interface VapiCampaignDTO {
+  id: string;
+  name: string;
+  status: string;
+  assistantId: string | null;
+  phoneNumberId: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  endedReason: string | null;
+  counters: {
+    scheduled: number;
+    queued: number;
+    inProgress: number;
+    ended: number;
+    voicemail: number;
+  };
+  customersCount: number;
+}
+
+interface VapiCampaignRaw {
+  id: string;
+  name?: string;
+  status?: string;
+  assistantId?: string;
+  phoneNumberId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  endedReason?: string;
+  callsCounterScheduled?: number;
+  callsCounterQueued?: number;
+  callsCounterInProgress?: number;
+  callsCounterEnded?: number;
+  callsCounterEndedVoicemail?: number;
+  customers?: unknown[];
+}
+
+function mapCampaign(c: VapiCampaignRaw): VapiCampaignDTO {
+  return {
+    id: c.id,
+    name: c.name ?? "Campanha",
+    status: c.status ?? "scheduled",
+    assistantId: c.assistantId ?? null,
+    phoneNumberId: c.phoneNumberId ?? null,
+    createdAt: c.createdAt ?? null,
+    updatedAt: c.updatedAt ?? null,
+    endedReason: c.endedReason ?? null,
+    counters: {
+      scheduled: c.callsCounterScheduled ?? 0,
+      queued: c.callsCounterQueued ?? 0,
+      inProgress: c.callsCounterInProgress ?? 0,
+      ended: c.callsCounterEnded ?? 0,
+      voicemail: c.callsCounterEndedVoicemail ?? 0,
+    },
+    customersCount: Array.isArray(c.customers) ? c.customers.length : 0,
+  };
+}
+
+export const listVapiCampaigns = createServerFn({ method: "GET" })
+  .middleware([withVapiCredentials])
+  .handler(async (): Promise<VapiCampaignDTO[]> => {
+    const data = await vapiFetch("/campaign", { method: "GET" });
+    const list = Array.isArray(data)
+      ? (data as VapiCampaignRaw[])
+      : (((data as { results?: VapiCampaignRaw[] } | null)?.results ?? []) as VapiCampaignRaw[]);
+    return list
+      .map(mapCampaign)
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  });
+
+const campaignCustomerSchema = z.object({
+  number: z.string().trim().min(6, "Número inválido").max(20),
+  name: z.string().trim().max(120).optional(),
+});
+
+const createCampaignSchema = z.object({
+  name: z.string().trim().min(1, "Informe o nome da campanha").max(120),
+  assistantId: z.string().trim().min(1, "Selecione uma assistente"),
+  phoneNumberId: z.string().trim().min(1, "Selecione um número de origem"),
+  customers: z.array(campaignCustomerSchema).min(1, "Envie ao menos um contato").max(5000),
+  startedAt: z.string().trim().optional(),
+  latestAt: z.string().trim().optional(),
+});
+
+export const createVapiCampaign = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: unknown) => createCampaignSchema.parse(input))
+  .handler(async ({ data }): Promise<VapiCampaignDTO> => {
+    const schedulePlan =
+      data.startedAt || data.latestAt
+        ? {
+            ...(data.startedAt ? { earliestAt: new Date(data.startedAt).toISOString() } : {}),
+            ...(data.latestAt ? { latestAt: new Date(data.latestAt).toISOString() } : {}),
+          }
+        : undefined;
+
+    const body = {
+      name: data.name,
+      assistantId: data.assistantId,
+      phoneNumberId: data.phoneNumberId,
+      customers: data.customers.map((c) => ({
+        number: c.number,
+        ...(c.name ? { name: c.name } : {}),
+      })),
+      ...(schedulePlan ? { schedulePlan } : {}),
+    };
+
+    const res = (await vapiFetch("/campaign", {
+      method: "POST",
+      body: JSON.stringify(body),
+    })) as VapiCampaignRaw;
+    return mapCampaign(res);
+  });
+
+export const endVapiCampaign = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { id: string }) => {
+    if (!input?.id) throw new Error("id é obrigatório");
+    return { id: input.id };
+  })
+  .handler(async ({ data }): Promise<VapiCampaignDTO> => {
+    const res = (await vapiFetch(`/campaign/${data.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "ended" }),
+    })) as VapiCampaignRaw;
+    return mapCampaign(res);
+  });
+
+export const deleteVapiCampaign = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { id: string }) => {
+    if (!input?.id) throw new Error("id é obrigatório");
+    return { id: input.id };
+  })
+  .handler(async ({ data }) => {
+    await vapiFetch(`/campaign/${data.id}`, { method: "DELETE" });
+    return { ok: true };
+  });
