@@ -277,10 +277,13 @@ function TelefoniaPage() {
     twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
       ? twilioNumbersQuery.data.numbers
       : [];
-  const liveTrunks =
-    twilioTrunksQuery.data && "ok" in twilioTrunksQuery.data && twilioTrunksQuery.data.ok
-      ? twilioTrunksQuery.data.trunks
-      : [];
+  const liveNvoip = nvoipNumbersQuery.data?.connected
+    ? nvoipNumbersQuery.data.numbers
+    : [];
+  const nvoipWarning =
+    nvoipNumbersQuery.data && "warning" in nvoipNumbersQuery.data
+      ? (nvoipNumbersQuery.data.warning as string | undefined)
+      : undefined;
 
   // Merge: Twilio live numbers are the source of truth for connected accounts;
   // fall back to local rows (e.g. SIP BYOC) when no Twilio credentials.
@@ -293,7 +296,7 @@ function TelefoniaPage() {
           id: local?.id ?? n.sid,
           phone_number: n.phoneNumber,
           region: local?.region ?? null,
-          provider: "Twilio (Sua conta)",
+          provider: "Twilio (legado)",
           assistant: assistantName ?? local?.assistant ?? null,
           calls_today: local?.calls_today ?? 0,
           answer_rate: local?.answer_rate ?? 0,
@@ -305,6 +308,27 @@ function TelefoniaPage() {
         const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
         return { ...n, assistant: assistantName ?? n.assistant };
       });
+
+  // DIDs vindos direto da conta Nvoip (revendedor) entram na mesma tabela.
+  for (const d of liveNvoip) {
+    const existing = numbers.find((row) => row.phone_number === d.number);
+    if (existing) {
+      existing.provider = "Nvoip";
+      continue;
+    }
+    const local = localNumbers.find((l) => l.phone_number === d.number);
+    const assistantId = assistantByPhone.get(d.number);
+    numbers.push({
+      id: local?.id ?? `nvoip-${d.number}`,
+      phone_number: d.number,
+      region: d.label ?? local?.region ?? null,
+      provider: "Nvoip",
+      assistant: assistantId ? assistantById.get(assistantId) ?? null : local?.assistant ?? null,
+      calls_today: local?.calls_today ?? 0,
+      answer_rate: local?.answer_rate ?? 0,
+      health: "Seguro" as Health,
+    });
+  }
 
   // Any number registered inside Vapi (free Vapi numbers or Twilio numbers
   // imported into Vapi) is usable as origin — append the ones not listed yet.
