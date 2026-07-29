@@ -52,7 +52,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
@@ -65,16 +64,13 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  connectExternalNumber,
-  disconnectTwilio,
-  getTwilioConnection,
   listMyNumbers,
-  listTwilioNumbers,
   listTestContacts,
   releaseNumber,
   removeTestContact,
   saveTestContact,
 } from "@/lib/twilio.functions";
+
 
 import {
   disconnectNvoip,
@@ -181,10 +177,8 @@ function TelefoniaPage() {
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
-  const connectSipFn = useServerFn(connectExternalNumber);
-  const getConnFn = useServerFn(getTwilioConnection);
-  const disconnectFn = useServerFn(disconnectTwilio);
-  const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
+
+
 
   // Nvoip (provedor principal — conta de revendedor)
   const getNvoipConnFn = useServerFn(getNvoipConnection);
@@ -207,11 +201,6 @@ function TelefoniaPage() {
     queryFn: () => listFn(),
   });
 
-  const twilioConnQuery = useQuery({
-    queryKey: ["twilio-connection"],
-    queryFn: () => getConnFn(),
-  });
-
   const userQuery = useQuery({
     queryKey: ["auth-user-id"],
     queryFn: async () => {
@@ -220,8 +209,6 @@ function TelefoniaPage() {
     },
   });
 
-  const twilioConn = twilioConnQuery.data;
-  const isTwilioConnected = twilioConn?.connected === true;
 
   const nvoipConnQuery = useQuery({
     queryKey: ["nvoip-connection"],
@@ -241,11 +228,8 @@ function TelefoniaPage() {
     enabled: isNvoipConnected,
   });
 
-  const twilioNumbersQuery = useQuery({
-    queryKey: ["twilio-numbers-live"],
-    queryFn: () => listTwilioNumbersFn(),
-    enabled: isTwilioConnected,
-  });
+
+
 
   const assistantsQuery = useQuery({
     queryKey: ["vapi-assistants"],
@@ -273,10 +257,6 @@ function TelefoniaPage() {
   }, [vapiPhoneNumbersQuery.data]);
 
   const localNumbers = (numbersQuery.data ?? []) as NumberRow[];
-  const liveTwilio =
-    twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
-      ? twilioNumbersQuery.data.numbers
-      : [];
   const liveNvoip = nvoipNumbersQuery.data?.connected
     ? nvoipNumbersQuery.data.numbers
     : [];
@@ -285,29 +265,15 @@ function TelefoniaPage() {
       ? (nvoipNumbersQuery.data.warning as string | undefined)
       : undefined;
 
-  // Merge: Twilio live numbers are the source of truth for connected accounts;
-  // fall back to local rows (e.g. SIP BYOC) when no Twilio credentials.
-  const numbers: NumberRow[] = isTwilioConnected
-    ? liveTwilio.map((n) => {
-        const local = localNumbers.find((l) => l.phone_number === n.phoneNumber);
-        const assistantId = assistantByPhone.get(n.phoneNumber);
-        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
-        return {
-          id: local?.id ?? n.sid,
-          phone_number: n.phoneNumber,
-          region: local?.region ?? null,
-          provider: "Twilio (legado)",
-          assistant: assistantName ?? local?.assistant ?? null,
-          calls_today: local?.calls_today ?? 0,
-          answer_rate: local?.answer_rate ?? 0,
-          health: "Seguro" as Health,
-        };
-      })
-    : localNumbers.map((n) => {
-        const assistantId = assistantByPhone.get(n.phone_number);
-        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
-        return { ...n, assistant: assistantName ?? n.assistant };
-      });
+  // Só existe um provedor: o tronco SIP do próprio usuário. As linhas locais
+  // são a base; os DIDs retornados pela API entram logo abaixo.
+  const numbers: NumberRow[] = localNumbers.map((n) => {
+    const assistantId = assistantByPhone.get(n.phone_number);
+    const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
+    return { ...n, assistant: assistantName ?? n.assistant };
+  });
+
+
 
   // DIDs vindos direto da conta Nvoip (revendedor) entram na mesma tabela.
   for (const d of liveNvoip) {
@@ -366,7 +332,6 @@ function TelefoniaPage() {
 
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"nvoip" | "did" | "twilio" | "sip">("nvoip");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
@@ -525,70 +490,36 @@ function TelefoniaPage() {
 
 
 
-  const [nvoipForm, setNvoipForm] = useState({
-    apiKey: "",
-    clientId: "",
-    clientSecret: "",
-    sipHost: "sip.nvoip.com.br",
+  // Um único provedor: o tronco SIP do próprio usuário, com os dados que a
+  // Vapi exige para o BYO SIP Trunk (gateway, usuário, senha) + o DID.
+  const [sipForm, setSipForm] = useState({
+    label: "",
+    sipHost: "",
     sipUsername: "",
     sipPassword: "",
-    friendlyLabel: "",
+    apiKey: "",
+    phoneNumber: "",
+    friendlyName: "",
   });
-  const [sipForm, setSipForm] = useState({ routeName: "" });
 
   const sipUri = useMemo(() => {
     const slug = (userQuery.data ?? "anon").replace(/-/g, "").slice(0, 12);
     return `sip:${slug}@sip.vapi.ai`;
   }, [userQuery.data]);
 
-  // ---- Cadastrar DID Nvoip ----
-  // Na conta de revendedor a aquisição do DID acontece no painel da Nvoip;
-  // aqui vinculamos o número já contratado à conta do usuário na plataforma.
-  const [didForm, setDidForm] = useState({ phoneNumber: "", friendlyName: "" });
-  const [registeringDid, setRegisteringDid] = useState(false);
-
-  const handleRegisterDid = async () => {
-    const phone = didForm.phoneNumber.trim();
-    const name = didForm.friendlyName.trim();
-    if (phone.replace(/\D/g, "").length < 8)
-      return toast.error("Informe um DID válido (ex: +551140028922).");
-    if (name.length < 2) return toast.error("Dê um nome para identificar o número.");
-    setRegisteringDid(true);
-    try {
-      const res = await registerNvoipNumberFn({
-        data: { phoneNumber: phone, friendlyName: name },
-      });
-      toast.success(
-        res.alreadyRegistered
-          ? "Este número já estava cadastrado."
-          : "DID Nvoip cadastrado com sucesso!",
-      );
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
-      setDidForm({ phoneNumber: "", friendlyName: "" });
-      setOpen(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar DID.");
-    } finally {
-      setRegisteringDid(false);
-    }
-  };
-
   const resetModal = () => {
-    setTab("nvoip");
-    setNvoipForm({
-      apiKey: "",
-      clientId: "",
-      clientSecret: "",
-      sipHost: "sip.nvoip.com.br",
+    setSipForm({
+      label: "",
+      sipHost: "",
       sipUsername: "",
       sipPassword: "",
-      friendlyLabel: "",
+      apiKey: "",
+      phoneNumber: "",
+      friendlyName: "",
     });
-    setSipForm({ routeName: "" });
-    setDidForm({ phoneNumber: "", friendlyName: "" });
     setCopied(false);
   };
+
 
   const handleCopySip = async () => {
     try {
@@ -600,56 +531,54 @@ function TelefoniaPage() {
     }
   };
 
-  const handleConnectNvoip = async () => {
+  // Salva o tronco SIP do usuário e, quando informado, já cadastra o DID.
+  const handleConnectSipTrunk = async () => {
+    const host = sipForm.sipHost.trim();
+    const user = sipForm.sipUsername.trim();
+    const pass = sipForm.sipPassword.trim();
+    const did = sipForm.phoneNumber.trim();
+    const didName = sipForm.friendlyName.trim();
+    if (host.length < 4) return toast.error("Informe o gateway/host SIP da sua operadora.");
+    if (user.length < 2) return toast.error("Informe o usuário SIP.");
+    if (pass.length < 4) return toast.error("Informe a senha SIP.");
+    if (did.replace(/\D/g, "").length < 8)
+      return toast.error("Informe o número (DID) em formato E.164, ex: +551140028922.");
+    if (didName.length < 2) return toast.error("Dê um nome para identificar o número.");
+
     setConnecting(true);
     try {
-      const res = await saveNvoipCredsFn({
+      await saveNvoipCredsFn({
         data: {
-          apiKey: nvoipForm.apiKey.trim(),
-          clientId: nvoipForm.clientId.trim(),
-          clientSecret: nvoipForm.clientSecret.trim(),
-          sipHost: nvoipForm.sipHost.trim() || "sip.nvoip.com.br",
-          sipUsername: nvoipForm.sipUsername.trim(),
-          sipPassword: nvoipForm.sipPassword.trim(),
-          friendlyLabel: nvoipForm.friendlyLabel.trim() || undefined,
+          apiKey: sipForm.apiKey.trim(),
+          clientId: "",
+          clientSecret: "",
+          sipHost: host,
+          sipUsername: user,
+          sipPassword: pass,
+          friendlyLabel: sipForm.label.trim() || undefined,
         },
       });
+      const res = await registerNvoipNumberFn({
+        data: { phoneNumber: did, friendlyName: didName },
+      });
       toast.success(
-        res.apiValidated
-          ? "Conta Nvoip conectada com sucesso!"
-          : "Credenciais salvas. Não conseguimos validar a API agora — os DIDs podem demorar a aparecer.",
+        res.alreadyRegistered
+          ? "Tronco SIP salvo. Este número já estava cadastrado."
+          : "Tronco SIP conectado e número cadastrado!",
       );
       await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
       await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
       await queryClient.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao conectar Nvoip");
+      toast.error(err instanceof Error ? err.message : "Falha ao conectar o tronco SIP");
     } finally {
       setConnecting(false);
     }
   };
 
-  const handleConnectSip = async () => {
-    setConnecting(true);
-    try {
-      await connectSipFn({
-        data: {
-          routeName: sipForm.routeName.trim(),
-          sipUri,
-        },
-      });
-      toast.success("Rota SIP conectada com sucesso!");
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      setOpen(false);
-      resetModal();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao gerar rota SIP");
-    } finally {
-      setConnecting(false);
-    }
-  };
 
   const disconnectMutation = useMutation({
     mutationFn: () => disconnectNvoipFn(),
@@ -668,7 +597,6 @@ function TelefoniaPage() {
     onSuccess: () => {
       toast.success("Número liberado da sua conta.");
       queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
       setReleaseTarget(null);
     },
     onError: (err) =>
@@ -803,11 +731,6 @@ function TelefoniaPage() {
               </DropdownMenu>
             ) : null}
 
-            {isTwilioConnected ? (
-              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[11px] text-muted-foreground">
-                Twilio (legado) ativo
-              </span>
-            ) : null}
 
             <Button
               className="gap-2 shadow-glow"
@@ -862,7 +785,7 @@ function TelefoniaPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {numbersQuery.isLoading || (isTwilioConnected && twilioNumbersQuery.isLoading) ? (
+                    {numbersQuery.isLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i} className="border-border/50">
                           <TableCell className="px-6">
@@ -1113,7 +1036,6 @@ function TelefoniaPage() {
                                 type="button"
                                 className="underline underline-offset-2 hover:text-foreground"
                                 onClick={() => {
-                                  setTab(isNvoipConnected ? "did" : "nvoip");
                                   setOpen(true);
                                 }}
                               >
@@ -1178,7 +1100,7 @@ function TelefoniaPage() {
                           size="sm"
                           className="w-full gap-1.5 shadow-glow"
                           disabled={
-                            (!isNvoipConnected && !isTwilioConnected) ||
+                            !isNvoipConnected ||
                             !from ||
                             !assistantId ||
                             callingContactId === c.id
@@ -1340,247 +1262,122 @@ function TelefoniaPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs
-            value={tab}
-            onValueChange={(v) => setTab(v as "nvoip" | "did" | "twilio" | "sip")}
-          >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="nvoip">Nvoip</TabsTrigger>
-              <TabsTrigger value="did" disabled={!isNvoipConnected}>
-                Cadastrar DID
-              </TabsTrigger>
-              <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
-            </TabsList>
+          <div className="space-y-4">
+            <Alert className="border-primary/30 bg-primary/10 text-foreground">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-xs text-muted-foreground">
+                Informe os dados do seu tronco SIP (gateway, usuário e senha) e o número
+                (DID) que a IA vai usar. Com isso criamos o tronco na Vapi e associamos o
+                número automaticamente.
+              </AlertDescription>
+            </Alert>
 
-            <TabsContent value="nvoip" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Conecte sua conta Nvoip (revendedor). A Napikey fica em{" "}
-                  <b>Painel Nvoip → Integrações → API</b>; usuário e senha SIP ficam em{" "}
-                  <b>Ramais / Contas SIP</b>. As chamadas passam a sair pelo seu tronco.
-                </AlertDescription>
-              </Alert>
+            <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label>Nome da conexão (opcional)</Label>
+                <Input
+                  placeholder="Ex: Tronco principal"
+                  value={sipForm.label}
+                  onChange={(e) => setSipForm({ ...sipForm, label: e.target.value })}
+                />
+              </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label>Gateway / Host SIP</Label>
+                <Input
+                  placeholder="ex: sip.suaoperadora.com.br"
+                  value={sipForm.sipHost}
+                  onChange={(e) => setSipForm({ ...sipForm, sipHost: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Napikey (API)</Label>
+                  <Label>Usuário SIP</Label>
+                  <Input
+                    placeholder="ex: 1001"
+                    value={sipForm.sipUsername}
+                    onChange={(e) =>
+                      setSipForm({ ...sipForm, sipUsername: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Senha SIP</Label>
                   <Input
                     type="password"
-                    placeholder="••••••••••••••••"
-                    value={nvoipForm.apiKey}
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    onChange={(e) => setNvoipForm({ ...nvoipForm, apiKey: e.target.value })}
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Se sua conta usa OAuth2, deixe em branco e preencha Client ID + Secret.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Client ID (opcional)</Label>
-                    <Input
-                      value={nvoipForm.clientId}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, clientId: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Client Secret (opcional)</Label>
-                    <Input
-                      type="password"
-                      value={nvoipForm.clientSecret}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, clientSecret: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Host SIP</Label>
-                    <Input
-                      value={nvoipForm.sipHost}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, sipHost: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Usuário SIP</Label>
-                    <Input
-                      value={nvoipForm.sipUsername}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, sipUsername: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Senha SIP</Label>
-                    <Input
-                      type="password"
-                      value={nvoipForm.sipPassword}
-                      onChange={(e) =>
-                        setNvoipForm({ ...nvoipForm, sipPassword: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label className="text-xs">Apelido da conta (opcional)</Label>
-                  <Input
-                    placeholder="Ex: Revenda Isaques"
-                    value={nvoipForm.friendlyLabel}
+                    placeholder="••••••••"
+                    value={sipForm.sipPassword}
                     onChange={(e) =>
-                      setNvoipForm({ ...nvoipForm, friendlyLabel: e.target.value })
+                      setSipForm({ ...sipForm, sipPassword: e.target.value })
                     }
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleConnectNvoip}
-                  disabled={
-                    connecting ||
-                    nvoipForm.sipUsername.trim().length < 2 ||
-                    nvoipForm.sipPassword.trim().length < 4 ||
-                    (!nvoipForm.apiKey.trim() &&
-                      !(nvoipForm.clientId.trim() && nvoipForm.clientSecret.trim()))
-                  }
-                  className="gap-2"
-                >
-                  {connecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Link2 className="h-4 w-4" />
-                  )}
-                  Conectar Nvoip
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="did" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Contrate o DID no painel da Nvoip (revendedor) e cadastre-o aqui para
-                  vinculá-lo a uma assistente. Os DIDs já listados pela API aparecem
-                  automaticamente na tabela.
-                </AlertDescription>
-              </Alert>
-
-              <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Número (DID)</Label>
+                  <Label>Número (DID) em E.164</Label>
                   <Input
                     placeholder="+551140028922"
-                    value={didForm.phoneNumber}
+                    value={sipForm.phoneNumber}
                     onChange={(e) =>
-                      setDidForm({ ...didForm, phoneNumber: e.target.value })
+                      setSipForm({ ...sipForm, phoneNumber: e.target.value })
                     }
                   />
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Nome do número</Label>
                   <Input
-                    placeholder="Ex: Central de Vendas SP"
-                    value={didForm.friendlyName}
-                    maxLength={80}
+                    placeholder="Ex: Comercial SP"
+                    value={sipForm.friendlyName}
                     onChange={(e) =>
-                      setDidForm({ ...didForm, friendlyName: e.target.value })
+                      setSipForm({ ...sipForm, friendlyName: e.target.value })
                     }
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleRegisterDid}
-                  disabled={registeringDid}
-                  className="gap-2"
-                >
-                  {registeringDid ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  Cadastrar DID
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="sip" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Aponte o tráfego da sua operadora atual (Zenvia, Vonage, PABX) para
-                  o nosso SIP URI.
-                </AlertDescription>
-              </Alert>
-
               <div className="grid gap-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  Seu SIP URI de Destino
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input readOnly value={sipUri} className="font-mono text-xs" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleCopySip}
-                    className="shrink-0"
-                    aria-label="Copiar SIP URI"
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-success" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Nome da Rota</Label>
+                <Label>Chave de API da operadora (opcional)</Label>
                 <Input
-                  placeholder="Ex: Central de Vendas SP"
-                  value={sipForm.routeName}
-                  maxLength={80}
-                  onChange={(e) => setSipForm({ routeName: e.target.value })}
+                  type="password"
+                  placeholder="Usada apenas para listar DIDs e saldo, se houver"
+                  value={sipForm.apiKey}
+                  onChange={(e) => setSipForm({ ...sipForm, apiKey: e.target.value })}
                 />
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleConnectSip}
-                  disabled={connecting || sipForm.routeName.trim().length < 2}
-                  className="gap-2"
-                >
-                  {connecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Link2 className="h-4 w-4" />
-                  )}
-                  Gerar SIP URI
-                </Button>
+              <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Encaminhe o DID, no painel da sua operadora, para este SIP URI:
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-black/30 px-2 py-1 font-mono text-xs">
+                    {sipUri}
+                  </code>
+                  <Button size="sm" variant="outline" onClick={handleCopySip}>
+                    {copied ? "Copiado" : "Copiar"}
+                  </Button>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleConnectSipTrunk} disabled={connecting} className="gap-2">
+                {connecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Link2 className="h-4 w-4" />
+                )}
+                Conectar tronco SIP
+              </Button>
+            </div>
+          </div>
+
         </DialogContent>
       </Dialog>
 
