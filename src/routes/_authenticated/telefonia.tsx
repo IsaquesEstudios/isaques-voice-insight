@@ -202,11 +202,6 @@ function TelefoniaPage() {
     queryFn: () => listFn(),
   });
 
-  const twilioConnQuery = useQuery({
-    queryKey: ["twilio-connection"],
-    queryFn: () => getConnFn(),
-  });
-
   const userQuery = useQuery({
     queryKey: ["auth-user-id"],
     queryFn: async () => {
@@ -215,8 +210,6 @@ function TelefoniaPage() {
     },
   });
 
-  const twilioConn = twilioConnQuery.data;
-  const isTwilioConnected = twilioConn?.connected === true;
 
   const nvoipConnQuery = useQuery({
     queryKey: ["nvoip-connection"],
