@@ -296,7 +296,7 @@ function TelefoniaPage() {
     });
   }
 
-  // Any number registered inside Vapi (free Vapi numbers or Twilio numbers
+  // Any number registered inside Vapi (números gratuitos da Vapi ou DIDs do tronco SIP
   // imported into Vapi) is usable as origin — append the ones not listed yet.
   for (const n of vapiPhoneNumbersQuery.data ?? []) {
     if (!n.number) continue;
@@ -350,7 +350,7 @@ function TelefoniaPage() {
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
   // Contatos de teste ficam salvos na própria plataforma: a Nvoip não possui
-  // um serviço de verificação por OTP como o Twilio Verify.
+  // um serviço externo de verificação por OTP.
   const testContactsQuery = useQuery({
     queryKey: ["test-contacts"],
     queryFn: () => listTestContactsFn(),

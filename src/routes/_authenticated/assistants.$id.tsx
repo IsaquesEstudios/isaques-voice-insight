@@ -4408,7 +4408,7 @@ function ToolsTab({
                       <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3">
                         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
                         <p className="text-[11px] leading-relaxed text-amber-200/90">
-                          No configured Twilio numbers found. Add one in{" "}
+                          Nenhum número configurado. Cadastre um em{" "}
                           <span className="font-semibold underline underline-offset-2">Phone Numbers</span>.
                         </p>
                       </div>
@@ -4417,7 +4417,7 @@ function ToolsTab({
                         <Label className="text-xs">From Phone Number *</Label>
                         <Select disabled>
                           <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
-                            <SelectValue placeholder="Selecione um número Twilio" />
+                            <SelectValue placeholder="Selecione um número" />
                           </SelectTrigger>
                           <SelectContent />
                         </Select>
