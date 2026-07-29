@@ -492,70 +492,36 @@ function TelefoniaPage() {
 
 
 
-  const [nvoipForm, setNvoipForm] = useState({
-    apiKey: "",
-    clientId: "",
-    clientSecret: "",
-    sipHost: "sip.nvoip.com.br",
+  // Um único provedor: o tronco SIP do próprio usuário, com os dados que a
+  // Vapi exige para o BYO SIP Trunk (gateway, usuário, senha) + o DID.
+  const [sipForm, setSipForm] = useState({
+    label: "",
+    sipHost: "",
     sipUsername: "",
     sipPassword: "",
-    friendlyLabel: "",
+    apiKey: "",
+    phoneNumber: "",
+    friendlyName: "",
   });
-  const [sipForm, setSipForm] = useState({ routeName: "" });
 
   const sipUri = useMemo(() => {
     const slug = (userQuery.data ?? "anon").replace(/-/g, "").slice(0, 12);
     return `sip:${slug}@sip.vapi.ai`;
   }, [userQuery.data]);
 
-  // ---- Cadastrar DID Nvoip ----
-  // Na conta de revendedor a aquisição do DID acontece no painel da Nvoip;
-  // aqui vinculamos o número já contratado à conta do usuário na plataforma.
-  const [didForm, setDidForm] = useState({ phoneNumber: "", friendlyName: "" });
-  const [registeringDid, setRegisteringDid] = useState(false);
-
-  const handleRegisterDid = async () => {
-    const phone = didForm.phoneNumber.trim();
-    const name = didForm.friendlyName.trim();
-    if (phone.replace(/\D/g, "").length < 8)
-      return toast.error("Informe um DID válido (ex: +551140028922).");
-    if (name.length < 2) return toast.error("Dê um nome para identificar o número.");
-    setRegisteringDid(true);
-    try {
-      const res = await registerNvoipNumberFn({
-        data: { phoneNumber: phone, friendlyName: name },
-      });
-      toast.success(
-        res.alreadyRegistered
-          ? "Este número já estava cadastrado."
-          : "DID Nvoip cadastrado com sucesso!",
-      );
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
-      setDidForm({ phoneNumber: "", friendlyName: "" });
-      setOpen(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar DID.");
-    } finally {
-      setRegisteringDid(false);
-    }
-  };
-
   const resetModal = () => {
-    setTab("nvoip");
-    setNvoipForm({
-      apiKey: "",
-      clientId: "",
-      clientSecret: "",
-      sipHost: "sip.nvoip.com.br",
+    setSipForm({
+      label: "",
+      sipHost: "",
       sipUsername: "",
       sipPassword: "",
-      friendlyLabel: "",
+      apiKey: "",
+      phoneNumber: "",
+      friendlyName: "",
     });
-    setSipForm({ routeName: "" });
-    setDidForm({ phoneNumber: "", friendlyName: "" });
     setCopied(false);
   };
+
 
   const handleCopySip = async () => {
     try {
