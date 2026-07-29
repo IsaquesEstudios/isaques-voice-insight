@@ -1026,7 +1026,7 @@ function TelefoniaPage() {
               <div>
                 <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Caller IDs verificados diretamente na sua conta Twilio.
+                  Números seus, usados para testar ligações da assistente.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1034,7 +1034,7 @@ function TelefoniaPage() {
                   size="sm"
                   variant="ghost"
                   className="gap-1.5"
-                  disabled={!isTwilioConnected || testContactsQuery.isFetching}
+                  disabled={testContactsQuery.isFetching}
                   onClick={() => testContactsQuery.refetch()}
                   title="Atualizar lista"
                 >
@@ -1042,41 +1042,31 @@ function TelefoniaPage() {
                     className={`h-4 w-4 ${testContactsQuery.isFetching ? "animate-spin" : ""}`}
                   />
                 </Button>
-                <Button size="sm" variant="outline" asChild className="gap-1.5">
-                  <a
-                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Plus className="h-4 w-4" /> Verificar na Twilio
-                  </a>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setTestContactOpen(true)}
+                >
+                  <Plus className="h-4 w-4" /> Novo contato
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!isTwilioConnected && (
-                <Alert className="border-warning/30 bg-warning/10">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <AlertDescription className="text-xs text-muted-foreground">
-                    Conecte sua conta Twilio para listar seus Caller IDs verificados.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {isTwilioConnected && testContactsQuery.isLoading ? (
+              {testContactsQuery.isLoading ? (
                 Array.from({ length: 2 }).map((_, i) => (
                   <div
                     key={i}
                     className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
                   />
                 ))
-              ) : isTwilioConnected && testContacts.length === 0 ? (
+              ) : testContacts.length === 0 ? (
                 <div className="space-y-2 py-4 text-center">
                   <p className="text-xs text-muted-foreground">
-                    Nenhum Caller ID verificado encontrado na sua conta Twilio.
+                    Nenhum contato de teste cadastrado.
                   </p>
                   <p className="text-[11px] text-muted-foreground/80">
-                    Verifique um número em <b>Console → Phone Numbers → Verified Caller IDs</b> e clique em atualizar.
+                    Cadastre um número seu para receber a ligação da assistente.
                   </p>
                 </div>
               ) : (
