@@ -6,8 +6,6 @@ import {
   Bot,
   PhoneCall,
   Video,
-  Inbox,
-  ListChecks,
   Settings,
   Sparkles,
   Phone,
