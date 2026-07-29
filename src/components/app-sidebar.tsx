@@ -27,7 +27,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { getTwilioConnection, getTwilioBalance } from "@/lib/twilio.functions";
 import { getVapiEstimatedCredits } from "@/lib/vapi.functions";
 
 type NavItem = {
@@ -109,26 +108,12 @@ export function AppSidebar() {
 }
 
 function SidebarCredits() {
-  const twilioConn = useQuery({
-    queryKey: ["twilio-connection"],
-    queryFn: () => getTwilioConnection(),
-  });
-  const twilioBalance = useQuery({
-    queryKey: ["twilio-balance"],
-    queryFn: () => getTwilioBalance(),
-    enabled: !!twilioConn.data?.connected,
-    staleTime: 60_000,
-  });
   const vapiCredits = useQuery({
     queryKey: ["vapi-estimated-credits"],
     queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
 
-  const twilioValue =
-    twilioBalance.data?.connected && twilioBalance.data.balance !== null
-      ? twilioBalance.data.balance
-      : null;
   const vapiValue =
     vapiCredits.data?.ok && vapiCredits.data?.balance !== null
       ? vapiCredits.data.balance
@@ -136,14 +121,6 @@ function SidebarCredits() {
 
   return (
     <div className="space-y-3 group-data-[collapsible=icon]:hidden">
-      <SidebarCreditRow
-        icon={Phone}
-        title="Twilio"
-        value={twilioValue}
-        currency={twilioBalance.data?.currency || "USD"}
-        badge={twilioBalance.data?.accountType ?? undefined}
-        loading={twilioBalance.isLoading}
-      />
       <SidebarCreditRow
         icon={Sparkles}
         title="Vapi"
