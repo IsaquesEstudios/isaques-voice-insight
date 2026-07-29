@@ -274,9 +274,7 @@ function TelefoniaPage() {
     return { ...n, assistant: assistantName ?? n.assistant };
   });
 
-        const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
-        return { ...n, assistant: assistantName ?? n.assistant };
-      });
+
 
   // DIDs vindos direto da conta Nvoip (revendedor) entram na mesma tabela.
   for (const d of liveNvoip) {
