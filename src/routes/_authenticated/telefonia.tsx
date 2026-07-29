@@ -178,10 +178,8 @@ function TelefoniaPage() {
 
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
-  const connectSipFn = useServerFn(connectExternalNumber);
-  const getConnFn = useServerFn(getTwilioConnection);
-  const disconnectFn = useServerFn(disconnectTwilio);
-  const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
+
+
 
   // Nvoip (provedor principal — conta de revendedor)
   const getNvoipConnFn = useServerFn(getNvoipConnection);
