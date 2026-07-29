@@ -36,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
       { title: "Onboarding — Isaques Estúdios | AI Voice" },
       {
         name: "description",
-        content: "Conecte suas chaves Vapi e Twilio para começar.",
+        content: "Conecte sua chave Vapi e seu tronco SIP para começar.",
       },
     ],
   }),
@@ -44,7 +44,7 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
   beforeLoad: async () => {
     try {
       const status = await getSetupStatus();
-      if (status?.vapi && status?.twilio) {
+      if (status?.vapi && status?.telefonia) {
         throw redirect({ to: "/dashboard" });
       }
     } catch (e) {
@@ -82,19 +82,19 @@ function OnboardingPage() {
 
   const [editVapi, setEditVapi] = useState(false);
 
-  // Se Vapi está totalmente conectada (com public key) e Twilio não, pula para o passo 2.
+  // Se Vapi está totalmente conectada (com public key) e a telefonia não, pula para o passo 2.
   useEffect(() => {
-    if (status.data?.vapi && !status.data?.twilio) {
+    if (status.data?.vapi && !status.data?.telefonia) {
       setStep(2);
     }
-  }, [status.data?.vapi, status.data?.twilio]);
+  }, [status.data?.vapi, status.data?.telefonia]);
 
   // Se ambos já estão conectados, mandar direto para o dashboard.
   useEffect(() => {
-    if (status.data?.vapi && status.data?.twilio) {
+    if (status.data?.vapi && status.data?.telefonia) {
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [status.data?.vapi, status.data?.twilio, navigate]);
+  }, [status.data?.vapi, status.data?.telefonia, navigate]);
 
   const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
 

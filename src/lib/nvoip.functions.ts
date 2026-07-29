@@ -335,6 +335,7 @@ export const registerNvoipNumber = createServerFn({ method: "POST" })
 
     const { error } = await context.supabase.from("user_phone_numbers").insert({
       user_id: context.userId,
+      // coluna legada de identificador do provedor no banco
       twilio_sid: `nvoip_${crypto.randomUUID()}`,
       phone_number: data.phoneNumber,
       friendly_name: data.friendlyName,
