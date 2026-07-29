@@ -6,8 +6,6 @@ import {
   Bot,
   PhoneCall,
   Video,
-  Inbox,
-  ListChecks,
   Settings,
   Sparkles,
   Phone,
@@ -46,8 +44,6 @@ const nav: NavItem[] = [
   },
   { title: "Telefonia & Números", url: "/telefonia", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
-  { title: "CRM & Leads", url: "/crm", icon: Inbox },
-  { title: "Histórico de Chamadas", url: "/historico", icon: ListChecks },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
 ];
 
