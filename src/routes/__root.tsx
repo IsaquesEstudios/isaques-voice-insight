@@ -14,7 +14,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
-import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/client";
+import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { RouteProgress } from "@/components/route-progress";
 import { useQueryCachePersistence } from "@/components/query-persist";
 

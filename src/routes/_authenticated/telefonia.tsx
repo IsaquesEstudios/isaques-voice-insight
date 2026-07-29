@@ -62,7 +62,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { getSupabaseBrowser } from "@/integrations/supabase/client";
+import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   listMyNumbers,
   listTestContacts,

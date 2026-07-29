@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, isRedirect, Outlet } from "@tanstack/react-router";
 import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
-import { getSupabaseBrowser, initSupabaseBrowser } from "@/integrations/supabase/client";
+import { getSupabaseBrowser, initSupabaseBrowser } from "@/integrations/supabase/browser";
 import { getSetupStatus } from "@/lib/vapi.functions";
 
 async function ensureSupabaseBrowser() {
