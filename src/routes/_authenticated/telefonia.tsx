@@ -525,9 +525,14 @@ function TelefoniaPage() {
 
 
 
-  const [twilioForm, setTwilioForm] = useState({
-    accountSid: "",
-    authToken: "",
+  const [nvoipForm, setNvoipForm] = useState({
+    apiKey: "",
+    clientId: "",
+    clientSecret: "",
+    sipHost: "sip.nvoip.com.br",
+    sipUsername: "",
+    sipPassword: "",
+    friendlyLabel: "",
   });
   const [sipForm, setSipForm] = useState({ routeName: "" });
 
@@ -536,90 +541,53 @@ function TelefoniaPage() {
     return `sip:${slug}@sip.vapi.ai`;
   }, [userQuery.data]);
 
-  // ---- Comprar número Twilio ----
-  const searchTwilioFn = useServerFn(searchAvailableTwilioNumbers);
-  const purchaseTwilioFn = useServerFn(purchaseTwilioNumber);
-  const [buyForm, setBuyForm] = useState({
-    countryCode: "US",
-    areaCode: "",
-    contains: "",
-  });
-  const [buyResults, setBuyResults] = useState<
-    Array<{
-      phoneNumber: string;
-      friendlyName: string;
-      locality: string | null;
-      region: string | null;
-      country: string;
-      voice: boolean;
-      sms: boolean;
-    }>
-  >([]);
-  const [buySearching, setBuySearching] = useState(false);
-  const [buyingNumber, setBuyingNumber] = useState<string | null>(null);
+  // ---- Cadastrar DID Nvoip ----
+  // Na conta de revendedor a aquisição do DID acontece no painel da Nvoip;
+  // aqui vinculamos o número já contratado à conta do usuário na plataforma.
+  const [didForm, setDidForm] = useState({ phoneNumber: "", friendlyName: "" });
+  const [registeringDid, setRegisteringDid] = useState(false);
 
-  const handleSearchTwilio = async () => {
-    setBuySearching(true);
+  const handleRegisterDid = async () => {
+    const phone = didForm.phoneNumber.trim();
+    const name = didForm.friendlyName.trim();
+    if (phone.replace(/\D/g, "").length < 8)
+      return toast.error("Informe um DID válido (ex: +551140028922).");
+    if (name.length < 2) return toast.error("Dê um nome para identificar o número.");
+    setRegisteringDid(true);
     try {
-      const res = await searchTwilioFn({
-        data: {
-          countryCode: (buyForm.countryCode || "US").toUpperCase(),
-          areaCode: buyForm.areaCode.trim() || undefined,
-          contains: buyForm.contains.trim() || undefined,
-        },
+      const res = await registerNvoipNumberFn({
+        data: { phoneNumber: phone, friendlyName: name },
       });
-      if (!res.ok) {
-        if (res.reason === "no_credentials") {
-          toast.error("Conecte sua conta Twilio primeiro.");
-          setTab("twilio");
-        } else {
-          toast.error(res.message ?? "Falha ao buscar números na Twilio.");
-        }
-        setBuyResults([]);
-        return;
-      }
-      setBuyResults(res.numbers);
-      if (res.numbers.length === 0) {
-        toast.info("Nenhum número encontrado. Ajuste país / DDD / contém e tente novamente.");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na busca.");
-    } finally {
-      setBuySearching(false);
-    }
-  };
-
-  const handleBuyTwilio = async (phoneNumber: string) => {
-    setBuyingNumber(phoneNumber);
-    try {
-      const res = await purchaseTwilioFn({ data: { phoneNumber } });
-      if (!("ok" in res) || !res.ok) {
-        toast.error(res.message ?? "Não foi possível comprar este número.");
-        return;
-      }
-      toast.success(`Número ${res.phoneNumber} adquirido na Twilio!`);
-      setBuyResults((prev) => prev.filter((n) => n.phoneNumber !== phoneNumber));
-      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
+      toast.success(
+        res.alreadyRegistered
+          ? "Este número já estava cadastrado."
+          : "DID Nvoip cadastrado com sucesso!",
+      );
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
+      setDidForm({ phoneNumber: "", friendlyName: "" });
       setOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao comprar número.");
+      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar DID.");
     } finally {
-      setBuyingNumber(null);
+      setRegisteringDid(false);
     }
   };
 
-
-
-
-
   const resetModal = () => {
-    setTab("twilio");
-    setTwilioForm({ accountSid: "", authToken: "" });
+    setTab("nvoip");
+    setNvoipForm({
+      apiKey: "",
+      clientId: "",
+      clientSecret: "",
+      sipHost: "sip.nvoip.com.br",
+      sipUsername: "",
+      sipPassword: "",
+      friendlyLabel: "",
+    });
     setSipForm({ routeName: "" });
+    setDidForm({ phoneNumber: "", friendlyName: "" });
     setCopied(false);
-    setBuyResults([]);
-    setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
-    
   };
 
   const handleCopySip = async () => {
@@ -632,23 +600,32 @@ function TelefoniaPage() {
     }
   };
 
-  const handleConnectTwilio = async () => {
+  const handleConnectNvoip = async () => {
     setConnecting(true);
     try {
-      await saveCredsFn({
+      const res = await saveNvoipCredsFn({
         data: {
-          accountSid: twilioForm.accountSid.trim(),
-          authToken: twilioForm.authToken.trim(),
+          apiKey: nvoipForm.apiKey.trim(),
+          clientId: nvoipForm.clientId.trim(),
+          clientSecret: nvoipForm.clientSecret.trim(),
+          sipHost: nvoipForm.sipHost.trim() || "sip.nvoip.com.br",
+          sipUsername: nvoipForm.sipUsername.trim(),
+          sipPassword: nvoipForm.sipPassword.trim(),
+          friendlyLabel: nvoipForm.friendlyLabel.trim() || undefined,
         },
       });
-      toast.success("Conta Twilio conectada com sucesso!");
-      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
-      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
-      await queryClient.invalidateQueries({ queryKey: ["twilio-trunks-live"] });
+      toast.success(
+        res.apiValidated
+          ? "Conta Nvoip conectada com sucesso!"
+          : "Credenciais salvas. Não conseguimos validar a API agora — os DIDs podem demorar a aparecer.",
+      );
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-balance"] });
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao conectar Twilio");
+      toast.error(err instanceof Error ? err.message : "Falha ao conectar Nvoip");
     } finally {
       setConnecting(false);
     }
