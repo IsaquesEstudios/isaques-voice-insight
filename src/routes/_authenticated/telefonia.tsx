@@ -229,11 +229,8 @@ function TelefoniaPage() {
     enabled: isNvoipConnected,
   });
 
-  const twilioNumbersQuery = useQuery({
-    queryKey: ["twilio-numbers-live"],
-    queryFn: () => listTwilioNumbersFn(),
-    enabled: isTwilioConnected,
-  });
+
+
 
   const assistantsQuery = useQuery({
     queryKey: ["vapi-assistants"],
