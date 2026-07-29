@@ -533,56 +533,54 @@ function TelefoniaPage() {
     }
   };
 
-  const handleConnectNvoip = async () => {
+  // Salva o tronco SIP do usuário e, quando informado, já cadastra o DID.
+  const handleConnectSipTrunk = async () => {
+    const host = sipForm.sipHost.trim();
+    const user = sipForm.sipUsername.trim();
+    const pass = sipForm.sipPassword.trim();
+    const did = sipForm.phoneNumber.trim();
+    const didName = sipForm.friendlyName.trim();
+    if (host.length < 4) return toast.error("Informe o gateway/host SIP da sua operadora.");
+    if (user.length < 2) return toast.error("Informe o usuário SIP.");
+    if (pass.length < 4) return toast.error("Informe a senha SIP.");
+    if (did.replace(/\D/g, "").length < 8)
+      return toast.error("Informe o número (DID) em formato E.164, ex: +551140028922.");
+    if (didName.length < 2) return toast.error("Dê um nome para identificar o número.");
+
     setConnecting(true);
     try {
-      const res = await saveNvoipCredsFn({
+      await saveNvoipCredsFn({
         data: {
-          apiKey: nvoipForm.apiKey.trim(),
-          clientId: nvoipForm.clientId.trim(),
-          clientSecret: nvoipForm.clientSecret.trim(),
-          sipHost: nvoipForm.sipHost.trim() || "sip.nvoip.com.br",
-          sipUsername: nvoipForm.sipUsername.trim(),
-          sipPassword: nvoipForm.sipPassword.trim(),
-          friendlyLabel: nvoipForm.friendlyLabel.trim() || undefined,
+          apiKey: sipForm.apiKey.trim(),
+          clientId: "",
+          clientSecret: "",
+          sipHost: host,
+          sipUsername: user,
+          sipPassword: pass,
+          friendlyLabel: sipForm.label.trim() || undefined,
         },
       });
+      const res = await registerNvoipNumberFn({
+        data: { phoneNumber: did, friendlyName: didName },
+      });
       toast.success(
-        res.apiValidated
-          ? "Conta Nvoip conectada com sucesso!"
-          : "Credenciais salvas. Não conseguimos validar a API agora — os DIDs podem demorar a aparecer.",
+        res.alreadyRegistered
+          ? "Tronco SIP salvo. Este número já estava cadastrado."
+          : "Tronco SIP conectado e número cadastrado!",
       );
       await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
       await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
       await queryClient.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao conectar Nvoip");
+      toast.error(err instanceof Error ? err.message : "Falha ao conectar o tronco SIP");
     } finally {
       setConnecting(false);
     }
   };
 
-  const handleConnectSip = async () => {
-    setConnecting(true);
-    try {
-      await connectSipFn({
-        data: {
-          routeName: sipForm.routeName.trim(),
-          sipUri,
-        },
-      });
-      toast.success("Rota SIP conectada com sucesso!");
-      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
-      setOpen(false);
-      resetModal();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao gerar rota SIP");
-    } finally {
-      setConnecting(false);
-    }
-  };
 
   const disconnectMutation = useMutation({
     mutationFn: () => disconnectNvoipFn(),
