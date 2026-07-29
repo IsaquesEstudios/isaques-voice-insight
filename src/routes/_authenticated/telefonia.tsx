@@ -985,7 +985,7 @@ function TelefoniaPage() {
                                   onClick={() => resyncMutation.mutate(n.phone_number)}
                                 >
                                   <RefreshCw className="mr-2 h-4 w-4" />
-                                  Ressincronizar credenciais Twilio
+                                  Ressincronizar credenciais na Vapi
                                 </DropdownMenuItem>
 
                                 {n.vapiId ? (
