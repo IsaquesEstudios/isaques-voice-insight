@@ -65,21 +65,25 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  checkVerifyOtp,
   connectExternalNumber,
-  deleteVerifiedCallerId,
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
   listTwilioNumbers,
-  listTwilioTrunks,
-  listVerifiedCallerIds,
-  purchaseTwilioNumber,
+  listTestContacts,
   releaseNumber,
-  saveTwilioCredentials,
-  searchAvailableTwilioNumbers,
-  sendVerifyOtp,
+  removeTestContact,
+  saveTestContact,
 } from "@/lib/twilio.functions";
+
+import {
+  disconnectNvoip,
+  getNvoipConnection,
+  getNvoipBalance,
+  listNvoipNumbers,
+  registerNvoipNumber,
+  saveNvoipCredentials,
+} from "@/lib/nvoip.functions";
 
 
 
