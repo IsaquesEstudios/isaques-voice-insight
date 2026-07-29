@@ -14,7 +14,180 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_nvoip_credentials: {
+        Row: {
+          api_key: string | null
+          client_id: string | null
+          client_secret: string | null
+          created_at: string
+          friendly_label: string | null
+          sip_host: string | null
+          sip_password: string | null
+          sip_username: string | null
+          updated_at: string
+          user_id: string
+          vapi_credential_id: string | null
+        }
+        Insert: {
+          api_key?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          friendly_label?: string | null
+          sip_host?: string | null
+          sip_password?: string | null
+          sip_username?: string | null
+          updated_at?: string
+          user_id: string
+          vapi_credential_id?: string | null
+        }
+        Update: {
+          api_key?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          friendly_label?: string | null
+          sip_host?: string | null
+          sip_password?: string | null
+          sip_username?: string | null
+          updated_at?: string
+          user_id?: string
+          vapi_credential_id?: string | null
+        }
+        Relationships: []
+      }
+      user_phone_numbers: {
+        Row: {
+          assistant_id: string | null
+          capabilities: Json | null
+          country_iso: string | null
+          created_at: string
+          friendly_name: string | null
+          id: string
+          monthly_cost: number | null
+          phone_number: string
+          provider: string | null
+          region: string | null
+          twilio_sid: string | null
+          updated_at: string
+          user_id: string
+          vapi_phone_number_id: string | null
+        }
+        Insert: {
+          assistant_id?: string | null
+          capabilities?: Json | null
+          country_iso?: string | null
+          created_at?: string
+          friendly_name?: string | null
+          id?: string
+          monthly_cost?: number | null
+          phone_number: string
+          provider?: string | null
+          region?: string | null
+          twilio_sid?: string | null
+          updated_at?: string
+          user_id: string
+          vapi_phone_number_id?: string | null
+        }
+        Update: {
+          assistant_id?: string | null
+          capabilities?: Json | null
+          country_iso?: string | null
+          created_at?: string
+          friendly_name?: string | null
+          id?: string
+          monthly_cost?: number | null
+          phone_number?: string
+          provider?: string | null
+          region?: string | null
+          twilio_sid?: string | null
+          updated_at?: string
+          user_id?: string
+          vapi_phone_number_id?: string | null
+        }
+        Relationships: []
+      }
+      user_test_contacts: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          phone_e164: string
+          updated_at: string
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          phone_e164: string
+          updated_at?: string
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          phone_e164?: string
+          updated_at?: string
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
+      user_vapi_credentials: {
+        Row: {
+          created_at: string
+          friendly_label: string | null
+          private_key: string | null
+          public_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          friendly_label?: string | null
+          private_key?: string | null
+          public_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          friendly_label?: string | null
+          private_key?: string | null
+          public_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_vapi_settings: {
+        Row: {
+          created_at: string
+          credits_budget: number | null
+          low_balance_threshold: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_budget?: number | null
+          low_balance_threshold?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_budget?: number | null
+          low_balance_threshold?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
