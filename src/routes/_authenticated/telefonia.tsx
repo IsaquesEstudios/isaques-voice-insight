@@ -652,14 +652,15 @@ function TelefoniaPage() {
   };
 
   const disconnectMutation = useMutation({
-    mutationFn: () => disconnectFn(),
+    mutationFn: () => disconnectNvoipFn(),
     onSuccess: async () => {
-      toast.success("Conta Twilio desconectada.");
-      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
+      toast.success("Conta Nvoip desconectada.");
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
       setConfirmDisconnect(false);
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Twilio"),
+      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Nvoip"),
   });
 
   const releaseMutation = useMutation({
