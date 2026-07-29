@@ -325,7 +325,7 @@ function OnboardingPage() {
                         className="gap-2 shadow-glow"
                       >
                         {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                        Próximo <ArrowRight className="h-4 w-4" />
+                        Concluir e entrar <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>

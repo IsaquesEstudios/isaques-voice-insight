@@ -27,7 +27,8 @@ export const Route = createFileRoute("/_authenticated")({
     if (!user) {
       throw redirect({ to: "/" });
     }
-    // Onboarding gate: exige Vapi e telefonia (tronco SIP) antes de acessar o app.
+    // Onboarding gate: exige apenas a Vapi. A telefonia (Nvoip) pode ser
+    // concluída depois — nesse caso o painel mostra a barra de alerta.
     if (location.pathname !== "/onboarding") {
       const fresh = setupCache && Date.now() - setupCache.at < SETUP_TTL;
       if (fresh) {
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/_authenticated")({
       } else {
         try {
           const status = await getSetupStatus();
-          setupCache = { ok: Boolean(status.vapi && status.telefonia), at: Date.now() };
+          setupCache = { ok: Boolean(status.vapi), at: Date.now() };
           if (!setupCache.ok) {
             throw redirect({ to: "/onboarding" });
           }
@@ -45,6 +46,7 @@ export const Route = createFileRoute("/_authenticated")({
         }
       }
     }
+
     return { user };
   },
   component: () => <Outlet />,
