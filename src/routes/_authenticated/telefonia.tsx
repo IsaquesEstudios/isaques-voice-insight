@@ -65,16 +65,13 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  connectExternalNumber,
-  disconnectTwilio,
-  getTwilioConnection,
   listMyNumbers,
-  listTwilioNumbers,
   listTestContacts,
   releaseNumber,
   removeTestContact,
   saveTestContact,
 } from "@/lib/twilio.functions";
+
 
 import {
   disconnectNvoip,
