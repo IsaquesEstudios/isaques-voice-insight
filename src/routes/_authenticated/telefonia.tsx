@@ -65,21 +65,25 @@ import {
 import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/client";
 import {
-  checkVerifyOtp,
   connectExternalNumber,
-  deleteVerifiedCallerId,
   disconnectTwilio,
   getTwilioConnection,
   listMyNumbers,
   listTwilioNumbers,
-  listTwilioTrunks,
-  listVerifiedCallerIds,
-  purchaseTwilioNumber,
+  listTestContacts,
   releaseNumber,
-  saveTwilioCredentials,
-  searchAvailableTwilioNumbers,
-  sendVerifyOtp,
+  removeTestContact,
+  saveTestContact,
 } from "@/lib/twilio.functions";
+
+import {
+  disconnectNvoip,
+  getNvoipConnection,
+  getNvoipBalance,
+  listNvoipNumbers,
+  registerNvoipNumber,
+  saveNvoipCredentials,
+} from "@/lib/nvoip.functions";
 
 
 
@@ -178,15 +182,22 @@ function TelefoniaPage() {
   const listFn = useServerFn(listMyNumbers);
   const releaseFn = useServerFn(releaseNumber);
   const connectSipFn = useServerFn(connectExternalNumber);
-  const saveCredsFn = useServerFn(saveTwilioCredentials);
   const getConnFn = useServerFn(getTwilioConnection);
   const disconnectFn = useServerFn(disconnectTwilio);
   const listTwilioNumbersFn = useServerFn(listTwilioNumbers);
-  const listTwilioTrunksFn = useServerFn(listTwilioTrunks);
-  const listVerifiedCallerIdsFn = useServerFn(listVerifiedCallerIds);
-  const deleteVerifiedCallerIdFn = useServerFn(deleteVerifiedCallerId);
-  const sendVerifyOtpFn = useServerFn(sendVerifyOtp);
-  const checkVerifyOtpFn = useServerFn(checkVerifyOtp);
+
+  // Nvoip (provedor principal — conta de revendedor)
+  const getNvoipConnFn = useServerFn(getNvoipConnection);
+  const saveNvoipCredsFn = useServerFn(saveNvoipCredentials);
+  const disconnectNvoipFn = useServerFn(disconnectNvoip);
+  const listNvoipNumbersFn = useServerFn(listNvoipNumbers);
+  const registerNvoipNumberFn = useServerFn(registerNvoipNumber);
+  const getNvoipBalanceFn = useServerFn(getNvoipBalance);
+
+  // Contatos de teste (armazenados localmente, sem depender de operadora)
+  const listTestContactsFn = useServerFn(listTestContacts);
+  const saveTestContactFn = useServerFn(saveTestContact);
+  const removeTestContactFn = useServerFn(removeTestContact);
 
 
 
@@ -212,14 +223,27 @@ function TelefoniaPage() {
   const twilioConn = twilioConnQuery.data;
   const isTwilioConnected = twilioConn?.connected === true;
 
+  const nvoipConnQuery = useQuery({
+    queryKey: ["nvoip-connection"],
+    queryFn: () => getNvoipConnFn(),
+  });
+  const nvoipConn = nvoipConnQuery.data;
+  const isNvoipConnected = nvoipConn?.connected === true;
+
+  const nvoipNumbersQuery = useQuery({
+    queryKey: ["nvoip-numbers-live"],
+    queryFn: () => listNvoipNumbersFn(),
+    enabled: isNvoipConnected,
+  });
+  const nvoipBalanceQuery = useQuery({
+    queryKey: ["nvoip-balance"],
+    queryFn: () => getNvoipBalanceFn(),
+    enabled: isNvoipConnected,
+  });
+
   const twilioNumbersQuery = useQuery({
     queryKey: ["twilio-numbers-live"],
     queryFn: () => listTwilioNumbersFn(),
-    enabled: isTwilioConnected,
-  });
-  const twilioTrunksQuery = useQuery({
-    queryKey: ["twilio-trunks-live"],
-    queryFn: () => listTwilioTrunksFn(),
     enabled: isTwilioConnected,
   });
 
@@ -253,10 +277,13 @@ function TelefoniaPage() {
     twilioNumbersQuery.data && "ok" in twilioNumbersQuery.data && twilioNumbersQuery.data.ok
       ? twilioNumbersQuery.data.numbers
       : [];
-  const liveTrunks =
-    twilioTrunksQuery.data && "ok" in twilioTrunksQuery.data && twilioTrunksQuery.data.ok
-      ? twilioTrunksQuery.data.trunks
-      : [];
+  const liveNvoip = nvoipNumbersQuery.data?.connected
+    ? nvoipNumbersQuery.data.numbers
+    : [];
+  const nvoipWarning =
+    nvoipNumbersQuery.data && "warning" in nvoipNumbersQuery.data
+      ? (nvoipNumbersQuery.data.warning as string | undefined)
+      : undefined;
 
   // Merge: Twilio live numbers are the source of truth for connected accounts;
   // fall back to local rows (e.g. SIP BYOC) when no Twilio credentials.
@@ -269,7 +296,7 @@ function TelefoniaPage() {
           id: local?.id ?? n.sid,
           phone_number: n.phoneNumber,
           region: local?.region ?? null,
-          provider: "Twilio (Sua conta)",
+          provider: "Twilio (legado)",
           assistant: assistantName ?? local?.assistant ?? null,
           calls_today: local?.calls_today ?? 0,
           answer_rate: local?.answer_rate ?? 0,
@@ -281,6 +308,27 @@ function TelefoniaPage() {
         const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
         return { ...n, assistant: assistantName ?? n.assistant };
       });
+
+  // DIDs vindos direto da conta Nvoip (revendedor) entram na mesma tabela.
+  for (const d of liveNvoip) {
+    const existing = numbers.find((row) => row.phone_number === d.number);
+    if (existing) {
+      existing.provider = "Nvoip";
+      continue;
+    }
+    const local = localNumbers.find((l) => l.phone_number === d.number);
+    const assistantId = assistantByPhone.get(d.number);
+    numbers.push({
+      id: local?.id ?? `nvoip-${d.number}`,
+      phone_number: d.number,
+      region: d.label ?? local?.region ?? null,
+      provider: "Nvoip",
+      assistant: assistantId ? assistantById.get(assistantId) ?? null : local?.assistant ?? null,
+      calls_today: local?.calls_today ?? 0,
+      answer_rate: local?.answer_rate ?? 0,
+      health: "Seguro" as Health,
+    });
+  }
 
   // Any number registered inside Vapi (free Vapi numbers or Twilio numbers
   // imported into Vapi) is usable as origin — append the ones not listed yet.
@@ -318,7 +366,7 @@ function TelefoniaPage() {
 
 
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"twilio" | "buy" | "vapi" | "sip">("twilio");
+  const [tab, setTab] = useState<"nvoip" | "did" | "twilio" | "sip">("nvoip");
   const [releaseTarget, setReleaseTarget] = useState<NumberRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<NumberRow | null>(null);
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
@@ -327,14 +375,7 @@ function TelefoniaPage() {
   const [connecting, setConnecting] = useState(false);
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
-  const [verifyStep, setVerifyStep] = useState<"form" | "code">("form");
-  const [verifyState, setVerifyState] = useState<{
-    phoneE164: string;
-    label: string;
-  } | null>(null);
-  const [otpCode, setOtpCode] = useState("");
-  const [verifyStarting, setVerifyStarting] = useState(false);
-  const [verifyChecking, setVerifyChecking] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
 
   // Per-row call controls (assistant + origin number)
@@ -343,113 +384,53 @@ function TelefoniaPage() {
 
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
+  // Contatos de teste ficam salvos na própria plataforma: a Nvoip não possui
+  // um serviço de verificação por OTP como o Twilio Verify.
   const testContactsQuery = useQuery({
-    queryKey: ["verified-caller-ids"],
-    queryFn: () => listVerifiedCallerIdsFn(),
-    enabled: isTwilioConnected,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    queryKey: ["test-contacts"],
+    queryFn: () => listTestContactsFn(),
   });
-  const testContacts = (testContactsQuery.data ?? []).map((c) => ({
-    id: c.sid,
-    label: c.friendly_name || c.phone_number,
-    phone_e164: c.phone_number,
-    verified: true,
+  const testContacts = (
+    (testContactsQuery.data ?? []) as Array<{
+      id: string;
+      label: string;
+      phone_e164: string;
+      verified: boolean | null;
+    }>
+  ).map((c) => ({
+    id: c.id,
+    label: c.label || c.phone_e164,
+    phone_e164: c.phone_e164,
+    verified: Boolean(c.verified),
   }));
 
-
   const removeTestContactMutation = useMutation({
-    mutationFn: (sid: string) => deleteVerifiedCallerIdFn({ data: { sid } }),
+    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
     onSuccess: async () => {
-      toast.success("Caller ID removido da sua conta Twilio.");
-      await queryClient.invalidateQueries({ queryKey: ["verified-caller-ids"] });
+      toast.success("Contato de teste removido.");
+      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao remover Caller ID"),
+      toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
   });
 
-  // Reset verification state whenever the modal closes.
-  const resetVerification = () => {
-    setVerifyStep("form");
-    setVerifyState(null);
-    setOtpCode("");
-    setVerifyStarting(false);
-    setVerifyChecking(false);
-  };
-
-  const startVerification = async () => {
+  const handleSaveTestContact = async () => {
     const label = testContactForm.label.trim();
     const phone = testContactForm.phoneE164.trim();
     if (!label) return toast.error("Informe uma identificação.");
     if (!/^\+[1-9]\d{7,14}$/.test(phone))
       return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
-
-    setVerifyStarting(true);
+    setSavingContact(true);
     try {
-      const res = await sendVerifyOtpFn({
-        data: { phoneE164: phone, channel: "sms" },
-      });
-      if (!res.ok) {
-        if (res.reason === "no_credentials") {
-          toast.error("Conecte sua conta Twilio primeiro.");
-        } else if (res.reason === "trial_unverified") {
-          toast.error(
-            "Conta trial da Twilio: cadastre o número em Verified Caller IDs no Console Twilio antes de enviar o SMS.",
-            { duration: 8000 },
-          );
-        } else {
-          toast.error(
-            `Erro Twilio: ${("message" in res && res.message) || "falha desconhecida"}`,
-          );
-        }
-        return;
-      }
-      setVerifyState({ phoneE164: phone, label });
-      setOtpCode("");
-      setVerifyStep("code");
-      toast.success("SMS enviado! Digite o código recebido.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao enviar SMS");
-    } finally {
-      setVerifyStarting(false);
-    }
-  };
-
-  const confirmOtp = async () => {
-    if (!verifyState) return;
-    const code = otpCode.trim();
-    if (!/^\d{4,10}$/.test(code)) return toast.error("Digite o código recebido por SMS.");
-    setVerifyChecking(true);
-    try {
-      const res = await checkVerifyOtpFn({
-        data: {
-          phoneE164: verifyState.phoneE164,
-          code,
-          label: verifyState.label,
-        },
-      });
-      if (!res.ok) {
-        if (res.reason === "invalid_code") toast.error("Código incorreto. Tente novamente.");
-        else if (res.reason === "expired")
-          toast.error("Código expirado. Reenvie o SMS.");
-        else if (res.reason === "no_credentials")
-          toast.error("Conecte sua conta Twilio primeiro.");
-        else
-          toast.error(
-            `Erro Twilio: ${("message" in res && res.message) || "falha ao validar"}`,
-          );
-        return;
-      }
-      toast.success("Número verificado e salvo!");
+      await saveTestContactFn({ data: { label, phoneE164: phone } });
+      toast.success("Contato de teste salvo!");
       await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
       setTestContactOpen(false);
       setTestContactForm({ label: "", phoneE164: "" });
-      resetVerification();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao validar código");
+      toast.error(err instanceof Error ? err.message : "Falha ao salvar contato");
     } finally {
-      setVerifyChecking(false);
+      setSavingContact(false);
     }
   };
 
@@ -544,9 +525,14 @@ function TelefoniaPage() {
 
 
 
-  const [twilioForm, setTwilioForm] = useState({
-    accountSid: "",
-    authToken: "",
+  const [nvoipForm, setNvoipForm] = useState({
+    apiKey: "",
+    clientId: "",
+    clientSecret: "",
+    sipHost: "sip.nvoip.com.br",
+    sipUsername: "",
+    sipPassword: "",
+    friendlyLabel: "",
   });
   const [sipForm, setSipForm] = useState({ routeName: "" });
 
@@ -555,90 +541,53 @@ function TelefoniaPage() {
     return `sip:${slug}@sip.vapi.ai`;
   }, [userQuery.data]);
 
-  // ---- Comprar número Twilio ----
-  const searchTwilioFn = useServerFn(searchAvailableTwilioNumbers);
-  const purchaseTwilioFn = useServerFn(purchaseTwilioNumber);
-  const [buyForm, setBuyForm] = useState({
-    countryCode: "US",
-    areaCode: "",
-    contains: "",
-  });
-  const [buyResults, setBuyResults] = useState<
-    Array<{
-      phoneNumber: string;
-      friendlyName: string;
-      locality: string | null;
-      region: string | null;
-      country: string;
-      voice: boolean;
-      sms: boolean;
-    }>
-  >([]);
-  const [buySearching, setBuySearching] = useState(false);
-  const [buyingNumber, setBuyingNumber] = useState<string | null>(null);
+  // ---- Cadastrar DID Nvoip ----
+  // Na conta de revendedor a aquisição do DID acontece no painel da Nvoip;
+  // aqui vinculamos o número já contratado à conta do usuário na plataforma.
+  const [didForm, setDidForm] = useState({ phoneNumber: "", friendlyName: "" });
+  const [registeringDid, setRegisteringDid] = useState(false);
 
-  const handleSearchTwilio = async () => {
-    setBuySearching(true);
+  const handleRegisterDid = async () => {
+    const phone = didForm.phoneNumber.trim();
+    const name = didForm.friendlyName.trim();
+    if (phone.replace(/\D/g, "").length < 8)
+      return toast.error("Informe um DID válido (ex: +551140028922).");
+    if (name.length < 2) return toast.error("Dê um nome para identificar o número.");
+    setRegisteringDid(true);
     try {
-      const res = await searchTwilioFn({
-        data: {
-          countryCode: (buyForm.countryCode || "US").toUpperCase(),
-          areaCode: buyForm.areaCode.trim() || undefined,
-          contains: buyForm.contains.trim() || undefined,
-        },
+      const res = await registerNvoipNumberFn({
+        data: { phoneNumber: phone, friendlyName: name },
       });
-      if (!res.ok) {
-        if (res.reason === "no_credentials") {
-          toast.error("Conecte sua conta Twilio primeiro.");
-          setTab("twilio");
-        } else {
-          toast.error(res.message ?? "Falha ao buscar números na Twilio.");
-        }
-        setBuyResults([]);
-        return;
-      }
-      setBuyResults(res.numbers);
-      if (res.numbers.length === 0) {
-        toast.info("Nenhum número encontrado. Ajuste país / DDD / contém e tente novamente.");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na busca.");
-    } finally {
-      setBuySearching(false);
-    }
-  };
-
-  const handleBuyTwilio = async (phoneNumber: string) => {
-    setBuyingNumber(phoneNumber);
-    try {
-      const res = await purchaseTwilioFn({ data: { phoneNumber } });
-      if (!("ok" in res) || !res.ok) {
-        toast.error(res.message ?? "Não foi possível comprar este número.");
-        return;
-      }
-      toast.success(`Número ${res.phoneNumber} adquirido na Twilio!`);
-      setBuyResults((prev) => prev.filter((n) => n.phoneNumber !== phoneNumber));
-      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
+      toast.success(
+        res.alreadyRegistered
+          ? "Este número já estava cadastrado."
+          : "DID Nvoip cadastrado com sucesso!",
+      );
+      await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
+      setDidForm({ phoneNumber: "", friendlyName: "" });
       setOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao comprar número.");
+      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar DID.");
     } finally {
-      setBuyingNumber(null);
+      setRegisteringDid(false);
     }
   };
 
-
-
-
-
   const resetModal = () => {
-    setTab("twilio");
-    setTwilioForm({ accountSid: "", authToken: "" });
+    setTab("nvoip");
+    setNvoipForm({
+      apiKey: "",
+      clientId: "",
+      clientSecret: "",
+      sipHost: "sip.nvoip.com.br",
+      sipUsername: "",
+      sipPassword: "",
+      friendlyLabel: "",
+    });
     setSipForm({ routeName: "" });
+    setDidForm({ phoneNumber: "", friendlyName: "" });
     setCopied(false);
-    setBuyResults([]);
-    setBuyForm({ countryCode: "US", areaCode: "", contains: "" });
-    
   };
 
   const handleCopySip = async () => {
@@ -651,23 +600,32 @@ function TelefoniaPage() {
     }
   };
 
-  const handleConnectTwilio = async () => {
+  const handleConnectNvoip = async () => {
     setConnecting(true);
     try {
-      await saveCredsFn({
+      const res = await saveNvoipCredsFn({
         data: {
-          accountSid: twilioForm.accountSid.trim(),
-          authToken: twilioForm.authToken.trim(),
+          apiKey: nvoipForm.apiKey.trim(),
+          clientId: nvoipForm.clientId.trim(),
+          clientSecret: nvoipForm.clientSecret.trim(),
+          sipHost: nvoipForm.sipHost.trim() || "sip.nvoip.com.br",
+          sipUsername: nvoipForm.sipUsername.trim(),
+          sipPassword: nvoipForm.sipPassword.trim(),
+          friendlyLabel: nvoipForm.friendlyLabel.trim() || undefined,
         },
       });
-      toast.success("Conta Twilio conectada com sucesso!");
-      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
-      await queryClient.invalidateQueries({ queryKey: ["twilio-numbers-live"] });
-      await queryClient.invalidateQueries({ queryKey: ["twilio-trunks-live"] });
+      toast.success(
+        res.apiValidated
+          ? "Conta Nvoip conectada com sucesso!"
+          : "Credenciais salvas. Não conseguimos validar a API agora — os DIDs podem demorar a aparecer.",
+      );
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-balance"] });
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao conectar Twilio");
+      toast.error(err instanceof Error ? err.message : "Falha ao conectar Nvoip");
     } finally {
       setConnecting(false);
     }
@@ -694,14 +652,15 @@ function TelefoniaPage() {
   };
 
   const disconnectMutation = useMutation({
-    mutationFn: () => disconnectFn(),
+    mutationFn: () => disconnectNvoipFn(),
     onSuccess: async () => {
-      toast.success("Conta Twilio desconectada.");
-      await queryClient.invalidateQueries({ queryKey: ["twilio-connection"] });
+      toast.success("Conta Nvoip desconectada.");
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
+      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
       setConfirmDisconnect(false);
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Twilio"),
+      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Nvoip"),
   });
 
   const releaseMutation = useMutation({
@@ -810,7 +769,7 @@ function TelefoniaPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isTwilioConnected && twilioConn ? (
+            {isNvoipConnected && nvoipConn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -818,7 +777,10 @@ function TelefoniaPage() {
                     className="gap-2 border-success/40 bg-success/10 text-success hover:bg-success/15 hover:text-success"
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    Twilio: {twilioConn.accountSid.slice(0, 8)}…
+                    Nvoip: {nvoipConn.friendlyLabel || nvoipConn.sipUsername}
+                    {nvoipBalanceQuery.data?.available
+                      ? ` · ${nvoipBalanceQuery.data.currency} ${nvoipBalanceQuery.data.balance.toFixed(2)}`
+                      : ""}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -835,10 +797,16 @@ function TelefoniaPage() {
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Desconectar Twilio
+                    Desconectar Nvoip
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            ) : null}
+
+            {isTwilioConnected ? (
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[11px] text-muted-foreground">
+                Twilio (legado) ativo
+              </span>
             ) : null}
 
             <Button
@@ -1017,7 +985,7 @@ function TelefoniaPage() {
                                   onClick={() => resyncMutation.mutate(n.phone_number)}
                                 >
                                   <RefreshCw className="mr-2 h-4 w-4" />
-                                  Ressincronizar credenciais Twilio
+                                  Ressincronizar credenciais na Vapi
                                 </DropdownMenuItem>
 
                                 {n.vapiId ? (
@@ -1059,7 +1027,7 @@ function TelefoniaPage() {
               <div>
                 <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Caller IDs verificados diretamente na sua conta Twilio.
+                  Números seus, usados para testar ligações da assistente.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1067,7 +1035,7 @@ function TelefoniaPage() {
                   size="sm"
                   variant="ghost"
                   className="gap-1.5"
-                  disabled={!isTwilioConnected || testContactsQuery.isFetching}
+                  disabled={testContactsQuery.isFetching}
                   onClick={() => testContactsQuery.refetch()}
                   title="Atualizar lista"
                 >
@@ -1075,41 +1043,31 @@ function TelefoniaPage() {
                     className={`h-4 w-4 ${testContactsQuery.isFetching ? "animate-spin" : ""}`}
                   />
                 </Button>
-                <Button size="sm" variant="outline" asChild className="gap-1.5">
-                  <a
-                    href="https://console.twilio.com/us1/develop/phone-numbers/manage/verified"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Plus className="h-4 w-4" /> Verificar na Twilio
-                  </a>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setTestContactOpen(true)}
+                >
+                  <Plus className="h-4 w-4" /> Novo contato
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!isTwilioConnected && (
-                <Alert className="border-warning/30 bg-warning/10">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <AlertDescription className="text-xs text-muted-foreground">
-                    Conecte sua conta Twilio para listar seus Caller IDs verificados.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {isTwilioConnected && testContactsQuery.isLoading ? (
+              {testContactsQuery.isLoading ? (
                 Array.from({ length: 2 }).map((_, i) => (
                   <div
                     key={i}
                     className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
                   />
                 ))
-              ) : isTwilioConnected && testContacts.length === 0 ? (
+              ) : testContacts.length === 0 ? (
                 <div className="space-y-2 py-4 text-center">
                   <p className="text-xs text-muted-foreground">
-                    Nenhum Caller ID verificado encontrado na sua conta Twilio.
+                    Nenhum contato de teste cadastrado.
                   </p>
                   <p className="text-[11px] text-muted-foreground/80">
-                    Verifique um número em <b>Console → Phone Numbers → Verified Caller IDs</b> e clique em atualizar.
+                    Cadastre um número seu para receber a ligação da assistente.
                   </p>
                 </div>
               ) : (
@@ -1150,18 +1108,18 @@ function TelefoniaPage() {
                           <Alert className="border-warning/30 bg-warning/10 py-2">
                             <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                             <AlertDescription className="text-[11px] text-muted-foreground">
-                              Nenhum número Twilio disponível.{" "}
+                              Nenhum número de origem disponível.{" "}
                               <button
                                 type="button"
                                 className="underline underline-offset-2 hover:text-foreground"
                                 onClick={() => {
-                                  setTab(isTwilioConnected ? "buy" : "twilio");
+                                  setTab(isNvoipConnected ? "did" : "nvoip");
                                   setOpen(true);
                                 }}
                               >
-                                {isTwilioConnected
-                                  ? "Comprar número na Twilio"
-                                  : "Conectar Twilio"}
+                                {isNvoipConnected
+                                  ? "Cadastrar DID Nvoip"
+                                  : "Conectar Nvoip"}
                               </button>{" "}
                               para poder disparar testes.
                             </AlertDescription>
@@ -1220,7 +1178,7 @@ function TelefoniaPage() {
                           size="sm"
                           className="w-full gap-1.5 shadow-glow"
                           disabled={
-                            !isTwilioConnected ||
+                            (!isNvoipConnected && !isTwilioConnected) ||
                             !from ||
                             !assistantId ||
                             callingContactId === c.id
@@ -1253,66 +1211,43 @@ function TelefoniaPage() {
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Rotas ativas (Twilio Trunks)
+              Rota ativa (SIP Trunk Nvoip)
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {!isTwilioConnected ? (
+            {!isNvoipConnected ? (
               <p className="text-xs text-muted-foreground">
-                Conecte sua conta Twilio para listar suas Elastic SIP Trunks.
-              </p>
-            ) : twilioTrunksQuery.isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-16 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
-                />
-              ))
-            ) : liveTrunks.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Nenhum trunk encontrado na sua conta Twilio.
+                Conecte sua conta Nvoip (revendedor) para exibir o tronco SIP usado
+                nas chamadas.
               </p>
             ) : (
-              liveTrunks.map((r) => {
-                const load = Math.min(100, r.numbersCount * 10);
-                return (
-                  <div
-                    key={r.sid}
-                    className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">
-                        {r.friendlyName}
-                      </p>
-                      <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                        {r.status}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {r.numbersCount} números vinculados
-                      {r.domainName ? ` • ${r.domainName}` : ""}
+              <>
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">
+                      {nvoipConn?.friendlyLabel || "Tronco Nvoip"}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            load > 85
-                              ? "bg-destructive"
-                              : load > 60
-                                ? "bg-chart-3"
-                                : "bg-primary",
-                          )}
-                          style={{ width: `${load}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {load}%
-                      </span>
-                    </div>
+                    <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                      ativo
+                    </span>
                   </div>
-                );
-              })
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    {nvoipConn?.sipUsername}@{nvoipConn?.sipHost}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {liveNvoip.length} DIDs na conta
+                    {nvoipConn?.vapiCredentialId ? " • credencial Vapi vinculada" : ""}
+                  </p>
+                </div>
+                {nvoipWarning ? (
+                  <Alert className="border-warning/30 bg-warning/10 md:col-span-2">
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                    <AlertDescription className="text-[11px] text-muted-foreground">
+                      Não foi possível listar os DIDs pela API da Nvoip: {nvoipWarning}
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+              </>
             )}
           </CardContent>
         </Card>
@@ -1328,119 +1263,57 @@ function TelefoniaPage() {
         open={testContactOpen}
         onOpenChange={(o) => {
           setTestContactOpen(o);
-          if (!o) {
-            setTestContactForm({ label: "", phoneE164: "" });
-            resetVerification();
-          }
+          if (!o) setTestContactForm({ label: "", phoneE164: "" });
         }}
       >
         <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
-              Enviaremos um SMS via Twilio Verify com um código de 6 dígitos.
-              Digite o código para confirmar que o número é seu.
+              Cadastre um número seu para receber as ligações de teste da assistente.
+              A Nvoip disca direto pelo tronco SIP, sem verificação por SMS.
             </DialogDescription>
           </DialogHeader>
 
-          {verifyStep === "form" ? (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Identificação</Label>
-                <Input
-                  placeholder="Ex: Meu celular"
-                  value={testContactForm.label}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                  }
-                  disabled={verifyStarting}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Número (E.164)</Label>
-                <Input
-                  placeholder="+5511999999999"
-                  value={testContactForm.phoneE164}
-                  onChange={(e) =>
-                    setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                  }
-                  disabled={verifyStarting}
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Inclua o código do país (+55 para Brasil).
-                </p>
-              </div>
-              <Button
-                className="w-full gap-2"
-                onClick={startVerification}
-                disabled={verifyStarting || !isTwilioConnected}
-              >
-                {verifyStarting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <PhoneCall className="h-4 w-4" />
-                )}
-                Enviar SMS de verificação
-              </Button>
-              {!isTwilioConnected && (
-                <p className="text-center text-[11px] text-warning">
-                  Conecte sua conta Twilio antes de verificar um número.
-                </p>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Identificação</Label>
+              <Input
+                placeholder="Ex: Meu celular"
+                value={testContactForm.label}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
+                }
+                disabled={savingContact}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Número (E.164)</Label>
+              <Input
+                placeholder="+5511999999999"
+                value={testContactForm.phoneE164}
+                onChange={(e) =>
+                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
+                }
+                disabled={savingContact}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Inclua o código do país (+55 para Brasil).
+              </p>
+            </div>
+            <Button
+              className="w-full gap-2"
+              onClick={handleSaveTestContact}
+              disabled={savingContact}
+            >
+              {savingContact ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
               )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Enviamos um SMS para{" "}
-                  <span className="font-mono text-foreground">{verifyState?.phoneE164}</span>.
-                  Digite abaixo o código recebido.
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Código de verificação</Label>
-                <Input
-                  placeholder="123456"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  disabled={verifyChecking}
-                  className="font-mono text-center text-xl tracking-[0.4em]"
-                  maxLength={10}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={resetVerification}
-                  disabled={verifyChecking}
-                >
-                  Voltar
-                </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={confirmOtp}
-                  disabled={verifyChecking || otpCode.length < 4}
-                >
-                  {verifyChecking ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : null}
-                  Validar código
-                </Button>
-              </div>
-              <button
-                type="button"
-                onClick={startVerification}
-                disabled={verifyStarting}
-                className="w-full text-center text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                {verifyStarting ? "Reenviando..." : "Reenviar SMS"}
-              </button>
-            </div>
-          )}
+              Salvar contato
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1469,144 +1342,110 @@ function TelefoniaPage() {
 
           <Tabs
             value={tab}
-            onValueChange={(v) => setTab(v as "twilio" | "buy" | "vapi" | "sip")}
+            onValueChange={(v) => setTab(v as "nvoip" | "did" | "twilio" | "sip")}
           >
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="twilio">Credenciais</TabsTrigger>
-              <TabsTrigger value="buy" disabled={!isTwilioConnected}>
-                Comprar número
+              <TabsTrigger value="nvoip">Nvoip</TabsTrigger>
+              <TabsTrigger value="did" disabled={!isNvoipConnected}>
+                Cadastrar DID
               </TabsTrigger>
               <TabsTrigger value="sip">SIP Trunk</TabsTrigger>
-
             </TabsList>
 
-
-
-
-
-            <TabsContent value="buy" className="mt-4 space-y-4">
+            <TabsContent value="nvoip" className="mt-4 space-y-4">
               <Alert className="border-primary/30 bg-primary/10 text-foreground">
                 <Info className="h-4 w-4 text-primary" />
                 <AlertDescription className="text-xs text-muted-foreground">
-                  Pesquise e compre um número na sua conta Twilio. Contas trial só podem
-                  usar o número gratuito emitido no cadastro — para adquirir novos,
-                  faça upgrade da conta Twilio.
-                </AlertDescription>
-              </Alert>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="grid gap-1">
-                  <Label className="text-[11px] text-muted-foreground">País (ISO-2)</Label>
-                  <Input
-                    value={buyForm.countryCode}
-                    maxLength={2}
-                    onChange={(e) =>
-                      setBuyForm({ ...buyForm, countryCode: e.target.value.toUpperCase() })
-                    }
-                    placeholder="US"
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-[11px] text-muted-foreground">DDD / Area code</Label>
-                  <Input
-                    value={buyForm.areaCode}
-                    onChange={(e) => setBuyForm({ ...buyForm, areaCode: e.target.value })}
-                    placeholder="415"
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-[11px] text-muted-foreground">Contém dígitos</Label>
-                  <Input
-                    value={buyForm.contains}
-                    onChange={(e) => setBuyForm({ ...buyForm, contains: e.target.value })}
-                    placeholder="7777"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSearchTwilio}
-                  disabled={buySearching}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {buySearching ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Signal className="h-4 w-4" />
-                  )}
-                  Pesquisar
-                </Button>
-              </div>
-
-              {buyResults.length > 0 && (
-                <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-white/[0.08] bg-background/40 p-2">
-                  {buyResults.map((n) => (
-                    <div
-                      key={n.phoneNumber}
-                      className="flex items-center justify-between gap-3 rounded-md border border-white/[0.06] bg-card/40 p-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-mono text-sm">{n.phoneNumber}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {[n.locality, n.region, n.country].filter(Boolean).join(" · ") || "—"}
-                          {n.voice ? " · Voz" : ""}
-                          {n.sms ? " · SMS" : ""}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleBuyTwilio(n.phoneNumber)}
-                        disabled={buyingNumber !== null}
-                        className="gap-1.5"
-                      >
-                        {buyingNumber === n.phoneNumber ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Plus className="h-3.5 w-3.5" />
-                        )}
-                        Comprar
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-
-            <TabsContent value="twilio" className="mt-4 space-y-4">
-              <Alert className="border-primary/30 bg-primary/10 text-foreground">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Conecte sua conta Twilio. Os custos de telefonia e a titularidade dos
-                  números serão gerenciados diretamente no seu painel da Twilio.
+                  Conecte sua conta Nvoip (revendedor). A Napikey fica em{" "}
+                  <b>Painel Nvoip → Integrações → API</b>; usuário e senha SIP ficam em{" "}
+                  <b>Ramais / Contas SIP</b>. As chamadas passam a sair pelo seu tronco.
                 </AlertDescription>
               </Alert>
 
               <div className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Twilio Account SID</Label>
-                  <Input
-                    placeholder="AC..."
-                    value={twilioForm.accountSid}
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    onChange={(e) =>
-                      setTwilioForm({ ...twilioForm, accountSid: e.target.value.trim() })
-                    }
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Twilio Auth Token</Label>
+                  <Label>Napikey (API)</Label>
                   <Input
                     type="password"
                     placeholder="••••••••••••••••"
-                    value={twilioForm.authToken}
+                    value={nvoipForm.apiKey}
                     autoCapitalize="none"
                     spellCheck={false}
+                    onChange={(e) => setNvoipForm({ ...nvoipForm, apiKey: e.target.value })}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Se sua conta usa OAuth2, deixe em branco e preencha Client ID + Secret.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Client ID (opcional)</Label>
+                    <Input
+                      value={nvoipForm.clientId}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, clientId: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Client Secret (opcional)</Label>
+                    <Input
+                      type="password"
+                      value={nvoipForm.clientSecret}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, clientSecret: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Host SIP</Label>
+                    <Input
+                      value={nvoipForm.sipHost}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, sipHost: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Usuário SIP</Label>
+                    <Input
+                      value={nvoipForm.sipUsername}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, sipUsername: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Senha SIP</Label>
+                    <Input
+                      type="password"
+                      value={nvoipForm.sipPassword}
+                      onChange={(e) =>
+                        setNvoipForm({ ...nvoipForm, sipPassword: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Apelido da conta (opcional)</Label>
+                  <Input
+                    placeholder="Ex: Revenda Isaques"
+                    value={nvoipForm.friendlyLabel}
                     onChange={(e) =>
-                      setTwilioForm({ ...twilioForm, authToken: e.target.value })
+                      setNvoipForm({ ...nvoipForm, friendlyLabel: e.target.value })
                     }
                   />
                 </div>
@@ -1614,21 +1453,72 @@ function TelefoniaPage() {
 
               <div className="flex justify-end">
                 <Button
-                  onClick={handleConnectTwilio}
+                  onClick={handleConnectNvoip}
                   disabled={
                     connecting ||
-                    !/^AC[a-zA-Z0-9]{10,}$/.test(twilioForm.accountSid) ||
-                    twilioForm.authToken.length < 8
+                    nvoipForm.sipUsername.trim().length < 2 ||
+                    nvoipForm.sipPassword.trim().length < 4 ||
+                    (!nvoipForm.apiKey.trim() &&
+                      !(nvoipForm.clientId.trim() && nvoipForm.clientSecret.trim()))
                   }
                   className="gap-2"
                 >
-
                   {connecting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Link2 className="h-4 w-4" />
                   )}
-                  Conectar Twilio
+                  Conectar Nvoip
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="did" className="mt-4 space-y-4">
+              <Alert className="border-primary/30 bg-primary/10 text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Contrate o DID no painel da Nvoip (revendedor) e cadastre-o aqui para
+                  vinculá-lo a uma assistente. Os DIDs já listados pela API aparecem
+                  automaticamente na tabela.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Número (DID)</Label>
+                  <Input
+                    placeholder="+551140028922"
+                    value={didForm.phoneNumber}
+                    onChange={(e) =>
+                      setDidForm({ ...didForm, phoneNumber: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Nome do número</Label>
+                  <Input
+                    placeholder="Ex: Central de Vendas SP"
+                    value={didForm.friendlyName}
+                    maxLength={80}
+                    onChange={(e) =>
+                      setDidForm({ ...didForm, friendlyName: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleRegisterDid}
+                  disabled={registeringDid}
+                  className="gap-2"
+                >
+                  {registeringDid ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Cadastrar DID
                 </Button>
               </div>
             </TabsContent>
@@ -1741,11 +1631,11 @@ function TelefoniaPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desconectar conta Twilio?</AlertDialogTitle>
+            <AlertDialogTitle>Desconectar conta Nvoip?</AlertDialogTitle>
             <AlertDialogDescription>
-              Suas credenciais Twilio serão removidas deste app. Os números já
-              cadastrados continuam listados, mas novas buscas e compras ficarão
-              bloqueadas até você reconectar.
+              Suas credenciais Nvoip (API e tronco SIP) serão removidas deste app.
+              Os números continuam listados, mas as chamadas ficarão bloqueadas até
+              você reconectar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
