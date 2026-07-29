@@ -768,7 +768,7 @@ function TelefoniaPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isTwilioConnected && twilioConn ? (
+            {isNvoipConnected && nvoipConn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -776,7 +776,10 @@ function TelefoniaPage() {
                     className="gap-2 border-success/40 bg-success/10 text-success hover:bg-success/15 hover:text-success"
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    Twilio: {twilioConn.accountSid.slice(0, 8)}…
+                    Nvoip: {nvoipConn.friendlyLabel || nvoipConn.sipUsername}
+                    {nvoipBalanceQuery.data?.available
+                      ? ` · ${nvoipBalanceQuery.data.currency} ${nvoipBalanceQuery.data.balance.toFixed(2)}`
+                      : ""}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -793,10 +796,16 @@ function TelefoniaPage() {
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Desconectar Twilio
+                    Desconectar Nvoip
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            ) : null}
+
+            {isTwilioConnected ? (
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[11px] text-muted-foreground">
+                Twilio (legado) ativo
+              </span>
             ) : null}
 
             <Button
