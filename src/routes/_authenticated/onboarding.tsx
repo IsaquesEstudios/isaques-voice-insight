@@ -467,7 +467,7 @@ function OnboardingPage() {
                 funcionam depois de finalizar este cadastro.
               </p>
 
-              </div>
+
 
             </CardContent>
           </Card>
