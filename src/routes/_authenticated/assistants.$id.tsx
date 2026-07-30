@@ -944,7 +944,7 @@ function AssistantDetailPage() {
       const msg = err instanceof Error ? err.message : String(err);
       const isElevenLabsVoiceError = /elevenlabs|11labs|voz/i.test(msg) && /não encontrada|couldn'?t find|find/i.test(msg);
       toast.error(isElevenLabsVoiceError ? "Voz ElevenLabs indisponível." : "Erro ao salvar alterações.", {
-        description: msg.slice(0, 500),
+        description: translateError(err, "Não foi possível salvar. Tente novamente.").slice(0, 500),
       });
     } finally {
       setIsSaving(false);
