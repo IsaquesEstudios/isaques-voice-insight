@@ -125,6 +125,7 @@ function formatCallError(error: unknown): string {
   }
   return [
     "Problema: a ligação de teste não pôde ser iniciada.",
+    `Motivo provável: ${translateError(error, "erro desconhecido no provedor de voz.")}`,
     "Como resolver: confira modelo, voz e transcriber da assistente e tente novamente.",
     `Detalhe técnico: ${detail}`,
   ].join("\n");
