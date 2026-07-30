@@ -94,6 +94,7 @@ function OnboardingPage() {
   // Se ambos já estão conectados, mandar direto para o dashboard.
   useEffect(() => {
     if (status.data?.vapi && status.data?.telefonia) {
+      resetSetupCache();
       navigate({ to: "/dashboard", replace: true });
     }
   }, [status.data?.vapi, status.data?.telefonia, navigate]);
