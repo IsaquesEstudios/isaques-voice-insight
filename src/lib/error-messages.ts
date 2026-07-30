@@ -10,6 +10,7 @@ const RULES: Rule[] = [
   { test: /invalid login credentials/i, message: "E-mail ou senha incorretos." },
   { test: /email not confirmed/i, message: "Confirme seu e-mail antes de entrar." },
   { test: /user already registered|already been registered/i, message: "Este e-mail já possui cadastro." },
+  { test: /weak.?password|known to be weak|pwned|easy to guess/i, message: "Esta senha é considerada fraca ou já apareceu em vazamentos públicos. Escolha outra senha, com pelo menos 8 caracteres, misturando letras, números e símbolos." },
   { test: /password should be at least (\d+)/i, message: "A senha deve ter pelo menos 6 caracteres." },
   { test: /invalid email|unable to validate email/i, message: "E-mail inválido." },
   { test: /email rate limit|over_email_send_rate_limit/i, message: "Muitas tentativas de envio de e-mail. Aguarde alguns minutos." },
