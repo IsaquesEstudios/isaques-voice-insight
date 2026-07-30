@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { createVapiWebCall } from "@/lib/vapi.functions";
+import { translateError } from "@/lib/error-messages";
 
 type BrowserCallInstance = {
   stop: () => void | Promise<void>;
