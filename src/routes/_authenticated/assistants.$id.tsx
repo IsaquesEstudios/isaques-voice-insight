@@ -1457,7 +1457,11 @@ function LogsTab({ assistantId }: { assistantId: string }) {
   });
 
   const calls = data?.calls ?? [];
-  const apiError = data?.error ?? (error instanceof Error ? error.message : null);
+  const apiError = data?.error
+    ? translateError(data.error, data.error)
+    : error
+      ? translateError(error, "Não foi possível carregar os registros.")
+      : null;
 
   return (
     <>
