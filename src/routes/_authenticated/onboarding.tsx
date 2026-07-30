@@ -29,6 +29,7 @@ import {
 } from "@/lib/nvoip.functions";
 
 import { cn } from "@/lib/utils";
+import { resetSetupCache } from "./route";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
@@ -93,6 +94,7 @@ function OnboardingPage() {
   // Se ambos já estão conectados, mandar direto para o dashboard.
   useEffect(() => {
     if (status.data?.vapi && status.data?.telefonia) {
+      resetSetupCache();
       navigate({ to: "/dashboard", replace: true });
     }
   }, [status.data?.vapi, status.data?.telefonia, navigate]);
@@ -111,9 +113,12 @@ function OnboardingPage() {
       toast.success("Vapi conectada!");
       setVapiKey("");
       setVapiPublicKey("");
+      resetSetupCache();
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
       navigate({ to: "/dashboard", replace: true });
+
+
 
     },
     onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
@@ -222,7 +227,10 @@ function OnboardingPage() {
                       Trocar chaves
                     </Button>
                     <Button
-                      onClick={() => navigate({ to: "/dashboard", replace: true })}
+                      onClick={() => {
+                        resetSetupCache();
+                        navigate({ to: "/dashboard", replace: true });
+                      }}
                       className="gap-2 shadow-glow"
                     >
                       Ir para o painel <ArrowRight className="h-4 w-4" />
