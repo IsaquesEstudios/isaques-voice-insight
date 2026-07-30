@@ -29,6 +29,7 @@ import {
 } from "@/lib/nvoip.functions";
 
 import { cn } from "@/lib/utils";
+import { resetSetupCache } from "./route";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
