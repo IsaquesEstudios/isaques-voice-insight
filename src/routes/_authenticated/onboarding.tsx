@@ -112,9 +112,12 @@ function OnboardingPage() {
       toast.success("Vapi conectada!");
       setVapiKey("");
       setVapiPublicKey("");
+      resetSetupCache();
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
       navigate({ to: "/dashboard", replace: true });
+
+
 
     },
     onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
