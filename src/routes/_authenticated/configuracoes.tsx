@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { translateError } from "@/lib/error-messages";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -201,7 +202,7 @@ function ApiKeysSection() {
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Vapi"),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
   });
 
   const saveNvoip = useMutation({
@@ -226,7 +227,7 @@ function ApiKeysSection() {
       qc.invalidateQueries({ queryKey: ["nvoip-balance"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Nvoip"),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar Nvoip")),
   });
 
   const vapiConnected = vapi.data?.connected;
@@ -568,7 +569,7 @@ function FaturamentoSection() {
       setBudgetInput("");
       qc.invalidateQueries({ queryKey: ["vapi-estimated-credits"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar orçamento"),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar orçamento")),
   });
 
   const refreshing =

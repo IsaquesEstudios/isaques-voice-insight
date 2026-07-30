@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { translateError } from "@/lib/error-messages";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { WebCallDialog } from "@/components/assistants/web-call-dialog";
@@ -3228,7 +3229,7 @@ function ToolsTab({
     } catch (err) {
       console.error(err);
       toast.error("Erro ao inserir a regra no prompt.", {
-        description: err instanceof Error ? err.message.slice(0, 300) : undefined,
+        description: translateError(err),
       });
     } finally {
       setIsInsertingRule(false);
@@ -6934,7 +6935,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
       toast.success("Structured Outputs salvos na Vapi.");
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : "Falha ao salvar na Vapi.");
+      toast.error(translateError(e, "Falha ao salvar na Vapi."));
     } finally {
       setSavingAll(false);
     }

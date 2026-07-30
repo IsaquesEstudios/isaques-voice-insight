@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { translateError } from "@/lib/error-messages";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -376,7 +377,7 @@ function TelefoniaPage() {
       await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao remover contato"),
+      toast.error(translateError(err, "Falha ao remover contato")),
   });
 
   const handleSaveTestContact = async () => {
@@ -393,7 +394,7 @@ function TelefoniaPage() {
       setTestContactOpen(false);
       setTestContactForm({ label: "", phoneE164: "" });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao salvar contato");
+      toast.error(translateError(err, "Falha ao salvar contato"));
     } finally {
       setSavingContact(false);
     }
@@ -407,10 +408,10 @@ function TelefoniaPage() {
     mutationFn: (phoneNumberE164: string) => resyncFn({ data: { phoneNumberE164 } }),
     onSuccess: (res) => {
       if (res.ok) toast.success(res.message);
-      else toast.error(res.message);
+      else toast.error(translateError(res));
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao ressincronizar."),
+      toast.error(translateError(err, "Falha ao ressincronizar.")),
   });
 
   const deleteVapiNumberMutation = useMutation({
@@ -420,7 +421,7 @@ function TelefoniaPage() {
       queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao remover número."),
+      toast.error(translateError(err, "Falha ao remover número.")),
   });
 
 
@@ -480,7 +481,7 @@ function TelefoniaPage() {
       if (res?.callId) void watchCall(res.callId);
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao iniciar chamada"),
+      toast.error(translateError(err, "Falha ao iniciar chamada")),
     onSettled: () => setCallingContactId(null),
   });
 
@@ -573,7 +574,7 @@ function TelefoniaPage() {
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao conectar o tronco SIP");
+      toast.error(translateError(err, "Falha ao conectar o tronco SIP"));
     } finally {
       setConnecting(false);
     }
@@ -589,7 +590,7 @@ function TelefoniaPage() {
       setConfirmDisconnect(false);
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao desconectar Nvoip"),
+      toast.error(translateError(err, "Falha ao desconectar Nvoip")),
   });
 
   const releaseMutation = useMutation({
@@ -600,7 +601,7 @@ function TelefoniaPage() {
       setReleaseTarget(null);
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao liberar número"),
+      toast.error(translateError(err, "Falha ao liberar número")),
   });
 
   const attachAssistantMutation = useMutation({
@@ -619,7 +620,7 @@ function TelefoniaPage() {
       }),
     onSuccess: async (res, variables) => {
       if (!res.ok) {
-        toast.error(res.message);
+        toast.error(translateError(res));
         return;
       }
       toast.success(
@@ -631,7 +632,7 @@ function TelefoniaPage() {
       setAssignAssistantId("");
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao vincular atendente"),
+      toast.error(translateError(err, "Falha ao vincular atendente")),
   });
 
   const detachAssistantMutation = useMutation({
@@ -643,7 +644,7 @@ function TelefoniaPage() {
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
     },
     onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Falha ao remover atendente"),
+      toast.error(translateError(err, "Falha ao remover atendente")),
   });
 
 

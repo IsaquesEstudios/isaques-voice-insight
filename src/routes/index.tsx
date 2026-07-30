@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Phone } from "lucide-react";
@@ -80,7 +81,7 @@ function LoginHomePage() {
         }
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na autenticação");
+      toast.error(translateError(err, "Falha na autenticação"));
     } finally {
       setLoading(false);
     }
