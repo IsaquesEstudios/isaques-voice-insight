@@ -16,6 +16,11 @@ async function ensureSupabaseBrowser() {
 let setupCache: { ok: boolean; at: number } | null = null;
 const SETUP_TTL = 5 * 60_000;
 
+/** Limpa o cache do gate de onboarding (usar após salvar credenciais). */
+export function resetSetupCache() {
+  setupCache = null;
+}
+
 export const Route = createFileRoute("/_authenticated")({
   // Session lives in browser localStorage — skip SSR gating to avoid loops.
   ssr: false,
