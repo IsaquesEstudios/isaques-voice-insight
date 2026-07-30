@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { translateError } from "@/lib/error-messages";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { WebCallDialog } from "@/components/assistants/web-call-dialog";
@@ -943,7 +944,7 @@ function AssistantDetailPage() {
       const msg = err instanceof Error ? err.message : String(err);
       const isElevenLabsVoiceError = /elevenlabs|11labs|voz/i.test(msg) && /não encontrada|couldn'?t find|find/i.test(msg);
       toast.error(isElevenLabsVoiceError ? "Voz ElevenLabs indisponível." : "Erro ao salvar alterações.", {
-        description: msg.slice(0, 500),
+        description: translateError(err, "Não foi possível salvar. Tente novamente.").slice(0, 500),
       });
     } finally {
       setIsSaving(false);
@@ -1456,7 +1457,11 @@ function LogsTab({ assistantId }: { assistantId: string }) {
   });
 
   const calls = data?.calls ?? [];
-  const apiError = data?.error ?? (error instanceof Error ? error.message : null);
+  const apiError = data?.error
+    ? translateError(data.error, data.error)
+    : error
+      ? translateError(error, "Não foi possível carregar os registros.")
+      : null;
 
   return (
     <>
@@ -3228,7 +3233,7 @@ function ToolsTab({
     } catch (err) {
       console.error(err);
       toast.error("Erro ao inserir a regra no prompt.", {
-        description: err instanceof Error ? err.message.slice(0, 300) : undefined,
+        description: translateError(err),
       });
     } finally {
       setIsInsertingRule(false);
@@ -6934,7 +6939,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
       toast.success("Structured Outputs salvos na Vapi.");
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : "Falha ao salvar na Vapi.");
+      toast.error(translateError(e, "Falha ao salvar na Vapi."));
     } finally {
       setSavingAll(false);
     }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { translateError } from "@/lib/error-messages";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, PhoneCall } from "lucide-react";
@@ -83,7 +84,7 @@ export function VoiceCallTestCard({
     },
     onError: (err: unknown) => {
       const raw = err instanceof Error ? err.message : String(err ?? "");
-      const message = extractVapiMessage(raw);
+      const message = translateError(extractVapiMessage(raw), "Não foi possível iniciar a ligação.");
       toast.error(`Erro na Vapi: ${message}`);
     },
   });

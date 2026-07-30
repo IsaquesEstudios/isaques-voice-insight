@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { createVapiWebCall } from "@/lib/vapi.functions";
+import { translateError } from "@/lib/error-messages";
 
 type BrowserCallInstance = {
   stop: () => void | Promise<void>;
@@ -125,6 +126,7 @@ function formatCallError(error: unknown): string {
   }
   return [
     "Problema: a ligação de teste não pôde ser iniciada.",
+    `Motivo provável: ${translateError(error, "erro desconhecido no provedor de voz.")}`,
     "Como resolver: confira modelo, voz e transcriber da assistente e tente novamente.",
     `Detalhe técnico: ${detail}`,
   ].join("\n");

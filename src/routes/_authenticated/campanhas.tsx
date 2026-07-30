@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { translateError } from "@/lib/error-messages";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -296,7 +297,7 @@ function CampanhasPage() {
       resetForm();
       void queryClient.invalidateQueries({ queryKey: ["vapi", "campaigns"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(translateError(e)),
   });
 
   const endMutation = useMutation({
@@ -305,7 +306,7 @@ function CampanhasPage() {
       toast.success("Campanha encerrada.");
       void queryClient.invalidateQueries({ queryKey: ["vapi", "campaigns"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(translateError(e)),
   });
 
   const deleteMutation = useMutation({
@@ -315,7 +316,7 @@ function CampanhasPage() {
       setConfirmDelete(null);
       void queryClient.invalidateQueries({ queryKey: ["vapi", "campaigns"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(translateError(e)),
   });
 
   const campaigns = campaignsQuery.data ?? [];

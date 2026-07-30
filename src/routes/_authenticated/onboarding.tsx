@@ -1,4 +1,5 @@
 import { createFileRoute, isRedirect, redirect, useNavigate } from "@tanstack/react-router";
+import { translateError } from "@/lib/error-messages";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -115,7 +116,7 @@ function OnboardingPage() {
       navigate({ to: "/dashboard", replace: true });
 
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Vapi"),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
   });
 
   const saveNvoip = useMutation({
@@ -137,7 +138,7 @@ function OnboardingPage() {
       qc.invalidateQueries({ queryKey: ["setup-status"] });
       setStep(2);
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao salvar Nvoip"),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar Nvoip")),
   });
 
   const handleLogout = async () => {
