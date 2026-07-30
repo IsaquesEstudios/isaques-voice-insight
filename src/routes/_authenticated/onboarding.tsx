@@ -226,7 +226,10 @@ function OnboardingPage() {
                       Trocar chaves
                     </Button>
                     <Button
-                      onClick={() => navigate({ to: "/dashboard", replace: true })}
+                      onClick={() => {
+                        resetSetupCache();
+                        navigate({ to: "/dashboard", replace: true });
+                      }}
                       className="gap-2 shadow-glow"
                     >
                       Ir para o painel <ArrowRight className="h-4 w-4" />
