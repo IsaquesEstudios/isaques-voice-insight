@@ -292,6 +292,14 @@ function CampanhasPage() {
     queryFn: () => fetchCampaignCalls({ data: { campaignId: diagCampaign!.id } }),
     enabled: !!diagCampaign,
   });
+  const diagCalls = diagQuery.data?.calls ?? [];
+  const diagReference = diagQuery.data?.reference ?? null;
+  const diagSameOrigin =
+    diagReference && diagCalls[0]
+      ? (diagReference.fromNumber ?? diagReference.phoneNumberId) ===
+        (diagCalls[0].fromNumber ?? diagCalls[0].phoneNumberId)
+      : null;
+
 
   const assistantName = useMemo(() => {
     const map = new Map<string, string>();
