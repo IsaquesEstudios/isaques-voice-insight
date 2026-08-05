@@ -1029,7 +1029,7 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
     if (!Array.isArray(data)) return [];
     return (data as VapiPhoneNumberRaw[]).map((n) => ({
       id: n.id,
-      provider: (n.provider as string) ?? "nvoip",
+      provider: (n.provider as string) ?? "sip",
       number: (n.number as string | undefined) ?? null,
       name: (n.name as string | undefined) ?? null,
       assistantId: (n.assistantId as string | undefined) ?? null,
@@ -1131,7 +1131,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
 
 
     let vapiNumberId: string;
-    let mirrorProvider = "nvoip";
+    let mirrorProvider = "sip";
 
     if (existing) {
       const patched = (await vapiFetch(`/phone-number/${existing.id}`, {
@@ -1145,7 +1145,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
         .slice(0, 40) || "Numero";
 
       // Único transporte: o tronco SIP do usuário (BYO SIP Trunk na Vapi).
-      const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+      const trunk = await loadSipTrunk(context.supabase, context.userId);
       if (!trunk) {
         return {
           ok: false,
@@ -1155,7 +1155,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
         };
       }
 
-      const credentialId = await ensureNvoipCredentialId(
+      const credentialId = await ensureSipCredentialId(
         context.supabase,
         context.userId,
         trunk,
@@ -1271,13 +1271,13 @@ export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+    const trunk = await loadSipTrunk(context.supabase, context.userId);
     if (!trunk)
       return {
         ok: false as const,
         message: "Conecte seu tronco SIP antes de ressincronizar o número.",
       };
-    const credentialId = await ensureNvoipCredentialId(
+    const credentialId = await ensureSipCredentialId(
       context.supabase,
       context.userId,
       trunk,
@@ -1350,12 +1350,12 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
       if (existing) {
         phoneNumberId = existing.id;
       } else {
-        const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+        const trunk = await loadSipTrunk(context.supabase, context.userId);
         if (!trunk)
           throw new Error(
             "Conecte seu tronco SIP para usar este número como origem.",
           );
-        const credentialId = await ensureNvoipCredentialId(
+        const credentialId = await ensureSipCredentialId(
           context.supabase,
           context.userId,
           trunk,
