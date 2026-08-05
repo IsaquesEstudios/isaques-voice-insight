@@ -163,9 +163,9 @@ function ApiKeysSection() {
     queryKey: ["vapi-connection"],
     queryFn: () => getVapiConnection(),
   });
-  const nvoip = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnection(),
+  const sip = useQuery({
+    queryKey: ["sip-connection"],
+    queryFn: () => getSipConnection(),
   });
 
   const [vapiPrivate, setVapiPrivate] = useState("");
@@ -173,13 +173,12 @@ function ApiKeysSection() {
   const [showVapiPriv, setShowVapiPriv] = useState(false);
   const [showVapiPub, setShowVapiPub] = useState(false);
 
-  const [nvoipForm, setNvoipForm] = useState({
-    apiKey: "",
-    sipHost: "sip.nvoip.com.br",
+  const [sipForm, setSipForm] = useState({
+    sipHost: "",
     sipUsername: "",
     sipPassword: "",
   });
-  const [showNvoipSecrets, setShowNvoipSecrets] = useState(false);
+  const [showSipSecrets, setShowSipSecrets] = useState(false);
 
 
   const saveVapi = useMutation({
@@ -205,33 +204,26 @@ function ApiKeysSection() {
     onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
   });
 
-  const saveNvoip = useMutation({
+  const saveSip = useMutation({
     mutationFn: () =>
-      saveNvoipCredentials({
+      saveSipTrunk({
         data: {
-          apiKey: nvoipForm.apiKey.trim(),
-          sipHost: nvoipForm.sipHost.trim(),
-          sipUsername: nvoipForm.sipUsername.trim(),
-          sipPassword: nvoipForm.sipPassword.trim(),
+          sipHost: sipForm.sipHost.trim(),
+          sipUsername: sipForm.sipUsername.trim(),
+          sipPassword: sipForm.sipPassword.trim(),
         },
       }),
     onSuccess: () => {
-      toast.success("Credenciais Nvoip atualizadas!");
-      setNvoipForm({
-        apiKey: "",
-        sipHost: "sip.nvoip.com.br",
-        sipUsername: "",
-        sipPassword: "",
-      });
-      qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      qc.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      toast.success("Tronco SIP atualizado!");
+      setSipForm({ sipHost: "", sipUsername: "", sipPassword: "" });
+      qc.invalidateQueries({ queryKey: ["sip-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
     },
-    onError: (e) => toast.error(translateError(e, "Falha ao salvar Nvoip")),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar o tronco SIP")),
   });
 
   const vapiConnected = vapi.data?.connected;
-  const nvoipConnected = nvoip.data?.connected;
+  const sipConnected = sip.data?.connected;
 
 
   return (
