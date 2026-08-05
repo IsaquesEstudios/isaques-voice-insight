@@ -35,11 +35,7 @@ import {
   getVapiEstimatedCredits,
   saveVapiBudget,
 } from "@/lib/vapi.functions";
-import {
-  getNvoipConnection,
-  saveNvoipCredentials,
-  getNvoipBalance,
-} from "@/lib/nvoip.functions";
+import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
 
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
