@@ -305,7 +305,7 @@ function TelefoniaPage() {
 
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
-  // Contatos de teste ficam salvos na própria plataforma: a Nvoip não possui
+  // Contatos de teste ficam salvos na própria plataforma: o tronco SIP não possui
   // um serviço externo de verificação por OTP.
   const testContactsQuery = useQuery({
     queryKey: ["test-contacts"],
@@ -672,7 +672,7 @@ function TelefoniaPage() {
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Desconectar Nvoip
+                    Desconectar tronco SIP
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1133,7 +1133,7 @@ function TelefoniaPage() {
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
               Cadastre um número seu para receber as ligações de teste da assistente.
-              A Nvoip disca direto pelo tronco SIP, sem verificação por SMS.
+              O tronco SIP disca direto, sem verificação por SMS.
             </DialogDescription>
           </DialogHeader>
 
@@ -1368,9 +1368,9 @@ function TelefoniaPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desconectar conta Nvoip?</AlertDialogTitle>
+            <AlertDialogTitle>Desconectar tronco SIP?</AlertDialogTitle>
             <AlertDialogDescription>
-              Suas credenciais Nvoip (API e tronco SIP) serão removidas deste app.
+              As credenciais do seu tronco SIP serão removidas deste app.
               Os números continuam listados, mas as chamadas ficarão bloqueadas até
               você reconectar.
             </AlertDialogDescription>
