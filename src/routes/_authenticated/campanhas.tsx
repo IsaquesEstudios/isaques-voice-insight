@@ -225,16 +225,28 @@ const ENDED_REASON_LABEL: Record<string, string> = {
   "exceeded-max-duration": "Duração máxima atingida",
   "manually-canceled": "Cancelada manualmente",
   "phone-call-provider-closed-websocket": "Áudio interrompido pela operadora (SIP)",
+  "call.in-progress.error-sip-outbound-call-failed-to-connect":
+    "A operadora (tronco SIP) recusou a ligação — a chamada nunca chegou a completar",
+  "call.in-progress.error-sip-telephony-provider-failed-to-connect-call":
+    "A operadora (tronco SIP) não conseguiu completar a ligação",
+  "call.ringing.sip-inbound-caller-hungup": "Quem ligou desligou antes de atender",
 };
+
+// Erros de tronco SIP: a chamada nunca completa, então a IA nunca fala.
+function isSipConnectFailure(reason: string | null): boolean {
+  return !!reason && reason.includes("sip") && reason.includes("failed-to-connect");
+}
 
 function endedReasonLabel(reason: string | null): string {
   if (!reason) return "—";
   if (ENDED_REASON_LABEL[reason]) return ENDED_REASON_LABEL[reason];
+  if (isSipConnectFailure(reason)) return "A operadora recusou a ligação (tronco SIP)";
   if (reason.startsWith("pipeline-error")) return `Erro de processamento de voz (${reason})`;
   if (reason.startsWith("assistant-request")) return `Erro ao carregar a assistente (${reason})`;
   if (reason.includes("transport")) return `Falha de transporte de áudio (${reason})`;
   return reason;
 }
+
 
 // --- Page -------------------------------------------------------------------
 
