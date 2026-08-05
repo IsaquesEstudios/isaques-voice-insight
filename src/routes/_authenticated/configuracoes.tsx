@@ -328,6 +328,10 @@ function ApiKeysSection() {
               )}
               Salvar chaves Vapi
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* TRONCO SIP (opcional) */}
       <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
