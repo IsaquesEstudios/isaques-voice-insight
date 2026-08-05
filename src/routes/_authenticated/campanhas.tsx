@@ -461,6 +461,10 @@ function CampanhasPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setDiagCampaign(c)}>
+                            <Stethoscope className="mr-1 h-3.5 w-3.5" />
+                            Diagnóstico
+                          </Button>
                           {c.status !== "ended" && (
                             <Button
                               size="sm"
