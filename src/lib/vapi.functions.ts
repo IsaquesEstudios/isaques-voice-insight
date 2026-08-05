@@ -3295,13 +3295,50 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
     return { campaignId: input.campaignId };
   })
   .handler(async ({ data }): Promise<CampaignCallDTO[]> => {
-    const res = await vapiFetch(
-      `/call?campaignId=${encodeURIComponent(data.campaignId)}&limit=50`,
-      { method: "GET" },
+    const toList = (res: unknown) =>
+      (Array.isArray(res)
+        ? res
+        : ((res as { results?: unknown[] } | null)?.results ?? [])) as Array<
+        Record<string, unknown>
+      >;
+
+    // A Vapi nem sempre aceita ?campaignId no GET /call (400). Tenta e cai para
+    // a listagem recente filtrada localmente.
+    let list: Array<Record<string, unknown>> = [];
+    try {
+      list = toList(
+        await vapiFetch(`/call?campaignId=${encodeURIComponent(data.campaignId)}&limit=50`, {
+          method: "GET",
+        }),
+      );
+    } catch {
+      list = [];
+    }
+    if (list.length === 0) {
+      const recent = toList(await vapiFetch(`/call?limit=100`, { method: "GET" }));
+      list = recent.filter((c) => c["campaignId"] === data.campaignId);
+    }
+
+    // A listagem não traz `messages`; busca o detalhe das primeiras chamadas
+    // para saber se a assistente chegou a falar.
+    const detailed = await Promise.all(
+      list.slice(0, 20).map(async (c) => {
+        const id = String(c["id"] ?? "");
+        if (!id) return c;
+        try {
+          const full = (await vapiFetch(`/call/${id}`, { method: "GET" })) as Record<
+            string,
+            unknown
+          > | null;
+          return full ? { ...c, ...full } : c;
+        } catch {
+          return c;
+        }
+      }),
     );
-    const list = (
-      Array.isArray(res) ? res : ((res as { results?: unknown[] } | null)?.results ?? [])
-    ) as Array<Record<string, unknown>>;
+    list = detailed;
+
+
 
     return list.map((c) => {
       const startedAt = typeof c["startedAt"] === "string" ? (c["startedAt"] as string) : null;
