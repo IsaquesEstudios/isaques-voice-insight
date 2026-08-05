@@ -540,9 +540,7 @@ function FaturamentoSection() {
     onError: (e) => toast.error(translateError(e, "Falha ao salvar orçamento")),
   });
 
-  const refreshing =
-    nvoipBalanceQuery.isFetching ||
-    vapiCreditsQuery.isFetching;
+  const refreshing = vapiCreditsQuery.isFetching;
 
   return (
     <div className="space-y-6">
@@ -551,7 +549,7 @@ function FaturamentoSection() {
           <div>
             <CardTitle className="text-base font-semibold">Faturamento</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Saldo da telefonia (Nvoip) e saldo estimado na Vapi (baseado nas chamadas).
+              Saldo estimado na Vapi (baseado nas chamadas realizadas).
             </p>
           </div>
           <Button
@@ -560,7 +558,6 @@ function FaturamentoSection() {
             className="gap-1.5"
             disabled={refreshing}
             onClick={() => {
-              nvoipBalanceQuery.refetch();
               vapiCreditsQuery.refetch();
             }}
             title="Atualizar saldos"
@@ -571,23 +568,7 @@ function FaturamentoSection() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <CompactCreditCard
-          icon={Phone}
-          title="Nvoip"
-          subtitle={
-            nvoipConn.data?.connected
-              ? nvoipBalanceQuery.data?.available
-                ? "Saldo disponível na conta"
-                : "Não foi possível ler o saldo"
-              : "Conecte sua conta Nvoip"
-          }
-          value={nvoipBalanceQuery.data?.available ? nvoipBalanceQuery.data.balance : null}
-          currency={
-            (nvoipBalanceQuery.data?.available && nvoipBalanceQuery.data.currency) || "BRL"
-          }
-          loading={nvoipBalanceQuery.isLoading}
-          progress={nvoipConn.data?.connected ? 0.65 : 0}
-        />
+
 
 
         <CompactCreditCard
