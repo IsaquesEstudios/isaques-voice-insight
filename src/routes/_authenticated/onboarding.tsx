@@ -142,12 +142,26 @@ function OnboardingPage() {
             <ShieldCheck className="h-5 w-5" />
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Vamos conectar sua conta Vapi
+            Configuração inicial
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cada usuário usa suas próprias chaves. Isso mantém seus dados,
-            assistentes e números totalmente vinculados à sua conta.
+            Dois passos: conectar sua conta Vapi e cadastrar seu número através
+            do seu tronco SIP — tudo por aqui, via API da Vapi.
           </p>
+          <div className="mt-3 flex items-center justify-center gap-2 text-[11px] font-semibold">
+            <span
+              className={`rounded-full px-2.5 py-1 ${vapiReady ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}
+            >
+              1. Chaves Vapi
+            </span>
+            <span className="text-muted-foreground">→</span>
+            <span
+              className={`rounded-full px-2.5 py-1 ${numberReady ? "bg-success/15 text-success" : vapiReady ? "bg-primary/15 text-primary" : "bg-white/[0.04] text-muted-foreground"}`}
+            >
+              2. Seu número
+            </span>
+          </div>
+
         </div>
 
         <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
