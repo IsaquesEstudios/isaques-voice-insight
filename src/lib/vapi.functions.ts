@@ -3343,9 +3343,20 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
     return list.map((c) => {
       const startedAt = typeof c["startedAt"] === "string" ? (c["startedAt"] as string) : null;
       const endedAt = typeof c["endedAt"] === "string" ? (c["endedAt"] as string) : null;
-      const messages = Array.isArray(c["messages"])
-        ? (c["messages"] as Array<Record<string, unknown>>)
-        : [];
+      const artifact = (c["artifact"] ?? {}) as { messages?: unknown; transcript?: unknown };
+      const messages = (
+        Array.isArray(c["messages"])
+          ? c["messages"]
+          : Array.isArray(artifact.messages)
+            ? artifact.messages
+            : []
+      ) as Array<Record<string, unknown>>;
+      const transcript =
+        typeof c["transcript"] === "string"
+          ? (c["transcript"] as string)
+          : typeof artifact.transcript === "string"
+            ? artifact.transcript
+            : "";
       const customer = (c["customer"] ?? {}) as { number?: string };
       return {
         id: String(c["id"] ?? ""),
@@ -3357,12 +3368,14 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
           startedAt && endedAt
             ? Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000))
             : 0,
-        assistantSpoke: messages.some(
-          (m) =>
-            (m["role"] === "bot" || m["role"] === "assistant") &&
-            typeof m["message"] === "string" &&
-            (m["message"] as string).trim().length > 0,
-        ),
+        assistantSpoke:
+          messages.some(
+            (m) =>
+              (m["role"] === "bot" || m["role"] === "assistant") &&
+              typeof m["message"] === "string" &&
+              (m["message"] as string).trim().length > 0,
+          ) || /(^|\n)\s*ai:/i.test(transcript),
+
         assistantId: typeof c["assistantId"] === "string" ? (c["assistantId"] as string) : null,
         phoneNumberId:
           typeof c["phoneNumberId"] === "string" ? (c["phoneNumberId"] as string) : null,
