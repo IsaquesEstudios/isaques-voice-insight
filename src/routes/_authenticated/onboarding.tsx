@@ -1,4 +1,4 @@
-import { createFileRoute, isRedirect, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
+  Phone,
   ShieldCheck,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
+  connectSipNumber,
   getSetupStatus,
   saveVapiCredentials,
   updateVapiPublicKey,
@@ -31,22 +33,11 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
       { title: "Onboarding — Isaques Estúdios | AI Voice" },
       {
         name: "description",
-        content: "Conecte sua chave Vapi para começar a usar as assistentes de voz.",
+        content:
+          "Conecte sua chave Vapi e cadastre seu número via tronco SIP para começar.",
       },
     ],
   }),
-  // Se a Vapi já está conectada, nem abre a tela — vai direto ao painel.
-  beforeLoad: async () => {
-    try {
-      const status = await getSetupStatus();
-      if (status?.vapi) {
-        throw redirect({ to: "/dashboard" });
-      }
-    } catch (e) {
-      if (isRedirect(e)) throw e;
-      // Se o status falhar, deixa o componente lidar com o erro.
-    }
-  },
   component: OnboardingPage,
 });
 
@@ -63,13 +54,23 @@ function OnboardingPage() {
   const [vapiPublicKey, setVapiPublicKey] = useState("");
   const [editVapi, setEditVapi] = useState(false);
 
-  // Única integração obrigatória: a Vapi.
+  // Etapa 2 — número via tronco SIP
+  const [sipHost, setSipHost] = useState("");
+  const [sipUsername, setSipUsername] = useState("");
+  const [sipPassword, setSipPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [friendlyLabel, setFriendlyLabel] = useState("");
+
+  const vapiReady = !!status.data?.vapi;
+  const numberReady = !!status.data?.sip;
+
+  // Onboarding concluído (Vapi + número conectado) → painel.
   useEffect(() => {
-    if (status.data?.vapi) {
+    if (vapiReady && numberReady) {
       resetSetupCache();
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [status.data?.vapi, navigate]);
+  }, [vapiReady, numberReady, navigate]);
 
   const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
 
@@ -81,23 +82,46 @@ function OnboardingPage() {
       return saveVapiCredentials({ data: v });
     },
     onSuccess: () => {
-      toast.success("Vapi conectada!");
+      toast.success("Vapi conectada! Agora cadastre seu número.");
       setVapiKey("");
       setVapiPublicKey("");
+      setEditVapi(false);
       resetSetupCache();
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
-      navigate({ to: "/dashboard", replace: true });
     },
     onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
+  });
+
+  const connectNumber = useMutation({
+    mutationFn: async () =>
+      connectSipNumber({
+        data: {
+          sipHost: sipHost.trim(),
+          sipUsername: sipUsername.trim(),
+          sipPassword: sipPassword.trim(),
+          friendlyLabel: friendlyLabel.trim() || undefined,
+          phoneNumber: phoneNumber.trim(),
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(`Número ${res.phoneNumber} conectado à Vapi!`);
+      resetSetupCache();
+      qc.invalidateQueries({ queryKey: ["setup-status"] });
+      qc.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+      navigate({ to: "/dashboard", replace: true });
+    },
+    onError: (e) => toast.error(translateError(e, "Falha ao conectar o número")),
   });
 
   const handleLogout = async () => {
     await getSupabaseBrowser().auth.signOut();
     navigate({ to: "/", replace: true });
   };
-
-  const vapiReady = !!status.data?.vapi;
 
   // Enquanto o status inicial não chega, evita renderizar o formulário errado
   // (pisca entre "só Public Key" e "os dois campos").
@@ -108,6 +132,7 @@ function OnboardingPage() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-background px-4 py-10">
