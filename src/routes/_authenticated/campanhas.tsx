@@ -65,6 +65,7 @@ import {
   deleteVapiCampaign,
   listVapiAssistants,
   listVapiPhoneNumbers,
+  listCampaignCalls,
   type VapiCampaignDTO,
 } from "@/lib/vapi.functions";
 
