@@ -33,10 +33,12 @@ export const Route = createFileRoute("/")({
 function LoginHomePage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"auth" | "forgot">("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [sent, setSent] = useState(false);
 
   // Usuário já autenticado → mandar para o dashboard.
   useEffect(() => {
@@ -49,6 +51,26 @@ function LoginHomePage() {
       }
     });
   }, [navigate]);
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setSent(true);
+      toast.success(
+        "Se este e-mail estiver cadastrado, você receberá um link de recuperação na caixa de entrada.",
+      );
+    } catch (err) {
+      toast.error(translateError(err, "Falha ao enviar o e-mail de recuperação"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +109,7 @@ function LoginHomePage() {
     }
   };
 
+
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -112,6 +135,54 @@ function LoginHomePage() {
 
         <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
           <CardContent className="p-6">
+            {mode === "forgot" ? (
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Esqueci minha senha
+                </h2>
+                <p className="mb-4 mt-1 text-xs text-muted-foreground">
+                  Informe seu e-mail. Se existir uma conta cadastrada, você
+                  receberá na caixa de entrada um link para criar uma nova senha.
+                </p>
+                <form className="space-y-4" onSubmit={handleForgot}>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="forgot-email" className="text-xs text-muted-foreground">
+                      E-mail
+                    </Label>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="bg-background/50"
+                    />
+                  </div>
+                  {sent && (
+                    <p className="rounded-lg border border-border/60 bg-background/40 p-3 text-xs text-muted-foreground">
+                      E-mail enviado. Verifique também a pasta de spam — o link
+                      expira em alguns minutos.
+                    </p>
+                  )}
+                  <Button type="submit" disabled={loading} className="w-full gap-2 shadow-glow">
+                    {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Enviar link de recuperação
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-xs text-muted-foreground"
+                    onClick={() => {
+                      setMode("auth");
+                      setSent(false);
+                    }}
+                  >
+                    Voltar para o login
+                  </Button>
+                </form>
+              </div>
+            ) : (
             <Tabs value={tab} onValueChange={(v) => setTab(v as "signin" | "signup")}>
               <TabsList className="grid w-full grid-cols-2 bg-background/40">
                 <TabsTrigger value="signin">Entrar</TabsTrigger>
@@ -169,10 +240,21 @@ function LoginHomePage() {
                   {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                   {tab === "signin" ? "Entrar" : "Criar conta"}
                 </Button>
+                {tab === "signin" && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("forgot")}
+                    className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    Esqueci minha senha
+                  </button>
+                )}
               </form>
             </Tabs>
+            )}
           </CardContent>
         </Card>
+
 
         <p className="text-center text-xs text-muted-foreground">
           Área restrita — acesso somente para clientes autenticados.
