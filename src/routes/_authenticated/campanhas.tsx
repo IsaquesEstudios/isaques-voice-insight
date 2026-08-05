@@ -14,6 +14,7 @@ import {
   Users,
   PhoneOutgoing,
   CheckCircle2,
+  Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
 
