@@ -21,6 +21,26 @@ export function resetSetupCache() {
   setupCache = null;
 }
 
+const SKIP_SIP_KEY = "onboarding:skip-sip";
+
+/** Marca que o usuário optou por pular o cadastro do tronco SIP. */
+export function skipSipStep() {
+  try {
+    localStorage.setItem(SKIP_SIP_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  setupCache = null;
+}
+
+function sipSkipped() {
+  try {
+    return localStorage.getItem(SKIP_SIP_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export const Route = createFileRoute("/_authenticated")({
   // Session lives in browser localStorage — skip SSR gating to avoid loops.
   ssr: false,
@@ -41,7 +61,10 @@ export const Route = createFileRoute("/_authenticated")({
       } else {
         try {
           const status = await getSetupStatus();
-          setupCache = { ok: Boolean(status.vapi && status.sip), at: Date.now() };
+          setupCache = {
+            ok: Boolean(status.vapi && (status.sip || sipSkipped())),
+            at: Date.now(),
+          };
 
           if (!setupCache.ok) {
             throw redirect({ to: "/onboarding" });
