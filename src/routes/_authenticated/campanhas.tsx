@@ -696,7 +696,22 @@ function CampanhasPage() {
               Nenhuma ligação registrada nesta campanha ainda.
             </p>
           ) : (
+            <>
+              {(diagQuery.data ?? []).some((c) => isSipConnectFailure(c.endedReason)) && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <p className="font-medium text-amber-300">
+                    A ligação não chegou a completar no tronco SIP
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Por isso a assistente ficou muda: ela só começa a falar depois que a operadora
+                    conecta a chamada. Verifique se os números da lista existem e estão em E.164
+                    (+55DDDNÚMERO), se o número de origem escolhido está liberado para chamadas de
+                    saída na operadora e se há saldo/limite de canais simultâneos disponível.
+                  </p>
+                </div>
+              )}
             <Table>
+
               <TableHeader>
                 <TableRow>
                   <TableHead>Contato</TableHead>
