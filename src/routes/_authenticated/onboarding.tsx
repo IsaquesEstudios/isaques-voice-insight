@@ -25,7 +25,7 @@ import {
   updateVapiPublicKey,
 } from "@/lib/vapi.functions";
 
-import { resetSetupCache } from "./route";
+import { resetSetupCache, skipSipStep } from "./route";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
@@ -397,7 +397,18 @@ function OnboardingPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="ghost"
+                disabled={!vapiReady || connectNumber.isPending}
+                onClick={() => {
+                  skipSipStep();
+                  navigate({ to: "/dashboard", replace: true });
+                }}
+                className="text-muted-foreground"
+              >
+                Já tenho número na Vapi — pular
+              </Button>
               <Button
                 disabled={
                   !vapiReady ||
