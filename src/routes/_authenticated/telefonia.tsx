@@ -1100,12 +1100,14 @@ function TelefoniaPage() {
                         <Button
                           size="sm"
                           className="w-full gap-1.5 shadow-glow"
-                          disabled={
-                            !isNvoipConnected ||
-                            !from ||
-                            !assistantId ||
-                            callingContactId === c.id
+                          title={
+                            !from
+                              ? "Selecione um número de origem"
+                              : !assistantId
+                                ? "Selecione uma assistente"
+                                : "Disparar ligação de teste"
                           }
+                          disabled={!from || !assistantId || callingContactId === c.id}
                           onClick={() =>
                             testCallMutation.mutate({
                               id: c.id,
