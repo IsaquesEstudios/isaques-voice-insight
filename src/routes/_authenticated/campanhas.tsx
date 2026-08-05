@@ -225,16 +225,28 @@ const ENDED_REASON_LABEL: Record<string, string> = {
   "exceeded-max-duration": "Duração máxima atingida",
   "manually-canceled": "Cancelada manualmente",
   "phone-call-provider-closed-websocket": "Áudio interrompido pela operadora (SIP)",
+  "call.in-progress.error-sip-outbound-call-failed-to-connect":
+    "A operadora (tronco SIP) recusou a ligação — a chamada nunca chegou a completar",
+  "call.in-progress.error-sip-telephony-provider-failed-to-connect-call":
+    "A operadora (tronco SIP) não conseguiu completar a ligação",
+  "call.ringing.sip-inbound-caller-hungup": "Quem ligou desligou antes de atender",
 };
+
+// Erros de tronco SIP: a chamada nunca completa, então a IA nunca fala.
+function isSipConnectFailure(reason: string | null): boolean {
+  return !!reason && reason.includes("sip") && reason.includes("failed-to-connect");
+}
 
 function endedReasonLabel(reason: string | null): string {
   if (!reason) return "—";
   if (ENDED_REASON_LABEL[reason]) return ENDED_REASON_LABEL[reason];
+  if (isSipConnectFailure(reason)) return "A operadora recusou a ligação (tronco SIP)";
   if (reason.startsWith("pipeline-error")) return `Erro de processamento de voz (${reason})`;
   if (reason.startsWith("assistant-request")) return `Erro ao carregar a assistente (${reason})`;
   if (reason.includes("transport")) return `Falha de transporte de áudio (${reason})`;
   return reason;
 }
+
 
 // --- Page -------------------------------------------------------------------
 
@@ -684,7 +696,22 @@ function CampanhasPage() {
               Nenhuma ligação registrada nesta campanha ainda.
             </p>
           ) : (
+            <>
+              {(diagQuery.data ?? []).some((c) => isSipConnectFailure(c.endedReason)) && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <p className="font-medium text-amber-300">
+                    A ligação não chegou a completar no tronco SIP
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Por isso a assistente ficou muda: ela só começa a falar depois que a operadora
+                    conecta a chamada. Verifique se os números da lista existem e estão em E.164
+                    (+55DDDNÚMERO), se o número de origem escolhido está liberado para chamadas de
+                    saída na operadora e se há saldo/limite de canais simultâneos disponível.
+                  </p>
+                </div>
+              )}
             <Table>
+
               <TableHeader>
                 <TableRow>
                   <TableHead>Contato</TableHead>
@@ -723,7 +750,9 @@ function CampanhasPage() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
+
 
           <DialogFooter>
             <Button variant="outline" onClick={() => void diagQuery.refetch()}>
