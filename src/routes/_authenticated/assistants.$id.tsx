@@ -3750,6 +3750,34 @@ function ToolsTab({
                                   </p>
                                 </div>
 
+                                {d.mode.startsWith("blind-transfer") && (
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[11px] font-medium text-muted-foreground">
+                                      Método no tronco SIP
+                                    </Label>
+                                    <Select
+                                      value={d.sipVerb}
+                                      onValueChange={(v) => patch({ sipVerb: v as TransferSipVerb })}
+                                    >
+                                      <SelectTrigger className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                        {SIP_VERB_OPTIONS.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-muted-foreground/70">
+                                      {SIP_VERB_OPTIONS.find((o) => o.value === d.sipVerb)?.hint}
+                                    </p>
+                                  </div>
+                                )}
+
+
+
                                 {needsWarmMessage && (
                                   <div className="space-y-1.5">
                                     <Label className="text-[11px] font-medium text-muted-foreground">
