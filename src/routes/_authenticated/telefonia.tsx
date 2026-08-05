@@ -393,11 +393,15 @@ function TelefoniaPage() {
         const s = await callStatusFn({ data: { callId } });
         setLastCallDiag({ status: s.status, endedReason: s.endedReason });
         if (s.endedReason || s.status === "ended") {
-          if (s.endedReason && !/customer-ended-call|assistant-ended-call/.test(s.endedReason)) {
-            toast.error(`Chamada encerrada pela Vapi: ${s.endedReason}`);
+          const reason = s.endedReason ?? "";
+          if (/assistant-forwarded-call/.test(reason)) {
+            toast.success("Chamada transferida para o número de destino.");
+          } else if (reason && !/customer-ended-call|assistant-ended-call/.test(reason)) {
+            toast.error(`Chamada encerrada pela Vapi: ${reason}`);
           }
           return;
         }
+
       } catch {
         return;
       }
