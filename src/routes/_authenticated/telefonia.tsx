@@ -503,18 +503,15 @@ function TelefoniaPage() {
 
     setConnecting(true);
     try {
-      await saveNvoipCredsFn({
+      await saveSipTrunkFn({
         data: {
-          apiKey: sipForm.apiKey.trim(),
-          clientId: "",
-          clientSecret: "",
           sipHost: host,
           sipUsername: user,
           sipPassword: pass,
           friendlyLabel: sipForm.label.trim() || undefined,
         },
       });
-      const res = await registerNvoipNumberFn({
+      const res = await registerSipNumberFn({
         data: { phoneNumber: did, friendlyName: didName },
       });
       toast.success(
@@ -522,9 +519,7 @@ function TelefoniaPage() {
           ? "Tronco SIP salvo. Este número já estava cadastrado."
           : "Tronco SIP conectado e número cadastrado!",
       );
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      await queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
@@ -537,15 +532,14 @@ function TelefoniaPage() {
 
 
   const disconnectMutation = useMutation({
-    mutationFn: () => disconnectNvoipFn(),
+    mutationFn: () => disconnectSipFn(),
     onSuccess: async () => {
-      toast.success("Conta Nvoip desconectada.");
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
+      toast.success("Tronco SIP desconectado.");
+      await queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
       setConfirmDisconnect(false);
     },
     onError: (err) =>
-      toast.error(translateError(err, "Falha ao desconectar Nvoip")),
+      toast.error(translateError(err, "Falha ao desconectar o tronco SIP")),
   });
 
   const releaseMutation = useMutation({
