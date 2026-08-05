@@ -659,6 +659,81 @@ function CampanhasPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!diagCampaign} onOpenChange={(v) => !v && setDiagCampaign(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Diagnóstico das ligações</DialogTitle>
+            <DialogDescription>
+              Últimas chamadas da campanha “{diagCampaign?.name}” com o motivo real de
+              encerramento informado pela plataforma de voz.
+            </DialogDescription>
+          </DialogHeader>
+
+          {diagQuery.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : diagQuery.isError ? (
+            <p className="py-6 text-center text-sm text-destructive">
+              {translateError(diagQuery.error as Error)}
+            </p>
+          ) : (diagQuery.data ?? []).length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma ligação registrada nesta campanha ainda.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Duração</TableHead>
+                  <TableHead>IA falou?</TableHead>
+                  <TableHead>Motivo do encerramento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(diagQuery.data ?? []).map((call) => (
+                  <TableRow key={call.id}>
+                    <TableCell className="font-mono text-xs">
+                      {call.customerNumber ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {call.status ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {call.durationSec ? `${call.durationSec}s` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          call.assistantSpoke
+                            ? "border-emerald-500/30 text-emerald-400"
+                            : "border-amber-500/30 text-amber-400"
+                        }
+                      >
+                        {call.assistantSpoke ? "Sim" : "Não"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">{endedReasonLabel(call.endedReason)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => void diagQuery.refetch()}>
+              Atualizar
+            </Button>
+            <Button onClick={() => setDiagCampaign(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
