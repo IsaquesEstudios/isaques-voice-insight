@@ -515,17 +515,8 @@ function NotificacoesSection() {
 
 function FaturamentoSection() {
   const qc = useQueryClient();
-  const nvoipConn = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnection(),
-  });
-  const nvoipBalanceQuery = useQuery({
-    queryKey: ["nvoip-balance"],
-    queryFn: () => getNvoipBalance(),
-    enabled: !!nvoipConn.data?.connected,
-    staleTime: 60_000,
-  });
   const vapiCreditsQuery = useQuery({
+
     queryKey: ["vapi-estimated-credits"],
     queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
