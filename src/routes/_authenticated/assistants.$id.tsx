@@ -2408,12 +2408,15 @@ function ToolsTab({
             const base: TransferDestinationBase = {
               description: typeof d?.description === "string" ? d.description : "",
               message: typeof d?.message === "string" ? d.message : "",
-              mode: (d?.transferPlan?.mode ?? "blind-transfer") as TransferMode,
+              // Padronizado: os dois valores que comprovadamente funcionam
+              // no tronco SIP (blind + discar nova perna).
+              mode: (d?.transferPlan?.mode?.toString().startsWith("blind-transfer")
+                ? d.transferPlan.mode
+                : "blind-transfer") as TransferMode,
               warmMessage:
                 typeof d?.transferPlan?.message === "string" ? d.transferPlan.message : "",
-              sipVerb: (typeof d?.transferPlan?.sipVerb === "string"
-                ? d.transferPlan.sipVerb
-                : "dial") as TransferSipVerb,
+              sipVerb: "dial" as TransferSipVerb,
+
               fallbackMessage:
                 typeof d?.transferPlan?.fallbackPlan?.message === "string"
                   ? d.transferPlan.fallbackPlan.message
