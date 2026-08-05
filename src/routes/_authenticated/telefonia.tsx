@@ -207,23 +207,12 @@ function TelefoniaPage() {
   });
 
 
-  const nvoipConnQuery = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnFn(),
+  const sipConnQuery = useQuery({
+    queryKey: ["sip-connection"],
+    queryFn: () => getSipConnFn(),
   });
-  const nvoipConn = nvoipConnQuery.data;
-  const isNvoipConnected = nvoipConn?.connected === true;
-
-  const nvoipNumbersQuery = useQuery({
-    queryKey: ["nvoip-numbers-live"],
-    queryFn: () => listNvoipNumbersFn(),
-    enabled: isNvoipConnected,
-  });
-  const nvoipBalanceQuery = useQuery({
-    queryKey: ["nvoip-balance"],
-    queryFn: () => getNvoipBalanceFn(),
-    enabled: isNvoipConnected,
-  });
+  const sipConn = sipConnQuery.data;
+  const isSipConnected = sipConn?.connected === true;
 
 
 
