@@ -2289,7 +2289,7 @@ export const getSetupStatus = createServerFn({ method: "GET" })
 
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [vapiRes, nvoipRes] = await Promise.all([
+    const [vapiRes, sipRes] = await Promise.all([
       context.supabase
         .from("user_vapi_credentials")
         .select("user_id, public_key")
@@ -2303,12 +2303,12 @@ export const getSetupStatus = createServerFn({ method: "GET" })
     ]);
     const vapiRow = vapiRes.data as { public_key: string | null } | null;
     const hasVapiPublicKey = !!(vapiRow?.public_key && vapiRow.public_key.trim().length > 0);
-    const nvoip = !!nvoipRes.data;
+    const sip = !!sipRes.data;
     return {
       vapi: !!vapiRes.data && hasVapiPublicKey,
-      // `telefonia`: tronco SIP do usuário configurado.
-      telefonia: nvoip,
-      nvoip,
+      // `telefonia`: tronco SIP do usuário configurado (opcional).
+      telefonia: sip,
+      sip,
       vapiPrivateOnly: !!vapiRes.data && !hasVapiPublicKey,
     };
 
