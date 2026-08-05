@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
-import { SetupBanner } from "@/components/setup-banner";
+
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
