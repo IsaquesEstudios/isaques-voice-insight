@@ -1278,15 +1278,6 @@ function TelefoniaPage() {
                 </div>
               </div>
 
-              <div className="grid gap-1.5">
-                <Label>Chave de API da operadora (opcional)</Label>
-                <Input
-                  type="password"
-                  placeholder="Usada apenas para listar DIDs e saldo, se houver"
-                  value={sipForm.apiKey}
-                  onChange={(e) => setSipForm({ ...sipForm, apiKey: e.target.value })}
-                />
-              </div>
 
               <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3">
                 <p className="text-[11px] text-muted-foreground">
