@@ -2407,6 +2407,9 @@ function ToolsTab({
               mode: (d?.transferPlan?.mode ?? "blind-transfer") as TransferMode,
               warmMessage:
                 typeof d?.transferPlan?.message === "string" ? d.transferPlan.message : "",
+              sipVerb: (typeof d?.transferPlan?.sipVerb === "string"
+                ? d.transferPlan.sipVerb
+                : "dial") as TransferSipVerb,
             };
             return d?.type === "sip"
               ? { type: "sip", sipUri: String(d.sipUri ?? ""), ...base }
