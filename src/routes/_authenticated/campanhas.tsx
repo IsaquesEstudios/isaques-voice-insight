@@ -211,6 +211,31 @@ function campaignProgress(c: VapiCampaignDTO) {
   return Math.min(100, Math.round((c.counters.ended / total) * 100));
 }
 
+// Motivos de encerramento da Vapi traduzidos (diagnóstico das ligações).
+const ENDED_REASON_LABEL: Record<string, string> = {
+  "silence-timeout-reached": "Silêncio: ninguém falou e a chamada caiu",
+  "customer-did-not-answer": "Cliente não atendeu",
+  "customer-did-not-give-microphone-permission": "Sem permissão de microfone",
+  "customer-busy": "Linha ocupada",
+  "customer-ended-call": "Cliente desligou",
+  "assistant-ended-call": "Assistente encerrou a chamada",
+  "assistant-said-end-call-phrase": "Assistente encerrou com frase final",
+  "assistant-forwarded-call": "Chamada transferida",
+  "voicemail": "Caiu na caixa postal",
+  "exceeded-max-duration": "Duração máxima atingida",
+  "manually-canceled": "Cancelada manualmente",
+  "phone-call-provider-closed-websocket": "Áudio interrompido pela operadora (SIP)",
+};
+
+function endedReasonLabel(reason: string | null): string {
+  if (!reason) return "—";
+  if (ENDED_REASON_LABEL[reason]) return ENDED_REASON_LABEL[reason];
+  if (reason.startsWith("pipeline-error")) return `Erro de processamento de voz (${reason})`;
+  if (reason.startsWith("assistant-request")) return `Erro ao carregar a assistente (${reason})`;
+  if (reason.includes("transport")) return `Falha de transporte de áudio (${reason})`;
+  return reason;
+}
+
 // --- Page -------------------------------------------------------------------
 
 function CampanhasPage() {
