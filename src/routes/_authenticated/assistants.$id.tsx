@@ -2718,6 +2718,10 @@ function ToolsTab({
           if (needsWarmMessage && d.warmMessage.trim()) {
             transferPlan.message = d.warmMessage.trim();
           }
+          // Só os modos "blind" passam pelo tronco via REFER/dial.
+          if (d.mode.startsWith("blind-transfer")) {
+            transferPlan.sipVerb = d.sipVerb || "dial";
+          }
           return {
             ...(d.type === "number"
               ? { type: "number" as const, number: d.number.trim() }
