@@ -1019,6 +1019,149 @@ export const ensureSipCredential = createServerFn({ method: "POST" })
     }
   });
 
+// Fluxo completo de cadastro de número: salva o tronco SIP do usuário, cria a
+// credencial `byo-sip-trunk` na Vapi e importa o DID como `byo-phone-number`,
+// deixando o número já validado/conectado na conta Vapi do próprio usuário.
+export const connectSipNumber = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input) =>
+    z
+      .object({
+        sipHost: z.string().trim().min(4, "Host SIP obrigatório").max(120),
+        sipUsername: z.string().trim().min(2, "Usuário SIP obrigatório").max(120),
+        sipPassword: z.string().trim().min(4, "Senha SIP obrigatória").max(200),
+        friendlyLabel: z.string().trim().max(80).optional(),
+        phoneNumber: z
+          .string()
+          .trim()
+          .min(8, "Informe o número")
+          .transform((v) => {
+            const digits = v.replace(/\D/g, "");
+            if (v.startsWith("+")) return `+${digits}`;
+            if (digits.startsWith("55")) return `+${digits}`;
+            return `+55${digits}`;
+          }),
+      })
+      .parse(input),
+  )
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<
+      | { ok: true; vapiNumberId: string; phoneNumber: string }
+      | { ok: false; message: string }
+    > => {
+      // 1) guarda o tronco SIP do usuário
+      const { error: upsertErr } = await context.supabase
+        .from("user_nvoip_credentials")
+        .upsert(
+          {
+            user_id: context.userId,
+            sip_host: data.sipHost,
+            sip_username: data.sipUsername,
+            sip_password: data.sipPassword,
+            friendly_label: data.friendlyLabel ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+      if (upsertErr) return { ok: false, message: upsertErr.message };
+
+      // 2) credencial do tronco na Vapi
+      let credentialId: string;
+      try {
+        credentialId = await ensureSipCredentialId(context.supabase, context.userId, {
+          sipHost: data.sipHost,
+          sipUsername: data.sipUsername,
+          sipPassword: data.sipPassword,
+          vapiCredentialId: null,
+        });
+      } catch (e) {
+        return {
+          ok: false,
+          message:
+            e instanceof Error
+              ? `Falha ao criar o tronco SIP na Vapi: ${e.message}`
+              : "Falha ao criar o tronco SIP na Vapi.",
+        };
+      }
+
+      // 3) importa (ou reaproveita) o número na Vapi
+      let vapiNumberId: string | null = null;
+      try {
+        const all = (await vapiFetch("/phone-number?limit=100", { method: "GET" })) as
+          | VapiPhoneNumberRaw[]
+          | null;
+        const existing = Array.isArray(all)
+          ? all.find((n) => (n.number as string | undefined) === data.phoneNumber)
+          : undefined;
+        if (existing) {
+          await vapiFetch(`/phone-number/${existing.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ credentialId }),
+          });
+          vapiNumberId = existing.id;
+        } else {
+          const safeName =
+            (data.friendlyLabel ?? data.phoneNumber)
+              .replace(/[^a-zA-Z0-9 _-]/g, "")
+              .slice(0, 40) || "Numero";
+          const created = (await vapiFetch("/phone-number", {
+            method: "POST",
+            body: JSON.stringify({
+              provider: "byo-phone-number",
+              number: data.phoneNumber,
+              credentialId,
+              numberE164CheckEnabled: false,
+              name: safeName,
+            }),
+          })) as VapiPhoneNumberRaw;
+          vapiNumberId = created.id;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/already in use by another org/i.test(msg)) {
+          return {
+            ok: false,
+            message: `O número ${data.phoneNumber} já está vinculado a outra organização Vapi. Remova-o de lá antes de importá-lo aqui.`,
+          };
+        }
+        return { ok: false, message: `Falha ao conectar o número na Vapi: ${msg}` };
+      }
+
+      // 4) espelha no banco (não fatal)
+      try {
+        const { data: row } = await context.supabase
+          .from("user_phone_numbers")
+          .select("id")
+          .eq("user_id", context.userId)
+          .eq("phone_number", data.phoneNumber)
+          .maybeSingle();
+        if (row) {
+          await context.supabase
+            .from("user_phone_numbers")
+            .update({ vapi_phone_number_id: vapiNumberId, provider: "sip" })
+            .eq("id", row.id);
+        } else {
+          await context.supabase.from("user_phone_numbers").insert({
+            user_id: context.userId,
+            phone_number: data.phoneNumber,
+            friendly_name: data.friendlyLabel ?? data.phoneNumber,
+            provider: "sip",
+            country_iso: "BR",
+            capabilities: { sip: true, voice: true },
+            vapi_phone_number_id: vapiNumberId,
+          });
+        }
+      } catch (e) {
+        console.warn("mirror user_phone_numbers failed (non-fatal)", e);
+      }
+
+      return { ok: true, vapiNumberId: vapiNumberId!, phoneNumber: data.phoneNumber };
+    },
+  );
+
 
 // Lists phone numbers imported on the Vapi account. Filtered/paginated by
 // caller — Vapi returns all numbers on the account.
