@@ -1991,6 +1991,29 @@ const TRANSFER_MODE_OPTIONS: { value: TransferMode; label: string; hint: string 
   },
 ];
 
+/** Como a Vapi executa a transferência no tronco SIP. `refer` devolve a
+ * ligação para a operadora (muitos troncos brasileiros recusam e a chamada
+ * cai); `dial` mantém a ligação na Vapi e disca uma segunda perna. */
+type TransferSipVerb = "dial" | "refer" | "bye";
+
+const SIP_VERB_OPTIONS: { value: TransferSipVerb; label: string; hint: string }[] = [
+  {
+    value: "dial",
+    label: "Discar nova perna (recomendado)",
+    hint: "A plataforma liga para o destino e junta as duas pontas. Funciona com troncos que recusam REFER (caso da maioria no Brasil).",
+  },
+  {
+    value: "refer",
+    label: "SIP REFER (entregar à operadora)",
+    hint: "Devolve a ligação para a operadora concluir. Se o tronco não aceitar REFER, a chamada é encerrada na hora da transferência.",
+  },
+  {
+    value: "bye",
+    label: "SIP REFER + BYE",
+    hint: "Igual ao REFER, encerrando a perna da assistente logo em seguida.",
+  },
+];
+
 interface TransferDestinationBase {
   /** Condição em linguagem natural que a IA avalia para disparar a transferência. */
   description: string;
@@ -1999,6 +2022,8 @@ interface TransferDestinationBase {
   mode: TransferMode;
   /** Mensagem dita para quem recebe (modos warm que exigem mensagem). */
   warmMessage: string;
+  /** Método usado no tronco SIP para transferências diretas (blind). */
+  sipVerb: TransferSipVerb;
 }
 
 type TransferDestination =
@@ -2010,7 +2035,9 @@ const EMPTY_TRANSFER_FIELDS: TransferDestinationBase = {
   message: "",
   mode: "blind-transfer",
   warmMessage: "",
+  sipVerb: "dial",
 };
+
 
 type TransferMessageType =
   | "request-start"
