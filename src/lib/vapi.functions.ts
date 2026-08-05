@@ -3282,10 +3282,21 @@ export interface CampaignCallDTO {
   status: string | null;
   endedReason: string | null;
   startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string | null;
   durationSec: number;
+  answered: boolean;
   assistantSpoke: boolean;
   assistantId: string | null;
   phoneNumberId: string | null;
+  fromNumber: string | null;
+  source: "campanha" | "teste";
+}
+
+export interface CampaignDiagnosticsDTO {
+  calls: CampaignCallDTO[];
+  // Última ligação avulsa (teste manual) da mesma assistente, para comparação.
+  reference: CampaignCallDTO | null;
 }
 
 export const listCampaignCalls = createServerFn({ method: "POST" })
@@ -3294,7 +3305,7 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
     if (!input?.campaignId) throw new Error("campaignId é obrigatório");
     return { campaignId: input.campaignId };
   })
-  .handler(async ({ data }): Promise<CampaignCallDTO[]> => {
+  .handler(async ({ data }): Promise<CampaignDiagnosticsDTO> => {
     const toList = (res: unknown) =>
       (Array.isArray(res)
         ? res
@@ -3304,43 +3315,74 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
 
     // A Vapi nem sempre aceita ?campaignId no GET /call (400). Tenta e cai para
     // a listagem recente filtrada localmente.
-    let list: Array<Record<string, unknown>> = [];
-    try {
-      list = toList(
-        await vapiFetch(`/call?campaignId=${encodeURIComponent(data.campaignId)}&limit=50`, {
-          method: "GET",
-        }),
-      );
-    } catch {
-      list = [];
-    }
+    const recent = toList(await vapiFetch(`/call?limit=100`, { method: "GET" }));
+    let list = recent.filter((c) => c["campaignId"] === data.campaignId);
     if (list.length === 0) {
-      const recent = toList(await vapiFetch(`/call?limit=100`, { method: "GET" }));
-      list = recent.filter((c) => c["campaignId"] === data.campaignId);
+      try {
+        list = toList(
+          await vapiFetch(`/call?campaignId=${encodeURIComponent(data.campaignId)}&limit=50`, {
+            method: "GET",
+          }),
+        );
+      } catch {
+        list = [];
+      }
     }
+
+    // Assistente usada pela campanha: serve para achar a ligação de teste
+    // equivalente (mesma assistente, fora de campanha).
+    const campaignAssistantId = list
+      .map((c) => (typeof c["assistantId"] === "string" ? (c["assistantId"] as string) : null))
+      .find(Boolean) as string | undefined;
+
+    const referenceRaw =
+      campaignAssistantId != null
+        ? recent.find(
+            (c) => !c["campaignId"] && c["assistantId"] === campaignAssistantId && c["endedAt"],
+          )
+        : undefined;
+
+    const fetchDetail = async (c: Record<string, unknown>) => {
+      const id = String(c["id"] ?? "");
+      if (!id) return c;
+      try {
+        const full = (await vapiFetch(`/call/${id}`, { method: "GET" })) as Record<
+          string,
+          unknown
+        > | null;
+        return full ? { ...c, ...full } : c;
+      } catch {
+        return c;
+      }
+    };
 
     // A listagem não traz `messages`; busca o detalhe das primeiras chamadas
     // para saber se a assistente chegou a falar.
-    const detailed = await Promise.all(
-      list.slice(0, 20).map(async (c) => {
-        const id = String(c["id"] ?? "");
-        if (!id) return c;
-        try {
-          const full = (await vapiFetch(`/call/${id}`, { method: "GET" })) as Record<
-            string,
-            unknown
-          > | null;
-          return full ? { ...c, ...full } : c;
-        } catch {
-          return c;
-        }
-      }),
-    );
-    list = detailed;
+    const detailed = await Promise.all(list.slice(0, 20).map(fetchDetail));
+    const referenceDetailed = referenceRaw ? await fetchDetail(referenceRaw) : null;
 
+    // Resolve o número E.164 de origem de cada phoneNumberId (cache local).
+    const numberCache = new Map<string, string | null>();
+    const resolveFrom = async (phoneNumberId: string | null) => {
+      if (!phoneNumberId) return null;
+      if (numberCache.has(phoneNumberId)) return numberCache.get(phoneNumberId) ?? null;
+      let value: string | null = null;
+      try {
+        const pn = (await vapiFetch(`/phone-number/${phoneNumberId}`, {
+          method: "GET",
+        })) as { number?: string; name?: string } | null;
+        value = pn?.number ?? pn?.name ?? null;
+      } catch {
+        value = null;
+      }
+      numberCache.set(phoneNumberId, value);
+      return value;
+    };
 
-
-    return list.map((c) => {
+    const mapCall = async (
+      c: Record<string, unknown>,
+      source: "campanha" | "teste",
+    ): Promise<CampaignCallDTO> => {
       const startedAt = typeof c["startedAt"] === "string" ? (c["startedAt"] as string) : null;
       const endedAt = typeof c["endedAt"] === "string" ? (c["endedAt"] as string) : null;
       const artifact = (c["artifact"] ?? {}) as { messages?: unknown; transcript?: unknown };
@@ -3358,16 +3400,23 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
             ? artifact.transcript
             : "";
       const customer = (c["customer"] ?? {}) as { number?: string };
+      const phoneNumberId =
+        typeof c["phoneNumberId"] === "string" ? (c["phoneNumberId"] as string) : null;
+      const inlineFrom = (c["phoneNumber"] ?? {}) as { number?: string };
       return {
         id: String(c["id"] ?? ""),
         customerNumber: customer.number ?? null,
         status: typeof c["status"] === "string" ? (c["status"] as string) : null,
         endedReason: typeof c["endedReason"] === "string" ? (c["endedReason"] as string) : null,
         startedAt,
+        endedAt,
+        createdAt: typeof c["createdAt"] === "string" ? (c["createdAt"] as string) : null,
         durationSec:
           startedAt && endedAt
             ? Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000))
             : 0,
+        // `startedAt` só existe quando a Vapi considerou a chamada conectada.
+        answered: Boolean(startedAt),
         assistantSpoke:
           messages.some(
             (m) =>
@@ -3375,11 +3424,18 @@ export const listCampaignCalls = createServerFn({ method: "POST" })
               typeof m["message"] === "string" &&
               (m["message"] as string).trim().length > 0,
           ) || /(^|\n)\s*ai:/i.test(transcript),
-
         assistantId: typeof c["assistantId"] === "string" ? (c["assistantId"] as string) : null,
-        phoneNumberId:
-          typeof c["phoneNumberId"] === "string" ? (c["phoneNumberId"] as string) : null,
+        phoneNumberId,
+        fromNumber: inlineFrom.number ?? (await resolveFrom(phoneNumberId)),
+        source,
       };
-    });
+    };
+
+    const calls: CampaignCallDTO[] = [];
+    for (const c of detailed) calls.push(await mapCall(c, "campanha"));
+    const reference = referenceDetailed ? await mapCall(referenceDetailed, "teste") : null;
+
+    return { calls, reference };
   });
+
 
