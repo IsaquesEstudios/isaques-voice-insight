@@ -750,7 +750,9 @@ function CampanhasPage() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
+
 
           <DialogFooter>
             <Button variant="outline" onClick={() => void diagQuery.refetch()}>
