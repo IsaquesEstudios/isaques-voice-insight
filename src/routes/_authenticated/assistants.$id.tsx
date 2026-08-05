@@ -2024,6 +2024,8 @@ interface TransferDestinationBase {
   warmMessage: string;
   /** Método usado no tronco SIP para transferências diretas (blind). */
   sipVerb: TransferSipVerb;
+  /** O que a IA fala se a transferência falhar (mantém a ligação viva). */
+  fallbackMessage: string;
 }
 
 type TransferDestination =
@@ -2036,6 +2038,8 @@ const EMPTY_TRANSFER_FIELDS: TransferDestinationBase = {
   mode: "blind-transfer",
   warmMessage: "",
   sipVerb: "dial",
+  fallbackMessage:
+    "Não consegui completar a transferência agora. Posso continuar te ajudando por aqui.",
 };
 
 
@@ -2410,6 +2414,10 @@ function ToolsTab({
               sipVerb: (typeof d?.transferPlan?.sipVerb === "string"
                 ? d.transferPlan.sipVerb
                 : "dial") as TransferSipVerb,
+              fallbackMessage:
+                typeof d?.transferPlan?.fallbackPlan?.message === "string"
+                  ? d.transferPlan.fallbackPlan.message
+                  : EMPTY_TRANSFER_FIELDS.fallbackMessage,
             };
             return d?.type === "sip"
               ? { type: "sip", sipUri: String(d.sipUri ?? ""), ...base }
@@ -2721,6 +2729,15 @@ function ToolsTab({
           // Só os modos "blind" passam pelo tronco via REFER/dial.
           if (d.mode.startsWith("blind-transfer")) {
             transferPlan.sipVerb = d.sipVerb || "dial";
+            if ((d.sipVerb || "dial") === "dial") transferPlan.dialTimeout = 45;
+            // Se a perna de transferência falhar, a IA volta para o cliente em
+            // vez de derrubar a ligação.
+            if (d.fallbackMessage.trim()) {
+              transferPlan.fallbackPlan = {
+                message: d.fallbackMessage.trim(),
+                endCallEnabled: false,
+              };
+            }
           }
           return {
             ...(d.type === "number"
@@ -3773,6 +3790,21 @@ function ToolsTab({
                                     <p className="text-[10px] text-muted-foreground/70">
                                       {SIP_VERB_OPTIONS.find((o) => o.value === d.sipVerb)?.hint}
                                     </p>
+                                    <div className="space-y-1.5 pt-2">
+                                      <Label className="text-[11px] font-medium text-muted-foreground">
+                                        Mensagem se a transferência falhar
+                                      </Label>
+                                      <Input
+                                        value={d.fallbackMessage}
+                                        onChange={(e) => patch({ fallbackMessage: e.target.value })}
+                                        placeholder="Não consegui completar a transferência agora..."
+                                        className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                      />
+                                      <p className="text-[10px] text-muted-foreground/70">
+                                        A IA fala isso e continua o atendimento em vez de desligar
+                                        quando o tronco recusa a transferência.
+                                      </p>
+                                    </div>
                                   </div>
                                 )}
 

@@ -352,6 +352,19 @@ function sanitizeTransferDestination(destination: any): any {
       if (mode.startsWith("blind-transfer")) {
         const verb = destination.transferPlan.sipVerb;
         plan.sipVerb = verb === "refer" || verb === "bye" ? verb : "dial";
+        const dialTimeout = destination.transferPlan.dialTimeout;
+        if (plan.sipVerb === "dial" && typeof dialTimeout === "number" && dialTimeout > 0) {
+          plan.dialTimeout = Math.min(600, Math.max(1, Math.round(dialTimeout)));
+        }
+        // Sem fallbackPlan a Vapi encerra a chamada quando o tronco recusa a
+        // transferência — foi o "desligou ao transferir" relatado.
+        const fb = destination.transferPlan.fallbackPlan;
+        if (fb && typeof fb === "object" && typeof fb.message === "string" && fb.message.trim()) {
+          plan.fallbackPlan = {
+            message: fb.message.trim(),
+            endCallEnabled: fb.endCallEnabled === true,
+          };
+        }
       }
       out.transferPlan = plan;
     }
