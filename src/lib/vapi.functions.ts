@@ -199,7 +199,65 @@ async function vapiFetchWithKey(
         "Content-Type": "application/json",
         ...(init.headers ?? {}),
       },
+  });
+
+// Diagnóstico: chamadas geradas por uma campanha, com motivo de encerramento.
+export interface CampaignCallDTO {
+  id: string;
+  customerNumber: string | null;
+  status: string | null;
+  endedReason: string | null;
+  startedAt: string | null;
+  durationSec: number;
+  assistantSpoke: boolean;
+  assistantId: string | null;
+  phoneNumberId: string | null;
+}
+
+export const listCampaignCalls = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .inputValidator((input: { campaignId: string }) => {
+    if (!input?.campaignId) throw new Error("campaignId é obrigatório");
+    return { campaignId: input.campaignId };
+  })
+  .handler(async ({ data }): Promise<CampaignCallDTO[]> => {
+    const res = await vapiFetch(
+      `/call?campaignId=${encodeURIComponent(data.campaignId)}&limit=50`,
+      { method: "GET" },
+    );
+    const list = (
+      Array.isArray(res) ? res : ((res as { results?: unknown[] } | null)?.results ?? [])
+    ) as Array<Record<string, unknown>>;
+
+    return list.map((c) => {
+      const startedAt = typeof c["startedAt"] === "string" ? (c["startedAt"] as string) : null;
+      const endedAt = typeof c["endedAt"] === "string" ? (c["endedAt"] as string) : null;
+      const messages = Array.isArray(c["messages"])
+        ? (c["messages"] as Array<Record<string, unknown>>)
+        : [];
+      const customer = (c["customer"] ?? {}) as { number?: string };
+      return {
+        id: String(c["id"] ?? ""),
+        customerNumber: customer.number ?? null,
+        status: typeof c["status"] === "string" ? (c["status"] as string) : null,
+        endedReason: typeof c["endedReason"] === "string" ? (c["endedReason"] as string) : null,
+        startedAt,
+        durationSec:
+          startedAt && endedAt
+            ? Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000))
+            : 0,
+        assistantSpoke: messages.some(
+          (m) =>
+            (m["role"] === "bot" || m["role"] === "assistant") &&
+            typeof m["message"] === "string" &&
+            (m["message"] as string).trim().length > 0,
+        ),
+        assistantId: typeof c["assistantId"] === "string" ? (c["assistantId"] as string) : null,
+        phoneNumberId:
+          typeof c["phoneNumberId"] === "string" ? (c["phoneNumberId"] as string) : null,
+      };
     });
+  });
     if (res.ok) {
       if (res.status === 204) return null;
       const text = await res.text();
