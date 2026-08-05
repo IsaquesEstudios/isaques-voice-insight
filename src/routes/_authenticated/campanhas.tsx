@@ -272,6 +272,14 @@ function CampanhasPage() {
   const [csv, setCsv] = useState<ParsedCsv | null>(null);
   const [fileName, setFileName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<VapiCampaignDTO | null>(null);
+  const [diagCampaign, setDiagCampaign] = useState<VapiCampaignDTO | null>(null);
+
+  const fetchCampaignCalls = useServerFn(listCampaignCalls);
+  const diagQuery = useQuery({
+    queryKey: ["vapi", "campaign-calls", diagCampaign?.id],
+    queryFn: () => fetchCampaignCalls({ data: { campaignId: diagCampaign!.id } }),
+    enabled: !!diagCampaign,
+  });
 
   const assistantName = useMemo(() => {
     const map = new Map<string, string>();
