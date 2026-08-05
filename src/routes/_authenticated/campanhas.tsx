@@ -14,6 +14,7 @@ import {
   Users,
   PhoneOutgoing,
   CheckCircle2,
+  Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -65,6 +66,7 @@ import {
   deleteVapiCampaign,
   listVapiAssistants,
   listVapiPhoneNumbers,
+  listCampaignCalls,
   type VapiCampaignDTO,
 } from "@/lib/vapi.functions";
 
@@ -209,6 +211,31 @@ function campaignProgress(c: VapiCampaignDTO) {
   return Math.min(100, Math.round((c.counters.ended / total) * 100));
 }
 
+// Motivos de encerramento da Vapi traduzidos (diagnóstico das ligações).
+const ENDED_REASON_LABEL: Record<string, string> = {
+  "silence-timeout-reached": "Silêncio: ninguém falou e a chamada caiu",
+  "customer-did-not-answer": "Cliente não atendeu",
+  "customer-did-not-give-microphone-permission": "Sem permissão de microfone",
+  "customer-busy": "Linha ocupada",
+  "customer-ended-call": "Cliente desligou",
+  "assistant-ended-call": "Assistente encerrou a chamada",
+  "assistant-said-end-call-phrase": "Assistente encerrou com frase final",
+  "assistant-forwarded-call": "Chamada transferida",
+  "voicemail": "Caiu na caixa postal",
+  "exceeded-max-duration": "Duração máxima atingida",
+  "manually-canceled": "Cancelada manualmente",
+  "phone-call-provider-closed-websocket": "Áudio interrompido pela operadora (SIP)",
+};
+
+function endedReasonLabel(reason: string | null): string {
+  if (!reason) return "—";
+  if (ENDED_REASON_LABEL[reason]) return ENDED_REASON_LABEL[reason];
+  if (reason.startsWith("pipeline-error")) return `Erro de processamento de voz (${reason})`;
+  if (reason.startsWith("assistant-request")) return `Erro ao carregar a assistente (${reason})`;
+  if (reason.includes("transport")) return `Falha de transporte de áudio (${reason})`;
+  return reason;
+}
+
 // --- Page -------------------------------------------------------------------
 
 function CampanhasPage() {
@@ -245,6 +272,14 @@ function CampanhasPage() {
   const [csv, setCsv] = useState<ParsedCsv | null>(null);
   const [fileName, setFileName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<VapiCampaignDTO | null>(null);
+  const [diagCampaign, setDiagCampaign] = useState<VapiCampaignDTO | null>(null);
+
+  const fetchCampaignCalls = useServerFn(listCampaignCalls);
+  const diagQuery = useQuery({
+    queryKey: ["vapi", "campaign-calls", diagCampaign?.id],
+    queryFn: () => fetchCampaignCalls({ data: { campaignId: diagCampaign!.id } }),
+    enabled: !!diagCampaign,
+  });
 
   const assistantName = useMemo(() => {
     const map = new Map<string, string>();
@@ -426,6 +461,10 @@ function CampanhasPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setDiagCampaign(c)}>
+                            <Stethoscope className="mr-1 h-3.5 w-3.5" />
+                            Diagnóstico
+                          </Button>
                           {c.status !== "ended" && (
                             <Button
                               size="sm"
@@ -616,6 +655,81 @@ function CampanhasPage() {
               )}
               Iniciar campanha
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!diagCampaign} onOpenChange={(v) => !v && setDiagCampaign(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Diagnóstico das ligações</DialogTitle>
+            <DialogDescription>
+              Últimas chamadas da campanha “{diagCampaign?.name}” com o motivo real de
+              encerramento informado pela plataforma de voz.
+            </DialogDescription>
+          </DialogHeader>
+
+          {diagQuery.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : diagQuery.isError ? (
+            <p className="py-6 text-center text-sm text-destructive">
+              {translateError(diagQuery.error as Error)}
+            </p>
+          ) : (diagQuery.data ?? []).length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma ligação registrada nesta campanha ainda.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Duração</TableHead>
+                  <TableHead>IA falou?</TableHead>
+                  <TableHead>Motivo do encerramento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(diagQuery.data ?? []).map((call) => (
+                  <TableRow key={call.id}>
+                    <TableCell className="font-mono text-xs">
+                      {call.customerNumber ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {call.status ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {call.durationSec ? `${call.durationSec}s` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          call.assistantSpoke
+                            ? "border-emerald-500/30 text-emerald-400"
+                            : "border-amber-500/30 text-amber-400"
+                        }
+                      >
+                        {call.assistantSpoke ? "Sim" : "Não"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">{endedReasonLabel(call.endedReason)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => void diagQuery.refetch()}>
+              Atualizar
+            </Button>
+            <Button onClick={() => setDiagCampaign(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
