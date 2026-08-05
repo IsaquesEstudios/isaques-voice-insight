@@ -930,19 +930,19 @@ type AttachAssistantResult =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VapiPhoneNumberRaw = Record<string, any> & { id: string };
 
-/* ---------------- Nvoip (BYO SIP Trunk) ---------------- */
+/* ---------------- Tronco SIP do usuário (BYO SIP Trunk) ---------------- */
 
-type NvoipTrunk = {
+type SipTrunk = {
   sipHost: string;
   sipUsername: string;
   sipPassword: string;
   vapiCredentialId: string | null;
 };
 
-async function loadNvoipTrunk(
+async function loadSipTrunk(
   supabase: SupabaseClient,
   userId: string,
-): Promise<NvoipTrunk | null> {
+): Promise<SipTrunk | null> {
   const { data, error } = await supabase
     .from("user_nvoip_credentials")
     .select("sip_host, sip_username, sip_password, vapi_credential_id")
@@ -950,8 +950,9 @@ async function loadNvoipTrunk(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
+  if (!data.sip_host || !data.sip_username) return null;
   return {
-    sipHost: (data.sip_host as string) ?? "sip.nvoip.com.br",
+    sipHost: data.sip_host as string,
     sipUsername: data.sip_username as string,
     sipPassword: data.sip_password as string,
     vapiCredentialId: (data.vapi_credential_id as string | null) ?? null,
@@ -959,12 +960,12 @@ async function loadNvoipTrunk(
 }
 
 // Cria (ou reaproveita) a credencial `byo-sip-trunk` da Vapi apontando para o
-// tronco SIP da Nvoip. A Vapi não tem provider nativo "nvoip" — este é o
-// caminho oficial para provedores de telefonia externos.
-async function ensureNvoipCredentialId(
+// tronco SIP informado pelo usuário — caminho oficial da Vapi para operadoras
+// externas.
+async function ensureSipCredentialId(
   supabase: SupabaseClient,
   userId: string,
-  trunk: NvoipTrunk,
+  trunk: SipTrunk,
 ): Promise<string> {
   if (trunk.vapiCredentialId) {
     try {
@@ -978,7 +979,7 @@ async function ensureNvoipCredentialId(
     method: "POST",
     body: JSON.stringify({
       provider: "byo-sip-trunk",
-      name: `Nvoip (${trunk.sipUsername})`,
+      name: `SIP (${trunk.sipUsername})`,
       gateways: [{ ip: trunk.sipHost }],
       outboundAuthenticationPlan: {
         authUsername: trunk.sipUsername,
@@ -996,15 +997,15 @@ async function ensureNvoipCredentialId(
   return created.id;
 }
 
-// Recria/atualiza a credencial SIP da Nvoip na Vapi sob demanda.
-export const ensureNvoipSipCredential = createServerFn({ method: "POST" })
+// Recria/atualiza a credencial do tronco SIP na Vapi sob demanda.
+export const ensureSipCredential = createServerFn({ method: "POST" })
   .middleware([withVapiCredentials])
   .handler(async ({ context }) => {
-    const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+    const trunk = await loadSipTrunk(context.supabase, context.userId);
     if (!trunk)
-      return { ok: false as const, message: "Conecte sua conta Nvoip primeiro." };
+      return { ok: false as const, message: "Conecte seu tronco SIP primeiro." };
     try {
-      const credentialId = await ensureNvoipCredentialId(
+      const credentialId = await ensureSipCredentialId(
         context.supabase,
         context.userId,
         trunk,
@@ -1028,7 +1029,7 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
     if (!Array.isArray(data)) return [];
     return (data as VapiPhoneNumberRaw[]).map((n) => ({
       id: n.id,
-      provider: (n.provider as string) ?? "nvoip",
+      provider: (n.provider as string) ?? "sip",
       number: (n.number as string | undefined) ?? null,
       name: (n.name as string | undefined) ?? null,
       assistantId: (n.assistantId as string | undefined) ?? null,
@@ -1130,7 +1131,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
 
 
     let vapiNumberId: string;
-    let mirrorProvider = "nvoip";
+    let mirrorProvider = "sip";
 
     if (existing) {
       const patched = (await vapiFetch(`/phone-number/${existing.id}`, {
@@ -1144,7 +1145,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
         .slice(0, 40) || "Numero";
 
       // Único transporte: o tronco SIP do usuário (BYO SIP Trunk na Vapi).
-      const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+      const trunk = await loadSipTrunk(context.supabase, context.userId);
       if (!trunk) {
         return {
           ok: false,
@@ -1154,7 +1155,7 @@ export const attachAssistantToNumber = createServerFn({ method: "POST" })
         };
       }
 
-      const credentialId = await ensureNvoipCredentialId(
+      const credentialId = await ensureSipCredentialId(
         context.supabase,
         context.userId,
         trunk,
@@ -1270,13 +1271,13 @@ export const resyncVapiNumberCredentials = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+    const trunk = await loadSipTrunk(context.supabase, context.userId);
     if (!trunk)
       return {
         ok: false as const,
         message: "Conecte seu tronco SIP antes de ressincronizar o número.",
       };
-    const credentialId = await ensureNvoipCredentialId(
+    const credentialId = await ensureSipCredentialId(
       context.supabase,
       context.userId,
       trunk,
@@ -1349,12 +1350,12 @@ export const createOutboundTestCall = createServerFn({ method: "POST" })
       if (existing) {
         phoneNumberId = existing.id;
       } else {
-        const trunk = await loadNvoipTrunk(context.supabase, context.userId);
+        const trunk = await loadSipTrunk(context.supabase, context.userId);
         if (!trunk)
           throw new Error(
             "Conecte seu tronco SIP para usar este número como origem.",
           );
-        const credentialId = await ensureNvoipCredentialId(
+        const credentialId = await ensureSipCredentialId(
           context.supabase,
           context.userId,
           trunk,
@@ -2288,7 +2289,7 @@ export const getSetupStatus = createServerFn({ method: "GET" })
 
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [vapiRes, nvoipRes] = await Promise.all([
+    const [vapiRes, sipRes] = await Promise.all([
       context.supabase
         .from("user_vapi_credentials")
         .select("user_id, public_key")
@@ -2302,12 +2303,12 @@ export const getSetupStatus = createServerFn({ method: "GET" })
     ]);
     const vapiRow = vapiRes.data as { public_key: string | null } | null;
     const hasVapiPublicKey = !!(vapiRow?.public_key && vapiRow.public_key.trim().length > 0);
-    const nvoip = !!nvoipRes.data;
+    const sip = !!sipRes.data;
     return {
       vapi: !!vapiRes.data && hasVapiPublicKey,
-      // `telefonia`: tronco SIP do usuário configurado.
-      telefonia: nvoip,
-      nvoip,
+      // `telefonia`: tronco SIP do usuário configurado (opcional).
+      telefonia: sip,
+      sip,
       vapiPrivateOnly: !!vapiRes.data && !hasVapiPublicKey,
     };
 

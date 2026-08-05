@@ -74,13 +74,11 @@ import {
 
 
 import {
-  disconnectNvoip,
-  getNvoipConnection,
-  getNvoipBalance,
-  listNvoipNumbers,
-  registerNvoipNumber,
-  saveNvoipCredentials,
-} from "@/lib/nvoip.functions";
+  disconnectSipTrunk,
+  getSipConnection,
+  registerSipNumber,
+  saveSipTrunk,
+} from "@/lib/sip.functions";
 
 
 
@@ -181,13 +179,11 @@ function TelefoniaPage() {
 
 
 
-  // Nvoip (provedor principal — conta de revendedor)
-  const getNvoipConnFn = useServerFn(getNvoipConnection);
-  const saveNvoipCredsFn = useServerFn(saveNvoipCredentials);
-  const disconnectNvoipFn = useServerFn(disconnectNvoip);
-  const listNvoipNumbersFn = useServerFn(listNvoipNumbers);
-  const registerNvoipNumberFn = useServerFn(registerNvoipNumber);
-  const getNvoipBalanceFn = useServerFn(getNvoipBalance);
+  // Tronco SIP do próprio usuário (opcional)
+  const getSipConnFn = useServerFn(getSipConnection);
+  const saveSipTrunkFn = useServerFn(saveSipTrunk);
+  const disconnectSipFn = useServerFn(disconnectSipTrunk);
+  const registerSipNumberFn = useServerFn(registerSipNumber);
 
   // Contatos de teste (armazenados localmente, sem depender de operadora)
   const listTestContactsFn = useServerFn(listTestContacts);
@@ -211,23 +207,12 @@ function TelefoniaPage() {
   });
 
 
-  const nvoipConnQuery = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnFn(),
+  const sipConnQuery = useQuery({
+    queryKey: ["sip-connection"],
+    queryFn: () => getSipConnFn(),
   });
-  const nvoipConn = nvoipConnQuery.data;
-  const isNvoipConnected = nvoipConn?.connected === true;
-
-  const nvoipNumbersQuery = useQuery({
-    queryKey: ["nvoip-numbers-live"],
-    queryFn: () => listNvoipNumbersFn(),
-    enabled: isNvoipConnected,
-  });
-  const nvoipBalanceQuery = useQuery({
-    queryKey: ["nvoip-balance"],
-    queryFn: () => getNvoipBalanceFn(),
-    enabled: isNvoipConnected,
-  });
+  const sipConn = sipConnQuery.data;
+  const isSipConnected = sipConn?.connected === true;
 
 
 
@@ -258,44 +243,14 @@ function TelefoniaPage() {
   }, [vapiPhoneNumbersQuery.data]);
 
   const localNumbers = (numbersQuery.data ?? []) as unknown as NumberRow[];
-  const liveNvoip = nvoipNumbersQuery.data?.connected
-    ? nvoipNumbersQuery.data.numbers
-    : [];
-  const nvoipWarning =
-    nvoipNumbersQuery.data && "warning" in nvoipNumbersQuery.data
-      ? (nvoipNumbersQuery.data.warning as string | undefined)
-      : undefined;
 
-  // Só existe um provedor: o tronco SIP do próprio usuário. As linhas locais
-  // são a base; os DIDs retornados pela API entram logo abaixo.
+  // Base: números registrados localmente. Os números da conta Vapi entram logo abaixo.
   const numbers: NumberRow[] = localNumbers.map((n) => {
     const assistantId = assistantByPhone.get(n.phone_number);
     const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
     return { ...n, assistant: assistantName ?? n.assistant };
   });
 
-
-
-  // DIDs vindos direto da conta Nvoip (revendedor) entram na mesma tabela.
-  for (const d of liveNvoip) {
-    const existing = numbers.find((row) => row.phone_number === d.number);
-    if (existing) {
-      existing.provider = "Nvoip";
-      continue;
-    }
-    const local = localNumbers.find((l) => l.phone_number === d.number);
-    const assistantId = assistantByPhone.get(d.number);
-    numbers.push({
-      id: local?.id ?? `nvoip-${d.number}`,
-      phone_number: d.number,
-      region: d.label ?? local?.region ?? null,
-      provider: "Nvoip",
-      assistant: assistantId ? assistantById.get(assistantId) ?? null : local?.assistant ?? null,
-      calls_today: local?.calls_today ?? 0,
-      answer_rate: local?.answer_rate ?? 0,
-      health: "Seguro" as Health,
-    });
-  }
 
   // Any number registered inside Vapi (números gratuitos da Vapi ou DIDs do tronco SIP
   // imported into Vapi) is usable as origin — append the ones not listed yet.
@@ -350,7 +305,7 @@ function TelefoniaPage() {
 
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
-  // Contatos de teste ficam salvos na própria plataforma: a Nvoip não possui
+  // Contatos de teste ficam salvos na própria plataforma: o tronco SIP não possui
   // um serviço externo de verificação por OTP.
   const testContactsQuery = useQuery({
     queryKey: ["test-contacts"],
@@ -548,18 +503,15 @@ function TelefoniaPage() {
 
     setConnecting(true);
     try {
-      await saveNvoipCredsFn({
+      await saveSipTrunkFn({
         data: {
-          apiKey: sipForm.apiKey.trim(),
-          clientId: "",
-          clientSecret: "",
           sipHost: host,
           sipUsername: user,
           sipPassword: pass,
           friendlyLabel: sipForm.label.trim() || undefined,
         },
       });
-      const res = await registerNvoipNumberFn({
+      const res = await registerSipNumberFn({
         data: { phoneNumber: did, friendlyName: didName },
       });
       toast.success(
@@ -567,9 +519,7 @@ function TelefoniaPage() {
           ? "Tronco SIP salvo. Este número já estava cadastrado."
           : "Tronco SIP conectado e número cadastrado!",
       );
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      await queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
       setOpen(false);
       resetModal();
@@ -582,15 +532,14 @@ function TelefoniaPage() {
 
 
   const disconnectMutation = useMutation({
-    mutationFn: () => disconnectNvoipFn(),
+    mutationFn: () => disconnectSipFn(),
     onSuccess: async () => {
-      toast.success("Conta Nvoip desconectada.");
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      await queryClient.invalidateQueries({ queryKey: ["nvoip-numbers-live"] });
+      toast.success("Tronco SIP desconectado.");
+      await queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
       setConfirmDisconnect(false);
     },
     onError: (err) =>
-      toast.error(translateError(err, "Falha ao desconectar Nvoip")),
+      toast.error(translateError(err, "Falha ao desconectar o tronco SIP")),
   });
 
   const releaseMutation = useMutation({
@@ -698,7 +647,7 @@ function TelefoniaPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isNvoipConnected && nvoipConn ? (
+            {isSipConnected && sipConn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -706,10 +655,7 @@ function TelefoniaPage() {
                     className="gap-2 border-success/40 bg-success/10 text-success hover:bg-success/15 hover:text-success"
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    Nvoip: {nvoipConn.friendlyLabel || nvoipConn.sipUsername}
-                    {nvoipBalanceQuery.data?.available
-                      ? ` · ${nvoipBalanceQuery.data.currency} ${nvoipBalanceQuery.data.balance.toFixed(2)}`
-                      : ""}
+                    SIP: {sipConn.friendlyLabel || sipConn.sipUsername}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -726,7 +672,7 @@ function TelefoniaPage() {
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Desconectar Nvoip
+                    Desconectar tronco SIP
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1040,9 +986,9 @@ function TelefoniaPage() {
                                   setOpen(true);
                                 }}
                               >
-                                {isNvoipConnected
-                                  ? "Cadastrar DID Nvoip"
-                                  : "Conectar Nvoip"}
+                                {isSipConnected
+                                  ? "Cadastrar número do tronco SIP"
+                                  : "Conectar número"}
                               </button>{" "}
                               para poder disparar testes.
                             </AlertDescription>
@@ -1136,43 +1082,34 @@ function TelefoniaPage() {
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Rota ativa (SIP Trunk Nvoip)
+              Rota ativa (tronco SIP)
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {!isNvoipConnected ? (
+            {!isSipConnected ? (
               <p className="text-xs text-muted-foreground">
-                Conecte sua conta Nvoip (revendedor) para exibir o tronco SIP usado
-                nas chamadas.
+                Nenhum tronco SIP conectado. É opcional: você pode usar números da
+                sua própria conta Vapi ou conectar o tronco da sua operadora.
               </p>
             ) : (
-              <>
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">
-                      {nvoipConn?.friendlyLabel || "Tronco Nvoip"}
-                    </p>
-                    <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                      ativo
-                    </span>
-                  </div>
-                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                    {nvoipConn?.sipUsername}@{nvoipConn?.sipHost}
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">
+                    {sipConn?.friendlyLabel || "Tronco SIP"}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {liveNvoip.length} DIDs na conta
-                    {nvoipConn?.vapiCredentialId ? " • credencial Vapi vinculada" : ""}
-                  </p>
+                  <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                    ativo
+                  </span>
                 </div>
-                {nvoipWarning ? (
-                  <Alert className="border-warning/30 bg-warning/10 md:col-span-2">
-                    <AlertTriangle className="h-4 w-4 text-warning" />
-                    <AlertDescription className="text-[11px] text-muted-foreground">
-                      Não foi possível listar os DIDs pela API da Nvoip: {nvoipWarning}
-                    </AlertDescription>
-                  </Alert>
-                ) : null}
-              </>
+                <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                  {sipConn?.sipUsername}@{sipConn?.sipHost}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {sipConn?.vapiCredentialId
+                    ? "credencial Vapi vinculada"
+                    : "credencial Vapi ainda não vinculada"}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1196,7 +1133,7 @@ function TelefoniaPage() {
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
               Cadastre um número seu para receber as ligações de teste da assistente.
-              A Nvoip disca direto pelo tronco SIP, sem verificação por SMS.
+              O tronco SIP disca direto, sem verificação por SMS.
             </DialogDescription>
           </DialogHeader>
 
@@ -1341,15 +1278,6 @@ function TelefoniaPage() {
                 </div>
               </div>
 
-              <div className="grid gap-1.5">
-                <Label>Chave de API da operadora (opcional)</Label>
-                <Input
-                  type="password"
-                  placeholder="Usada apenas para listar DIDs e saldo, se houver"
-                  value={sipForm.apiKey}
-                  onChange={(e) => setSipForm({ ...sipForm, apiKey: e.target.value })}
-                />
-              </div>
 
               <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3">
                 <p className="text-[11px] text-muted-foreground">
@@ -1431,9 +1359,9 @@ function TelefoniaPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desconectar conta Nvoip?</AlertDialogTitle>
+            <AlertDialogTitle>Desconectar tronco SIP?</AlertDialogTitle>
             <AlertDialogDescription>
-              Suas credenciais Nvoip (API e tronco SIP) serão removidas deste app.
+              As credenciais do seu tronco SIP serão removidas deste app.
               Os números continuam listados, mas as chamadas ficarão bloqueadas até
               você reconectar.
             </AlertDialogDescription>

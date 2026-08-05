@@ -9,7 +9,6 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
-  Phone,
   ShieldCheck,
 } from "lucide-react";
 
@@ -23,12 +22,7 @@ import {
   saveVapiCredentials,
   updateVapiPublicKey,
 } from "@/lib/vapi.functions";
-import {
-  getNvoipConnection,
-  saveNvoipCredentials,
-} from "@/lib/nvoip.functions";
 
-import { cn } from "@/lib/utils";
 import { resetSetupCache } from "./route";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -37,15 +31,15 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
       { title: "Onboarding — Isaques Estúdios | AI Voice" },
       {
         name: "description",
-        content: "Conecte sua chave Vapi e seu tronco SIP para começar.",
+        content: "Conecte sua chave Vapi para começar a usar as assistentes de voz.",
       },
     ],
   }),
-  // Se todas as credenciais já estão salvas, nem abre a tela — vai direto ao painel.
+  // Se a Vapi já está conectada, nem abre a tela — vai direto ao painel.
   beforeLoad: async () => {
     try {
       const status = await getSetupStatus();
-      if (status?.vapi && status?.telefonia) {
+      if (status?.vapi) {
         throw redirect({ to: "/dashboard" });
       }
     } catch (e) {
@@ -64,41 +58,18 @@ function OnboardingPage() {
     queryKey: ["setup-status"],
     queryFn: () => getSetupStatus(),
   });
-  
 
-  const nvoipConn = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnection(),
-  });
-
-  const [step, setStep] = useState<1 | 2>(1);
   const [vapiKey, setVapiKey] = useState("");
   const [vapiPublicKey, setVapiPublicKey] = useState("");
-  const [nvoipForm, setNvoipForm] = useState({
-    apiKey: "",
-    sipHost: "sip.nvoip.com.br",
-    sipUsername: "",
-    sipPassword: "",
-  });
-
   const [editVapi, setEditVapi] = useState(false);
 
-  // Etapa 1 = Nvoip (telefonia), Etapa 2 = Vapi.
-  // Se a telefonia já está conectada e a Vapi não, pula para o passo 2.
+  // Única integração obrigatória: a Vapi.
   useEffect(() => {
-    if (status.data?.telefonia && !status.data?.vapi) {
-      setStep(2);
-    }
-  }, [status.data?.vapi, status.data?.telefonia]);
-
-  // Se ambos já estão conectados, mandar direto para o dashboard.
-  useEffect(() => {
-    if (status.data?.vapi && status.data?.telefonia) {
+    if (status.data?.vapi) {
       resetSetupCache();
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [status.data?.vapi, status.data?.telefonia, navigate]);
-
+  }, [status.data?.vapi, navigate]);
 
   const vapiHasPrivateOnly = !!status.data?.vapiPrivateOnly;
 
@@ -117,33 +88,8 @@ function OnboardingPage() {
       qc.invalidateQueries({ queryKey: ["vapi-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
       navigate({ to: "/dashboard", replace: true });
-
-
-
     },
     onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
-  });
-
-  const saveNvoip = useMutation({
-    mutationFn: (v: {
-      apiKey: string;
-      sipHost: string;
-      sipUsername: string;
-      sipPassword: string;
-    }) => saveNvoipCredentials({ data: v }),
-    onSuccess: () => {
-      toast.success("Nvoip conectada!");
-      setNvoipForm({
-        apiKey: "",
-        sipHost: "sip.nvoip.com.br",
-        sipUsername: "",
-        sipPassword: "",
-      });
-      qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      qc.invalidateQueries({ queryKey: ["setup-status"] });
-      setStep(2);
-    },
-    onError: (e) => toast.error(translateError(e, "Falha ao salvar Nvoip")),
   });
 
   const handleLogout = async () => {
@@ -152,8 +98,6 @@ function OnboardingPage() {
   };
 
   const vapiReady = !!status.data?.vapi;
-  const telefoniaReady = nvoipConn.data?.connected;
-
 
   // Enquanto o status inicial não chega, evita renderizar o formulário errado
   // (pisca entre "só Public Key" e "os dois campos").
@@ -173,351 +117,171 @@ function OnboardingPage() {
             <ShieldCheck className="h-5 w-5" />
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Vamos conectar sua conta
+            Vamos conectar sua conta Vapi
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cada usuário usa suas próprias credenciais. Isso mantém seus dados,
+            Cada usuário usa suas próprias chaves. Isso mantém seus dados,
             assistentes e números totalmente vinculados à sua conta.
           </p>
         </div>
 
-        {/* Stepper */}
-        <div className="flex items-center justify-center gap-3">
-          <StepDot n={1} active={step === 1} done={!!telefoniaReady} label="Nvoip" />
-          <div className="h-px w-10 bg-white/[0.08]" />
-          <StepDot n={2} active={step === 2} done={!!vapiReady} label="Vapi" />
-        </div>
-
-        {step === 2 ? (
-
-          <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-3">
-                <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <KeyRound className="h-4 w-4" />
-                </div>
-                <div>
-                  <CardTitle className="text-base font-semibold">
-                    Etapa 2 · Vapi (voz + IA)
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Onde acontece a inteligência da sua assistente virtual.
-                  </p>
-                </div>
+        <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                <KeyRound className="h-4 w-4" />
               </div>
-              {vapiReady ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
-                  <Check className="h-3 w-3" /> Conectada
-                </span>
-              ) : null}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {vapiReady && !editVapi ? (
-                <>
-                  <div className="rounded-xl border border-success/25 bg-success/10 p-3 text-xs text-success-foreground">
-                    Sua conta Vapi já está conectada. Suas chaves ficam salvas e
-                    você não precisa preencher de novo a cada login.
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setEditVapi(true)}
-                      className="text-muted-foreground"
-                    >
-                      Trocar chaves
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        resetSetupCache();
-                        navigate({ to: "/dashboard", replace: true });
-                      }}
-                      className="gap-2 shadow-glow"
-                    >
-                      Ir para o painel <ArrowRight className="h-4 w-4" />
-                    </Button>
+              <div>
+                <CardTitle className="text-base font-semibold">
+                  Vapi (voz + IA)
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Onde acontece a inteligência da sua assistente virtual.
+                </p>
+              </div>
+            </div>
+            {vapiReady ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                <Check className="h-3 w-3" /> Conectada
+              </span>
+            ) : null}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {vapiReady && !editVapi ? (
+              <>
+                <div className="rounded-xl border border-success/25 bg-success/10 p-3 text-xs text-success-foreground">
+                  Sua conta Vapi já está conectada. Suas chaves ficam salvas e
+                  você não precisa preencher de novo a cada login.
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setEditVapi(true)}
+                    className="text-muted-foreground"
+                  >
+                    Trocar chaves
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      resetSetupCache();
+                      navigate({ to: "/dashboard", replace: true });
+                    }}
+                    className="gap-2 shadow-glow"
+                  >
+                    Ir para o painel <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground mb-1.5">
+                    Como encontrar sua chave Vapi
+                  </p>
+                  <ol className="list-decimal space-y-1 pl-4">
+                    <li>
+                      Acesse{" "}
+                      <a
+                        href="https://dashboard.vapi.ai/org/api-keys"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                      >
+                        dashboard.vapi.ai <ExternalLink className="h-3 w-3" />
+                      </a>{" "}
+                      e faça login.
+                    </li>
+                    <li>
+                      No menu lateral, clique em <span className="text-foreground">Organization</span> → <span className="text-foreground">API Keys</span>.
+                    </li>
+                    <li>
+                      Copie a <span className="text-foreground">Private Key</span> (começa com <code className="rounded bg-background/60 px-1">vapi_sk_…</code>) — usada para gerenciar assistentes.
+                    </li>
+                    <li>
+                      Copie também a <span className="text-foreground">Public Key</span> — necessária para o botão <span className="text-foreground">Testar no navegador</span>.
+                    </li>
+                  </ol>
+                </div>
 
+                {vapiHasPrivateOnly ? (
+                  <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+                    Sua Private Key já está salva. Falta apenas a{" "}
+                    <span className="font-semibold">Public Key</span> para liberar o
+                    teste no navegador e concluir o onboarding.
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
-                    <p className="font-semibold text-foreground mb-1.5">
-                      Como encontrar sua chave Vapi
-                    </p>
-                    <ol className="list-decimal space-y-1 pl-4">
-                      <li>
-                        Acesse{" "}
-                        <a
-                          href="https://dashboard.vapi.ai/org/api-keys"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-0.5 text-primary hover:underline"
-                        >
-                          dashboard.vapi.ai <ExternalLink className="h-3 w-3" />
-                        </a>{" "}
-                        e faça login.
-                      </li>
-                      <li>
-                        No menu lateral, clique em <span className="text-foreground">Organization</span> → <span className="text-foreground">API Keys</span>.
-                      </li>
-                      <li>
-                        Copie a <span className="text-foreground">Private Key</span> (começa com <code className="rounded bg-background/60 px-1">vapi_sk_…</code>) — usada para gerenciar assistentes.
-                      </li>
-                      <li>
-                        Copie também a <span className="text-foreground">Public Key</span> — necessária para o botão <span className="text-foreground">Testar no navegador</span>.
-                      </li>
-                    </ol>
-                  </div>
-
-                  {vapiHasPrivateOnly ? (
-                    <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
-                      Sua Private Key já está salva. Falta apenas a{" "}
-                      <span className="font-semibold">Public Key</span> para liberar o
-                      teste no navegador e concluir o onboarding.
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Vapi Private Key</Label>
-                      <Input
-                        type="password"
-                        placeholder="vapi_sk_…"
-                        value={vapiKey}
-                        onChange={(e) => setVapiKey(e.target.value)}
-                        className="bg-background/50 font-mono text-xs"
-                      />
-                    </div>
-                  )}
-
+                ) : (
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Vapi Public Key</Label>
+                    <Label className="text-xs">Vapi Private Key</Label>
                     <Input
-                      placeholder="ex.: 4c1a2f…"
-                      value={vapiPublicKey}
-                      onChange={(e) => setVapiPublicKey(e.target.value)}
+                      type="password"
+                      placeholder="vapi_sk_…"
+                      value={vapiKey}
+                      onChange={(e) => setVapiKey(e.target.value)}
                       className="bg-background/50 font-mono text-xs"
                     />
-                    <p className="text-[11px] text-muted-foreground">
-                      Obrigatória — é a chave usada pelo botão “Testar no navegador”.
-                    </p>
                   </div>
+                )}
 
-                  <div className="flex items-center justify-between gap-3">
-                    <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
-                      Sair
-                    </Button>
-                    <div className="flex gap-2">
-                      {vapiReady && editVapi ? (
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            setEditVapi(false);
-                            setVapiKey("");
-                            setVapiPublicKey("");
-                          }}
-                          className="text-muted-foreground"
-                        >
-                          Cancelar
-                        </Button>
-                      ) : null}
-                      <Button
-                        disabled={
-                          saveVapi.isPending ||
-                          vapiPublicKey.trim().length < 20 ||
-                          (!vapiHasPrivateOnly && vapiKey.trim().length < 20)
-                        }
-                        onClick={() =>
-                          saveVapi.mutate({
-                            privateKey: vapiKey.trim(),
-                            publicKey: vapiPublicKey.trim(),
-                          })
-                        }
-                        className="gap-2 shadow-glow"
-                      >
-                        {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                        Concluir e entrar <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-3">
-                <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <Phone className="h-4 w-4" />
-                </div>
-                <div>
-                  <CardTitle className="text-base font-semibold">
-                    Etapa 1 · Nvoip (telefonia)
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Onde ficam seus números e o tronco SIP das chamadas reais.
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Vapi Public Key</Label>
+                  <Input
+                    placeholder="ex.: 4c1a2f…"
+                    value={vapiPublicKey}
+                    onChange={(e) => setVapiPublicKey(e.target.value)}
+                    className="bg-background/50 font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Obrigatória — é a chave usada pelo botão “Testar no navegador”.
                   </p>
                 </div>
-              </div>
-              {telefoniaReady ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
-                  <Check className="h-3 w-3" /> Conectada
-                </span>
-              ) : null}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground mb-1.5">
-                  Como encontrar suas credenciais Nvoip
+
+                <p className="text-[11px] text-muted-foreground">
+                  Telefonia é opcional: depois, em <span className="text-foreground">Telefonia & Números</span>,
+                  você importa números da sua própria conta Vapi ou conecta um tronco SIP.
                 </p>
-                <ol className="list-decimal space-y-1 pl-4">
-                  <li>
-                    Acesse{" "}
-                    <a
-                      href="https://app.nvoip.com.br/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-0.5 text-primary hover:underline"
+
+                <div className="flex items-center justify-between gap-3">
+                  <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
+                    Sair
+                  </Button>
+                  <div className="flex gap-2">
+                    {vapiReady && editVapi ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setEditVapi(false);
+                          setVapiKey("");
+                          setVapiPublicKey("");
+                        }}
+                        className="text-muted-foreground"
+                      >
+                        Cancelar
+                      </Button>
+                    ) : null}
+                    <Button
+                      disabled={
+                        saveVapi.isPending ||
+                        vapiPublicKey.trim().length < 20 ||
+                        (!vapiHasPrivateOnly && vapiKey.trim().length < 20)
+                      }
+                      onClick={() =>
+                        saveVapi.mutate({
+                          privateKey: vapiKey.trim(),
+                          publicKey: vapiPublicKey.trim(),
+                        })
+                      }
+                      className="gap-2 shadow-glow"
                     >
-                      app.nvoip.com.br <ExternalLink className="h-3 w-3" />
-                    </a>{" "}
-                    e faça login.
-                  </li>
-                  <li>
-                    Em <span className="text-foreground">Integrações → API</span>, copie sua{" "}
-                    <span className="text-foreground">Napikey</span>.
-                  </li>
-                  <li>
-                    Em <span className="text-foreground">Ramais / Tronco SIP</span>, copie o
-                    usuário e a senha SIP — é por ele que a IA fala.
-                  </li>
-                </ol>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label className="text-xs">Napikey (API)</Label>
-                  <Input
-                    type="password"
-                    placeholder="sua chave da API Nvoip"
-                    value={nvoipForm.apiKey}
-                    onChange={(e) =>
-                      setNvoipForm((f) => ({ ...f, apiKey: e.target.value }))
-                    }
-                    className="bg-background/50 font-mono text-xs"
-                  />
+                      {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Concluir e entrar <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label className="text-xs">Servidor SIP</Label>
-                  <Input
-                    placeholder="sip.nvoip.com.br"
-                    value={nvoipForm.sipHost}
-                    onChange={(e) =>
-                      setNvoipForm((f) => ({ ...f, sipHost: e.target.value }))
-                    }
-                    className="bg-background/50 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Usuário SIP</Label>
-                  <Input
-                    value={nvoipForm.sipUsername}
-                    onChange={(e) =>
-                      setNvoipForm((f) => ({ ...f, sipUsername: e.target.value }))
-                    }
-                    className="bg-background/50 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Senha SIP</Label>
-                  <Input
-                    type="password"
-                    value={nvoipForm.sipPassword}
-                    onChange={(e) =>
-                      setNvoipForm((f) => ({ ...f, sipPassword: e.target.value }))
-                    }
-                    className="bg-background/50 font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Button
-                  variant="ghost"
-                  onClick={() => setStep(2)}
-                  className="gap-2 text-muted-foreground"
-                >
-                  Concluir cadastro depois <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  disabled={
-                    saveNvoip.isPending ||
-                    nvoipForm.apiKey.trim().length < 8 ||
-                    nvoipForm.sipHost.trim().length < 4 ||
-                    nvoipForm.sipUsername.trim().length < 2 ||
-                    nvoipForm.sipPassword.trim().length < 4
-                  }
-                  onClick={() =>
-                    saveNvoip.mutate({
-                      apiKey: nvoipForm.apiKey.trim(),
-                      sipHost: nvoipForm.sipHost.trim(),
-                      sipUsername: nvoipForm.sipUsername.trim(),
-                      sipPassword: nvoipForm.sipPassword.trim(),
-                    })
-                  }
-                  className="gap-2 shadow-glow"
-                >
-                  {saveNvoip.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <Check className="h-4 w-4" /> Salvar e continuar
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Você pode entrar no painel sem a Nvoip, mas as chamadas reais só
-                funcionam depois de finalizar este cadastro.
-              </p>
-
-
-
-            </CardContent>
-          </Card>
-        )}
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
-  );
-}
-
-function StepDot({
-  n,
-  active,
-  done,
-  label,
-}: {
-  n: number;
-  active: boolean;
-  done: boolean;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className={cn(
-          "grid h-7 w-7 place-items-center rounded-full text-[11px] font-semibold transition-colors",
-          done
-            ? "bg-success/20 text-success"
-            : active
-              ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-              : "bg-white/[0.05] text-muted-foreground",
-        )}
-      >
-        {done ? <Check className="h-3.5 w-3.5" /> : n}
-      </div>
-      <span
-        className={cn(
-          "text-xs font-medium",
-          active || done ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        {label}
-      </span>
     </div>
   );
 }

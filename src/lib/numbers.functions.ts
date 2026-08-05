@@ -1,6 +1,6 @@
 // Operações locais de números e contatos de teste. Não dependem de nenhum
 // provedor externo: o transporte de voz é sempre o tronco SIP do usuário
-// (ver `nvoip.functions.ts`). RLS limita tudo a `auth.uid()`.
+// (ver `sip.functions.ts`). RLS limita tudo a `auth.uid()`.
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";

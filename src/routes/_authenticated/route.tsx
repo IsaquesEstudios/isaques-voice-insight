@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated")({
     if (!user) {
       throw redirect({ to: "/" });
     }
-    // Onboarding gate: exige apenas a Vapi. A telefonia (Nvoip) pode ser
+    // Onboarding gate: exige apenas a Vapi. A telefonia (tronco SIP) pode ser
     // concluída depois — nesse caso o painel mostra a barra de alerta.
     if (location.pathname !== "/onboarding") {
       const fresh = setupCache && Date.now() - setupCache.at < SETUP_TTL;

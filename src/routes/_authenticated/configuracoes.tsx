@@ -35,11 +35,7 @@ import {
   getVapiEstimatedCredits,
   saveVapiBudget,
 } from "@/lib/vapi.functions";
-import {
-  getNvoipConnection,
-  saveNvoipCredentials,
-  getNvoipBalance,
-} from "@/lib/nvoip.functions";
+import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
 
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -163,9 +159,9 @@ function ApiKeysSection() {
     queryKey: ["vapi-connection"],
     queryFn: () => getVapiConnection(),
   });
-  const nvoip = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnection(),
+  const sip = useQuery({
+    queryKey: ["sip-connection"],
+    queryFn: () => getSipConnection(),
   });
 
   const [vapiPrivate, setVapiPrivate] = useState("");
@@ -173,13 +169,12 @@ function ApiKeysSection() {
   const [showVapiPriv, setShowVapiPriv] = useState(false);
   const [showVapiPub, setShowVapiPub] = useState(false);
 
-  const [nvoipForm, setNvoipForm] = useState({
-    apiKey: "",
-    sipHost: "sip.nvoip.com.br",
+  const [sipForm, setSipForm] = useState({
+    sipHost: "",
     sipUsername: "",
     sipPassword: "",
   });
-  const [showNvoipSecrets, setShowNvoipSecrets] = useState(false);
+  const [showSipSecrets, setShowSipSecrets] = useState(false);
 
 
   const saveVapi = useMutation({
@@ -205,33 +200,26 @@ function ApiKeysSection() {
     onError: (e) => toast.error(translateError(e, "Falha ao salvar Vapi")),
   });
 
-  const saveNvoip = useMutation({
+  const saveSip = useMutation({
     mutationFn: () =>
-      saveNvoipCredentials({
+      saveSipTrunk({
         data: {
-          apiKey: nvoipForm.apiKey.trim(),
-          sipHost: nvoipForm.sipHost.trim(),
-          sipUsername: nvoipForm.sipUsername.trim(),
-          sipPassword: nvoipForm.sipPassword.trim(),
+          sipHost: sipForm.sipHost.trim(),
+          sipUsername: sipForm.sipUsername.trim(),
+          sipPassword: sipForm.sipPassword.trim(),
         },
       }),
     onSuccess: () => {
-      toast.success("Credenciais Nvoip atualizadas!");
-      setNvoipForm({
-        apiKey: "",
-        sipHost: "sip.nvoip.com.br",
-        sipUsername: "",
-        sipPassword: "",
-      });
-      qc.invalidateQueries({ queryKey: ["nvoip-connection"] });
-      qc.invalidateQueries({ queryKey: ["nvoip-balance"] });
+      toast.success("Tronco SIP atualizado!");
+      setSipForm({ sipHost: "", sipUsername: "", sipPassword: "" });
+      qc.invalidateQueries({ queryKey: ["sip-connection"] });
       qc.invalidateQueries({ queryKey: ["setup-status"] });
     },
-    onError: (e) => toast.error(translateError(e, "Falha ao salvar Nvoip")),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar o tronco SIP")),
   });
 
   const vapiConnected = vapi.data?.connected;
-  const nvoipConnected = nvoip.data?.connected;
+  const sipConnected = sip.data?.connected;
 
 
   return (
@@ -344,7 +332,7 @@ function ApiKeysSection() {
         </CardContent>
       </Card>
 
-      {/* NVOIP */}
+      {/* TRONCO SIP (opcional) */}
       <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
@@ -352,61 +340,76 @@ function ApiKeysSection() {
               <Phone className="h-4 w-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">Nvoip (telefonia)</CardTitle>
+              <CardTitle className="text-base font-semibold">
+                Tronco SIP (opcional)
+              </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Provedor padrão de telefonia — números DID e tronco SIP para as chamadas.
+                Conecte o tronco SIP da sua operadora para usar números próprios.
+                Não é obrigatório — você pode usar números da sua conta Vapi.
               </p>
             </div>
           </div>
-          <StatusBadge loading={nvoip.isLoading} connected={!!nvoipConnected} />
+          <StatusBadge loading={sip.isLoading} connected={!!sipConnected} />
         </CardHeader>
         <CardContent className="space-y-4">
-          {nvoipConnected && (
+          {sipConnected && (
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground space-y-1">
               <p>
                 <span className="text-foreground font-medium">Tronco SIP:</span>{" "}
                 <span className="font-mono">
-                  {nvoip.data?.sipUsername}@{nvoip.data?.sipHost}
+                  {sip.data?.sipUsername}@{sip.data?.sipHost}
                 </span>
               </p>
               <p>
                 <span className="text-foreground font-medium">Atualizado:</span>{" "}
-                {nvoip.data?.updatedAt
-                  ? new Date(nvoip.data.updatedAt).toLocaleString("pt-BR")
+                {sip.data?.updatedAt
+                  ? new Date(sip.data.updatedAt).toLocaleString("pt-BR")
                   : "—"}
               </p>
             </div>
           )}
 
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
-            Encontre sua Napikey e o tronco SIP em{" "}
-            <a
-              href="https://app.nvoip.com.br"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-0.5 text-primary hover:underline"
-            >
-              app.nvoip.com.br <ExternalLink className="h-3 w-3" />
-            </a>
+            Use os dados de autenticação SIP fornecidos pela sua operadora
+            (servidor, usuário e senha).
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs">Napikey (API)</Label>
+              <Label className="text-xs">Servidor SIP</Label>
+              <Input
+                value={sipForm.sipHost}
+                onChange={(e) => setSipForm((f) => ({ ...f, sipHost: e.target.value }))}
+                placeholder="sip.suaoperadora.com.br"
+                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Usuário SIP</Label>
+              <Input
+                value={sipForm.sipUsername}
+                onChange={(e) => setSipForm((f) => ({ ...f, sipUsername: e.target.value }))}
+                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Senha SIP</Label>
               <div className="relative">
                 <Input
-                  type={showNvoipSecrets ? "text" : "password"}
-                  value={nvoipForm.apiKey}
-                  onChange={(e) => setNvoipForm((f) => ({ ...f, apiKey: e.target.value }))}
-                  placeholder="••••••••••••••••"
+                  type={showSipSecrets ? "text" : "password"}
+                  value={sipForm.sipPassword}
+                  onChange={(e) =>
+                    setSipForm((f) => ({ ...f, sipPassword: e.target.value }))
+                  }
+                  placeholder="••••••••"
                   className="pr-9 border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowNvoipSecrets((v) => !v)}
+                  onClick={() => setShowSipSecrets((v) => !v)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showNvoipSecrets ? (
+                  {showSipSecrets ? (
                     <EyeOff className="h-3.5 w-3.5" />
                   ) : (
                     <Eye className="h-3.5 w-3.5" />
@@ -414,57 +417,31 @@ function ApiKeysSection() {
                 </button>
               </div>
             </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs">Servidor SIP</Label>
-              <Input
-                value={nvoipForm.sipHost}
-                onChange={(e) => setNvoipForm((f) => ({ ...f, sipHost: e.target.value }))}
-                placeholder="sip.nvoip.com.br"
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Usuário SIP</Label>
-              <Input
-                value={nvoipForm.sipUsername}
-                onChange={(e) => setNvoipForm((f) => ({ ...f, sipUsername: e.target.value }))}
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Senha SIP</Label>
-              <Input
-                type={showNvoipSecrets ? "text" : "password"}
-                value={nvoipForm.sipPassword}
-                onChange={(e) => setNvoipForm((f) => ({ ...f, sipPassword: e.target.value }))}
-                placeholder="••••••••"
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
-              />
-            </div>
           </div>
 
           <div className="flex justify-end">
             <Button
-              onClick={() => saveNvoip.mutate()}
+              onClick={() => saveSip.mutate()}
               disabled={
-                saveNvoip.isPending ||
-                !nvoipForm.apiKey.trim() ||
-                !nvoipForm.sipHost.trim() ||
-                !nvoipForm.sipUsername.trim() ||
-                !nvoipForm.sipPassword.trim()
+                saveSip.isPending ||
+                !sipForm.sipHost.trim() ||
+                !sipForm.sipUsername.trim() ||
+                !sipForm.sipPassword.trim()
               }
               className="gap-2 shadow-glow"
             >
-              {saveNvoip.isPending ? (
+              {saveSip.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Check className="h-4 w-4" />
               )}
-              Salvar credenciais Nvoip
+              Salvar tronco SIP
             </Button>
           </div>
         </CardContent>
       </Card>
+
+
 
     </div>
   );
@@ -538,17 +515,8 @@ function NotificacoesSection() {
 
 function FaturamentoSection() {
   const qc = useQueryClient();
-  const nvoipConn = useQuery({
-    queryKey: ["nvoip-connection"],
-    queryFn: () => getNvoipConnection(),
-  });
-  const nvoipBalanceQuery = useQuery({
-    queryKey: ["nvoip-balance"],
-    queryFn: () => getNvoipBalance(),
-    enabled: !!nvoipConn.data?.connected,
-    staleTime: 60_000,
-  });
   const vapiCreditsQuery = useQuery({
+
     queryKey: ["vapi-estimated-credits"],
     queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
@@ -572,9 +540,7 @@ function FaturamentoSection() {
     onError: (e) => toast.error(translateError(e, "Falha ao salvar orçamento")),
   });
 
-  const refreshing =
-    nvoipBalanceQuery.isFetching ||
-    vapiCreditsQuery.isFetching;
+  const refreshing = vapiCreditsQuery.isFetching;
 
   return (
     <div className="space-y-6">
@@ -583,7 +549,7 @@ function FaturamentoSection() {
           <div>
             <CardTitle className="text-base font-semibold">Faturamento</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Saldo da telefonia (Nvoip) e saldo estimado na Vapi (baseado nas chamadas).
+              Saldo estimado na Vapi (baseado nas chamadas realizadas).
             </p>
           </div>
           <Button
@@ -592,7 +558,6 @@ function FaturamentoSection() {
             className="gap-1.5"
             disabled={refreshing}
             onClick={() => {
-              nvoipBalanceQuery.refetch();
               vapiCreditsQuery.refetch();
             }}
             title="Atualizar saldos"
@@ -603,23 +568,7 @@ function FaturamentoSection() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <CompactCreditCard
-          icon={Phone}
-          title="Nvoip"
-          subtitle={
-            nvoipConn.data?.connected
-              ? nvoipBalanceQuery.data?.available
-                ? "Saldo disponível na conta"
-                : "Não foi possível ler o saldo"
-              : "Conecte sua conta Nvoip"
-          }
-          value={nvoipBalanceQuery.data?.available ? nvoipBalanceQuery.data.balance : null}
-          currency={
-            (nvoipBalanceQuery.data?.available && nvoipBalanceQuery.data.currency) || "BRL"
-          }
-          loading={nvoipBalanceQuery.isLoading}
-          progress={nvoipConn.data?.connected ? 0.65 : 0}
-        />
+
 
 
         <CompactCreditCard
