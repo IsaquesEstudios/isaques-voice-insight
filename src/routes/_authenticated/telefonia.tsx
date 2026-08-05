@@ -1082,43 +1082,34 @@ function TelefoniaPage() {
         <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Rota ativa (SIP Trunk Nvoip)
+              Rota ativa (tronco SIP)
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {!isNvoipConnected ? (
+            {!isSipConnected ? (
               <p className="text-xs text-muted-foreground">
-                Conecte sua conta Nvoip (revendedor) para exibir o tronco SIP usado
-                nas chamadas.
+                Nenhum tronco SIP conectado. É opcional: você pode usar números da
+                sua própria conta Vapi ou conectar o tronco da sua operadora.
               </p>
             ) : (
-              <>
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">
-                      {nvoipConn?.friendlyLabel || "Tronco Nvoip"}
-                    </p>
-                    <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                      ativo
-                    </span>
-                  </div>
-                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                    {nvoipConn?.sipUsername}@{nvoipConn?.sipHost}
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">
+                    {sipConn?.friendlyLabel || "Tronco SIP"}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {liveNvoip.length} DIDs na conta
-                    {nvoipConn?.vapiCredentialId ? " • credencial Vapi vinculada" : ""}
-                  </p>
+                  <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                    ativo
+                  </span>
                 </div>
-                {nvoipWarning ? (
-                  <Alert className="border-warning/30 bg-warning/10 md:col-span-2">
-                    <AlertTriangle className="h-4 w-4 text-warning" />
-                    <AlertDescription className="text-[11px] text-muted-foreground">
-                      Não foi possível listar os DIDs pela API da Nvoip: {nvoipWarning}
-                    </AlertDescription>
-                  </Alert>
-                ) : null}
-              </>
+                <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                  {sipConn?.sipUsername}@{sipConn?.sipHost}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {sipConn?.vapiCredentialId
+                    ? "credencial Vapi vinculada"
+                    : "credencial Vapi ainda não vinculada"}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
