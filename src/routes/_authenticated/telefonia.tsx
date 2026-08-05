@@ -74,13 +74,11 @@ import {
 
 
 import {
-  disconnectNvoip,
-  getNvoipConnection,
-  getNvoipBalance,
-  listNvoipNumbers,
-  registerNvoipNumber,
-  saveNvoipCredentials,
-} from "@/lib/nvoip.functions";
+  disconnectSipTrunk,
+  getSipConnection,
+  registerSipNumber,
+  saveSipTrunk,
+} from "@/lib/sip.functions";
 
 
 
