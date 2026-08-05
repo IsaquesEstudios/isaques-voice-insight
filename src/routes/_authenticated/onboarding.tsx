@@ -270,8 +270,8 @@ function OnboardingPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  Telefonia é opcional: depois, em <span className="text-foreground">Telefonia & Números</span>,
-                  você importa números da sua própria conta Vapi ou conecta um tronco SIP.
+                  Depois de salvar, você segue para o passo 2: cadastrar seu
+                  número pelo tronco SIP.
                 </p>
 
                 <div className="flex items-center justify-between gap-3">
@@ -307,7 +307,7 @@ function OnboardingPage() {
                       className="gap-2 shadow-glow"
                     >
                       {saveVapi.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                      Concluir e entrar <ArrowRight className="h-4 w-4" />
+                      Salvar e continuar <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -315,6 +315,108 @@ function OnboardingPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Etapa 2 — número via tronco SIP */}
+        <Card
+          className={`border-white/[0.08] bg-card/40 backdrop-blur-2xl ${vapiReady ? "" : "pointer-events-none opacity-50"}`}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                <Phone className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-semibold">
+                  Seu número (tronco SIP)
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Conectamos o número à sua conta Vapi automaticamente pela API.
+                </p>
+              </div>
+            </div>
+            {numberReady ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                <Check className="h-3 w-3" /> Conectado
+              </span>
+            ) : null}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
+              Peça à sua operadora os dados de autenticação do tronco SIP
+              (host/domínio, usuário e senha) e informe o número (DID) que você
+              já possui. Nós criamos a credencial SIP e importamos o número na
+              sua conta Vapi.
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Host / domínio SIP</Label>
+                <Input
+                  placeholder="ex.: sip.suaoperadora.com.br"
+                  value={sipHost}
+                  onChange={(e) => setSipHost(e.target.value)}
+                  className="bg-background/50 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Usuário SIP</Label>
+                <Input
+                  placeholder="ex.: 1001"
+                  value={sipUsername}
+                  onChange={(e) => setSipUsername(e.target.value)}
+                  className="bg-background/50 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Senha SIP</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={sipPassword}
+                  onChange={(e) => setSipPassword(e.target.value)}
+                  className="bg-background/50 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Número (DID)</Label>
+                <Input
+                  placeholder="+5511999999999"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="bg-background/50 font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs">Apelido (opcional)</Label>
+                <Input
+                  placeholder="ex.: Comercial SP"
+                  value={friendlyLabel}
+                  onChange={(e) => setFriendlyLabel(e.target.value)}
+                  className="bg-background/50 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <Button
+                disabled={
+                  !vapiReady ||
+                  connectNumber.isPending ||
+                  sipHost.trim().length < 4 ||
+                  sipUsername.trim().length < 2 ||
+                  sipPassword.trim().length < 4 ||
+                  phoneNumber.replace(/\D/g, "").length < 8
+                }
+                onClick={() => connectNumber.mutate()}
+                className="gap-2 shadow-glow"
+              >
+                {connectNumber.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Conectar número e entrar <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );
