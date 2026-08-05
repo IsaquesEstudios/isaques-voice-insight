@@ -292,6 +292,14 @@ function CampanhasPage() {
     queryFn: () => fetchCampaignCalls({ data: { campaignId: diagCampaign!.id } }),
     enabled: !!diagCampaign,
   });
+  const diagCalls = diagQuery.data?.calls ?? [];
+  const diagReference = diagQuery.data?.reference ?? null;
+  const diagSameOrigin =
+    diagReference && diagCalls[0]
+      ? (diagReference.fromNumber ?? diagReference.phoneNumberId) ===
+        (diagCalls[0].fromNumber ?? diagCalls[0].phoneNumberId)
+      : null;
+
 
   const assistantName = useMemo(() => {
     const map = new Map<string, string>();
@@ -691,67 +699,124 @@ function CampanhasPage() {
             <p className="py-6 text-center text-sm text-destructive">
               {translateError(diagQuery.error as Error)}
             </p>
-          ) : (diagQuery.data ?? []).length === 0 ? (
+          ) : diagCalls.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               Nenhuma ligação registrada nesta campanha ainda.
             </p>
           ) : (
             <>
-              {(diagQuery.data ?? []).some((c) => isSipConnectFailure(c.endedReason)) && (
+              {diagCalls.some((c) => isSipConnectFailure(c.endedReason)) && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
                   <p className="font-medium text-amber-300">
-                    A ligação não chegou a completar no tronco SIP
+                    O telefone toca, mas a ligação não completa no tronco SIP
                   </p>
                   <p className="mt-1 text-muted-foreground">
-                    Por isso a assistente ficou muda: ela só começa a falar depois que a operadora
-                    conecta a chamada. Verifique se os números da lista existem e estão em E.164
-                    (+55DDDNÚMERO), se o número de origem escolhido está liberado para chamadas de
-                    saída na operadora e se há saldo/limite de canais simultâneos disponível.
+                    A operadora chega a tocar o celular, porém não devolve a confirmação de
+                    atendimento nem o áudio de volta para a plataforma de voz. Por isso você atende
+                    e ouve silêncio até a chamada cair: a assistente só começa a falar depois que a
+                    ligação é considerada conectada. Verifique com a operadora a liberação do
+                    retorno de mídia (RTP) para a plataforma, o número de origem liberado para
+                    saída e o limite de canais simultâneos.
                   </p>
                 </div>
               )}
-            <Table>
 
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duração</TableHead>
-                  <TableHead>IA falou?</TableHead>
-                  <TableHead>Motivo do encerramento</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(diagQuery.data ?? []).map((call) => (
-                  <TableRow key={call.id}>
-                    <TableCell className="font-mono text-xs">
-                      {call.customerNumber ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {call.status ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {call.durationSec ? `${call.durationSec}s` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          call.assistantSpoke
-                            ? "border-emerald-500/30 text-emerald-400"
-                            : "border-amber-500/30 text-amber-400"
-                        }
-                      >
-                        {call.assistantSpoke ? "Sim" : "Não"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{endedReasonLabel(call.endedReason)}</TableCell>
+              {diagReference && (
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
+                  <p className="font-medium">Comparação com a última ligação de teste</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Teste manual</p>
+                      <p className="font-mono text-xs">
+                        origem {diagReference.fromNumber ?? diagReference.phoneNumberId ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {diagReference.answered ? "Conectou" : "Não conectou"} ·{" "}
+                        {diagReference.durationSec}s · IA falou:{" "}
+                        {diagReference.assistantSpoke ? "sim" : "não"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {endedReasonLabel(diagReference.endedReason)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Campanha</p>
+                      <p className="font-mono text-xs">
+                        origem {diagCalls[0]?.fromNumber ?? diagCalls[0]?.phoneNumberId ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {diagCalls.filter((c) => c.answered).length} de {diagCalls.length}{" "}
+                        conectaram
+                      </p>
+                      {diagSameOrigin !== null && (
+                        <p className="mt-1 text-xs font-medium text-amber-300">
+                          {diagSameOrigin
+                            ? "Mesmo número de origem do teste — o problema está na rota/canais do tronco."
+                            : "Número de origem diferente do teste — use o mesmo número que funcionou."}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Origem</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead>Conectou?</TableHead>
+                    <TableHead>Duração</TableHead>
+                    <TableHead>IA falou?</TableHead>
+                    <TableHead>Motivo do encerramento</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {diagCalls.map((call) => (
+                    <TableRow key={call.id}>
+                      <TableCell className="font-mono text-xs">
+                        {call.fromNumber ?? call.phoneNumberId ?? "—"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {call.customerNumber ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            call.answered
+                              ? "border-emerald-500/30 text-emerald-400"
+                              : "border-amber-500/30 text-amber-400"
+                          }
+                        >
+                          {call.answered ? "Sim" : "Não"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {call.durationSec ? `${call.durationSec}s` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            call.assistantSpoke
+                              ? "border-emerald-500/30 text-emerald-400"
+                              : "border-amber-500/30 text-amber-400"
+                          }
+                        >
+                          {call.assistantSpoke ? "Sim" : "Não"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {endedReasonLabel(call.endedReason)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </>
           )}
+
 
 
           <DialogFooter>
