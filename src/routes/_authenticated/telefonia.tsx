@@ -986,9 +986,9 @@ function TelefoniaPage() {
                                   setOpen(true);
                                 }}
                               >
-                                {isNvoipConnected
-                                  ? "Cadastrar DID Nvoip"
-                                  : "Conectar Nvoip"}
+                                {isSipConnected
+                                  ? "Cadastrar número do tronco SIP"
+                                  : "Conectar número"}
                               </button>{" "}
                               para poder disparar testes.
                             </AlertDescription>
