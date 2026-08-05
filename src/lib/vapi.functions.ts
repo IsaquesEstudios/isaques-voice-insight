@@ -346,6 +346,13 @@ function sanitizeTransferDestination(destination: any): any {
         const summaryPlan = destination.transferPlan.summaryPlan;
         if (summaryPlan && typeof summaryPlan === "object") plan.summaryPlan = summaryPlan;
       }
+      // Em transferências diretas o tronco decide o método: `refer` devolve a
+      // ligação para a operadora (troncos que recusam REFER derrubam a chamada
+      // no momento da transferência) e `dial` mantém a ligação na Vapi.
+      if (mode.startsWith("blind-transfer")) {
+        const verb = destination.transferPlan.sipVerb;
+        plan.sipVerb = verb === "refer" || verb === "bye" ? verb : "dial";
+      }
       out.transferPlan = plan;
     }
   }
