@@ -179,13 +179,11 @@ function TelefoniaPage() {
 
 
 
-  // Nvoip (provedor principal — conta de revendedor)
-  const getNvoipConnFn = useServerFn(getNvoipConnection);
-  const saveNvoipCredsFn = useServerFn(saveNvoipCredentials);
-  const disconnectNvoipFn = useServerFn(disconnectNvoip);
-  const listNvoipNumbersFn = useServerFn(listNvoipNumbers);
-  const registerNvoipNumberFn = useServerFn(registerNvoipNumber);
-  const getNvoipBalanceFn = useServerFn(getNvoipBalance);
+  // Tronco SIP do próprio usuário (opcional)
+  const getSipConnFn = useServerFn(getSipConnection);
+  const saveSipTrunkFn = useServerFn(saveSipTrunk);
+  const disconnectSipFn = useServerFn(disconnectSipTrunk);
+  const registerSipNumberFn = useServerFn(registerSipNumber);
 
   // Contatos de teste (armazenados localmente, sem depender de operadora)
   const listTestContactsFn = useServerFn(listTestContacts);
