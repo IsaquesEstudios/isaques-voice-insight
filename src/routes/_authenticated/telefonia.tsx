@@ -243,44 +243,14 @@ function TelefoniaPage() {
   }, [vapiPhoneNumbersQuery.data]);
 
   const localNumbers = (numbersQuery.data ?? []) as unknown as NumberRow[];
-  const liveNvoip = nvoipNumbersQuery.data?.connected
-    ? nvoipNumbersQuery.data.numbers
-    : [];
-  const nvoipWarning =
-    nvoipNumbersQuery.data && "warning" in nvoipNumbersQuery.data
-      ? (nvoipNumbersQuery.data.warning as string | undefined)
-      : undefined;
 
-  // Só existe um provedor: o tronco SIP do próprio usuário. As linhas locais
-  // são a base; os DIDs retornados pela API entram logo abaixo.
+  // Base: números registrados localmente. Os números da conta Vapi entram logo abaixo.
   const numbers: NumberRow[] = localNumbers.map((n) => {
     const assistantId = assistantByPhone.get(n.phone_number);
     const assistantName = assistantId ? assistantById.get(assistantId) ?? null : null;
     return { ...n, assistant: assistantName ?? n.assistant };
   });
 
-
-
-  // DIDs vindos direto da conta Nvoip (revendedor) entram na mesma tabela.
-  for (const d of liveNvoip) {
-    const existing = numbers.find((row) => row.phone_number === d.number);
-    if (existing) {
-      existing.provider = "Nvoip";
-      continue;
-    }
-    const local = localNumbers.find((l) => l.phone_number === d.number);
-    const assistantId = assistantByPhone.get(d.number);
-    numbers.push({
-      id: local?.id ?? `nvoip-${d.number}`,
-      phone_number: d.number,
-      region: d.label ?? local?.region ?? null,
-      provider: "Nvoip",
-      assistant: assistantId ? assistantById.get(assistantId) ?? null : local?.assistant ?? null,
-      calls_today: local?.calls_today ?? 0,
-      answer_rate: local?.answer_rate ?? 0,
-      health: "Seguro" as Health,
-    });
-  }
 
   // Any number registered inside Vapi (números gratuitos da Vapi ou DIDs do tronco SIP
   // imported into Vapi) is usable as origin — append the ones not listed yet.
