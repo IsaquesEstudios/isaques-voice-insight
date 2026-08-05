@@ -647,7 +647,7 @@ function TelefoniaPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isNvoipConnected && nvoipConn ? (
+            {isSipConnected && sipConn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -655,10 +655,7 @@ function TelefoniaPage() {
                     className="gap-2 border-success/40 bg-success/10 text-success hover:bg-success/15 hover:text-success"
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    Nvoip: {nvoipConn.friendlyLabel || nvoipConn.sipUsername}
-                    {nvoipBalanceQuery.data?.available
-                      ? ` · ${nvoipBalanceQuery.data.currency} ${nvoipBalanceQuery.data.balance.toFixed(2)}`
-                      : ""}
+                    SIP: {sipConn.friendlyLabel || sipConn.sipUsername}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
