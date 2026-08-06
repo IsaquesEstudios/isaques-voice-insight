@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Video, Copy, Check, LogOut, Sparkles, Users } from "lucide-react";
+import { Video, Copy, Check, LogOut, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -49,20 +49,13 @@ function loadJitsiScript(): Promise<void> {
   });
 }
 
-function generateRoomName() {
-  const adjectives = ["rapido", "sereno", "brilhante", "vivo", "audaz", "leve"];
-  const nouns = ["encontro", "sala", "briefing", "call", "sync", "papo"];
-  const a = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const n = nouns[Math.floor(Math.random() * nouns.length)];
-  const id = Math.random().toString(36).slice(2, 8);
-  return `isaques-${a}-${n}-${id}`;
-}
 
 function ReunioesPage() {
   const [displayName, setDisplayName] = useState("");
   const [roomInput, setRoomInput] = useState("");
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<any>(null);
 
@@ -116,23 +109,36 @@ function ReunioesPage() {
   }, [activeRoom, displayName]);
 
   const handleCreate = () => {
-    const name = generateRoomName();
-    setRoomInput(name);
-    setActiveRoom(name);
-  };
-
-  const handleJoin = () => {
-    const name = roomInput.trim().replace(/\s+/g, "-");
-    if (!name) {
-      toast.error("Informe um nome para a sala");
+    const typed = roomInput
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-");
+    if (!typed) {
+      toast.error("Dê um nome para a reunião");
       return;
     }
+    const name = `${typed}-${Math.random().toString(36).slice(2, 6)}`;
+    setRoomInput(name);
     setActiveRoom(name);
   };
 
   const handleLeave = () => {
     setActiveRoom(null);
   };
+
+  const handleCopyCode = async () => {
+    if (!activeRoom) return;
+    try {
+      await navigator.clipboard.writeText(activeRoom);
+      setCopiedCode(true);
+      toast.success("Código copiado");
+      setTimeout(() => setCopiedCode(false), 1500);
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+
 
   const handleCopyLink = async () => {
     if (!activeRoom) return;
@@ -165,17 +171,29 @@ function ReunioesPage() {
         </header>
 
         {!activeRoom ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+          <div className="grid min-h-[55vh] place-items-center">
+            <Card className="w-full max-w-md border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+              <CardHeader className="text-center">
+                <CardTitle className="flex items-center justify-center gap-2 text-base">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  Criar nova sala
+                  Criar reunião
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="displayName">Seu nome</Label>
+                  <Label htmlFor="roomName">Nome da reunião</Label>
+                  <Input
+                    id="roomName"
+                    placeholder="ex: reuniao comercial"
+                    value={roomInput}
+                    onChange={(e) => setRoomInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreate();
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Seu nome (opcional)</Label>
                   <Input
                     id="displayName"
                     placeholder="Como você quer aparecer"
@@ -183,55 +201,28 @@ function ReunioesPage() {
                     onChange={(e) => setDisplayName(e.target.value)}
                   />
                 </div>
-                <Button onClick={handleCreate} className="w-full gap-2">
+                <Button onClick={handleCreate} size="lg" className="w-full gap-2">
                   <Video className="h-4 w-4" />
-                  Iniciar reunião agora
+                  Criar reunião
                 </Button>
-                <p className="text-xs text-muted-foreground">
-                  A sala é gerada com um nome único e você pode compartilhar o link com convidados.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Users className="h-4 w-4" />
-                  Entrar em uma sala
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="roomName">Nome da sala</Label>
-                  <Input
-                    id="roomName"
-                    placeholder="ex: reuniao-comercial-terca"
-                    value={roomInput}
-                    onChange={(e) => setRoomInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleJoin();
-                    }}
-                  />
-                </div>
-                <Button onClick={handleJoin} variant="secondary" className="w-full">
-                  Entrar
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Use o mesmo nome que outro participante para se encontrar na mesma sala.
+                <p className="text-center text-xs text-muted-foreground">
+                  Depois de criar, você recebe um código para enviar aos convidados.
                 </p>
               </CardContent>
             </Card>
           </div>
         ) : (
           <Card className="overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+            <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <CardTitle className="truncate text-base">{activeRoom}</CardTitle>
-                <p className="truncate text-xs text-muted-foreground">
-                  https://{JITSI_DOMAIN}/{activeRoom}
-                </p>
+                <p className="text-xs text-muted-foreground">Código da reunião</p>
+                <CardTitle className="truncate font-mono text-base">{activeRoom}</CardTitle>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleCopyCode} className="gap-2">
+                  {copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  Copiar código
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-2">
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   Copiar link
