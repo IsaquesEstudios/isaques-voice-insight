@@ -988,19 +988,33 @@ async function ensureSipCredentialId(
       // credencial removida na Vapi — recria abaixo
     }
   }
+  // A Vapi exige IPv4 numérico no gateway quando o tráfego de entrada está
+  // habilitado. Se o usuário informou um hostname, usamos o tronco só para
+  // saída (inboundEnabled: false) — aí hostname é aceito.
+  const rawHost = trunk.sipHost.replace(/^sips?:\/\//i, "").split("/")[0]!.trim();
+  const [hostOnly, portStr] = rawHost.split(":");
+  const host = (hostOnly ?? rawHost).trim();
+  const port = portStr ? Number(portStr) : undefined;
+  const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+
+  const gateway: Record<string, unknown> = { ip: host };
+  if (port && Number.isFinite(port)) gateway["port"] = port;
+  if (!isIpv4) gateway["inboundEnabled"] = false;
+
   const created = (await vapiFetch("/credential", {
     method: "POST",
     body: JSON.stringify({
       provider: "byo-sip-trunk",
       name: `SIP (${trunk.sipUsername})`,
-      gateways: [{ ip: trunk.sipHost }],
+      gateways: [gateway],
       outboundAuthenticationPlan: {
         authUsername: trunk.sipUsername,
         authPassword: trunk.sipPassword,
-        sipRegisterPlan: { realm: trunk.sipHost },
+        sipRegisterPlan: { realm: host },
       },
     }),
   })) as { id: string };
+
 
   await supabase
     .from("user_nvoip_credentials")
