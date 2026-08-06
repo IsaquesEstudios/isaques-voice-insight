@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Video, Copy, Check, LogOut, Sparkles, Users } from "lucide-react";
+import { Video, Copy, Check, LogOut, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
