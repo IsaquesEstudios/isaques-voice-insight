@@ -126,6 +126,19 @@ function ReunioesPage() {
     setActiveRoom(null);
   };
 
+  const handleCopyCode = async () => {
+    if (!activeRoom) return;
+    try {
+      await navigator.clipboard.writeText(activeRoom);
+      setCopiedCode(true);
+      toast.success("Código copiado");
+      setTimeout(() => setCopiedCode(false), 1500);
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+
+
   const handleCopyLink = async () => {
     if (!activeRoom) return;
     const url = `https://${JITSI_DOMAIN}/${activeRoom}`;
