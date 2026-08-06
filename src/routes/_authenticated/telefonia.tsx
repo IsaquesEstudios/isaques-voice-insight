@@ -477,6 +477,7 @@ function TelefoniaPage() {
       friendlyName: "",
     });
     setCopied(false);
+    setSipError(null);
   };
 
 
@@ -497,14 +498,19 @@ function TelefoniaPage() {
     const pass = sipForm.sipPassword.trim();
     const did = sipForm.phoneNumber.trim();
     const didName = sipForm.friendlyName.trim();
-    if (host.length < 4) return toast.error("Informe o gateway/host SIP da sua operadora.");
-    if (user.length < 2) return toast.error("Informe o usuário SIP.");
-    if (pass.length < 4) return toast.error("Informe a senha SIP.");
+    const fail = (msg: string) => {
+      setSipError(msg);
+      toast.error(msg, { duration: 12000 });
+    };
+    if (host.length < 4) return fail("Informe o gateway/host SIP da sua operadora.");
+    if (user.length < 2) return fail("Informe o usuário SIP.");
+    if (pass.length < 4) return fail("Informe a senha SIP.");
     if (did.replace(/\D/g, "").length < 8)
-      return toast.error("Informe o número (DID) em formato E.164, ex: +551140028922.");
-    if (didName.length < 2) return toast.error("Dê um nome para identificar o número.");
+      return fail("Informe o número (DID) em formato E.164, ex: +551140028922.");
+    if (didName.length < 2) return fail("Dê um nome para identificar o número.");
 
     setConnecting(true);
+    setSipError(null);
     try {
       const res = await connectSipNumberFn({
         data: {
@@ -516,7 +522,7 @@ function TelefoniaPage() {
         },
       });
       if (!res.ok) {
-        toast.error(res.message);
+        fail(res.message);
         return;
       }
       toast.success("Tronco SIP conectado e número validado na Vapi!");
@@ -526,11 +532,12 @@ function TelefoniaPage() {
       setOpen(false);
       resetModal();
     } catch (err) {
-      toast.error(translateError(err, "Falha ao conectar o tronco SIP"));
+      fail(translateError(err, "Falha ao conectar o tronco SIP"));
     } finally {
       setConnecting(false);
     }
   };
+
 
 
   const disconnectMutation = useMutation({
