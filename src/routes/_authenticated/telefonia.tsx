@@ -180,9 +180,8 @@ function TelefoniaPage() {
 
   // Tronco SIP do próprio usuário (opcional)
   const getSipConnFn = useServerFn(getSipConnection);
-  const saveSipTrunkFn = useServerFn(saveSipTrunk);
+  const connectSipNumberFn = useServerFn(connectSipNumber);
   const disconnectSipFn = useServerFn(disconnectSipTrunk);
-  const registerSipNumberFn = useServerFn(registerSipNumber);
 
   // Contatos de teste (armazenados localmente, sem depender de operadora)
   const listTestContactsFn = useServerFn(listTestContacts);
