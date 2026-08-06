@@ -292,6 +292,7 @@ function TelefoniaPage() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [sipError, setSipError] = useState<string | null>(null);
   const [testContactOpen, setTestContactOpen] = useState(false);
   const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
   const [savingContact, setSavingContact] = useState(false);
