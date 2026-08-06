@@ -118,7 +118,7 @@ function ReunioesPage() {
       return;
     }
     const name = `${typed}-${Math.random().toString(36).slice(2, 6)}`;
-    setRoomCode(name);
+    setRoomInput(name);
     setActiveRoom(name);
   };
 
