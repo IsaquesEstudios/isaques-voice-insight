@@ -49,14 +49,6 @@ function loadJitsiScript(): Promise<void> {
   });
 }
 
-function generateRoomName() {
-  const adjectives = ["rapido", "sereno", "brilhante", "vivo", "audaz", "leve"];
-  const nouns = ["encontro", "sala", "briefing", "call", "sync", "papo"];
-  const a = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const n = nouns[Math.floor(Math.random() * nouns.length)];
-  const id = Math.random().toString(36).slice(2, 8);
-  return `isaques-${a}-${n}-${id}`;
-}
 
 function ReunioesPage() {
   const [displayName, setDisplayName] = useState("");
