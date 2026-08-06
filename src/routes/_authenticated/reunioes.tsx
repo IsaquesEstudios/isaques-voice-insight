@@ -116,17 +116,17 @@ function ReunioesPage() {
   }, [activeRoom, displayName]);
 
   const handleCreate = () => {
-    const name = generateRoomName();
-    setRoomInput(name);
-    setActiveRoom(name);
-  };
-
-  const handleJoin = () => {
-    const name = roomInput.trim().replace(/\s+/g, "-");
-    if (!name) {
-      toast.error("Informe um nome para a sala");
+    const typed = roomInput
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-");
+    if (!typed) {
+      toast.error("Dê um nome para a reunião");
       return;
     }
+    const name = `${typed}-${Math.random().toString(36).slice(2, 6)}`;
+    setRoomCode(name);
     setActiveRoom(name);
   };
 
