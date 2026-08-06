@@ -199,14 +199,16 @@ function ReunioesPage() {
           </div>
         ) : (
           <Card className="overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+            <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <CardTitle className="truncate text-base">{activeRoom}</CardTitle>
-                <p className="truncate text-xs text-muted-foreground">
-                  https://{JITSI_DOMAIN}/{activeRoom}
-                </p>
+                <p className="text-xs text-muted-foreground">Código da reunião</p>
+                <CardTitle className="truncate font-mono text-base">{activeRoom}</CardTitle>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleCopyCode} className="gap-2">
+                  {copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  Copiar código
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-2">
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   Copiar link
