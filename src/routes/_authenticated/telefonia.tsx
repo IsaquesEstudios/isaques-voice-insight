@@ -1303,7 +1303,18 @@ function TelefoniaPage() {
               </div>
             </div>
 
+            {sipError ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+              >
+                <p className="font-medium">Não foi possível conectar o número</p>
+                <p className="mt-1 break-words text-destructive/90">{sipError}</p>
+              </div>
+            ) : null}
+
             <div className="flex justify-end gap-2">
+
               <Button variant="ghost" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
