@@ -505,24 +505,23 @@ function TelefoniaPage() {
 
     setConnecting(true);
     try {
-      await saveSipTrunkFn({
+      const res = await connectSipNumberFn({
         data: {
           sipHost: host,
           sipUsername: user,
           sipPassword: pass,
-          friendlyLabel: sipForm.label.trim() || undefined,
+          friendlyLabel: didName || sipForm.label.trim() || undefined,
+          phoneNumber: did,
         },
       });
-      const res = await registerSipNumberFn({
-        data: { phoneNumber: did, friendlyName: didName },
-      });
-      toast.success(
-        res.alreadyRegistered
-          ? "Tronco SIP salvo. Este número já estava cadastrado."
-          : "Tronco SIP conectado e número cadastrado!",
-      );
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success("Tronco SIP conectado e número validado na Vapi!");
       await queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
       await queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+      await queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
       setOpen(false);
       resetModal();
     } catch (err) {
