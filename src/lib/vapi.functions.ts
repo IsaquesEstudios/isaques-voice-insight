@@ -1143,6 +1143,40 @@ export const connectSipNumber = createServerFn({ method: "POST" })
         return { ok: false, message: `Falha ao conectar o número na Vapi: ${msg}` };
       }
 
+      // 3.1) valida na hora: relê o número na Vapi e checa erro do provedor
+      try {
+        const check = (await vapiFetch(`/phone-number/${vapiNumberId}`, {
+          method: "GET",
+        })) as (VapiPhoneNumberRaw & {
+          status?: string;
+          providerResourceError?: unknown;
+        }) | null;
+        const providerError = check?.providerResourceError;
+        const status = (check?.status as string | undefined) ?? "";
+        if (providerError) {
+          const detail =
+            typeof providerError === "string"
+              ? providerError
+              : JSON.stringify(providerError);
+          return {
+            ok: false,
+            message: `A Vapi recusou a conexão do número: ${detail}`,
+          };
+        }
+        if (status && !/active|ok/i.test(status)) {
+          return {
+            ok: false,
+            message: `O número foi criado na Vapi mas está com status "${status}". Verifique host, usuário e senha do tronco SIP com a sua operadora.`,
+          };
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return {
+          ok: false,
+          message: `Não foi possível validar o número na Vapi: ${msg}`,
+        };
+      }
+
       // 4) espelha no banco (não fatal)
       try {
         const { data: row } = await context.supabase
