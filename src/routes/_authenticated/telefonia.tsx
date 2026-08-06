@@ -76,14 +76,13 @@ import {
 import {
   disconnectSipTrunk,
   getSipConnection,
-  registerSipNumber,
-  saveSipTrunk,
 } from "@/lib/sip.functions";
 
 
 
 
 import {
+  connectSipNumber,
   attachAssistantToNumber,
   createOutboundTestCall,
   detachAssistantFromNumber,
