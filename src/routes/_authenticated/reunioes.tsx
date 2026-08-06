@@ -55,6 +55,7 @@ function ReunioesPage() {
   const [roomInput, setRoomInput] = useState("");
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<any>(null);
 
