@@ -2,13 +2,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Phone } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+
 import {
   Tabs,
   TabsContent,
