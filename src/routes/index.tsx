@@ -165,6 +165,34 @@ function LoginHomePage() {
 
         <Card className="border-border bg-card/40 backdrop-blur-2xl">
           <CardContent className="p-6">
+            {alert && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className={`mb-5 flex items-start gap-2 rounded-lg border p-3 text-xs ${
+                  alert.type === "error"
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-success/40 bg-success/10 text-foreground"
+                }`}
+              >
+                {alert.type === "error" ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                )}
+                <p className="flex-1 leading-relaxed whitespace-pre-line">
+                  {alert.message}
+                </p>
+                <button
+                  type="button"
+                  aria-label="Fechar alerta"
+                  onClick={() => setAlert(null)}
+                  className="shrink-0 opacity-70 transition hover:opacity-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             {mode === "forgot" ? (
               <div>
                 <h2 className="text-sm font-semibold text-foreground">
