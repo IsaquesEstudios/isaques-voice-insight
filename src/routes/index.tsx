@@ -266,6 +266,56 @@ function LoginHomePage() {
                 </button>
               </div>
             )}
+            {mode === "confirm-email" ? (
+              <div className="text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <MailCheck className="h-6 w-6 text-primary" />
+                </div>
+                <h2 className="mt-4 text-sm font-semibold text-foreground">
+                  Confirme seu e-mail
+                </h2>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Enviamos um link de confirmação para{" "}
+                  <span className="font-medium text-foreground">{pendingEmail}</span>.
+                  Clique no link para ativar sua conta — verifique também a pasta de spam.
+                </p>
+                <div className="mt-6 space-y-2">
+                  <Button
+                    type="button"
+                    disabled={loading}
+                    onClick={handleAlreadyConfirmed}
+                    className="w-full gap-2 shadow-glow"
+                  >
+                    {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Já confirmei — continuar configurando
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={loading || resendCooldown > 0}
+                    onClick={handleResendConfirmation}
+                    className="w-full"
+                  >
+                    {resendCooldown > 0
+                      ? `Reenviar e-mail em ${resendCooldown}s`
+                      : "Reenviar e-mail de confirmação"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-xs text-muted-foreground"
+                    onClick={() => {
+                      setMode("auth");
+                      setTabState("signin");
+                      setEmail(pendingEmail);
+                      setAlert(null);
+                    }}
+                  >
+                    Voltar ao login
+                  </Button>
+                </div>
+              </div>
+            ) : mode === "forgot" ? (
             {mode === "forgot" ? (
               <div>
                 <h2 className="text-sm font-semibold text-foreground">
