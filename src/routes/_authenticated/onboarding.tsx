@@ -164,6 +164,7 @@ function OnboardingPage() {
 
         </div>
 
+        {!vapiReady || editVapi ? (
         <Card className="border-border bg-card/40 backdrop-blur-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
@@ -186,27 +187,7 @@ function OnboardingPage() {
             ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
-            {vapiReady && !editVapi ? (
-              <>
-                <div className="rounded-xl border border-success/25 bg-success/10 p-3 text-xs text-white">
-                  Sua conta Vapi já está conectada. Suas chaves ficam salvas e
-                  você não precisa preencher de novo a cada login.
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setEditVapi(true)}
-                    className="text-muted-foreground"
-                  >
-                    Trocar chaves
-                  </Button>
-                  <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
-                    Sair
-                  </Button>
-                </div>
-
-              </>
-            ) : (
+            {false ? null : (
               <>
                 <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-xs text-muted-foreground">
                   <p className="font-semibold text-foreground mb-1.5">
