@@ -33,13 +33,23 @@ export const Route = createFileRoute("/")({
 
 function LoginHomePage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"signin" | "signup">("signin");
+  const [tab, setTabState] = useState<"signin" | "signup">("signin");
   const [mode, setMode] = useState<"auth" | "forgot">("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [sent, setSent] = useState(false);
+  const [alert, setAlert] = useState<
+    { type: "error" | "success"; message: string } | null
+  >(null);
+
+  const setTab = (value: "signin" | "signup") => {
+    setTabState(value);
+    setConfirmPassword("");
+    setAlert(null);
+  };
 
   // Usuário já autenticado → mandar para o dashboard.
   useEffect(() => {
@@ -55,6 +65,7 @@ function LoginHomePage() {
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAlert(null);
     setLoading(true);
     try {
       const supabase = getSupabaseBrowser();
@@ -63,11 +74,16 @@ function LoginHomePage() {
       });
       if (error) throw error;
       setSent(true);
-      toast.success(
-        "Se este e-mail estiver cadastrado, você receberá um link de recuperação na caixa de entrada.",
-      );
+      setAlert({
+        type: "success",
+        message:
+          "Se este e-mail estiver cadastrado, você receberá um link de recuperação na caixa de entrada.",
+      });
     } catch (err) {
-      toast.error(translateError(err, "Falha ao enviar o e-mail de recuperação"));
+      setAlert({
+        type: "error",
+        message: translateError(err, "Falha ao enviar o e-mail de recuperação"),
+      });
     } finally {
       setLoading(false);
     }
@@ -75,6 +91,17 @@ function LoginHomePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAlert(null);
+
+    if (tab === "signup" && password !== confirmPassword) {
+      setAlert({
+        type: "error",
+        message:
+          "As senhas não coincidem. Digite a mesma senha nos dois campos.",
+      });
+      return;
+    }
+
     setLoading(true);
     const supabase = getSupabaseBrowser();
     try {
@@ -84,7 +111,7 @@ function LoginHomePage() {
           password,
         });
         if (error) throw error;
-        toast.success("Bem-vindo de volta!");
+        setAlert({ type: "success", message: "Bem-vindo de volta!" });
         navigate({ to: "/dashboard", replace: true });
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -94,17 +121,23 @@ function LoginHomePage() {
         });
         if (error) throw error;
         if (data.session) {
-          toast.success("Conta criada!");
+          setAlert({ type: "success", message: "Conta criada!" });
           navigate({ to: "/dashboard", replace: true });
         } else {
-          toast.success(
-            "Conta criada. Verifique seu e-mail para confirmar (se necessário).",
-          );
-          setTab("signin");
+          setTabState("signin");
+          setConfirmPassword("");
+          setAlert({
+            type: "success",
+            message:
+              "Conta criada. Verifique seu e-mail para confirmar (se necessário).",
+          });
         }
       }
     } catch (err) {
-      toast.error(translateError(err, "Falha na autenticação"));
+      setAlert({
+        type: "error",
+        message: translateError(err, "Falha na autenticação"),
+      });
     } finally {
       setLoading(false);
     }
