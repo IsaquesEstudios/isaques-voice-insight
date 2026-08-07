@@ -1425,7 +1425,7 @@ function CaptureView({ raw }: { raw: string | null }) {
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
         Campos extraídos pela IA
       </p>
-      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-lg border border-border bg-background/40">
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-background/40">
         {entries.map(([k, v]) => (
           <div key={k} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2.5">
             <span className="font-mono text-[11px] text-muted-foreground">{k}</span>
