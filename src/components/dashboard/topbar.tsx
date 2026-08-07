@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
+import { ThemeToggle } from "@/components/theme-toggle";
+
 
 export function Topbar() {
   const navigate = useNavigate();
