@@ -16,11 +16,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getMyProfile } from "@/lib/profile.functions";
+import { useQuery } from "@tanstack/react-query";
 
+function initialsFrom(name: string, email: string) {
+  const base = name.trim() || email.trim();
+  if (!base) return "?";
+  const parts = base.split(/[\s@._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
 
 export function Topbar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const profile = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: () => getMyProfile(),
+  });
+
+  const displayName =
+    profile.data?.fullName?.trim() || profile.data?.email || "Minha conta";
+  const displayInitials = initialsFrom(
+    profile.data?.fullName ?? "",
+    profile.data?.email ?? "",
+  );
 
   async function handleSignOut() {
     try {
