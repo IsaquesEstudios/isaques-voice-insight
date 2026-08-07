@@ -187,8 +187,8 @@ function OnboardingPage() {
             ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
-            {false ? null : (
               <>
+
                 <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-xs text-muted-foreground">
                   <p className="font-semibold text-foreground mb-1.5">
                     Como encontrar sua chave Vapi
