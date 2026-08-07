@@ -27,6 +27,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { getVapiEstimatedCredits } from "@/lib/vapi.functions";
+import { BrandLogo } from "@/components/brand-logo";
+
 
 type NavItem = {
   title: string;
