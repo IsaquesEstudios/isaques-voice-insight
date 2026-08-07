@@ -407,8 +407,27 @@ function OnboardingPage() {
                 Conectar número e entrar <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+              <Button
+                variant="ghost"
+                onClick={() => setEditVapi(true)}
+                className="text-xs text-muted-foreground"
+              >
+                Trocar chaves Vapi
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="text-xs text-muted-foreground"
+              >
+                Sair
+              </Button>
+            </div>
           </CardContent>
         </Card>
+        ) : null}
+
 
       </div>
     </div>
