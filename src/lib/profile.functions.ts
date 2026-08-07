@@ -63,11 +63,15 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => updateSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, string> = {};
-    if (data.fullName !== undefined) patch['full_name'] = data.fullName;
-    if (data.company !== undefined) patch['company'] = data.company;
+    const patch: {
+      full_name?: string;
+      company?: string;
+      timezone?: string;
+    } = {};
+    if (data.fullName !== undefined) patch.full_name = data.fullName;
+    if (data.company !== undefined) patch.company = data.company;
     if (data.timezone !== undefined && data.timezone)
-      patch['timezone'] = data.timezone;
+      patch.timezone = data.timezone;
 
     const { error } = await supabase
       .from("profiles")
