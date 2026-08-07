@@ -1,4 +1,4 @@
-import darkLogo from "@/assets/omniasyn-logo-dark.png.asset.json";
+import darkLogo from "@/assets/omniasyn-logo-lightmode.png.asset.json";
 import lightLogo from "@/assets/omniasyn-logo-light.png.asset.json";
 import { useTheme } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
