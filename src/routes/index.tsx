@@ -316,7 +316,6 @@ function LoginHomePage() {
                 </div>
               </div>
             ) : mode === "forgot" ? (
-            {mode === "forgot" ? (
               <div>
                 <h2 className="text-sm font-semibold text-foreground">
                   Esqueci minha senha
