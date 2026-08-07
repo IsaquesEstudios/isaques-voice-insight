@@ -293,13 +293,14 @@ function OnboardingPage() {
                   </div>
                 </div>
               </>
-            )}
           </CardContent>
         </Card>
+        ) : null}
 
         {/* Etapa 2 — número via tronco SIP */}
+        {vapiReady && !editVapi ? (
         <Card
-          className={`border-border bg-card/40 backdrop-blur-2xl ${vapiReady ? "" : "pointer-events-none opacity-50"}`}
+          className="border-border bg-card/40 backdrop-blur-2xl"
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
