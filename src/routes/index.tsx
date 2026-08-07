@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
 
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { BrandLogo } from "@/components/brand-logo";
@@ -34,13 +33,23 @@ export const Route = createFileRoute("/")({
 
 function LoginHomePage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"signin" | "signup">("signin");
+  const [tab, setTabState] = useState<"signin" | "signup">("signin");
   const [mode, setMode] = useState<"auth" | "forgot">("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [sent, setSent] = useState(false);
+  const [alert, setAlert] = useState<
+    { type: "error" | "success"; message: string } | null
+  >(null);
+
+  const setTab = (value: "signin" | "signup") => {
+    setTabState(value);
+    setConfirmPassword("");
+    setAlert(null);
+  };
 
   // Usuário já autenticado → mandar para o dashboard.
   useEffect(() => {
@@ -56,6 +65,7 @@ function LoginHomePage() {
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAlert(null);
     setLoading(true);
     try {
       const supabase = getSupabaseBrowser();
@@ -64,11 +74,16 @@ function LoginHomePage() {
       });
       if (error) throw error;
       setSent(true);
-      toast.success(
-        "Se este e-mail estiver cadastrado, você receberá um link de recuperação na caixa de entrada.",
-      );
+      setAlert({
+        type: "success",
+        message:
+          "Se este e-mail estiver cadastrado, você receberá um link de recuperação na caixa de entrada.",
+      });
     } catch (err) {
-      toast.error(translateError(err, "Falha ao enviar o e-mail de recuperação"));
+      setAlert({
+        type: "error",
+        message: translateError(err, "Falha ao enviar o e-mail de recuperação"),
+      });
     } finally {
       setLoading(false);
     }
@@ -76,6 +91,17 @@ function LoginHomePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAlert(null);
+
+    if (tab === "signup" && password !== confirmPassword) {
+      setAlert({
+        type: "error",
+        message:
+          "As senhas não coincidem. Digite a mesma senha nos dois campos.",
+      });
+      return;
+    }
+
     setLoading(true);
     const supabase = getSupabaseBrowser();
     try {
@@ -85,7 +111,7 @@ function LoginHomePage() {
           password,
         });
         if (error) throw error;
-        toast.success("Bem-vindo de volta!");
+        setAlert({ type: "success", message: "Bem-vindo de volta!" });
         navigate({ to: "/dashboard", replace: true });
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -95,17 +121,23 @@ function LoginHomePage() {
         });
         if (error) throw error;
         if (data.session) {
-          toast.success("Conta criada!");
+          setAlert({ type: "success", message: "Conta criada!" });
           navigate({ to: "/dashboard", replace: true });
         } else {
-          toast.success(
-            "Conta criada. Verifique seu e-mail para confirmar (se necessário).",
-          );
-          setTab("signin");
+          setTabState("signin");
+          setConfirmPassword("");
+          setAlert({
+            type: "success",
+            message:
+              "Conta criada. Verifique seu e-mail para confirmar (se necessário).",
+          });
         }
       }
     } catch (err) {
-      toast.error(translateError(err, "Falha na autenticação"));
+      setAlert({
+        type: "error",
+        message: translateError(err, "Falha na autenticação"),
+      });
     } finally {
       setLoading(false);
     }
@@ -133,6 +165,34 @@ function LoginHomePage() {
 
         <Card className="border-border bg-card/40 backdrop-blur-2xl">
           <CardContent className="p-6">
+            {alert && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className={`mb-5 flex items-start gap-2 rounded-lg border p-3 text-xs ${
+                  alert.type === "error"
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-success/40 bg-success/10 text-foreground"
+                }`}
+              >
+                {alert.type === "error" ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                )}
+                <p className="flex-1 leading-relaxed whitespace-pre-line">
+                  {alert.message}
+                </p>
+                <button
+                  type="button"
+                  aria-label="Fechar alerta"
+                  onClick={() => setAlert(null)}
+                  className="shrink-0 opacity-70 transition hover:opacity-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             {mode === "forgot" ? (
               <div>
                 <h2 className="text-sm font-semibold text-foreground">
@@ -230,6 +290,26 @@ function LoginHomePage() {
                     className="bg-background/50"
                   />
                 </div>
+                {tab === "signup" && (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="confirm-password"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Confirmar senha
+                    </Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="bg-background/50"
+                    />
+                  </div>
+                )}
                 <Button
                   type="submit"
                   disabled={loading}
