@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
 
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { BrandLogo } from "@/components/brand-logo";
