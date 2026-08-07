@@ -30,7 +30,7 @@ import { resetSetupCache, skipSipStep } from "./route";
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
     meta: [
-      { title: "Onboarding — Isaques Estúdios | AI Voice" },
+      { title: "Onboarding — Omniasyn" },
       {
         name: "description",
         content:
@@ -156,7 +156,7 @@ function OnboardingPage() {
             </span>
             <span className="text-muted-foreground">→</span>
             <span
-              className={`rounded-full px-2.5 py-1 ${numberReady ? "bg-success/15 text-success" : vapiReady ? "bg-primary/15 text-primary" : "bg-white/[0.04] text-muted-foreground"}`}
+              className={`rounded-full px-2.5 py-1 ${numberReady ? "bg-success/15 text-success" : vapiReady ? "bg-primary/15 text-primary" : "bg-foreground/[0.04] text-muted-foreground"}`}
             >
               2. Seu número
             </span>
@@ -164,7 +164,7 @@ function OnboardingPage() {
 
         </div>
 
-        <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
+        <Card className="border-border bg-card/40 backdrop-blur-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -208,7 +208,7 @@ function OnboardingPage() {
               </>
             ) : (
               <>
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground">
+                <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-xs text-muted-foreground">
                   <p className="font-semibold text-foreground mb-1.5">
                     Como encontrar sua chave Vapi
                   </p>
@@ -318,7 +318,7 @@ function OnboardingPage() {
 
         {/* Etapa 2 — número via tronco SIP */}
         <Card
-          className={`border-white/[0.08] bg-card/40 backdrop-blur-2xl ${vapiReady ? "" : "pointer-events-none opacity-50"}`}
+          className={`border-border bg-card/40 backdrop-blur-2xl ${vapiReady ? "" : "pointer-events-none opacity-50"}`}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
@@ -341,7 +341,7 @@ function OnboardingPage() {
             ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
+            <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-[11px] text-muted-foreground">
               Peça à sua operadora os dados de autenticação do tronco SIP
               (host/domínio, usuário e senha) e informe o número (DID) que você
               já possui. Nós criamos a credencial SIP e importamos o número na

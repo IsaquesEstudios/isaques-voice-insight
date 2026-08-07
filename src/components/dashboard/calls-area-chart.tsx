@@ -18,7 +18,7 @@ interface CallsAreaChartProps {
 export function CallsAreaChart({ data, loading, rangeDays = 30 }: CallsAreaChartProps) {
   const empty = !loading && data.every((d) => d.inbound === 0 && d.outbound === 0);
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-2">
         <div>
           <CardTitle className="text-base font-semibold">Volume de Ligações</CardTitle>
@@ -38,9 +38,9 @@ export function CallsAreaChart({ data, loading, rangeDays = 30 }: CallsAreaChart
       <CardContent className="pt-4">
         <div className="h-[280px] w-full">
           {loading ? (
-            <Skeleton className="h-full w-full rounded-xl bg-white/[0.06]" />
+            <Skeleton className="h-full w-full rounded-xl bg-foreground/[0.04]" />
           ) : empty ? (
-            <div className="grid h-full place-items-center rounded-xl border border-dashed border-white/[0.08] text-sm text-muted-foreground">
+            <div className="grid h-full place-items-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
               Nenhuma ligação registrada no período.
             </div>
           ) : (

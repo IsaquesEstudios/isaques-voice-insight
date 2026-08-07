@@ -118,7 +118,7 @@ import { Bot } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
   head: () => ({
-    meta: [{ title: "Telefonia & Números — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Telefonia & Números — Omniasyn" }],
   }),
   component: TelefoniaPage,
 });
@@ -703,7 +703,7 @@ function TelefoniaPage() {
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {kpis.map((k) => (
-            <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+            <Card key={k.label} className="border-border bg-card/20 backdrop-blur-2xl">
               <CardContent className="flex items-center justify-between p-4">
                 <div>
                   <p className="text-xs text-muted-foreground">{k.label}</p>
@@ -722,7 +722,7 @@ function TelefoniaPage() {
 
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl lg:col-span-2">
+          <Card className="border-border bg-card/20 backdrop-blur-2xl lg:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Números (DIDs)</CardTitle>
             </CardHeader>
@@ -745,7 +745,7 @@ function TelefoniaPage() {
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i} className="border-border/50">
                           <TableCell className="px-6">
-                            <div className="h-3 w-32 animate-pulse rounded bg-white/10" />
+                            <div className="h-3 w-32 animate-pulse rounded bg-foreground/10" />
                           </TableCell>
                           <TableCell colSpan={6}>
                             <div className="h-3 w-full animate-pulse rounded bg-white/5" />
@@ -901,7 +901,7 @@ function TelefoniaPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <Card className="border-border bg-card/20 backdrop-blur-2xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <div>
                 <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
@@ -937,7 +937,7 @@ function TelefoniaPage() {
                 Array.from({ length: 2 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]"
+                    className="h-14 animate-pulse rounded-xl border border-border bg-foreground/[0.04]"
                   />
                 ))
               ) : testContacts.length === 0 ? (
@@ -956,7 +956,7 @@ function TelefoniaPage() {
                   return (
                     <div
                       key={c.id}
-                      className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
+                      className="space-y-3 rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
                     >
                       <div className="flex items-center gap-3">
                         <div className="min-w-0 flex-1">
@@ -1013,7 +1013,7 @@ function TelefoniaPage() {
                                 setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
                               }
                             >
-                              <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                              <SelectTrigger className="h-9 border-border bg-background/40 backdrop-blur-xl">
                                 <SelectValue placeholder="Selecione o número de origem" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1040,7 +1040,7 @@ function TelefoniaPage() {
                               setRowCallAssistant((prev) => ({ ...prev, [c.id]: v }))
                             }
                           >
-                            <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                            <SelectTrigger className="h-9 border-border bg-background/40 backdrop-blur-xl">
                               <SelectValue placeholder="Selecione uma assistente" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1088,7 +1088,7 @@ function TelefoniaPage() {
 
 
 
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
               Rota ativa (tronco SIP)
@@ -1101,7 +1101,7 @@ function TelefoniaPage() {
                 sua própria conta Vapi ou conectar o tronco da sua operadora.
               </p>
             ) : (
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
+              <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-foreground">
                     {sipConn?.friendlyLabel || "Tronco SIP"}
@@ -1137,7 +1137,7 @@ function TelefoniaPage() {
           if (!o) setTestContactForm({ label: "", phoneE164: "" });
         }}
       >
-        <DialogContent className="max-w-md border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+        <DialogContent className="max-w-md border-border bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>Novo contato de teste</DialogTitle>
             <DialogDescription>
@@ -1202,7 +1202,7 @@ function TelefoniaPage() {
           if (!o) resetModal();
         }}
       >
-        <DialogContent className="max-w-xl border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+        <DialogContent className="max-w-xl border-border bg-card/95 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>Conectar Número de Telefonia</DialogTitle>
             <DialogDescription>
@@ -1288,7 +1288,7 @@ function TelefoniaPage() {
               </div>
 
 
-              <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3">
+              <div className="rounded-lg border border-border bg-foreground/[0.04] p-3">
                 <p className="text-[11px] text-muted-foreground">
                   Encaminhe o DID, no painel da sua operadora, para este SIP URI:
                 </p>

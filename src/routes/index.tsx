@@ -2,13 +2,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Phone } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+
 import {
   Tabs,
   TabsContent,
@@ -19,7 +21,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Entrar — Isaques Estúdios | AI Voice" },
+      { title: "Entrar — Omniasyn" },
       {
         name: "description",
         content:
@@ -121,19 +123,15 @@ function LoginHomePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary/15 text-primary shadow-glow">
-            <Phone className="h-5 w-5" />
-          </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Isaques Estúdios
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center text-center">
+          <BrandLogo className="h-9" />
+          <p className="mt-2 text-sm text-muted-foreground">
             AI Voice — acesso à plataforma
           </p>
         </div>
 
-        <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
+
+        <Card className="border-border bg-card/40 backdrop-blur-2xl">
           <CardContent className="p-6">
             {mode === "forgot" ? (
               <div>

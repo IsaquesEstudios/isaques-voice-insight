@@ -73,13 +73,13 @@ import {
 export const Route = createFileRoute("/_authenticated/campanhas")({
   head: () => ({
     meta: [
-      { title: "Campanhas de Ligação — Isaques Estúdios | AI Voice" },
+      { title: "Campanhas de Ligação — Omniasyn" },
       {
         name: "description",
         content:
           "Suba uma lista CSV de contatos, escolha a assistente e o número de origem e dispare campanhas de ligações automáticas.",
       },
-      { property: "og:title", content: "Campanhas de Ligação — Isaques Estúdios" },
+      { property: "og:title", content: "Campanhas de Ligação — Omniasyn" },
       {
         property: "og:description",
         content: "Importe contatos por CSV e dispare ligações automáticas com sua assistente de voz.",

@@ -31,7 +31,7 @@ const healthConfig: Record<Health, { label: string; dot: string; badge: string }
 
 export function NumberPooling() {
   return (
-    <Card className="h-full border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="h-full border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -49,7 +49,7 @@ export function NumberPooling() {
           return (
             <div
               key={n.number}
-              className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-colors hover:border-primary/30 hover:bg-white/[0.06]"
+              className="group flex items-center gap-3 rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl transition-colors hover:border-primary/30 hover:bg-foreground/[0.04]"
             >
               <span className={cn("relative h-2.5 w-2.5 shrink-0 rounded-full", cfg.dot)}>
                 <span
@@ -77,7 +77,7 @@ export function NumberPooling() {
           );
         })}
 
-        <div className="rounded-xl border border-dashed border-white/[0.06] bg-white/[0.02] p-3 text-center backdrop-blur-xl">
+        <div className="rounded-xl border border-dashed border-border bg-foreground/[0.04] p-3 text-center backdrop-blur-xl">
           <p className="text-xs text-muted-foreground">
             Rotação automática ativa. Próxima troca em <span className="text-foreground font-semibold">02:14h</span>.
           </p>

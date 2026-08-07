@@ -40,7 +40,7 @@ import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
-    meta: [{ title: "Configurações / API — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Configurações / API — Omniasyn" }],
   }),
   component: ConfiguracoesPage,
 });
@@ -72,7 +72,7 @@ function ConfiguracoesPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
-          <Card className="border-white/[0.08] bg-card/20 p-2 backdrop-blur-2xl h-fit">
+          <Card className="border-border bg-card/20 p-2 backdrop-blur-2xl h-fit">
             <nav className="flex flex-col gap-0.5">
               {sections.map((s) => (
                 <button
@@ -82,7 +82,7 @@ function ConfiguracoesPage() {
                     "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors text-left",
                     active === s.id
                       ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
                   )}
                 >
                   <s.icon className="h-4 w-4" />
@@ -108,7 +108,7 @@ function ConfiguracoesPage() {
 
 function PerfilSection() {
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader>
         <CardTitle className="text-base font-semibold">Perfil</CardTitle>
       </CardHeader>
@@ -118,7 +118,7 @@ function PerfilSection() {
             IE
           </div>
           <div>
-            <Button variant="outline" size="sm" className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+            <Button variant="outline" size="sm" className="border-border bg-background/40 backdrop-blur-xl">
               Alterar foto
             </Button>
             <p className="mt-1 text-[11px] text-muted-foreground">PNG ou JPG • até 2MB</p>
@@ -127,19 +127,19 @@ function PerfilSection() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Nome completo</Label>
-            <Input defaultValue="Isaque Silva" className="border-white/[0.08] bg-background/40 backdrop-blur-xl" />
+            <Input defaultValue="Isaque Silva" className="border-border bg-background/40 backdrop-blur-xl" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">E-mail</Label>
-            <Input defaultValue="isaque@isaquesestudios.com" className="border-white/[0.08] bg-background/40 backdrop-blur-xl" />
+            <Input defaultValue="isaque@isaquesestudios.com" className="border-border bg-background/40 backdrop-blur-xl" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Empresa</Label>
-            <Input defaultValue="Isaques Estúdios" className="border-white/[0.08] bg-background/40 backdrop-blur-xl" />
+            <Input defaultValue="Omniasyn" className="border-border bg-background/40 backdrop-blur-xl" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Fuso horário</Label>
-            <Input defaultValue="America/Sao_Paulo (UTC-3)" className="border-white/[0.08] bg-background/40 backdrop-blur-xl" />
+            <Input defaultValue="America/Sao_Paulo (UTC-3)" className="border-border bg-background/40 backdrop-blur-xl" />
           </div>
         </div>
         <div className="flex justify-end">
@@ -225,7 +225,7 @@ function ApiKeysSection() {
   return (
     <div className="space-y-6">
       {/* VAPI */}
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -246,7 +246,7 @@ function ApiKeysSection() {
         </CardHeader>
         <CardContent className="space-y-4">
           {vapiConnected && (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground space-y-1">
+            <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-xs text-muted-foreground space-y-1">
               <p>
                 <span className="text-foreground font-medium">Conta:</span>{" "}
                 {vapi.data?.friendlyLabel ?? "—"}
@@ -262,7 +262,7 @@ function ApiKeysSection() {
             </div>
           )}
 
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
+          <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-[11px] text-muted-foreground">
             Encontre suas chaves em{" "}
             <a
               href="https://dashboard.vapi.ai/org/api-keys"
@@ -283,7 +283,7 @@ function ApiKeysSection() {
                   value={vapiPrivate}
                   onChange={(e) => setVapiPrivate(e.target.value)}
                   placeholder="vapi_sk_..."
-                  className="pr-9 border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+                  className="pr-9 border-border bg-background/40 backdrop-blur-xl font-mono text-xs"
                 />
                 <button
                   type="button"
@@ -302,7 +302,7 @@ function ApiKeysSection() {
                   value={vapiPublic}
                   onChange={(e) => setVapiPublic(e.target.value)}
                   placeholder="Public key para testes no navegador"
-                  className="pr-9 border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+                  className="pr-9 border-border bg-background/40 backdrop-blur-xl font-mono text-xs"
                 />
                 <button
                   type="button"
@@ -333,7 +333,7 @@ function ApiKeysSection() {
       </Card>
 
       {/* TRONCO SIP (opcional) */}
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -353,7 +353,7 @@ function ApiKeysSection() {
         </CardHeader>
         <CardContent className="space-y-4">
           {sipConnected && (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-muted-foreground space-y-1">
+            <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-xs text-muted-foreground space-y-1">
               <p>
                 <span className="text-foreground font-medium">Tronco SIP:</span>{" "}
                 <span className="font-mono">
@@ -369,7 +369,7 @@ function ApiKeysSection() {
             </div>
           )}
 
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[11px] text-muted-foreground">
+          <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-[11px] text-muted-foreground">
             Use os dados de autenticação SIP fornecidos pela sua operadora
             (servidor, usuário e senha).
           </div>
@@ -381,7 +381,7 @@ function ApiKeysSection() {
                 value={sipForm.sipHost}
                 onChange={(e) => setSipForm((f) => ({ ...f, sipHost: e.target.value }))}
                 placeholder="sip.suaoperadora.com.br"
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+                className="border-border bg-background/40 backdrop-blur-xl font-mono text-xs"
               />
             </div>
             <div className="space-y-1.5">
@@ -389,7 +389,7 @@ function ApiKeysSection() {
               <Input
                 value={sipForm.sipUsername}
                 onChange={(e) => setSipForm((f) => ({ ...f, sipUsername: e.target.value }))}
-                className="border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+                className="border-border bg-background/40 backdrop-blur-xl font-mono text-xs"
               />
             </div>
             <div className="space-y-1.5">
@@ -402,7 +402,7 @@ function ApiKeysSection() {
                     setSipForm((f) => ({ ...f, sipPassword: e.target.value }))
                   }
                   placeholder="••••••••"
-                  className="pr-9 border-white/[0.08] bg-background/40 backdrop-blur-xl font-mono text-xs"
+                  className="pr-9 border-border bg-background/40 backdrop-blur-xl font-mono text-xs"
                 />
                 <button
                   type="button"
@@ -458,7 +458,7 @@ function StatusBadge({
 }) {
   if (loading) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 text-[11px] text-muted-foreground">
+      <span className="inline-flex items-center gap-1 rounded-full bg-foreground/[0.04] px-2 py-0.5 text-[11px] text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" /> Verificando
       </span>
     );
@@ -486,7 +486,7 @@ function StatusBadge({
 
 function NotificacoesSection() {
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader>
         <CardTitle className="text-base font-semibold">Notificações</CardTitle>
       </CardHeader>
@@ -499,7 +499,7 @@ function NotificacoesSection() {
         ].map((n) => (
           <div
             key={n.label}
-            className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl"
+            className="flex items-center justify-between rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl"
           >
             <div>
               <p className="text-sm font-medium text-foreground">{n.label}</p>
@@ -544,7 +544,7 @@ function FaturamentoSection() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle className="text-base font-semibold">Faturamento</CardTitle>
@@ -591,7 +591,7 @@ function FaturamentoSection() {
       </div>
 
       {vapiConnected && (
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Orçamento Vapi</CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -616,12 +616,12 @@ function FaturamentoSection() {
                         }).format(vapi.budget)
                       : "Ex: 100.00"
                   }
-                  className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                  className="border-border bg-background/40 backdrop-blur-xl"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Gasto acumulado (90 dias)</Label>
-                <div className="flex h-9 items-center rounded-md border border-white/[0.08] bg-white/[0.03] px-3 text-sm text-foreground">
+                <div className="flex h-9 items-center rounded-md border border-border bg-foreground/[0.04] px-3 text-sm text-foreground">
                   {typeof vapi?.spent === "number"
                     ? new Intl.NumberFormat("pt-BR", {
                         style: "currency",
@@ -692,7 +692,7 @@ function CompactCreditCard({
       : "bg-gradient-to-r from-primary to-success";
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-card/20 p-5 backdrop-blur-2xl">
+    <Card className="relative overflow-hidden rounded-2xl border border-border bg-card/20 p-5 backdrop-blur-2xl">
       <div className="flex items-start gap-4">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
@@ -708,14 +708,14 @@ function CompactCreditCard({
           </div>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
           {loading ? (
-            <div className="mt-2 h-6 w-24 animate-pulse rounded-md bg-white/[0.06]" />
+            <div className="mt-2 h-6 w-24 animate-pulse rounded-md bg-foreground/[0.04]" />
           ) : typeof value === "number" ? (
             <p className="mt-1 text-xl font-bold text-foreground">{fmt(value, currency)}</p>
           ) : null}
         </div>
       </div>
 
-      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-foreground/[0.04]">
         <div
           className={`h-full rounded-full ${barColor} transition-all`}
           style={{ width: `${Math.round(progress * 100)}%` }}
@@ -728,7 +728,7 @@ function CompactCreditCard({
 
 function PlaceholderSection({ title, desc }: { title: string; desc: string }) {
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader>
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
       </CardHeader>

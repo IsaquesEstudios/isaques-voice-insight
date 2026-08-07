@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   head: () => ({
-    meta: [{ title: "CRM & Leads — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "CRM & Leads — Omniasyn" }],
   }),
   component: CrmPage,
 });
@@ -68,7 +68,7 @@ function CrmPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
+            <Button variant="outline" className="gap-2 border-border bg-card/20 backdrop-blur-xl">
               <Filter className="h-4 w-4" /> Filtros
             </Button>
             <Button className="gap-2 shadow-glow">
@@ -81,7 +81,7 @@ function CrmPage() {
           {stages.map((s) => (
             <Card
               key={s.key}
-              className="border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+              className="border-border bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
             >
               <CardContent className="p-4">
                 <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", s.color)}>
@@ -95,14 +95,14 @@ function CrmPage() {
         </section>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl lg:col-span-2">
+          <Card className="border-border bg-card/20 backdrop-blur-2xl lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-base font-semibold">Leads recentes</CardTitle>
               <div className="relative w-56">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar lead..."
-                  className="h-8 border-white/[0.08] bg-background/40 pl-8 text-xs backdrop-blur-xl"
+                  className="h-8 border-border bg-background/40 pl-8 text-xs backdrop-blur-xl"
                 />
               </div>
             </CardHeader>
@@ -110,7 +110,7 @@ function CrmPage() {
               {leads.map((l) => (
                 <div
                   key={l.email}
-                  className="group flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl transition-all hover:border-primary/30 hover:bg-primary/5"
+                  className="group flex items-center gap-4 rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl transition-all hover:border-primary/30 hover:bg-primary/5"
                 >
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-semibold text-sm">
                     {l.name
@@ -163,7 +163,7 @@ function CrmPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <Card className="border-border bg-card/20 backdrop-blur-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Performance do funil</CardTitle>
             </CardHeader>
@@ -194,7 +194,7 @@ function CrmPage() {
                 </div>
               ))}
 
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl">
+              <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl">
                 <div className="flex items-center gap-2 text-primary">
                   <TrendingUp className="h-4 w-4" />
                   <span className="text-xs font-semibold">Meta do mês</span>

@@ -27,6 +27,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { getVapiEstimatedCredits } from "@/lib/vapi.functions";
+import { BrandLogo } from "@/components/brand-logo";
+
 
 type NavItem = {
   title: string;
@@ -60,13 +62,12 @@ export function AppSidebar() {
             <AudioLines className="h-5 w-5" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-bold leading-tight text-sidebar-foreground">
-              Isaques Estúdios
-            </p>
-            <p className="truncate text-xs text-muted-foreground">| AI Voice</p>
+            <BrandLogo className="h-5" />
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">AI Voice</p>
           </div>
         </div>
       </SidebarHeader>
+
 
       <SidebarContent>
         <SidebarGroup>

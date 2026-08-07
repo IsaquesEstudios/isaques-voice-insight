@@ -21,7 +21,7 @@ const ITEMS: Array<{ key: keyof CostBreakdownCardProps["breakdown"]; label: stri
 export function CostBreakdownCard({ breakdown, total, loading }: CostBreakdownCardProps) {
   const sum = ITEMS.reduce((acc, i) => acc + (breakdown[i.key] || 0), 0);
   return (
-    <Card className="h-full border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="h-full border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -37,8 +37,8 @@ export function CostBreakdownCard({ breakdown, total, loading }: CostBreakdownCa
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="space-y-2">
-              <Skeleton className="h-3 w-32 bg-white/10" />
-              <Skeleton className="h-2 w-full bg-white/10" />
+              <Skeleton className="h-3 w-32 bg-foreground/10" />
+              <Skeleton className="h-2 w-full bg-foreground/10" />
             </div>
           ))
         ) : sum <= 0 ? (
@@ -62,13 +62,13 @@ export function CostBreakdownCard({ breakdown, total, loading }: CostBreakdownCa
                       <span className="font-normal text-muted-foreground">({pct.toFixed(0)}%)</span>
                     </span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.04]">
                     <div className={cn("h-full rounded-full", item.bar)} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
             })}
-            <div className="rounded-xl border border-dashed border-white/[0.06] bg-white/[0.02] p-3 text-center">
+            <div className="rounded-xl border border-dashed border-border bg-foreground/[0.04] p-3 text-center">
               <p className="text-xs text-muted-foreground">
                 Total no período:{" "}
                 <span className="font-semibold text-foreground">${total.toFixed(2)}</span>

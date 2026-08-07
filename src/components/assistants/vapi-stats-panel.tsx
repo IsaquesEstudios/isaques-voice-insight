@@ -138,7 +138,7 @@ function MetricBar({
   total: number;
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+    <div className="rounded-xl border border-border bg-background/40 p-3 backdrop-blur-xl">
       <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
         <Tooltip>
@@ -156,7 +156,7 @@ function MetricBar({
           {label === "Cost" && <span className="ml-1 text-xs font-normal text-muted-foreground">/min</span>}
           {label === "Latency" && <span className="ml-1 text-xs font-normal text-muted-foreground">ms</span>}
         </span>
-        <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-foreground/[0.04]">
           {parts.map((p, i) => {
             const pct = total > 0 ? (p.value / total) * 100 : 0;
             if (pct <= 0) return null;
@@ -196,7 +196,7 @@ function StatCard({
   rows: { label: string; value: string }[];
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-background/40 p-4 backdrop-blur-xl">
+    <div className="rounded-xl border border-border bg-background/40 p-4 backdrop-blur-xl">
       <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: providerColor }}>
         {icon}
         {title}
@@ -206,7 +206,7 @@ function StatCard({
         <span className={cn("h-1.5 w-1.5 rounded-full")} style={{ backgroundColor: providerColor }} />
         {providerLabel}
       </div>
-      <div className="grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-3">
+      <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
         {rows.map((r) => (
           <div key={r.label}>
             <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">

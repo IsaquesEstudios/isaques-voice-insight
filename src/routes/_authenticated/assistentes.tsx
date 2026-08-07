@@ -74,7 +74,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/assistentes")({
   head: () => ({
-    meta: [{ title: "Assistentes Virtuais — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Assistentes Virtuais — Omniasyn" }],
   }),
   component: AssistentesPage,
 });
@@ -485,7 +485,7 @@ function AssistentesPage() {
             },
             { label: "Taxa média", value: isLoading ? "—" : avgSuccess != null ? `${avgSuccess}%` : "—", icon: Clock },
           ].map((k) => (
-            <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+            <Card key={k.label} className="border-border bg-card/20 backdrop-blur-2xl">
               <CardContent className="flex items-center justify-between p-4">
                 <div>
                   <p className="text-xs text-muted-foreground">{k.label}</p>
@@ -504,7 +504,7 @@ function AssistentesPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar assistentes..."
-              className="border-white/[0.08] bg-card/20 pl-9 backdrop-blur-xl"
+              className="border-border bg-card/20 pl-9 backdrop-blur-xl"
             />
           </div>
           {["Todos", "Ativos", "Rascunhos", "Pausados"].map((f, i) => (
@@ -514,7 +514,7 @@ function AssistentesPage() {
               size="sm"
               className={cn(
                 i !== 0 &&
-                  "border-white/[0.08] bg-card/20 backdrop-blur-xl hover:bg-primary/10 hover:text-primary",
+                  "border-border bg-card/20 backdrop-blur-xl hover:bg-primary/10 hover:text-primary",
               )}
             >
               {f}
@@ -526,7 +526,7 @@ function AssistentesPage() {
           {isLoading ? (
             Array.from({ length: 6 }).map((_, i) => <AssistantSkeleton key={i} />)
           ) : enriched.length === 0 ? (
-            <Card className="col-span-full border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+            <Card className="col-span-full border-border bg-card/20 backdrop-blur-2xl">
               <CardContent className="p-8 text-center text-sm text-muted-foreground">
                 Nenhum assistente encontrado na sua conta Vapi.
               </CardContent>
@@ -535,7 +535,7 @@ function AssistentesPage() {
             enriched.map(({ raw, gradient, metrics }) => (
               <Card
                 key={raw.id}
-                className="group relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+                className="group relative overflow-hidden border-border bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
               >
                 <div
                   className={cn(
@@ -573,7 +573,7 @@ function AssistentesPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="border-white/[0.08] bg-card/80 backdrop-blur-2xl"
+                        className="border-border bg-card/80 backdrop-blur-2xl"
                       >
                         <DropdownMenuItem onSelect={() => openEdit(raw)}>
                           <Pencil className="mr-2 h-3.5 w-3.5" />
@@ -610,7 +610,7 @@ function AssistentesPage() {
                     <span className="truncate text-muted-foreground">{formatVoice(raw)}</span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/40 p-3 backdrop-blur-xl">
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                         Ligações
@@ -663,7 +663,7 @@ function AssistentesPage() {
         open={form.open}
         onOpenChange={(open) => !isSubmitting && setForm((f) => ({ ...f, open }))}
       >
-        <DialogContent className="max-w-lg border-white/[0.08] bg-card/80 backdrop-blur-2xl">
+        <DialogContent className="max-w-lg border-border bg-card/80 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle>
               {form.mode === "create" ? "Novo Assistente" : "Editar Assistente"}
@@ -676,7 +676,7 @@ function AssistentesPage() {
             {/* Stepper */}
             <div className="mt-3 flex items-center gap-2">
               <StepDot active={form.step >= 1} label="Comportamento" />
-              <div className="h-px flex-1 bg-white/[0.08]" />
+              <div className="h-px flex-1 bg-foreground/[0.04]" />
               <StepDot active={form.step >= 2} label="Modelo & Voz" />
             </div>
           </DialogHeader>
@@ -692,7 +692,7 @@ function AssistentesPage() {
                     placeholder="Ex: Sofia • SDR"
                     disabled={form.loadingInitial}
                     required
-                    className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                    className="border-border bg-background/40 backdrop-blur-xl"
                   />
                 </div>
                 <div className="space-y-2">
@@ -704,7 +704,7 @@ function AssistentesPage() {
                     placeholder="Olá, como posso ajudar?"
                     rows={2}
                     disabled={form.loadingInitial}
-                    className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                    className="border-border bg-background/40 backdrop-blur-xl"
                   />
                 </div>
                 <div className="space-y-2">
@@ -716,7 +716,7 @@ function AssistentesPage() {
                     placeholder="Descreva o papel, tom e regras do assistente..."
                     rows={7}
                     disabled={form.loadingInitial}
-                    className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                    className="border-border bg-background/40 backdrop-blur-xl"
                   />
                 </div>
               </>
@@ -747,7 +747,7 @@ function AssistentesPage() {
                       className={`w-full rounded-xl border p-4 text-left transition ${
                         selected
                           ? "border-primary/60 bg-primary/[0.08] shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
-                          : "border-white/[0.08] bg-background/40 hover:border-white/[0.16]"
+                          : "border-border bg-background/40 hover:border-border"
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -773,7 +773,7 @@ function AssistentesPage() {
                   variant="outline"
                   onClick={() => setForm((f) => ({ ...f, step: 1 }))}
                   disabled={isSubmitting}
-                  className="border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                  className="border-border bg-card/20 backdrop-blur-xl"
                 >
                   Voltar
                 </Button>
@@ -783,7 +783,7 @@ function AssistentesPage() {
                   variant="outline"
                   onClick={() => setForm(emptyForm)}
                   disabled={isSubmitting}
-                  className="border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                  className="border-border bg-card/20 backdrop-blur-xl"
                 >
                   Cancelar
                 </Button>
@@ -824,7 +824,7 @@ function AssistentesPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => !isDeleting && !open && setDeleteTarget(null)}
       >
-        <AlertDialogContent className="border-white/[0.08] bg-card/80 backdrop-blur-2xl">
+        <AlertDialogContent className="border-border bg-card/80 backdrop-blur-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir assistente?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -868,7 +868,7 @@ function StepDot({ active, label }: { active: boolean; label: string }) {
         className={
           active
             ? "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground"
-            : "flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.08] bg-background/40 text-[10px] font-semibold text-muted-foreground"
+            : "flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background/40 text-[10px] font-semibold text-muted-foreground"
         }
       >
         {active ? "•" : ""}
@@ -882,36 +882,36 @@ function StepDot({ active, label }: { active: boolean; label: string }) {
 
 function AssistantSkeleton() {
   return (
-    <Card className="relative overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="relative overflow-hidden border-border bg-card/20 backdrop-blur-2xl">
       <CardContent className="relative space-y-4 p-5">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <Skeleton className="h-11 w-11 rounded-xl bg-white/10" />
+            <Skeleton className="h-11 w-11 rounded-xl bg-foreground/10" />
             <div className="space-y-2">
-              <Skeleton className="h-3.5 w-32 bg-white/10" />
-              <Skeleton className="h-3 w-20 bg-white/10" />
+              <Skeleton className="h-3.5 w-32 bg-foreground/10" />
+              <Skeleton className="h-3 w-20 bg-foreground/10" />
             </div>
           </div>
-          <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
+          <Skeleton className="h-8 w-8 rounded-md bg-foreground/10" />
         </div>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-14 rounded-full bg-white/10" />
-          <Skeleton className="h-3 w-32 bg-white/10" />
+          <Skeleton className="h-4 w-14 rounded-full bg-foreground/10" />
+          <Skeleton className="h-3 w-32 bg-foreground/10" />
         </div>
-        <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/40 p-3 backdrop-blur-xl">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="space-y-2">
-              <Skeleton className="h-2.5 w-14 bg-white/10" />
-              <Skeleton className="h-3.5 w-12 bg-white/10" />
+              <Skeleton className="h-2.5 w-14 bg-foreground/10" />
+              <Skeleton className="h-3.5 w-12 bg-foreground/10" />
             </div>
           ))}
         </div>
         <div className="flex items-center justify-between">
-          <Skeleton className="h-3 w-24 bg-white/10" />
+          <Skeleton className="h-3 w-24 bg-foreground/10" />
           <div className="flex items-center gap-1">
-            <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
-            <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
-            <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
+            <Skeleton className="h-8 w-8 rounded-md bg-foreground/10" />
+            <Skeleton className="h-8 w-8 rounded-md bg-foreground/10" />
+            <Skeleton className="h-8 w-8 rounded-md bg-foreground/10" />
           </div>
         </div>
       </CardContent>

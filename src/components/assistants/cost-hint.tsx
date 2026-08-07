@@ -21,7 +21,7 @@ export function CostHint({ costPerMin, tooltip, className }: CostHintProps) {
       <TooltipTrigger asChild>
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-background/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur-xl",
+            "inline-flex items-center gap-1 rounded-full border border-border bg-background/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur-xl",
             !unknown && "text-foreground/80",
             className,
           )}

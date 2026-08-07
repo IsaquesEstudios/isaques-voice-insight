@@ -142,14 +142,14 @@ export function PhoneNumberInput({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="h-8 shrink-0 gap-1.5 border-white/[0.08] bg-background/40 px-2 text-xs backdrop-blur-xl"
+            className="h-8 shrink-0 gap-1.5 border-border bg-background/40 px-2 text-xs backdrop-blur-xl"
           >
             <span className="text-base leading-none">{flagEmoji(country)}</span>
             <span className="font-mono">{dial}</span>
             <ChevronsUpDown className="h-3 w-3 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[280px] border-white/[0.08] bg-card/90 p-0 backdrop-blur-2xl">
+        <PopoverContent className="w-[280px] border-border bg-card/90 p-0 backdrop-blur-2xl">
           <Command>
             <CommandInput placeholder="Buscar país..." className="h-9" />
             <CommandList>
@@ -188,7 +188,7 @@ export function PhoneNumberInput({
         placeholder={placeholder ?? (current ? `Número em ${current.name}` : "Número")}
         inputMode="tel"
         autoComplete="tel-national"
-        className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+        className="h-8 border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
       />
     </div>
   );

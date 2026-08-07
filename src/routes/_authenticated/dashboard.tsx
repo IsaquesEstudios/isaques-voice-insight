@@ -207,7 +207,7 @@ function MetricRow({
 }) {
   const max = reasons.reduce((m, r) => Math.max(m, r.count), 0);
   return (
-    <div className="h-full rounded-xl border border-white/[0.08] bg-card/20 p-5 backdrop-blur-2xl">
+    <div className="h-full rounded-xl border border-border bg-card/20 p-5 backdrop-blur-2xl">
       <div className="flex items-center gap-2">
         <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
           <Clock className="h-4 w-4" />
@@ -223,7 +223,7 @@ function MetricRow({
       <div className="mt-4 space-y-2.5">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-8 w-full animate-pulse rounded-lg bg-white/[0.06]" />
+            <div key={i} className="h-8 w-full animate-pulse rounded-lg bg-foreground/[0.04]" />
           ))
         ) : reasons.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -236,7 +236,7 @@ function MetricRow({
                 <span className="text-muted-foreground">{REASON_LABELS[r.reason] ?? r.reason}</span>
                 <span className="font-semibold text-foreground">{r.count}</span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.04]">
                 <div
                   className="h-full rounded-full bg-primary"
                   style={{ width: `${max > 0 ? (r.count / max) * 100 : 0}%` }}

@@ -385,7 +385,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+      <DialogContent className="max-w-lg border-border bg-card/95 backdrop-blur-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PhoneCall className="h-5 w-5 text-primary" />
@@ -398,7 +398,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <div className="flex items-center justify-between rounded-xl border border-border bg-foreground/[0.04] p-4">
             <div className="flex items-center gap-3">
               <span
                 className={cn(
@@ -437,7 +437,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
           )}
 
           {(status === "in_call" || status === "ended") && (
-            <ScrollArea className="h-56 rounded-xl border border-white/[0.06] bg-background/40 p-3">
+            <ScrollArea className="h-56 rounded-xl border border-border bg-background/40 p-3">
               {transcript.length === 0 ? (
                 <p className="pt-6 text-center text-xs text-muted-foreground">
                   Aguardando fala...
@@ -451,7 +451,7 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
                         "rounded-lg px-3 py-2 text-xs",
                         t.role === "user"
                           ? "ml-6 bg-primary/15 text-foreground"
-                          : "mr-6 bg-white/[0.05] text-foreground",
+                          : "mr-6 bg-foreground/[0.04] text-foreground",
                       )}
                     >
                       <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
