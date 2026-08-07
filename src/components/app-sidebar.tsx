@@ -10,7 +10,6 @@ import {
   Settings,
   Sparkles,
   Phone,
-  AudioLines,
   Loader2,
 } from "lucide-react";
 
@@ -58,9 +57,6 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-glow">
-            <AudioLines className="h-5 w-5" />
-          </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <BrandLogo className="h-5" />
             <p className="mt-0.5 truncate text-xs text-muted-foreground">AI Voice</p>
