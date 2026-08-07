@@ -381,6 +381,35 @@ function LoginHomePage() {
               </TabsContent>
 
               <form className="space-y-4" onSubmit={handleSubmit}>
+                {tab === "signup" ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="full-name" className="text-xs text-muted-foreground">
+                        Nome completo
+                      </Label>
+                      <Input
+                        id="full-name"
+                        autoComplete="name"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="bg-background/50"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="company" className="text-xs text-muted-foreground">
+                        Empresa <span className="opacity-70">(opcional)</span>
+                      </Label>
+                      <Input
+                        id="company"
+                        autoComplete="organization"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  </>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-xs text-muted-foreground">
                     E-mail
