@@ -19,7 +19,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Entrar — Isaques Estúdios | AI Voice" },
+      { title: "Entrar — Omniasyn" },
       {
         name: "description",
         content:
@@ -126,7 +126,7 @@ function LoginHomePage() {
             <Phone className="h-5 w-5" />
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Isaques Estúdios
+            Omniasyn
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             AI Voice — acesso à plataforma

@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   head: () => ({
-    meta: [{ title: "CRM & Leads — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "CRM & Leads — Omniasyn" }],
   }),
   component: CrmPage,
 });

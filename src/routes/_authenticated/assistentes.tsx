@@ -74,7 +74,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/assistentes")({
   head: () => ({
-    meta: [{ title: "Assistentes Virtuais — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Assistentes Virtuais — Omniasyn" }],
   }),
   component: AssistentesPage,
 });

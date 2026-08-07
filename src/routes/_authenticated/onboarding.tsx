@@ -30,7 +30,7 @@ import { resetSetupCache, skipSipStep } from "./route";
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
     meta: [
-      { title: "Onboarding — Isaques Estúdios | AI Voice" },
+      { title: "Onboarding — Omniasyn" },
       {
         name: "description",
         content:

@@ -40,7 +40,7 @@ import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
-    meta: [{ title: "Configurações / API — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Configurações / API — Omniasyn" }],
   }),
   component: ConfiguracoesPage,
 });
@@ -135,7 +135,7 @@ function PerfilSection() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Empresa</Label>
-            <Input defaultValue="Isaques Estúdios" className="border-white/[0.08] bg-background/40 backdrop-blur-xl" />
+            <Input defaultValue="Omniasyn" className="border-white/[0.08] bg-background/40 backdrop-blur-xl" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Fuso horário</Label>

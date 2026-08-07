@@ -14,13 +14,13 @@ export const Route = createFileRoute("/reset-password")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Redefinir senha — Isaques Estúdios | AI Voice" },
+      { title: "Redefinir senha — Omniasyn" },
       {
         name: "description",
         content:
           "Defina uma nova senha para acessar o painel de assistentes virtuais e chamadas.",
       },
-      { property: "og:title", content: "Redefinir senha — Isaques Estúdios" },
+      { property: "og:title", content: "Redefinir senha — Omniasyn" },
       {
         property: "og:description",
         content: "Defina uma nova senha para acessar sua conta.",

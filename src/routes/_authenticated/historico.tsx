@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/historico")({
   head: () => ({
-    meta: [{ title: "Histórico de Chamadas — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Histórico de Chamadas — Omniasyn" }],
   }),
   component: HistoricoPage,
 });

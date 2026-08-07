@@ -150,7 +150,7 @@ import { CostHint, CostSummary } from "@/components/assistants/cost-hint";
 
 export const Route = createFileRoute("/_authenticated/assistants/$id")({
   head: () => ({
-    meta: [{ title: "Detalhes do Assistente — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Detalhes do Assistente — Omniasyn" }],
   }),
   component: AssistantDetailPage,
 });

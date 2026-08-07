@@ -118,7 +118,7 @@ import { Bot } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/telefonia")({
   head: () => ({
-    meta: [{ title: "Telefonia & Números — Isaques Estúdios | AI Voice" }],
+    meta: [{ title: "Telefonia & Números — Omniasyn" }],
   }),
   component: TelefoniaPage,
 });
