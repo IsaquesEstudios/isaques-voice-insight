@@ -16,11 +16,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getMyProfile } from "@/lib/profile.functions";
+import { useQuery } from "@tanstack/react-query";
 
+function initialsFrom(name: string, email: string) {
+  const base = name.trim() || email.trim();
+  if (!base) return "?";
+  const parts = base.split(/[\s@._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
 
 export function Topbar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const profile = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: () => getMyProfile(),
+  });
+
+  const displayName =
+    profile.data?.fullName?.trim() || profile.data?.email || "Minha conta";
+  const displayInitials = initialsFrom(
+    profile.data?.fullName ?? "",
+    profile.data?.email ?? "",
+  );
 
   async function handleSignOut() {
     try {
@@ -64,11 +84,15 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-xl border border-border/60 bg-card/60 py-1.5 pl-1.5 pr-3 text-left transition-colors hover:bg-card">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-primary to-chart-3 text-sm font-bold text-primary-foreground">
-                RC
+                {displayInitials}
               </span>
               <span className="hidden text-sm leading-tight sm:block">
-                <span className="block font-semibold text-foreground">Ryan Coleford</span>
-                <span className="block text-[11px] text-muted-foreground">Admin</span>
+                <span className="block max-w-[180px] truncate font-semibold text-foreground">
+                  {displayName}
+                </span>
+                <span className="block max-w-[180px] truncate text-[11px] text-muted-foreground">
+                  {profile.data?.email ?? ""}
+                </span>
               </span>
             </button>
           </DropdownMenuTrigger>

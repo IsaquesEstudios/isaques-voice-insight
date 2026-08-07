@@ -37,6 +37,8 @@ function LoginHomePage() {
   const [mode, setMode] = useState<"auth" | "forgot" | "confirm-email">("auth");
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [fullName, setFullName] = useState("");
+  const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -121,7 +123,13 @@ function LoginHomePage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: {
+              full_name: fullName.trim(),
+              company: company.trim(),
+            },
+          },
         });
         if (error) throw error;
         if (data.session) {
@@ -381,6 +389,35 @@ function LoginHomePage() {
               </TabsContent>
 
               <form className="space-y-4" onSubmit={handleSubmit}>
+                {tab === "signup" ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="full-name" className="text-xs text-muted-foreground">
+                        Nome completo
+                      </Label>
+                      <Input
+                        id="full-name"
+                        autoComplete="name"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="bg-background/50"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="company" className="text-xs text-muted-foreground">
+                        Empresa <span className="opacity-70">(opcional)</span>
+                      </Label>
+                      <Input
+                        id="company"
+                        autoComplete="organization"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  </>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-xs text-muted-foreground">
                     E-mail

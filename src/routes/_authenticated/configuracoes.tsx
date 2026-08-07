@@ -36,6 +36,7 @@ import {
   saveVapiBudget,
 } from "@/lib/vapi.functions";
 import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
+import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -106,47 +107,137 @@ function ConfiguracoesPage() {
   );
 }
 
+function initialsFrom(name: string, email: string) {
+  const base = name.trim() || email.trim();
+  if (!base) return "?";
+  const parts = base.split(/[\s@._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
 function PerfilSection() {
+  const qc = useQueryClient();
+  const profile = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: () => getMyProfile(),
+  });
+
+  const [form, setForm] = useState<{
+    fullName: string;
+    company: string;
+    timezone: string;
+  } | null>(null);
+
+  const current = form ?? {
+    fullName: profile.data?.fullName ?? "",
+    company: profile.data?.company ?? "",
+    timezone: profile.data?.timezone ?? "America/Sao_Paulo",
+  };
+
+  const save = useMutation({
+    mutationFn: async () =>
+      updateMyProfile({
+        data: {
+          fullName: current.fullName.trim(),
+          company: current.company.trim(),
+          timezone: current.timezone.trim(),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Perfil atualizado!");
+      setForm(null);
+      qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar o perfil")),
+  });
+
   return (
     <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader>
         <CardTitle className="text-base font-semibold">Perfil</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/15 text-primary text-xl font-bold">
-            IE
+        {profile.isLoading ? (
+          <div className="space-y-4">
+            <div className="h-16 w-16 animate-pulse rounded-2xl bg-foreground/10" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-14 animate-pulse rounded-xl bg-foreground/10" />
+              ))}
+            </div>
           </div>
-          <div>
-            <Button variant="outline" size="sm" className="border-border bg-background/40 backdrop-blur-xl">
-              Alterar foto
-            </Button>
-            <p className="mt-1 text-[11px] text-muted-foreground">PNG ou JPG • até 2MB</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Nome completo</Label>
-            <Input defaultValue="Isaque Silva" className="border-border bg-background/40 backdrop-blur-xl" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">E-mail</Label>
-            <Input defaultValue="isaque@isaquesestudios.com" className="border-border bg-background/40 backdrop-blur-xl" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Empresa</Label>
-            <Input defaultValue="Omniasyn" className="border-border bg-background/40 backdrop-blur-xl" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Fuso horário</Label>
-            <Input defaultValue="America/Sao_Paulo (UTC-3)" className="border-border bg-background/40 backdrop-blur-xl" />
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <Button className="gap-2 shadow-glow">
-            <Check className="h-4 w-4" /> Salvar alterações
-          </Button>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/15 text-primary text-xl font-bold">
+                {initialsFrom(current.fullName, profile.data?.email ?? "")}
+              </div>
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="border-border bg-background/40 backdrop-blur-xl"
+                >
+                  Alterar foto
+                </Button>
+                <p className="mt-1 text-[11px] text-muted-foreground">Em breve</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nome completo</Label>
+                <Input
+                  value={current.fullName}
+                  onChange={(e) => setForm({ ...current, fullName: e.target.value })}
+                  placeholder="Seu nome"
+                  className="border-border bg-background/40 backdrop-blur-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">E-mail</Label>
+                <Input
+                  value={profile.data?.email ?? ""}
+                  readOnly
+                  className="border-border bg-background/40 backdrop-blur-xl opacity-70"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  É o e-mail usado para entrar na conta.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Empresa</Label>
+                <Input
+                  value={current.company}
+                  onChange={(e) => setForm({ ...current, company: e.target.value })}
+                  placeholder="Nome da sua empresa"
+                  className="border-border bg-background/40 backdrop-blur-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Fuso horário</Label>
+                <Input
+                  value={current.timezone}
+                  onChange={(e) => setForm({ ...current, timezone: e.target.value })}
+                  className="border-border bg-background/40 backdrop-blur-xl"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={() => save.mutate()}
+                disabled={save.isPending}
+                className="gap-2 shadow-glow"
+              >
+                {save.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Salvar alterações
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
