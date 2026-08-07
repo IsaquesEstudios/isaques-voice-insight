@@ -37,6 +37,8 @@ function LoginHomePage() {
   const [mode, setMode] = useState<"auth" | "forgot" | "confirm-email">("auth");
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [fullName, setFullName] = useState("");
+  const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
