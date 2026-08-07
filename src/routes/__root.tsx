@@ -17,6 +17,8 @@ import { getPublicSupabaseConfig } from "@/integrations/supabase/config.function
 import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { RouteProgress } from "@/components/route-progress";
 import { useQueryCachePersistence } from "@/components/query-persist";
+import { useTheme } from "@/components/theme-toggle";
+
 
 function NotFoundComponent() {
   return (
