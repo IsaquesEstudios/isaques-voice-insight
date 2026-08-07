@@ -128,13 +128,11 @@ function LoginHomePage() {
           setAlert({ type: "success", message: "Conta criada!" });
           navigate({ to: "/dashboard", replace: true });
         } else {
-          setTabState("signin");
+          setPendingEmail(email);
           setConfirmPassword("");
-          setAlert({
-            type: "success",
-            message:
-              "Conta criada. Verifique seu e-mail para confirmar (se necessário).",
-          });
+          setResendCooldown(60);
+          setMode("confirm-email");
+          setAlert(null);
         }
       }
     } catch (err) {
@@ -146,6 +144,77 @@ function LoginHomePage() {
       setLoading(false);
     }
   };
+
+  // Contagem regressiva para reenviar o e-mail de confirmação.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => {
+      setResendCooldown((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
+
+  const handleResendConfirmation = async () => {
+    if (resendCooldown > 0) return;
+    setAlert(null);
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: pendingEmail,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      setResendCooldown(60);
+      setAlert({
+        type: "success",
+        message: "E-mail de confirmação reenviado. Verifique a caixa de entrada e o spam.",
+      });
+    } catch (err) {
+      setAlert({
+        type: "error",
+        message: translateError(err, "Falha ao reenviar o e-mail de confirmação"),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAlreadyConfirmed = async () => {
+    setAlert(null);
+    if (!password) {
+      setMode("auth");
+      setTabState("signin");
+      setEmail(pendingEmail);
+      setAlert({
+        type: "success",
+        message: "Digite sua senha para entrar e continuar a configuração.",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: pendingEmail,
+        password,
+      });
+      if (error) throw error;
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err) {
+      setAlert({
+        type: "error",
+        message: translateError(
+          err,
+          "Ainda não conseguimos confirmar seu e-mail. Clique no link que enviamos e tente novamente.",
+        ),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
 
   if (checking) {
