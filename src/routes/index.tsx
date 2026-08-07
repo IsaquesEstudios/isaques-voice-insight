@@ -34,7 +34,9 @@ export const Route = createFileRoute("/")({
 function LoginHomePage() {
   const navigate = useNavigate();
   const [tab, setTabState] = useState<"signin" | "signup">("signin");
-  const [mode, setMode] = useState<"auth" | "forgot">("auth");
+  const [mode, setMode] = useState<"auth" | "forgot" | "confirm-email">("auth");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
