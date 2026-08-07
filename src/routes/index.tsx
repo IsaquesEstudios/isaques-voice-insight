@@ -262,6 +262,26 @@ function LoginHomePage() {
                     className="bg-background/50"
                   />
                 </div>
+                {tab === "signup" && (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="confirm-password"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Confirmar senha
+                    </Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="bg-background/50"
+                    />
+                  </div>
+                )}
                 <Button
                   type="submit"
                   disabled={loading}
