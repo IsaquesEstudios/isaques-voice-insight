@@ -83,30 +83,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Isaques Estúdios | AI Voice — Dashboard" },
+      { title: "Omniasyn — Plataforma de voz com IA" },
       {
         name: "description",
         content:
-          "Painel de controle da plataforma Isaques Estúdios | AI Voice: métricas, telefonia inteligente, CRM e histórico de chamadas.",
+          "Painel de controle da Omniasyn: métricas, telefonia inteligente, assistentes de voz e histórico de chamadas.",
       },
-      { property: "og:title", content: "Isaques Estúdios | AI Voice — Dashboard" },
+      { property: "og:title", content: "Omniasyn — Plataforma de voz com IA" },
       {
         property: "og:description",
-        content: "Painel de controle da plataforma Isaques Estúdios | AI Voice: métricas, telefonia inteligente, CRM e histórico de chamadas.",
+        content:
+          "Painel de controle da Omniasyn: métricas, telefonia inteligente, assistentes de voz e histórico de chamadas.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "Omniasyn" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Isaques Estúdios | AI Voice — Dashboard" },
-      { name: "twitter:description", content: "Painel de controle da plataforma Isaques Estúdios | AI Voice: métricas, telefonia inteligente, CRM e histórico de chamadas." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cd73db46-a508-4f6d-8ae7-e9f0ad27925c/id-preview-85b6feb7--818d1939-d4df-4ca2-b1af-4e1dda55214f.lovable.app-1784342173943.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cd73db46-a508-4f6d-8ae7-e9f0ad27925c/id-preview-85b6feb7--818d1939-d4df-4ca2-b1af-4e1dda55214f.lovable.app-1784342173943.png" },
+      { name: "twitter:title", content: "Omniasyn — Plataforma de voz com IA" },
+      {
+        name: "twitter:description",
+        content:
+          "Painel de controle da Omniasyn: métricas, telefonia inteligente, assistentes de voz e histórico de chamadas.",
+      },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -114,7 +118,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
       },
     ],
+    scripts: [
+      {
+        children: `(function(){try{var t=localStorage.getItem('omniasyn-theme');var d=t!=='light';var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();`,
+      },
+    ],
   }),
+
   loader: async () => {
     const cfg = await getPublicSupabaseConfig();
     // Initialize on the server so SSR-rendered code can call getSupabaseBrowser().
