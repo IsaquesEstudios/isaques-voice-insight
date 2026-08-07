@@ -188,7 +188,7 @@ function OnboardingPage() {
           <CardContent className="space-y-4">
             {vapiReady && !editVapi ? (
               <>
-                <div className="rounded-xl border border-success/25 bg-success/10 p-3 text-xs text-success-foreground">
+                <div className="rounded-xl border border-success/25 bg-success/10 p-3 text-xs text-white">
                   Sua conta Vapi já está conectada. Suas chaves ficam salvas e
                   você não precisa preencher de novo a cada login.
                 </div>
