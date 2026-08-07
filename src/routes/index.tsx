@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, MailCheck, X } from "lucide-react";
 
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { BrandLogo } from "@/components/brand-logo";
@@ -34,7 +34,9 @@ export const Route = createFileRoute("/")({
 function LoginHomePage() {
   const navigate = useNavigate();
   const [tab, setTabState] = useState<"signin" | "signup">("signin");
-  const [mode, setMode] = useState<"auth" | "forgot">("auth");
+  const [mode, setMode] = useState<"auth" | "forgot" | "confirm-email">("auth");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -126,13 +128,11 @@ function LoginHomePage() {
           setAlert({ type: "success", message: "Conta criada!" });
           navigate({ to: "/dashboard", replace: true });
         } else {
-          setTabState("signin");
+          setPendingEmail(email);
           setConfirmPassword("");
-          setAlert({
-            type: "success",
-            message:
-              "Conta criada. Verifique seu e-mail para confirmar (se necessário).",
-          });
+          setResendCooldown(60);
+          setMode("confirm-email");
+          setAlert(null);
         }
       }
     } catch (err) {
@@ -144,6 +144,77 @@ function LoginHomePage() {
       setLoading(false);
     }
   };
+
+  // Contagem regressiva para reenviar o e-mail de confirmação.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => {
+      setResendCooldown((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
+
+  const handleResendConfirmation = async () => {
+    if (resendCooldown > 0) return;
+    setAlert(null);
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: pendingEmail,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      setResendCooldown(60);
+      setAlert({
+        type: "success",
+        message: "E-mail de confirmação reenviado. Verifique a caixa de entrada e o spam.",
+      });
+    } catch (err) {
+      setAlert({
+        type: "error",
+        message: translateError(err, "Falha ao reenviar o e-mail de confirmação"),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAlreadyConfirmed = async () => {
+    setAlert(null);
+    if (!password) {
+      setMode("auth");
+      setTabState("signin");
+      setEmail(pendingEmail);
+      setAlert({
+        type: "success",
+        message: "Digite sua senha para entrar e continuar a configuração.",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: pendingEmail,
+        password,
+      });
+      if (error) throw error;
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err) {
+      setAlert({
+        type: "error",
+        message: translateError(
+          err,
+          "Ainda não conseguimos confirmar seu e-mail. Clique no link que enviamos e tente novamente.",
+        ),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
 
   if (checking) {
@@ -195,7 +266,56 @@ function LoginHomePage() {
                 </button>
               </div>
             )}
-            {mode === "forgot" ? (
+            {mode === "confirm-email" ? (
+              <div className="text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <MailCheck className="h-6 w-6 text-primary" />
+                </div>
+                <h2 className="mt-4 text-sm font-semibold text-foreground">
+                  Confirme seu e-mail
+                </h2>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Enviamos um link de confirmação para{" "}
+                  <span className="font-medium text-foreground">{pendingEmail}</span>.
+                  Clique no link para ativar sua conta — verifique também a pasta de spam.
+                </p>
+                <div className="mt-6 space-y-2">
+                  <Button
+                    type="button"
+                    disabled={loading}
+                    onClick={handleAlreadyConfirmed}
+                    className="w-full gap-2 shadow-glow"
+                  >
+                    {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Já confirmei — continuar configurando
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={loading || resendCooldown > 0}
+                    onClick={handleResendConfirmation}
+                    className="w-full"
+                  >
+                    {resendCooldown > 0
+                      ? `Reenviar e-mail em ${resendCooldown}s`
+                      : "Reenviar e-mail de confirmação"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-xs text-muted-foreground"
+                    onClick={() => {
+                      setMode("auth");
+                      setTabState("signin");
+                      setEmail(pendingEmail);
+                      setAlert(null);
+                    }}
+                  >
+                    Voltar ao login
+                  </Button>
+                </div>
+              </div>
+            ) : mode === "forgot" ? (
               <div>
                 <h2 className="text-sm font-semibold text-foreground">
                   Esqueci minha senha
