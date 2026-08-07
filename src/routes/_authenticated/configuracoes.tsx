@@ -36,6 +36,7 @@ import {
   saveVapiBudget,
 } from "@/lib/vapi.functions";
 import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
+import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
