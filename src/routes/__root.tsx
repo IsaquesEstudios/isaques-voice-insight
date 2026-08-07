@@ -155,6 +155,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { supabase: cfg } = Route.useLoaderData();
   const router = useRouter();
+  const { theme } = useTheme();
 
   // Keep the query cache in localStorage for instant repeat navigation.
   useQueryCachePersistence(queryClient);
@@ -182,7 +183,8 @@ function RootComponent() {
         <RouteProgress />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
-        <Toaster position="bottom-right" theme="dark" richColors closeButton />
+        <Toaster position="bottom-right" theme={theme} richColors closeButton />
+
       </TooltipProvider>
     </QueryClientProvider>
   );
