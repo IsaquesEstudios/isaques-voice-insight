@@ -10,7 +10,6 @@ import {
   Settings,
   Sparkles,
   Phone,
-  AudioLines,
   Loader2,
 } from "lucide-react";
 
