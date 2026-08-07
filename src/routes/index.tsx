@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, X } from "lucide-react";
 
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { BrandLogo } from "@/components/brand-logo";
