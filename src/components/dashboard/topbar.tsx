@@ -47,6 +47,7 @@ export function Topbar() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="icon"
@@ -55,6 +56,7 @@ export function Topbar() {
           <Bell className="h-4 w-4" />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary shadow-glow" />
         </Button>
+
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
