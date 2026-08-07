@@ -111,7 +111,7 @@ export function VoiceCallTestCard({
   };
 
   return (
-    <Card className="border-white/[0.08] bg-background/40">
+    <Card className="border-border bg-background/40">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <PhoneCall className="h-4 w-4 text-primary" />

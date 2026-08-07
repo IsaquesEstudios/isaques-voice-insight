@@ -57,7 +57,7 @@ interface RecentCallsTableProps {
 
 export function RecentCallsTable({ rows, loading, onSeeAll }: RecentCallsTableProps) {
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div>
           <CardTitle className="text-base font-semibold">Chamadas Recentes</CardTitle>
@@ -92,7 +92,7 @@ export function RecentCallsTable({ rows, loading, onSeeAll }: RecentCallsTablePr
                   <TableRow key={i} className="border-border/50">
                     {Array.from({ length: 7 }).map((__, j) => (
                       <TableCell key={j} className={j === 0 || j === 6 ? "px-6" : undefined}>
-                        <Skeleton className="h-4 w-full max-w-[110px] bg-white/10" />
+                        <Skeleton className="h-4 w-full max-w-[110px] bg-foreground/10" />
                       </TableCell>
                     ))}
                   </TableRow>

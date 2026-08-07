@@ -95,7 +95,7 @@ function ResetPasswordPage() {
           </p>
         </div>
 
-        <Card className="border-white/[0.08] bg-card/40 backdrop-blur-2xl">
+        <Card className="border-border bg-card/40 backdrop-blur-2xl">
           <CardContent className="p-6">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-1.5">

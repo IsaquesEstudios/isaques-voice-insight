@@ -11,7 +11,7 @@ interface TopAssistantsCardProps {
 
 export function TopAssistantsCard({ items, loading }: TopAssistantsCardProps) {
   return (
-    <Card className="h-full border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="h-full border-border bg-card/20 backdrop-blur-2xl">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -26,7 +26,7 @@ export function TopAssistantsCard({ items, loading }: TopAssistantsCardProps) {
       <CardContent className="space-y-2.5">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-xl bg-white/[0.06]" />
+            <Skeleton key={i} className="h-14 w-full rounded-xl bg-foreground/[0.04]" />
           ))
         ) : items.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -38,7 +38,7 @@ export function TopAssistantsCard({ items, loading }: TopAssistantsCardProps) {
               key={a.id}
               to="/assistants/$id"
               params={{ id: a.id }}
-              className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 transition-colors hover:border-primary/30 hover:bg-white/[0.06]"
+              className="flex items-center gap-3 rounded-xl border border-border bg-foreground/[0.04] p-3 transition-colors hover:border-primary/30 hover:bg-foreground/[0.04]"
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
                 {i + 1}

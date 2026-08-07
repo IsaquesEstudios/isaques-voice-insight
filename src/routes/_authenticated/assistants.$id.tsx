@@ -178,7 +178,7 @@ function SliderField({
   const active = value != null;
   const display = active ? value : (min + max) / 2;
   return (
-    <div className="space-y-2 rounded-lg border border-white/[0.06] bg-background/30 p-3">
+    <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3">
       <div className="flex items-center justify-between gap-2">
         <Label className="text-xs">{label}</Label>
         <div className="flex items-center gap-2">
@@ -970,8 +970,8 @@ function AssistantDetailPage() {
           <div className="min-w-0 space-y-1">
             {isLoading ? (
               <>
-                <Skeleton className="h-7 w-64 bg-white/10" />
-                <Skeleton className="h-3 w-40 bg-white/10" />
+                <Skeleton className="h-7 w-64 bg-foreground/10" />
+                <Skeleton className="h-3 w-40 bg-foreground/10" />
               </>
             ) : (
               <>
@@ -1022,7 +1022,7 @@ function AssistantDetailPage() {
         </div>
 
         <Tabs defaultValue="assistant" className="space-y-6">
-          <TabsList className="h-auto w-full justify-start gap-1 rounded-xl border border-white/[0.08] bg-card/20 p-1 backdrop-blur-2xl">
+          <TabsList className="h-auto w-full justify-start gap-1 rounded-xl border border-border bg-card/20 p-1 backdrop-blur-2xl">
             {[
               { value: "assistant", label: "Assistant", icon: Brain },
               { value: "model", label: "Modelo & Voz", icon: Mic },
@@ -1046,7 +1046,7 @@ function AssistantDetailPage() {
 
 
               {/* Coluna Esquerda — Comportamento */}
-              <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+              <Card className="border-border bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-5 p-6">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Comportamento</h2>
@@ -1061,7 +1061,7 @@ function AssistantDetailPage() {
                       value={form.name}
                       onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                       disabled={isLoading}
-                      className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                      className="border-border bg-background/40 backdrop-blur-xl"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1075,7 +1075,7 @@ function AssistantDetailPage() {
                       }
                       disabled={isLoading}
                       placeholder="Olá, como posso ajudar?"
-                      className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+                      className="border-border bg-background/40 backdrop-blur-xl"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1089,7 +1089,7 @@ function AssistantDetailPage() {
                       }
                       disabled={isLoading}
                       placeholder="Descreva o papel, tom e regras do assistente..."
-                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                      className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                     />
                   </div>
                 </CardContent>
@@ -1101,7 +1101,7 @@ function AssistantDetailPage() {
             <div className="grid grid-cols-1 gap-4">
 
               {/* Padrões de IA pré-configurados */}
-              <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+              <Card className="border-border bg-card/20 backdrop-blur-2xl">
                 <CardContent className="space-y-4 p-6">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Padrão de IA</h2>
@@ -1161,20 +1161,20 @@ function AssistantDetailPage() {
                           className={`rounded-xl border p-4 text-left transition ${
                             isActive
                               ? "border-primary/60 bg-primary/10"
-                              : "border-white/[0.08] bg-background/40 hover:border-white/20 hover:bg-background/60"
+                              : "border-border bg-background/40 hover:border-white/20 hover:bg-background/60"
                           }`}
                         >
                           <p className="text-sm font-semibold text-foreground">{p.label}</p>
                           <p className="mt-1 text-[11px] text-muted-foreground">{p.description}</p>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <span
-                              className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
+                              className="rounded-full border border-border bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
                               title={costTitle}
                             >
                               Custo previsto ~{formatUSDPerMin(estCost)}
                             </span>
                             <span
-                              className="rounded-full border border-white/[0.08] bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
+                              className="rounded-full border border-border bg-background/60 px-2 py-0.5 text-[10px] font-medium text-foreground"
                               title={latTitle}
                             >
                               Latência prevista {latencyLabel}
@@ -1188,7 +1188,7 @@ function AssistantDetailPage() {
                     })}
                   </div>
                   {form.transcriberProvider && form.transcriberModel && (
-                    <div className="rounded-lg border border-white/[0.06] bg-background/30 p-3 text-[11px] text-muted-foreground">
+                    <div className="rounded-lg border border-border bg-background/30 p-3 text-[11px] text-muted-foreground">
                       <span className="font-medium text-foreground">Transcriber ativo:</span>{" "}
                       {form.transcriberProvider} · {form.transcriberModel}
                       {form.transcriberLanguage ? ` · ${form.transcriberLanguage}` : ""}
@@ -1253,12 +1253,12 @@ function formatDateBR(iso: string | null): string {
 }
 
 function endedReasonBadgeClass(reason: string | null): string {
-  if (!reason) return "bg-white/[0.05] text-muted-foreground";
+  if (!reason) return "bg-foreground/[0.04] text-muted-foreground";
   if (/customer-ended/i.test(reason)) return "bg-emerald-500/10 text-emerald-300";
   if (/assistant-ended/i.test(reason)) return "bg-sky-500/10 text-sky-300";
   if (/error|failed|no-answer|busy/i.test(reason)) return "bg-rose-500/10 text-rose-300";
   if (/silence|voicemail/i.test(reason)) return "bg-amber-500/10 text-amber-300";
-  return "bg-white/[0.05] text-muted-foreground";
+  return "bg-foreground/[0.04] text-muted-foreground";
 }
 
 const ENDED_REASON_PT: Record<string, string> = {
@@ -1290,7 +1290,7 @@ function formatOrigin(row: AssistantCallLog): string {
 }
 
 function statusBadge(status: string | null): { label: string; className: string } {
-  if (!status) return { label: "—", className: "bg-white/[0.05] text-muted-foreground" };
+  if (!status) return { label: "—", className: "bg-foreground/[0.04] text-muted-foreground" };
   const map: Record<string, { label: string; className: string }> = {
     queued: { label: "Na fila", className: "bg-slate-500/10 text-slate-300" },
     ringing: { label: "Tocando", className: "bg-amber-500/10 text-amber-300" },
@@ -1298,7 +1298,7 @@ function statusBadge(status: string | null): { label: string; className: string 
     forwarding: { label: "Encaminhando", className: "bg-violet-500/10 text-violet-300" },
     ended: { label: "Finalizada", className: "bg-emerald-500/10 text-emerald-300" },
   };
-  return map[status] ?? { label: status, className: "bg-white/[0.05] text-muted-foreground" };
+  return map[status] ?? { label: status, className: "bg-foreground/[0.04] text-muted-foreground" };
 }
 
 function successBadge(v: string | null): { label: string; className: string } | null {
@@ -1308,7 +1308,7 @@ function successBadge(v: string | null): { label: string; className: string } | 
     return { label: "Sucesso", className: "bg-emerald-500/10 text-emerald-300" };
   if (low === "false" || low === "fail" || low === "failure")
     return { label: "Falhou", className: "bg-rose-500/10 text-rose-300" };
-  return { label: v, className: "bg-white/[0.05] text-muted-foreground" };
+  return { label: v, className: "bg-foreground/[0.04] text-muted-foreground" };
 }
 
 
@@ -1392,7 +1392,7 @@ function RecordingPlayer({ url, callId }: { url?: string | null; callId: string 
 function CaptureView({ raw }: { raw: string | null }) {
   if (!raw) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-background/20 p-8 text-center">
+      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-background/20 p-8 text-center">
         <FileText className="h-5 w-5 text-muted-foreground" />
         <p className="text-sm font-medium text-foreground">Nenhum dado capturado</p>
         <p className="max-w-sm text-xs text-muted-foreground">
@@ -1407,14 +1407,14 @@ function CaptureView({ raw }: { raw: string | null }) {
     parsed = JSON.parse(raw);
   } catch {
     return (
-      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-background/40 p-3 text-xs text-foreground">
         {raw}
       </pre>
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return (
-      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-background/40 p-3 text-xs text-foreground">
         {JSON.stringify(parsed, null, 2)}
       </pre>
     );
@@ -1425,7 +1425,7 @@ function CaptureView({ raw }: { raw: string | null }) {
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
         Campos extraídos pela IA
       </p>
-      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-lg border border-white/[0.06] bg-background/40">
+      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-lg border border-border bg-background/40">
         {entries.map(([k, v]) => (
           <div key={k} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2.5">
             <span className="font-mono text-[11px] text-muted-foreground">{k}</span>
@@ -1465,9 +1465,9 @@ function LogsTab({ assistantId }: { assistantId: string }) {
 
   return (
     <>
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Histórico do Agente</h2>
               <p className="text-xs text-muted-foreground">
@@ -1475,13 +1475,13 @@ function LogsTab({ assistantId }: { assistantId: string }) {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
+              <span className="rounded-full border border-border bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-xl">
                 {calls.length} {calls.length === 1 ? "chamada" : "chamadas"}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                className="h-8 gap-2 border-border bg-card/20 backdrop-blur-xl"
                 onClick={() =>
                   queryClient.invalidateQueries({
                     queryKey: ["vapi", "assistantCalls", assistantId],
@@ -1502,7 +1502,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
 
           <Table>
             <TableHeader>
-              <TableRow className="border-white/[0.06] hover:bg-transparent">
+              <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Data/Hora</TableHead>
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Origem/Destino</TableHead>
                 <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Status</TableHead>
@@ -1516,7 +1516,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
             <TableBody>
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={`sk-${i}`} className="border-white/[0.04]">
+                  <TableRow key={`sk-${i}`} className="border-border">
                     {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-24" />
@@ -1526,7 +1526,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
                 ))}
 
               {!isLoading && calls.length === 0 && !apiError && (
-                <TableRow className="border-white/[0.04] hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableCell colSpan={8} className="py-10 text-center text-xs text-muted-foreground">
                     Nenhuma ligação registrada ainda para este assistente.
                   </TableCell>
@@ -1541,7 +1541,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
                   const hasBreakdown =
                     bd && (bd.stt || bd.llm || bd.tts || bd.vapi || bd.transport);
                   return (
-                    <TableRow key={row.id} className="border-white/[0.04] transition-colors hover:bg-white/[0.03]">
+                    <TableRow key={row.id} className="border-border transition-colors hover:bg-foreground/[0.04]">
                       <TableCell className="text-sm text-foreground">{formatDateBR(row.startedAt)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{formatOrigin(row)}</TableCell>
                       <TableCell>
@@ -1636,12 +1636,12 @@ function LogsTab({ assistantId }: { assistantId: string }) {
 
 
           {!isLoading && calls.length >= limit && limit < 200 && (
-            <div className="flex justify-center border-t border-white/[0.06] p-3">
+            <div className="flex justify-center border-t border-border p-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setLimit((l) => Math.min(l + 50, 200))}
-                className="h-8 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+                className="h-8 border-border bg-card/20 backdrop-blur-xl"
               >
                 Carregar mais
               </Button>
@@ -1651,7 +1651,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
       </Card>
 
       <Dialog open={detail != null} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="max-w-2xl border-white/[0.08] bg-card/80 backdrop-blur-2xl">
+        <DialogContent className="max-w-2xl border-border bg-card/80 backdrop-blur-2xl">
           <DialogHeader>
             <DialogTitle className="text-base">
               {detailMode === "recording" ? "Gravação da ligação" : "Transcrição da ligação"}
@@ -1669,7 +1669,7 @@ function LogsTab({ assistantId }: { assistantId: string }) {
           )}
           {detail && detailMode === "transcript" && (
             <Tabs defaultValue="transcript" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 border border-white/[0.06] bg-background/40">
+              <TabsList className="grid w-full grid-cols-2 border border-border bg-background/40">
                 <TabsTrigger value="transcript" className="text-xs">Transcrição</TabsTrigger>
                 <TabsTrigger value="capture" className="text-xs">
                   Captura
@@ -1683,13 +1683,13 @@ function LogsTab({ assistantId }: { assistantId: string }) {
 
               <TabsContent value="transcript" className="mt-3 space-y-3">
                 {detail.summary && (
-                  <div className="rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                  <div className="rounded-lg border border-border bg-background/40 p-3">
                     <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
                     <p className="text-xs text-foreground">{detail.summary}</p>
                   </div>
                 )}
                 {detail.transcript ? (
-                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-background/40 p-3 text-xs text-foreground">
+                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-background/40 p-3 text-xs text-foreground">
                     {detail.transcript}
                   </pre>
                 ) : (
@@ -1761,21 +1761,21 @@ function ApiSchemaFieldsEditor({
   return (
     <div className="space-y-2">
       {fields.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
           {emptyLabel}
         </p>
       ) : (
         fields.map((f, idx) => (
-          <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+          <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3">
             <div className="flex items-center gap-2">
               <Input
                 value={f.key}
                 onChange={(e) => patch(idx, { key: e.target.value.replace(/\s+/g, "") })}
                 placeholder="nome_da_propriedade"
-                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                className="border-border bg-background/40 font-mono text-xs"
               />
               <Select value={f.type} onValueChange={(v) => patch(idx, { type: v as ApiSchemaField["type"] })}>
-                <SelectTrigger className="w-32 border-white/[0.08] bg-background/40 text-xs">
+                <SelectTrigger className="w-32 border-border bg-background/40 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1798,7 +1798,7 @@ function ApiSchemaFieldsEditor({
               value={f.description}
               onChange={(e) => patch(idx, { description: e.target.value })}
               placeholder="Descrição (ajuda a IA a preencher o valor)"
-              className="border-white/[0.08] bg-background/40 text-xs"
+              className="border-border bg-background/40 text-xs"
             />
             <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <Checkbox checked={f.required} onCheckedChange={(v) => patch(idx, { required: v === true })} />
@@ -1811,7 +1811,7 @@ function ApiSchemaFieldsEditor({
         size="sm"
         variant="outline"
         onClick={() => onChange([...fields, { key: "", type: "string", description: "", required: false }])}
-        className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+        className="h-7 gap-1 border-border bg-background/40 text-xs"
       >
         <Plus className="h-3 w-3" />
         {addLabel}
@@ -3315,7 +3315,7 @@ function ToolsTab({
       </div>
 
       {tools.length === 0 && !isLoading && (
-        <p className="rounded-xl border border-dashed border-white/[0.08] bg-background/20 p-8 text-center text-xs text-muted-foreground">
+        <p className="rounded-xl border border-dashed border-border bg-background/20 p-8 text-center text-xs text-muted-foreground">
           Nenhuma ferramenta configurada. Clique em "Adicionar Ferramenta" para começar.
         </p>
       )}
@@ -3336,7 +3336,7 @@ function ToolsTab({
                   openEditDialog(tool, index);
                 }
               }}
-              className="group relative cursor-pointer overflow-hidden border-white/[0.08] bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
+              className="group relative cursor-pointer overflow-hidden border-border bg-card/20 backdrop-blur-2xl transition-all hover:-translate-y-0.5 hover:border-primary/30"
             >
               <CardContent className="relative space-y-4 p-5">
                 <div className="flex items-start justify-between">
@@ -3375,7 +3375,7 @@ function ToolsTab({
                   <p className="text-xs text-muted-foreground">{meta.label}</p>
                 </div>
                 {tool.type === "transferCall" && (
-                  <div className="space-y-2 rounded-lg border border-white/[0.06] bg-background/30 p-3">
+                  <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3">
                     <p className="text-[10px] leading-relaxed text-muted-foreground">
                       A IA só transfere quando o System Prompt diz em quais situações fazer isso.
                       Insira a regra automaticamente:
@@ -3388,7 +3388,7 @@ function ToolsTab({
                         e.stopPropagation();
                         handleInsertPromptRule(tool);
                       }}
-                      className="h-7 w-full gap-1.5 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                      className="h-7 w-full gap-1.5 border-border bg-background/40 text-xs backdrop-blur-xl"
                     >
                       <Sparkles className="h-3 w-3" />
                       {isInsertingRule ? "Inserindo..." : "Inserir regra no prompt"}
@@ -3402,10 +3402,10 @@ function ToolsTab({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl border-white/[0.08] bg-card/90 p-0 backdrop-blur-2xl">
+        <DialogContent className="max-w-2xl border-border bg-card/90 p-0 backdrop-blur-2xl">
           {step === "select" ? (
             <div className="flex max-h-[80vh] flex-col">
-              <DialogHeader className="border-b border-white/[0.06] px-6 py-4">
+              <DialogHeader className="border-b border-border px-6 py-4">
                 <DialogTitle>Adicionar Ferramenta</DialogTitle>
                 <DialogDescription>
                   Escolha o tipo de ferramenta que o assistente poderá usar.
@@ -3445,31 +3445,31 @@ function ToolsTab({
                               </span>
                             )}
                             {item.locked && (
-                              <span className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <span className="flex items-center gap-1 rounded-full border border-border bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                 <Lock className="h-3 w-3" />
                                 Bloqueado
                               </span>
                             )}
                             {item.kind === "comingSoon" && (
-                              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <span className="rounded-full border border-border bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                 Em breve
                               </span>
                             )}
                             {item.subItems && !item.locked && (
-                              <span className="rounded-full border border-white/[0.08] bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <span className="rounded-full border border-border bg-background/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                 {item.subItems.length} opções
                               </span>
                             )}
                           </>
                         );
-                        const btnClass = "group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-background/30 p-3 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-background/50";
+                        const btnClass = "group flex w-full items-center gap-3 rounded-xl border border-border bg-background/30 p-3 text-left backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-border hover:bg-background/50";
                         if (item.locked) {
                           return (
                             <div
                               key={item.key}
                               aria-disabled
                               title="Em desenvolvimento — disponível em breve"
-                              className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl border border-white/[0.06] bg-background/20 p-3 text-left opacity-50 backdrop-blur-xl"
+                              className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl border border-border bg-background/20 p-3 text-left opacity-50 backdrop-blur-xl"
                             >
                               {buttonInner}
                             </div>
@@ -3483,7 +3483,7 @@ function ToolsTab({
                                   {buttonInner}
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-72 border-white/[0.08] bg-card/95 backdrop-blur-2xl">
+                              <DropdownMenuContent align="start" className="w-72 border-border bg-card/95 backdrop-blur-2xl">
                                 {item.subItems.map((sub) => {
                                   const SubIcon = sub.icon;
                                   return (
@@ -3526,7 +3526,7 @@ function ToolsTab({
             </div>
           ) : (
             <div className="flex max-h-[85vh] flex-col">
-              <div className="border-b border-white/[0.06] px-6 py-4">
+              <div className="border-b border-border px-6 py-4">
                 {editIndex === null && (
                   <Button
                     variant="ghost"
@@ -3567,7 +3567,7 @@ function ToolsTab({
                 {selected?.kind === "transferCall" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -3581,7 +3581,7 @@ function ToolsTab({
                           value={tcName}
                           onChange={(e) => setTcName(e.target.value)}
                           placeholder="transfer_call_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                         <p className="text-[11px] text-muted-foreground">
                           Padrão da Vapi é <span className="font-mono">transferCall</span>. Edite se necessário.
@@ -3603,7 +3603,7 @@ function ToolsTab({
                           value={tcDescription}
                           onChange={(e) => setTcDescription(e.target.value)}
                           placeholder="Explique para a IA quando usar essa ferramenta."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">
                           {tcDescription.length}/1000
@@ -3612,7 +3612,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — Destinations */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Phone className="h-3.5 w-3.5 text-muted-foreground" />
@@ -3622,12 +3622,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Destination
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             <DropdownMenuItem
                               onClick={() =>
                                 setTcDestinations((p) => [
@@ -3655,7 +3655,7 @@ function ToolsTab({
                       </div>
 
                       {tcDestinations.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-background/20 px-4 py-6 text-center">
                           <PhoneOffIcon className="h-6 w-6 text-muted-foreground/60" />
                           <p className="text-xs text-muted-foreground">
                             No destinations configured. Click 'Add Destination' to add a transfer destination.
@@ -3677,10 +3677,10 @@ function ToolsTab({
                             return (
                               <div
                                 key={idx}
-                                className="space-y-3 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                                className="space-y-3 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  <span className="rounded bg-foreground/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                                     {d.type === "number" ? "Phone" : "SIP"}
                                   </span>
                                   {d.type === "number" ? (
@@ -3696,7 +3696,7 @@ function ToolsTab({
                                         patch({ sipUri: e.target.value } as Partial<TransferDestination>)
                                       }
                                       placeholder="sip:user@domain.com"
-                                      className="h-8 border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                      className="h-8 border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                                     />
                                   )}
                                   <Button
@@ -3721,7 +3721,7 @@ function ToolsTab({
                                     onChange={(e) => patch({ description: e.target.value })}
                                     rows={2}
                                     placeholder="Ex.: quando o cliente pedir para falar com um humano, ou quando perguntar sobre cobrança/financeiro."
-                                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                    className="border-border bg-background/40 text-xs backdrop-blur-xl"
                                   />
                                   <p className="text-[10px] text-muted-foreground/70">
                                     É esta descrição que a IA usa para decidir sozinha quando chamar a
@@ -3737,7 +3737,7 @@ function ToolsTab({
                                     value={d.message}
                                     onChange={(e) => patch({ message: e.target.value })}
                                     placeholder="Só um momento, vou te transferir para um especialista."
-                                    className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                    className="h-8 border-border bg-background/40 text-xs backdrop-blur-xl"
                                   />
                                   <p className="text-[10px] text-muted-foreground/70">
                                     É exatamente esta frase que a IA fala em voz alta antes de
@@ -3754,10 +3754,10 @@ function ToolsTab({
                                     value={d.mode}
                                     onValueChange={(v) => patch({ mode: v as TransferMode })}
                                   >
-                                    <SelectTrigger className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                    <SelectTrigger className="h-8 border-border bg-background/40 text-xs backdrop-blur-xl">
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                    <SelectContent className="border-border bg-card/90 backdrop-blur-2xl">
                                       {TRANSFER_MODE_OPTIONS.map((opt) => (
                                         <SelectItem key={opt.value} value={opt.value} className="text-xs">
                                           {opt.label}
@@ -3779,10 +3779,10 @@ function ToolsTab({
                                       value={d.sipVerb}
                                       onValueChange={(v) => patch({ sipVerb: v as TransferSipVerb })}
                                     >
-                                      <SelectTrigger className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                      <SelectTrigger className="h-8 border-border bg-background/40 text-xs backdrop-blur-xl">
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                                      <SelectContent className="border-border bg-card/90 backdrop-blur-2xl">
                                         {SIP_VERB_OPTIONS.map((opt) => (
                                           <SelectItem key={opt.value} value={opt.value} className="text-xs">
                                             {opt.label}
@@ -3801,7 +3801,7 @@ function ToolsTab({
                                         value={d.fallbackMessage}
                                         onChange={(e) => patch({ fallbackMessage: e.target.value })}
                                         placeholder="Não consegui completar a transferência agora..."
-                                        className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                        className="h-8 border-border bg-background/40 text-xs backdrop-blur-xl"
                                       />
                                       <p className="text-[10px] text-muted-foreground/70">
                                         A IA fala isso e continua o atendimento em vez de desligar
@@ -3822,7 +3822,7 @@ function ToolsTab({
                                       value={d.warmMessage}
                                       onChange={(e) => patch({ warmMessage: e.target.value })}
                                       placeholder="Olá, estou passando um cliente interessado no plano premium."
-                                      className="h-8 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                      className="h-8 border-border bg-background/40 text-xs backdrop-blur-xl"
                                     />
                                   </div>
                                 )}
@@ -3834,7 +3834,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 3 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -3844,12 +3844,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -3865,7 +3865,7 @@ function ToolsTab({
                       </div>
 
                       {tcMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida. Adicione mensagens para o status da transferência.
                         </p>
                       ) : (
@@ -3873,7 +3873,7 @@ function ToolsTab({
                           {tcMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -3901,7 +3901,7 @@ function ToolsTab({
                                   );
                                 }}
                                 placeholder="Frase que a IA vai falar neste momento..."
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -3914,7 +3914,7 @@ function ToolsTab({
                 {selected?.kind === "dtmf" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -3928,7 +3928,7 @@ function ToolsTab({
                           value={dtName}
                           onChange={(e) => setDtName(e.target.value)}
                           placeholder="dtmf_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -3940,7 +3940,7 @@ function ToolsTab({
                           value={dtDescription}
                           onChange={(e) => setDtDescription(e.target.value)}
                           placeholder="Explique para a IA quando usar essa ferramenta."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">
                           {dtDescription.length}/1000
@@ -3951,7 +3951,7 @@ function ToolsTab({
                     {/* SIP INFO Checkbox */}
                     <label
                       htmlFor="dt-sipinfo"
-                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl hover:bg-background/40"
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl hover:bg-background/40"
                     >
                       <Checkbox
                         id="dt-sipinfo"
@@ -3973,7 +3973,7 @@ function ToolsTab({
                     </label>
 
                     {/* Panel 2 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -3983,12 +3983,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -4004,7 +4004,7 @@ function ToolsTab({
                       </div>
 
                       {dtMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida. Adicione mensagens de status opcionais.
                         </p>
                       ) : (
@@ -4012,7 +4012,7 @@ function ToolsTab({
                           {dtMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -4040,7 +4040,7 @@ function ToolsTab({
                                   );
                                 }}
                                 placeholder="Frase que a IA vai falar neste momento..."
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -4053,7 +4053,7 @@ function ToolsTab({
                 {selected?.kind === "endCall" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4067,7 +4067,7 @@ function ToolsTab({
                           value={ecName}
                           onChange={(e) => setEcName(e.target.value)}
                           placeholder="finalizar_chamada"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                         <p className="text-[10px] text-muted-foreground">
                           Somente letras, números, hífen e underline (máx. 64 caracteres).
@@ -4082,7 +4082,7 @@ function ToolsTab({
                           value={ecDescription}
                           onChange={(e) => setEcDescription(e.target.value)}
                           placeholder="Ex.: encerre a ligação quando o cliente se despedir, disser que não tem interesse ou quando o atendimento for concluído."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-[10px] text-muted-foreground">
                           Esta é a condição que a IA avalia para chamar a ferramenta. Sem ela, o
@@ -4096,7 +4096,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -4106,12 +4106,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {END_CALL_MESSAGE_TYPES.map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -4130,7 +4130,7 @@ function ToolsTab({
                       </div>
 
                       {ecMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida. Adicione mensagens para os estágios da chamada.
                         </p>
                       ) : (
@@ -4138,7 +4138,7 @@ function ToolsTab({
                           {ecMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-3 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-3 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -4210,7 +4210,7 @@ function ToolsTab({
                                         );
                                       }}
                                       placeholder="Frase que a IA vai falar..."
-                                      className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                      className="border-border bg-background/40 text-xs backdrop-blur-xl"
                                     />
                                     <Button
                                       size="sm"
@@ -4225,7 +4225,7 @@ function ToolsTab({
                                 )}
                               </div>
 
-                              <div className="flex items-start gap-2 rounded border border-white/[0.04] bg-background/30 p-2">
+                              <div className="flex items-start gap-2 rounded border border-border bg-background/30 p-2">
                                 <Checkbox
                                   id={`ec-${idx}-blocking`}
                                   checked={m.blocking}
@@ -4268,7 +4268,7 @@ function ToolsTab({
                                   </Button>
                                 </div>
                                 <CollapsibleContent className="pt-2">
-                                  <p className="rounded border border-dashed border-white/[0.06] bg-background/20 p-2 text-[11px] text-muted-foreground">
+                                  <p className="rounded border border-dashed border-border bg-background/20 p-2 text-[11px] text-muted-foreground">
                                     Configuração de condições em breve.
                                   </p>
                                 </CollapsibleContent>
@@ -4284,7 +4284,7 @@ function ToolsTab({
                 {selected?.kind === "voicemail" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4298,7 +4298,7 @@ function ToolsTab({
                           value={vmName}
                           onChange={(e) => setVmName(e.target.value)}
                           placeholder="voicemail_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -4310,7 +4310,7 @@ function ToolsTab({
                           value={vmDescription}
                           onChange={(e) => setVmDescription(e.target.value)}
                           placeholder="Leave a voicemail message when you determine the call reached voicemail."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">
                           {vmDescription.length}/1000
@@ -4319,7 +4319,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — Voicemail Script */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Voicemail className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4344,7 +4344,7 @@ function ToolsTab({
                             key={opt.value}
                             htmlFor={`vm-mode-${opt.value}`}
                             className={cn(
-                              "flex cursor-pointer items-start gap-3 rounded-lg border border-white/[0.08] bg-background/40 p-3 backdrop-blur-xl transition-colors hover:bg-background/60",
+                              "flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl transition-colors hover:bg-background/60",
                               vmScriptMode === opt.value && "border-primary/60 bg-primary/[0.06]",
                             )}
                           >
@@ -4366,14 +4366,14 @@ function ToolsTab({
                             value={vmScriptContent}
                             onChange={(e) => setVmScriptContent(e.target.value)}
                             placeholder="Hi, this is {{company}}. {{message}}. Please call us back at {{phone}}."
-                            className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                            className="border-border bg-background/40 text-xs backdrop-blur-xl"
                           />
                         </div>
                       )}
                     </div>
 
                     {/* Panel 3 — Beep Detection */}
-                    <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-background/30 px-4 py-3 backdrop-blur-xl">
+                    <div className="flex items-center justify-between rounded-xl border border-border bg-background/30 px-4 py-3 backdrop-blur-xl">
                       <div>
                         <p className="text-xs font-semibold text-foreground">Enable beep detection</p>
                         <p className="text-[11px] text-muted-foreground">
@@ -4384,7 +4384,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 4 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -4394,12 +4394,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -4415,7 +4415,7 @@ function ToolsTab({
                       </div>
 
                       {vmMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida. Adicione mensagens de status opcionais.
                         </p>
                       ) : (
@@ -4423,7 +4423,7 @@ function ToolsTab({
                           {vmMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -4451,7 +4451,7 @@ function ToolsTab({
                                   );
                                 }}
                                 placeholder="Frase que a IA vai falar neste momento..."
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -4464,7 +4464,7 @@ function ToolsTab({
                 {selected?.kind === "sms" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4478,7 +4478,7 @@ function ToolsTab({
                           value={smsName}
                           onChange={(e) => setSmsName(e.target.value)}
                           placeholder="send_text_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -4490,7 +4490,7 @@ function ToolsTab({
                           value={smsDescription}
                           onChange={(e) => setSmsDescription(e.target.value)}
                           placeholder="Explique para a IA quando enviar SMS."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">
                           {smsDescription.length}/1000
@@ -4499,7 +4499,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — SMS Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4518,7 +4518,7 @@ function ToolsTab({
                       <div className="space-y-2">
                         <Label className="text-xs">From Phone Number *</Label>
                         <Select disabled>
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                          <SelectTrigger className="border-border bg-background/40 text-xs backdrop-blur-xl">
                             <SelectValue placeholder="Selecione um número" />
                           </SelectTrigger>
                           <SelectContent />
@@ -4532,7 +4532,7 @@ function ToolsTab({
                           value={smsToPreset}
                           onChange={(e) => setSmsToPreset(e.target.value)}
                           placeholder="{{customer.number}}"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                         <p className="text-[11px] text-muted-foreground">
                           Optional preset recipient phone number. Supports LiquidJS templates (e.g., {"{{customer.number}}"}). When set, this overrides any model-provided value.
@@ -4547,7 +4547,7 @@ function ToolsTab({
                           value={smsBodyPreset}
                           onChange={(e) => setSmsBodyPreset(e.target.value)}
                           placeholder="Seu horário está confirmado para {{appointmentDate}}."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-[11px] text-muted-foreground">
                           Optional preset message body. Supports LiquidJS templates (e.g., {"{{appointmentDate}}"}). When set, this overrides any model-provided value.
@@ -4556,7 +4556,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 3 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -4566,12 +4566,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -4587,7 +4587,7 @@ function ToolsTab({
                       </div>
 
                       {smsMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
@@ -4595,7 +4595,7 @@ function ToolsTab({
                           {smsMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -4623,7 +4623,7 @@ function ToolsTab({
                                   );
                                 }}
                                 placeholder="Frase que a IA vai falar neste momento..."
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -4636,7 +4636,7 @@ function ToolsTab({
                 {selected?.kind === "sipRequest" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings & Options */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4650,7 +4650,7 @@ function ToolsTab({
                           value={srName}
                           onChange={(e) => setSrName(e.target.value)}
                           placeholder="sip_request_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -4660,11 +4660,11 @@ function ToolsTab({
                           rows={3}
                           value={srDescription}
                           onChange={(e) => setSrDescription(e.target.value)}
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                       </div>
 
-                      <div className="space-y-3 border-t border-white/[0.06] pt-3">
+                      <div className="space-y-3 border-t border-border pt-3">
                         <div className="flex items-center justify-between gap-4">
                           <div>
                             <p className="text-xs font-medium text-foreground">Async</p>
@@ -4685,7 +4685,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — Parameters */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -4693,13 +4693,13 @@ function ToolsTab({
                             Parameters
                           </h3>
                         </div>
-                        <div className="flex overflow-hidden rounded-md border border-white/[0.08]">
+                        <div className="flex overflow-hidden rounded-md border border-border">
                           <button
                             type="button"
                             onClick={() => setSrParamsMode("visual")}
                             className={cn(
                               "px-3 py-1 text-[11px]",
-                              srParamsMode === "visual" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                              srParamsMode === "visual" ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
                             )}
                           >
                             Visual
@@ -4709,7 +4709,7 @@ function ToolsTab({
                             onClick={() => setSrParamsMode("json")}
                             className={cn(
                               "px-3 py-1 text-[11px]",
-                              srParamsMode === "json" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                              srParamsMode === "json" ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
                             )}
                           >
                             JSON
@@ -4718,8 +4718,8 @@ function ToolsTab({
                       </div>
                       {srParamsMode === "visual" ? (
                         <div className="space-y-3">
-                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                          <div className="rounded-lg border border-dashed border-border bg-background/40 p-6 text-center">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs">
                               <Plus className="h-3 w-3" />
                               Add Property
                             </Button>
@@ -4739,13 +4739,13 @@ function ToolsTab({
                           value={srParamsJson}
                           onChange={(e) => setSrParamsJson(e.target.value)}
                           spellCheck={false}
-                          className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-[11px] backdrop-blur-xl"
                         />
                       )}
                     </div>
 
                     {/* Panel 3 — SIP Settings */}
-                    <div className="space-y-4 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-4 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Radio className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4756,7 +4756,7 @@ function ToolsTab({
                       <div className="space-y-2">
                         <Label className="text-xs">SIP verb</Label>
                         <Select value={srSipVerb} onValueChange={(v) => setSrSipVerb(v as typeof srSipVerb)}>
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                          <SelectTrigger className="border-border bg-background/40 text-xs backdrop-blur-xl">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -4767,13 +4767,13 @@ function ToolsTab({
                         </Select>
                       </div>
 
-                      <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                      <div className="space-y-2 border-t border-border pt-3">
                         <p className="text-xs font-semibold text-foreground">Headers</p>
                         <p className="text-[11px] text-muted-foreground">
                           Define SIP headers to include in the request.
                         </p>
-                        <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
-                          <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                        <div className="rounded-lg border border-dashed border-border bg-background/40 p-6 text-center">
+                          <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs">
                             <Plus className="h-3 w-3" />
                             Add Property
                           </Button>
@@ -4787,7 +4787,7 @@ function ToolsTab({
                         </label>
                       </div>
 
-                      <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                      <div className="space-y-2 border-t border-border pt-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold text-foreground">Body</p>
@@ -4796,7 +4796,7 @@ function ToolsTab({
                             </p>
                           </div>
                           <Select value={srBodyMode} onValueChange={(v) => setSrBodyMode(v as "schema" | "raw")}>
-                            <SelectTrigger className="h-7 w-[150px] border-white/[0.08] bg-background/40 text-[11px] backdrop-blur-xl">
+                            <SelectTrigger className="h-7 w-[150px] border-border bg-background/40 text-[11px] backdrop-blur-xl">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -4807,8 +4807,8 @@ function ToolsTab({
                         </div>
                         {srBodyMode === "schema" ? (
                           <>
-                            <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
-                              <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                            <div className="rounded-lg border border-dashed border-border bg-background/40 p-6 text-center">
+                              <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs">
                                 <Plus className="h-3 w-3" />
                                 Add Property
                               </Button>
@@ -4827,14 +4827,14 @@ function ToolsTab({
                             value={srBodyRaw}
                             onChange={(e) => setSrBodyRaw(e.target.value)}
                             placeholder="Raw body payload"
-                            className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                            className="border-border bg-background/40 font-mono text-[11px] backdrop-blur-xl"
                           />
                         )}
                       </div>
                     </div>
 
                     {/* Panel 4 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -4844,12 +4844,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -4864,7 +4864,7 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {srMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
@@ -4872,7 +4872,7 @@ function ToolsTab({
                           {srMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -4899,7 +4899,7 @@ function ToolsTab({
                                     prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
                                   );
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -4912,7 +4912,7 @@ function ToolsTab({
                 {selected?.kind === "handoff" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings & Options */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -4926,7 +4926,7 @@ function ToolsTab({
                           value={hoName}
                           onChange={(e) => setHoName(e.target.value)}
                           placeholder="handoff_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -4938,13 +4938,13 @@ function ToolsTab({
                           value={hoDescription}
                           onChange={(e) => setHoDescription(e.target.value)}
                           placeholder="Explique quando a IA deve transferir para outro assistente."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">
                           {hoDescription.length}/1000
                         </p>
                       </div>
-                      <div className="space-y-3 border-t border-white/[0.06] pt-3">
+                      <div className="space-y-3 border-t border-border pt-3">
                         <div className="flex items-center justify-between gap-4">
                           <div>
                             <p className="text-xs font-medium text-foreground">Async</p>
@@ -4965,7 +4965,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — Parameters */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -4973,13 +4973,13 @@ function ToolsTab({
                             Parameters
                           </h3>
                         </div>
-                        <div className="flex overflow-hidden rounded-md border border-white/[0.08]">
+                        <div className="flex overflow-hidden rounded-md border border-border">
                           <button
                             type="button"
                             onClick={() => setHoParamsMode("visual")}
                             className={cn(
                               "px-3 py-1 text-[11px]",
-                              hoParamsMode === "visual" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                              hoParamsMode === "visual" ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
                             )}
                           >
                             Visual
@@ -4989,7 +4989,7 @@ function ToolsTab({
                             onClick={() => setHoParamsMode("json")}
                             className={cn(
                               "px-3 py-1 text-[11px]",
-                              hoParamsMode === "json" ? "bg-white/10 text-foreground" : "text-muted-foreground",
+                              hoParamsMode === "json" ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
                             )}
                           >
                             JSON
@@ -4998,8 +4998,8 @@ function ToolsTab({
                       </div>
                       {hoParamsMode === "visual" ? (
                         <div className="space-y-3">
-                          <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/40 p-6 text-center">
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                          <div className="rounded-lg border border-dashed border-border bg-background/40 p-6 text-center">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs">
                               <Plus className="h-3 w-3" />
                               Add Property
                             </Button>
@@ -5019,13 +5019,13 @@ function ToolsTab({
                           value={hoParamsJson}
                           onChange={(e) => setHoParamsJson(e.target.value)}
                           spellCheck={false}
-                          className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-[11px] backdrop-blur-xl"
                         />
                       )}
                     </div>
 
                     {/* Panel 3 — Handoff Destinations */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2">
                           <Shuffle className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -5044,7 +5044,7 @@ function ToolsTab({
                           onClick={() =>
                             setHoDestinations((p) => [...p, { assistantId: "", description: "" }])
                           }
-                          className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl"
                         >
                           <Plus className="h-3 w-3" />
                           Add Destination
@@ -5052,7 +5052,7 @@ function ToolsTab({
                       </div>
 
                       {hoDestinations.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           No destinations configured. Click &apos;Add Destination&apos; to add your first destination.
                         </p>
                       ) : (
@@ -5060,7 +5060,7 @@ function ToolsTab({
                           {hoDestinations.map((d, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center gap-2">
                                 <div className="flex-1">
@@ -5072,7 +5072,7 @@ function ToolsTab({
                                       )
                                     }
                                   >
-                                    <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                                    <SelectTrigger className="border-border bg-background/40 text-xs backdrop-blur-xl">
                                       <SelectValue placeholder="Selecione um assistente" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -5111,7 +5111,7 @@ function ToolsTab({
                                   );
                                 }}
                                 placeholder="Descrição (quando transferir para este assistente)"
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -5120,7 +5120,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 4 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -5130,12 +5130,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -5150,7 +5150,7 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {hoMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
@@ -5158,7 +5158,7 @@ function ToolsTab({
                           {hoMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -5185,7 +5185,7 @@ function ToolsTab({
                                     prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
                                   );
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -5198,7 +5198,7 @@ function ToolsTab({
                 {selected?.kind === "query" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -5212,7 +5212,7 @@ function ToolsTab({
                           value={qName}
                           onChange={(e) => setQName(e.target.value)}
                           placeholder="query_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -5224,7 +5224,7 @@ function ToolsTab({
                           value={qDescription}
                           onChange={(e) => setQDescription(e.target.value)}
                           placeholder="Explique quando a IA deve consultar a base de conhecimento."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">
                           {qDescription.length}/1000
@@ -5233,7 +5233,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 2 — Knowledge Bases */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2">
                           <ServerCog className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -5252,7 +5252,7 @@ function ToolsTab({
                           onClick={() =>
                             setQKnowledgeBases((p) => [...p, { fileId: "" }])
                           }
-                          className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl"
                         >
                           <Plus className="h-3 w-3" />
                           Add Knowledge Base
@@ -5260,7 +5260,7 @@ function ToolsTab({
                       </div>
 
                       {qKnowledgeBases.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-8 text-center">
+                        <div className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-8 text-center">
                           <ServerCog className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
                           <p className="text-xs font-medium text-foreground">No knowledge bases configured</p>
                           <p className="mt-1 text-[11px] text-muted-foreground">
@@ -5272,7 +5272,7 @@ function ToolsTab({
                           {qKnowledgeBases.map((kb, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="flex items-center gap-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <Input
                                 value={kb.fileId}
@@ -5283,7 +5283,7 @@ function ToolsTab({
                                   );
                                 }}
                                 placeholder="ID do documento / File ID"
-                                className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                               />
                               <Button
                                 size="icon"
@@ -5303,7 +5303,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 3 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -5313,12 +5313,12 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" />
                               Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -5333,7 +5333,7 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {qMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
@@ -5341,7 +5341,7 @@ function ToolsTab({
                           {qMessages.map((m, idx) => (
                             <div
                               key={idx}
-                              className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl"
+                              className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
@@ -5368,7 +5368,7 @@ function ToolsTab({
                                     prev.map((it, i) => (i === idx ? { ...it, content: val } : it)),
                                   );
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -5381,7 +5381,7 @@ function ToolsTab({
                 {selected?.kind === "apiRequest" && (
                   <div className="space-y-4">
                     {/* Section 1 — Base Configuration (always visible) */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Plug className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -5395,7 +5395,7 @@ function ToolsTab({
                           value={arName}
                           onChange={(e) => setArName(e.target.value.replace(/\s+/g, ""))}
                           placeholder="e.g., getUserData, sendNotification"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -5407,7 +5407,7 @@ function ToolsTab({
                           value={arDescription}
                           onChange={(e) => setArDescription(e.target.value)}
                           placeholder="Explique quando a IA deve chamar essa API."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -5417,7 +5417,7 @@ function ToolsTab({
                           value={arUrl}
                           onChange={(e) => setArUrl(e.target.value)}
                           placeholder="https://www.vapi.ai"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                         <p className="text-[11px] text-muted-foreground">
                           The endpoint URL where the API request will be sent. Must use HTTPS.
@@ -5426,7 +5426,7 @@ function ToolsTab({
                       <div className="space-y-2">
                         <Label className="text-xs">Request HTTP Method *</Label>
                         <Select value={arMethod} onValueChange={(v) => setArMethod(v as typeof arMethod)}>
-                          <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                          <SelectTrigger className="border-border bg-background/40 text-xs backdrop-blur-xl">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -5440,7 +5440,7 @@ function ToolsTab({
 
                     {/* Sections 2-8 — Collapsible */}
                     <Accordion type="multiple" className="space-y-3">
-                      <AccordionItem value="auth" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="auth" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Authorization &amp; Headers
                         </AccordionTrigger>
@@ -5449,7 +5449,7 @@ function ToolsTab({
                             <p className="text-xs font-semibold text-foreground">Authorization</p>
                             <p className="text-[11px] text-muted-foreground">Configure a autenticação enviada no header da requisição.</p>
                             <Select value={arAuthType} onValueChange={(v) => setArAuthType(v as typeof arAuthType)}>
-                              <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <SelectTrigger className="border-border bg-background/40 text-xs backdrop-blur-xl">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -5464,7 +5464,7 @@ function ToolsTab({
                                 value={arAuthHeaderName}
                                 onChange={(e) => setArAuthHeaderName(e.target.value)}
                                 placeholder="x-api-key"
-                                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                className="border-border bg-background/40 font-mono text-xs"
                               />
                             )}
                             {arAuthType !== "none" && (
@@ -5472,26 +5472,26 @@ function ToolsTab({
                                 value={arAuthToken}
                                 onChange={(e) => setArAuthToken(e.target.value)}
                                 placeholder={arAuthType === "basic" ? "base64(user:senha)" : "Token / chave"}
-                                className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                className="border-border bg-background/40 font-mono text-xs"
                               />
                             )}
                           </div>
 
-                          <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                          <div className="space-y-2 border-t border-border pt-3">
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-semibold text-foreground">Request Headers</p>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setArHeaders((p) => [...p, { key: "", value: "" }])}
-                                className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                                className="h-7 gap-1 border-border bg-background/40 text-xs"
                               >
                                 <Plus className="h-3 w-3" />
                                 Add Header
                               </Button>
                             </div>
                             {arHeaders.length === 0 ? (
-                              <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                              <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
                                 No headers configured.
                               </p>
                             ) : (
@@ -5505,7 +5505,7 @@ function ToolsTab({
                                         setArHeaders((prev) => prev.map((it, i) => i === idx ? { ...it, key: val } : it));
                                       }}
                                       placeholder="Header name"
-                                      className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                      className="border-border bg-background/40 font-mono text-xs"
                                     />
                                     <Input
                                       value={h.value}
@@ -5514,7 +5514,7 @@ function ToolsTab({
                                         setArHeaders((prev) => prev.map((it, i) => i === idx ? { ...it, value: val } : it));
                                       }}
                                       placeholder="Value"
-                                      className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                      className="border-border bg-background/40 font-mono text-xs"
                                     />
                                     <Button
                                       size="icon"
@@ -5533,7 +5533,7 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="body" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="body" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Request Body
                         </AccordionTrigger>
@@ -5555,7 +5555,7 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="static" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="static" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Static Body Fields
                         </AccordionTrigger>
@@ -5568,14 +5568,14 @@ function ToolsTab({
                               size="sm"
                               variant="outline"
                               onClick={() => setArStaticFields((p) => [...p, { key: "", value: "" }])}
-                              className="h-7 shrink-0 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                              className="h-7 shrink-0 gap-1 border-border bg-background/40 text-xs"
                             >
                               <Plus className="h-3 w-3" />
                               Add Field
                             </Button>
                           </div>
                           {arStaticFields.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                            <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
                               No static body fields configured. Click &apos;Add Field&apos; to add one.
                             </p>
                           ) : (
@@ -5589,7 +5589,7 @@ function ToolsTab({
                                       setArStaticFields((prev) => prev.map((it, i) => i === idx ? { ...it, key: val } : it));
                                     }}
                                     placeholder="Field name"
-                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                    className="border-border bg-background/40 font-mono text-xs"
                                   />
                                   <Input
                                     value={f.value}
@@ -5598,7 +5598,7 @@ function ToolsTab({
                                       setArStaticFields((prev) => prev.map((it, i) => i === idx ? { ...it, value: val } : it));
                                     }}
                                     placeholder="Value (supports {{liquid}})"
-                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                    className="border-border bg-background/40 font-mono text-xs"
                                   />
                                   <Button
                                     size="icon"
@@ -5616,7 +5616,7 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="settings" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="settings" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Timeout &amp; Retries
                         </AccordionTrigger>
@@ -5629,7 +5629,7 @@ function ToolsTab({
                               max={300}
                               value={arTimeoutSeconds}
                               onChange={(e) => setArTimeoutSeconds(Number(e.target.value) || 0)}
-                              className="border-white/[0.08] bg-background/40 text-xs"
+                              className="border-border bg-background/40 text-xs"
                             />
                           </div>
                           <div className="space-y-2">
@@ -5640,7 +5640,7 @@ function ToolsTab({
                               max={10}
                               value={arRetries}
                               onChange={(e) => setArRetries(Number(e.target.value) || 0)}
-                              className="border-white/[0.08] bg-background/40 text-xs"
+                              className="border-border bg-background/40 text-xs"
                             />
                           </div>
                           {arRetries > 0 && (
@@ -5648,7 +5648,7 @@ function ToolsTab({
                               <div className="space-y-2">
                                 <Label className="text-xs">Estratégia de backoff</Label>
                                 <Select value={arBackoffType} onValueChange={(v) => setArBackoffType(v as typeof arBackoffType)}>
-                                  <SelectTrigger className="border-white/[0.08] bg-background/40 text-xs">
+                                  <SelectTrigger className="border-border bg-background/40 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -5665,7 +5665,7 @@ function ToolsTab({
                                   step={1000}
                                   value={arBackoffBaseDelay}
                                   onChange={(e) => setArBackoffBaseDelay(Number(e.target.value) || 1000)}
-                                  className="border-white/[0.08] bg-background/40 text-xs"
+                                  className="border-border bg-background/40 text-xs"
                                 />
                               </div>
                             </>
@@ -5673,7 +5673,7 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="response" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="response" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Response Body
                         </AccordionTrigger>
@@ -5690,7 +5690,7 @@ function ToolsTab({
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="aliases" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="aliases" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Aliases
                         </AccordionTrigger>
@@ -5699,7 +5699,7 @@ function ToolsTab({
                             Crie nomes simples para caminhos da resposta (ex.: <code>{"{{ output.data.name }}"}</code>).
                           </p>
                           {arAliases.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
+                            <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-[11px] text-muted-foreground">
                               Nenhum alias configurado.
                             </p>
                           ) : (
@@ -5713,7 +5713,7 @@ function ToolsTab({
                                       setArAliases((prev) => prev.map((it, i) => (i === idx ? { ...it, name: val } : it)));
                                     }}
                                     placeholder="nomeDoAlias"
-                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                    className="border-border bg-background/40 font-mono text-xs"
                                   />
                                   <Input
                                     value={a.value}
@@ -5722,7 +5722,7 @@ function ToolsTab({
                                       setArAliases((prev) => prev.map((it, i) => (i === idx ? { ...it, value: val } : it)));
                                     }}
                                     placeholder="{{ output.data.name }}"
-                                    className="border-white/[0.08] bg-background/40 font-mono text-xs"
+                                    className="border-border bg-background/40 font-mono text-xs"
                                   />
                                   <Button
                                     size="icon"
@@ -5741,7 +5741,7 @@ function ToolsTab({
                             size="sm"
                             variant="outline"
                             onClick={() => setArAliases((p) => [...p, { name: "", value: "" }])}
-                            className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs"
+                            className="h-7 gap-1 border-border bg-background/40 text-xs"
                           >
                             <Plus className="h-3 w-3" />
                             Add Alias
@@ -5750,7 +5750,7 @@ function ToolsTab({
                       </AccordionItem>
 
 
-                      <AccordionItem value="messages" className="rounded-xl border border-white/[0.08] bg-background/30 px-4 backdrop-blur-xl">
+                      <AccordionItem value="messages" className="rounded-xl border border-border bg-background/30 px-4 backdrop-blur-xl">
                         <AccordionTrigger className="text-xs font-semibold uppercase tracking-wide text-foreground hover:no-underline">
                           Messages
                         </AccordionTrigger>
@@ -5758,12 +5758,12 @@ function ToolsTab({
                           <div className="flex items-center justify-end">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs">
+                                <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs">
                                   <Plus className="h-3 w-3" />
                                   Add Message
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                              <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                                 {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                                   <DropdownMenuItem
                                     key={t}
@@ -5776,13 +5776,13 @@ function ToolsTab({
                             </DropdownMenu>
                           </div>
                           {arMessages.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                            <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                               Nenhuma mensagem definida.
                             </p>
                           ) : (
                             <div className="space-y-2">
                               {arMessages.map((m, idx) => (
-                                <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                                <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3">
                                   <div className="flex items-center justify-between">
                                     <span className="text-[11px] font-semibold text-foreground">
                                       {TRANSFER_MESSAGE_LABELS[m.type]}
@@ -5804,7 +5804,7 @@ function ToolsTab({
                                       const val = e.target.value;
                                       setArMessages((prev) => prev.map((it, i) => i === idx ? { ...it, content: val } : it));
                                     }}
-                                    className="border-white/[0.08] bg-background/40 text-xs"
+                                    className="border-border bg-background/40 text-xs"
                                   />
                                 </div>
                               ))}
@@ -5819,7 +5819,7 @@ function ToolsTab({
                 {selected?.kind === "mcp" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
@@ -5831,7 +5831,7 @@ function ToolsTab({
                           value={mcpName}
                           onChange={(e) => setMcpName(e.target.value)}
                           placeholder="mcp_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -5843,14 +5843,14 @@ function ToolsTab({
                           value={mcpDescription}
                           onChange={(e) => setMcpDescription(e.target.value)}
                           placeholder="Explique quando a IA deve chamar este servidor MCP."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">{mcpDescription.length}/1000</p>
                       </div>
                     </div>
 
                     {/* Panel 2 — Server Settings */}
-                    <Accordion type="single" collapsible defaultValue="server" className="rounded-xl border border-white/[0.08] bg-background/30 backdrop-blur-xl">
+                    <Accordion type="single" collapsible defaultValue="server" className="rounded-xl border border-border bg-background/30 backdrop-blur-xl">
                       <AccordionItem value="server" className="border-0">
                         <AccordionTrigger className="px-4 py-3 text-xs font-semibold uppercase tracking-wide hover:no-underline">
                           <div className="flex items-center gap-2">
@@ -5866,7 +5866,7 @@ function ToolsTab({
                               value={mcpServerUrl}
                               onChange={(e) => setMcpServerUrl(e.target.value)}
                               placeholder="https://api.example.com/function"
-                              className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                              className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                             />
                           </div>
 
@@ -5876,7 +5876,7 @@ function ToolsTab({
                                 <Label className="text-xs">Timeout</Label>
                                 <p className="text-[11px] text-muted-foreground">Server request timeout in seconds.</p>
                               </div>
-                              <span className="rounded-md border border-white/[0.08] bg-background/40 px-2 py-0.5 font-mono text-[11px] text-foreground">
+                              <span className="rounded-md border border-border bg-background/40 px-2 py-0.5 font-mono text-[11px] text-foreground">
                                 {mcpTimeout} sec
                               </span>
                             </div>
@@ -5892,22 +5892,22 @@ function ToolsTab({
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <Label className="text-xs">Authorization</Label>
-                              <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                                 <Plus className="h-3 w-3" /> Add New
                               </Button>
                             </div>
                             <Select value={mcpAuth} onValueChange={setMcpAuth}>
-                              <SelectTrigger className="h-9 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <SelectTrigger className="h-9 border-border bg-background/40 text-xs backdrop-blur-xl">
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                              <SelectContent className="border-border bg-card/90 backdrop-blur-2xl">
                                 <SelectItem value="none">No authentication</SelectItem>
                               </SelectContent>
                             </Select>
-                            <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                            <div className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-6 text-center">
                               <Lock className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
                               <p className="text-xs font-medium text-foreground">No custom credentials available</p>
-                              <Button size="sm" variant="outline" className="mt-3 h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Button size="sm" variant="outline" className="mt-3 h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                                 <Plus className="h-3 w-3" /> Create Credential
                               </Button>
                             </div>
@@ -5920,13 +5920,13 @@ function ToolsTab({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setMcpHeaders((p) => [...p, { key: "", value: "" }])}
-                                className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl"
                               >
                                 <Plus className="h-3 w-3" /> Add Header
                               </Button>
                             </div>
                             {mcpHeaders.length === 0 ? (
-                              <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                              <div className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-6 text-center">
                                 <Sparkles className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
                                 <p className="text-xs font-medium text-foreground">No Headers Configured</p>
                               </div>
@@ -5941,7 +5941,7 @@ function ToolsTab({
                                         setMcpHeaders((p) => p.map((it, i) => (i === idx ? { ...it, key: val } : it)));
                                       }}
                                       placeholder="Header"
-                                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                      className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                                     />
                                     <Input
                                       value={h.value}
@@ -5950,7 +5950,7 @@ function ToolsTab({
                                         setMcpHeaders((p) => p.map((it, i) => (i === idx ? { ...it, value: val } : it)));
                                       }}
                                       placeholder="Value"
-                                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                      className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                                     />
                                     <Button
                                       size="icon"
@@ -5967,7 +5967,7 @@ function ToolsTab({
                             )}
                           </div>
 
-                          <div className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.06] bg-background/40 p-3">
+                          <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background/40 p-3">
                             <p className="text-[11px] text-muted-foreground">
                               Route webhook requests through static IPs to allow-list Vapi in your firewall.
                             </p>
@@ -5988,13 +5988,13 @@ function ToolsTab({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setMcpEncryptedPaths((p) => [...p, ""])}
-                                className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl"
                               >
                                 <Plus className="h-3 w-3" /> Add Path
                               </Button>
                             </div>
                             {mcpEncryptedPaths.length === 0 ? (
-                              <div className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-6 text-center">
+                              <div className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-6 text-center">
                                 <Lock className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
                                 <p className="text-xs font-medium text-foreground">No Encrypted Paths</p>
                               </div>
@@ -6009,7 +6009,7 @@ function ToolsTab({
                                         setMcpEncryptedPaths((prev) => prev.map((it, i) => (i === idx ? val : it)));
                                       }}
                                       placeholder="body.field.path"
-                                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                                      className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                                     />
                                     <Button
                                       size="icon"
@@ -6030,7 +6030,7 @@ function ToolsTab({
                     </Accordion>
 
                     {/* Panel 3 — MCP Settings */}
-                    <Accordion type="single" collapsible defaultValue="mcp" className="rounded-xl border border-white/[0.08] bg-background/30 backdrop-blur-xl">
+                    <Accordion type="single" collapsible defaultValue="mcp" className="rounded-xl border border-border bg-background/30 backdrop-blur-xl">
                       <AccordionItem value="mcp" className="border-0">
                         <AccordionTrigger className="px-4 py-3 text-xs font-semibold uppercase tracking-wide hover:no-underline">
                           <div className="flex items-center gap-2">
@@ -6048,7 +6048,7 @@ function ToolsTab({
                                 "rounded-lg border p-3 text-left transition-all",
                                 mcpProtocol === "shttp"
                                   ? "border-emerald-500/60 bg-emerald-500/5"
-                                  : "border-white/[0.06] bg-background/40 hover:border-white/[0.12]",
+                                  : "border-border bg-background/40 hover:border-border",
                               )}
                             >
                               <p className="text-xs font-semibold text-foreground">Streamable HTTP (SHTTP)</p>
@@ -6061,7 +6061,7 @@ function ToolsTab({
                                 "rounded-lg border p-3 text-left transition-all",
                                 mcpProtocol === "sse"
                                   ? "border-emerald-500/60 bg-emerald-500/5"
-                                  : "border-white/[0.06] bg-background/40 hover:border-white/[0.12]",
+                                  : "border-border bg-background/40 hover:border-border",
                               )}
                             >
                               <p className="text-xs font-semibold text-foreground">Server-Sent Events (SSE)</p>
@@ -6076,7 +6076,7 @@ function ToolsTab({
                     </Accordion>
 
                     {/* Panel 4 — Messages */}
-                    <Accordion type="single" collapsible className="rounded-xl border border-white/[0.08] bg-background/30 backdrop-blur-xl">
+                    <Accordion type="single" collapsible className="rounded-xl border border-border bg-background/30 backdrop-blur-xl">
                       <AccordionItem value="msgs" className="border-0">
                         <AccordionTrigger className="px-4 py-3 text-xs font-semibold uppercase tracking-wide hover:no-underline">
                           <div className="flex items-center gap-2">
@@ -6087,11 +6087,11 @@ function ToolsTab({
                         <AccordionContent className="space-y-2 px-4 pb-4">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                              <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                                 <Plus className="h-3 w-3" /> Add Message
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                            <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                               {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                                 <DropdownMenuItem
                                   key={t}
@@ -6103,13 +6103,13 @@ function ToolsTab({
                             </DropdownMenuContent>
                           </DropdownMenu>
                           {mcpMessages.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                            <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                               Nenhuma mensagem definida.
                             </p>
                           ) : (
                             <div className="space-y-2">
                               {mcpMessages.map((m, idx) => (
-                                <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                                <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl">
                                   <div className="flex items-center justify-between">
                                     <span className="text-[11px] font-semibold text-foreground">
                                       {TRANSFER_MESSAGE_LABELS[m.type]}
@@ -6131,7 +6131,7 @@ function ToolsTab({
                                       const val = e.target.value;
                                       setMcpMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
                                     }}
-                                    className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                    className="border-border bg-background/40 text-xs backdrop-blur-xl"
                                   />
                                 </div>
                               ))}
@@ -6146,7 +6146,7 @@ function ToolsTab({
                 {selected?.kind === "slack" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
@@ -6158,7 +6158,7 @@ function ToolsTab({
                           value={slName}
                           onChange={(e) => setSlName(e.target.value)}
                           placeholder="slack_send_message_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -6170,14 +6170,14 @@ function ToolsTab({
                           value={slDescription}
                           onChange={(e) => setSlDescription(e.target.value)}
                           placeholder="Explique quando a IA deve enviar mensagens no Slack."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">{slDescription.length}/1000</p>
                       </div>
                     </div>
 
                     {/* Panel 2 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -6185,11 +6185,11 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" /> Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -6202,13 +6202,13 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {slMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
                         <div className="space-y-2">
                           {slMessages.map((m, idx) => (
-                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                            <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl">
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
                                   {TRANSFER_MESSAGE_LABELS[m.type]}
@@ -6230,7 +6230,7 @@ function ToolsTab({
                                   const val = e.target.value;
                                   setSlMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -6243,7 +6243,7 @@ function ToolsTab({
                 {selected?.kind === "sheets" && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
@@ -6255,7 +6255,7 @@ function ToolsTab({
                           value={gsName}
                           onChange={(e) => setGsName(e.target.value)}
                           placeholder="google_sheets_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -6267,14 +6267,14 @@ function ToolsTab({
                           value={gsDescription}
                           onChange={(e) => setGsDescription(e.target.value)}
                           placeholder="Explique quando a IA deve adicionar linhas à planilha."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">{gsDescription.length}/1000</p>
                       </div>
                     </div>
 
                     {/* Panel 2 — Google Sheets Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-start gap-2">
                         <Sheet className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
                         <div>
@@ -6292,7 +6292,7 @@ function ToolsTab({
                           onChange={(e) => setGsSpreadsheetId(e.target.value)}
                           placeholder="Enter Spreadsheet ID"
                           className={cn(
-                            "border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl",
+                            "border-border bg-background/40 font-mono text-xs backdrop-blur-xl",
                             !gsSpreadsheetId.trim() && "border-rose-500/40",
                           )}
                         />
@@ -6310,7 +6310,7 @@ function ToolsTab({
                           onChange={(e) => setGsRange(e.target.value)}
                           placeholder="Enter Range (e.g., Sheet1!A:Z)"
                           className={cn(
-                            "border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl",
+                            "border-border bg-background/40 font-mono text-xs backdrop-blur-xl",
                             !gsRange.trim() && "border-rose-500/40",
                           )}
                         />
@@ -6321,7 +6321,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 3 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -6329,11 +6329,11 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" /> Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -6346,13 +6346,13 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {gsMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
                         <div className="space-y-2">
                           {gsMessages.map((m, idx) => (
-                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                            <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl">
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
                                   {TRANSFER_MESSAGE_LABELS[m.type]}
@@ -6374,7 +6374,7 @@ function ToolsTab({
                                   const val = e.target.value;
                                   setGsMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -6387,7 +6387,7 @@ function ToolsTab({
                 {(selected?.kind === "gcalCreate" || selected?.kind === "gcalCheck") && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
@@ -6399,7 +6399,7 @@ function ToolsTab({
                           value={gcName}
                           onChange={(e) => setGcName(e.target.value)}
                           placeholder="google_calendar_tool"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -6415,14 +6415,14 @@ function ToolsTab({
                               ? "Explique quando a IA deve criar eventos na agenda."
                               : "Explique quando a IA deve verificar disponibilidade na agenda."
                           }
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">{gcDescription.length}/1000</p>
                       </div>
                     </div>
 
                     {/* Panel 2 — Calendar Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-start gap-2">
                         <Calendar className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
                         <div>
@@ -6441,7 +6441,7 @@ function ToolsTab({
                           value={gcCalendarId}
                           onChange={(e) => setGcCalendarId(e.target.value)}
                           placeholder="Enter Calendar ID"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                         <p className="text-[11px] text-muted-foreground">
                           The ID of the Google Calendar. Defaults to 'primary' if not specified.
@@ -6454,7 +6454,7 @@ function ToolsTab({
                           value={gcTimezone}
                           onChange={(e) => setGcTimezone(e.target.value)}
                           placeholder="America/New_York"
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                         <p className="text-[11px] text-muted-foreground">
                           The time zone for the calendar event (e.g., America/New_York). Defaults to UTC if not specified.
@@ -6463,7 +6463,7 @@ function ToolsTab({
                     </div>
 
                     {/* Panel 3 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -6471,11 +6471,11 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" /> Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -6488,13 +6488,13 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {gcMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
                         <div className="space-y-2">
                           {gcMessages.map((m, idx) => (
-                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                            <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl">
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
                                   {TRANSFER_MESSAGE_LABELS[m.type]}
@@ -6516,7 +6516,7 @@ function ToolsTab({
                                   const val = e.target.value;
                                   setGcMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -6532,7 +6532,7 @@ function ToolsTab({
                   selected?.kind === "ghlContactGet") && (
                   <div className="space-y-4">
                     {/* Panel 1 — Tool Settings */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Tool Settings</h3>
@@ -6552,7 +6552,7 @@ function ToolsTab({
                                   ? "ghl_contact_create_tool"
                                   : "ghl_contact_get_tool"
                           }
-                          className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -6564,7 +6564,7 @@ function ToolsTab({
                           value={ghlDescription}
                           onChange={(e) => setGhlDescription(e.target.value)}
                           placeholder="Descreva quando a IA deve usar esta ferramenta do GoHighLevel."
-                          className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                          className="border-border bg-background/40 text-xs backdrop-blur-xl"
                         />
                         <p className="text-right text-[10px] text-muted-foreground">{ghlDescription.length}/1000</p>
                       </div>
@@ -6572,7 +6572,7 @@ function ToolsTab({
 
                     {/* Panel 2 — Calendar Settings (only for calendar variants) */}
                     {(selected?.kind === "ghlCalCreate" || selected?.kind === "ghlCalCheck") && (
-                      <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                      <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                         <div className="flex items-start gap-2">
                           <Calendar className="mt-0.5 h-3.5 w-3.5 text-orange-500" />
                           <div>
@@ -6591,7 +6591,7 @@ function ToolsTab({
                             value={ghlCalendarId}
                             onChange={(e) => setGhlCalendarId(e.target.value)}
                             placeholder="Enter Calendar ID"
-                            className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                            className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                           />
                           <p className="text-[11px] text-muted-foreground">
                             The ID of the GoHighLevel Calendar.
@@ -6601,7 +6601,7 @@ function ToolsTab({
                     )}
 
                     {/* Panel 3 — Messages */}
-                    <div className="space-y-3 rounded-xl border border-white/[0.08] bg-background/30 p-4 backdrop-blur-xl">
+                    <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -6609,11 +6609,11 @@ function ToolsTab({
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 border-border bg-background/40 text-xs backdrop-blur-xl">
                               <Plus className="h-3 w-3" /> Add Message
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                          <DropdownMenuContent align="end" className="border-border bg-card/90 backdrop-blur-2xl">
                             {(Object.keys(TRANSFER_MESSAGE_LABELS) as TransferMessageType[]).map((t) => (
                               <DropdownMenuItem
                                 key={t}
@@ -6626,13 +6626,13 @@ function ToolsTab({
                         </DropdownMenu>
                       </div>
                       {ghlMessages.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-white/[0.08] bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-lg border border-dashed border-border bg-background/20 px-4 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma mensagem definida.
                         </p>
                       ) : (
                         <div className="space-y-2">
                           {ghlMessages.map((m, idx) => (
-                            <div key={idx} className="space-y-2 rounded-lg border border-white/[0.06] bg-background/40 p-3 backdrop-blur-xl">
+                            <div key={idx} className="space-y-2 rounded-lg border border-border bg-background/40 p-3 backdrop-blur-xl">
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-foreground">
                                   {TRANSFER_MESSAGE_LABELS[m.type]}
@@ -6654,7 +6654,7 @@ function ToolsTab({
                                   const val = e.target.value;
                                   setGhlMessages((prev) => prev.map((it, i) => (i === idx ? { ...it, content: val } : it)));
                                 }}
-                                className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                                className="border-border bg-background/40 text-xs backdrop-blur-xl"
                               />
                             </div>
                           ))}
@@ -6673,7 +6673,7 @@ function ToolsTab({
                         value={fnName}
                         onChange={(e) => setFnName(e.target.value.replace(/\s+/g, ""))}
                         placeholder="get_availability"
-                        className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -6684,7 +6684,7 @@ function ToolsTab({
                         value={fnDescription}
                         onChange={(e) => setFnDescription(e.target.value)}
                         placeholder="Explique para a IA quando e como usar essa função."
-                        className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                        className="border-border bg-background/40 text-xs backdrop-blur-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -6694,7 +6694,7 @@ function ToolsTab({
                         value={serverUrl}
                         onChange={(e) => setServerUrl(e.target.value)}
                         placeholder="https://seu-dominio.com/webhook"
-                        className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                        className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -6705,7 +6705,7 @@ function ToolsTab({
                         value={fnParams}
                         onChange={(e) => setFnParams(e.target.value)}
                         spellCheck={false}
-                        className="border-white/[0.08] bg-background/40 font-mono text-[11px] backdrop-blur-xl"
+                        className="border-border bg-background/40 font-mono text-[11px] backdrop-blur-xl"
                       />
                       <p className="text-[11px] text-muted-foreground">
                         Deve ser um JSON Schema válido com{" "}
@@ -6716,7 +6716,7 @@ function ToolsTab({
                 )}
 
                 {selected?.kind === "comingSoon" && (
-                  <div className="rounded-xl border border-dashed border-white/[0.1] bg-background/20 p-6 text-center">
+                  <div className="rounded-xl border border-dashed border-border bg-background/20 p-6 text-center">
                     <div
                       className={cn(
                         "mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl",
@@ -6738,7 +6738,7 @@ function ToolsTab({
                 )}
               </div>
 
-              <DialogFooter className="border-t border-white/[0.06] px-6 py-4">
+              <DialogFooter className="border-t border-border px-6 py-4">
                 <Button
                   variant="ghost"
                   onClick={() => setOpen(false)}
@@ -6810,7 +6810,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Métricas do assistente</h2>
@@ -6821,10 +6821,10 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
           <div className="flex items-center gap-2">
             {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
             <Select value={String(rangeDays)} onValueChange={(v) => setRangeDays(Number(v))}>
-              <SelectTrigger className="h-8 w-32 border-white/[0.08] bg-background/40 backdrop-blur-xl">
+              <SelectTrigger className="h-8 w-32 border-border bg-background/40 backdrop-blur-xl">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+              <SelectContent className="border-border bg-card/90 backdrop-blur-2xl">
                 <SelectItem value="7">Últimos 7 dias</SelectItem>
                 <SelectItem value="30">Últimos 30 dias</SelectItem>
                 <SelectItem value="90">Últimos 90 dias</SelectItem>
@@ -6849,7 +6849,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
           { label: "Custo total", value: isLoading ? null : `$${a.totals.cost.toFixed(2)}` },
           { label: "Custo médio/min", value: isLoading ? null : `$${avgCostPerMin.toFixed(3)}` },
         ].map((k) => (
-          <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+          <Card key={k.label} className="border-border bg-card/20 backdrop-blur-2xl">
             <CardContent className="p-4">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k.label}</p>
               {k.value === null ? (
@@ -6863,7 +6863,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardContent className="space-y-3 p-4">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Volume por dia</h3>
@@ -6898,7 +6898,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardContent className="space-y-3 p-4">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Custo por componente</h3>
@@ -6938,7 +6938,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardContent className="space-y-3 p-4">
             <h3 className="text-sm font-semibold text-foreground">Motivos de término</h3>
             {isLoading ? (
@@ -6948,7 +6948,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
             ) : (
               <div className="space-y-1.5">
                 {a.endedReasons.map((r) => (
-                  <div key={r.reason} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 px-3 py-2">
+                  <div key={r.reason} className="flex items-center justify-between rounded-lg border border-border bg-background/30 px-3 py-2">
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px]", endedReasonBadgeClass(r.reason))}>
                       {r.reason}
                     </span>
@@ -6960,7 +6960,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardContent className="space-y-3 p-4">
             <h3 className="text-sm font-semibold text-foreground">Avaliação de sucesso</h3>
             {isLoading ? (
@@ -6970,7 +6970,7 @@ function AnalyticsPanel({ assistantId }: { assistantId: string }) {
             ) : (
               <div className="space-y-1.5">
                 {a.success.map((s) => (
-                  <div key={s.label} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-background/30 px-3 py-2">
+                  <div key={s.label} className="flex items-center justify-between rounded-lg border border-border bg-background/30 px-3 py-2">
                     <span className="text-xs text-foreground">{s.label}</span>
                     <span className="text-xs font-medium text-foreground">{s.count}</span>
                   </div>
@@ -7074,7 +7074,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
   return (
     <div className="space-y-6">
       {/* Structured Outputs */}
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardContent className="space-y-4 p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -7087,7 +7087,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
               variant="outline"
               size="sm"
               onClick={addField}
-              className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl"
+              className="gap-2 border-border bg-card/20 backdrop-blur-xl"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Field
@@ -7095,12 +7095,12 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-background/20 p-10 text-center">
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-background/20 p-10 text-center">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Carregando campos da Vapi…</span>
             </div>
           ) : fields.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-background/20 p-10 text-center">
+            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border bg-background/20 p-10 text-center">
               <FileText className="h-5 w-5 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">Nenhum campo sendo extraído ainda</p>
               <p className="max-w-md text-xs text-muted-foreground">
@@ -7121,13 +7121,13 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
                 return (
                   <div
                     key={field.id}
-                    className="grid grid-cols-1 gap-2 rounded-xl border border-white/[0.06] bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_80px]"
+                    className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-background/30 p-3 backdrop-blur-xl md:grid-cols-[1fr_140px_1.5fr_80px]"
                   >
                     <Input
                       value={field.name}
                       onChange={(e) => updateField(field.id, { name: e.target.value })}
                       placeholder="ex: telefone"
-                      className="border-white/[0.08] bg-background/40 font-mono text-xs backdrop-blur-xl"
+                      className="border-border bg-background/40 font-mono text-xs backdrop-blur-xl"
                     />
                     <Select
                       value={field.type}
@@ -7135,10 +7135,10 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
                         updateField(field.id, { type: v as SchemaField["type"] })
                       }
                     >
-                      <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+                      <SelectTrigger className="border-border bg-background/40 backdrop-blur-xl">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+                      <SelectContent className="border-border bg-card/90 backdrop-blur-2xl">
                         <SelectItem value="string">string</SelectItem>
                         <SelectItem value="number">number</SelectItem>
                         <SelectItem value="boolean">boolean</SelectItem>
@@ -7148,7 +7148,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
                       value={field.description}
                       onChange={(e) => updateField(field.id, { description: e.target.value })}
                       placeholder="Explique o que a IA deve capturar"
-                      className="border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl"
+                      className="border-border bg-background/40 text-xs backdrop-blur-xl"
                     />
                     <div className="flex items-center justify-end gap-1">
                       <Button
@@ -7189,7 +7189,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
       </Card>
 
       {/* Scorecard */}
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <CardContent className="space-y-4 p-6">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Scorecard</h2>
@@ -7204,7 +7204,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
 
           <button
             type="button"
-            className="w-full rounded-xl border border-dashed border-white/[0.1] bg-background/20 p-4 text-left transition hover:bg-background/30"
+            className="w-full rounded-xl border border-dashed border-border bg-background/20 p-4 text-left transition hover:bg-background/30"
           >
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -7218,7 +7218,7 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
       </Card>
 
       {/* Attached Monitors */}
-      <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
         <Collapsible open={monitorsOpen} onOpenChange={setMonitorsOpen}>
           <CardContent className="space-y-4 p-6">
             <CollapsibleTrigger className="flex w-full items-start justify-between gap-3 text-left">
@@ -7239,12 +7239,12 @@ function AnalysisTab({ assistantId }: { assistantId: string }) {
             <CollapsibleContent className="space-y-3">
               <Button
                 variant="outline"
-                className="w-full gap-2 border-white/[0.08] bg-background/30 backdrop-blur-xl"
+                className="w-full gap-2 border-border bg-background/30 backdrop-blur-xl"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Adicionar monitor
               </Button>
-              <div className="rounded-xl border border-white/[0.06] bg-background/20 p-6 text-center text-xs text-muted-foreground">
+              <div className="rounded-xl border border-border bg-background/20 p-6 text-center text-xs text-muted-foreground">
                 Nenhum monitor anexado a este assistente
               </div>
             </CollapsibleContent>
@@ -7266,7 +7266,7 @@ function AdvancedTab() {
   const [endCallOnSilence, setEndCallOnSilence] = useState(true);
 
   return (
-    <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
       <CardContent className="space-y-6 p-6">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Configurações Avançadas</h2>
@@ -7276,7 +7276,7 @@ function AdvancedTab() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+          <div className="space-y-2 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
             <Label htmlFor="max-duration">Duração Máxima da Chamada (min)</Label>
             <Input
               id="max-duration"
@@ -7284,14 +7284,14 @@ function AdvancedTab() {
               min={1}
               value={maxDuration}
               onChange={(e) => setMaxDuration(Number(e.target.value))}
-              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+              className="border-border bg-background/40 backdrop-blur-xl"
             />
             <p className="text-[11px] text-muted-foreground">
               A ligação é encerrada automaticamente após este tempo.
             </p>
           </div>
 
-          <div className="space-y-2 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+          <div className="space-y-2 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
             <Label htmlFor="silence">Tempo de Silêncio para Desligar (s)</Label>
             <Input
               id="silence"
@@ -7299,20 +7299,20 @@ function AdvancedTab() {
               min={1}
               value={silenceTimeout}
               onChange={(e) => setSilenceTimeout(Number(e.target.value))}
-              className="border-white/[0.08] bg-background/40 backdrop-blur-xl"
+              className="border-border bg-background/40 backdrop-blur-xl"
             />
             <p className="text-[11px] text-muted-foreground">
               Encerra a chamada após o intervalo sem áudio do cliente.
             </p>
           </div>
 
-          <div className="space-y-2 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+          <div className="space-y-2 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
             <Label>Som de Fundo</Label>
             <Select value={backgroundSound} onValueChange={setBackgroundSound}>
-              <SelectTrigger className="border-white/[0.08] bg-background/40 backdrop-blur-xl">
+              <SelectTrigger className="border-border bg-background/40 backdrop-blur-xl">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="border-white/[0.08] bg-card/90 backdrop-blur-2xl">
+              <SelectContent className="border-border bg-card/90 backdrop-blur-2xl">
                 <SelectItem value="office">Office</SelectItem>
                 <SelectItem value="static">Static</SelectItem>
                 <SelectItem value="none">None</SelectItem>
@@ -7323,7 +7323,7 @@ function AdvancedTab() {
             </p>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-white/[0.06] bg-background/30 p-4 backdrop-blur-xl">
+          <div className="space-y-3 rounded-xl border border-border bg-background/30 p-4 backdrop-blur-xl">
             <Label>Privacidade & Gravação</Label>
             <ToggleRow
               label="Gravar Ligações"

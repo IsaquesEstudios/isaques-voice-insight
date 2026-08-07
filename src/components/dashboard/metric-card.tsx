@@ -27,7 +27,7 @@ export function MetricCard({
 }: MetricCardProps) {
   const positive = (delta ?? 0) >= 0;
   return (
-    <Card className="group relative overflow-hidden border-white/[0.08] bg-card/20 p-5 backdrop-blur-2xl transition-all hover:border-primary/30 hover:shadow-glow">
+    <Card className="group relative overflow-hidden border-border bg-card/20 p-5 backdrop-blur-2xl transition-all hover:border-primary/30 hover:shadow-glow">
       <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/5 blur-2xl transition-opacity group-hover:bg-primary/10" />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -35,7 +35,7 @@ export function MetricCard({
             {label}
           </p>
           {loading ? (
-            <Skeleton className="mt-3 h-8 w-28 bg-white/10" />
+            <Skeleton className="mt-3 h-8 w-28 bg-foreground/10" />
           ) : (
             <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{value}</p>
           )}
@@ -48,7 +48,7 @@ export function MetricCard({
 
       <div className="relative mt-4 flex items-center gap-2">
         {loading ? (
-          <Skeleton className="h-5 w-40 bg-white/10" />
+          <Skeleton className="h-5 w-40 bg-foreground/10" />
         ) : delta == null ? (
           <span className="text-xs text-muted-foreground">Sem base de comparação</span>
         ) : (

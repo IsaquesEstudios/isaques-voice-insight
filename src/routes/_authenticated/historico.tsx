@@ -79,10 +79,10 @@ function HistoricoPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
+            <Button variant="outline" className="gap-2 border-border bg-card/20 backdrop-blur-xl">
               <Calendar className="h-4 w-4" /> Últimos 7 dias
             </Button>
-            <Button variant="outline" className="gap-2 border-white/[0.08] bg-card/20 backdrop-blur-xl">
+            <Button variant="outline" className="gap-2 border-border bg-card/20 backdrop-blur-xl">
               <Download className="h-4 w-4" /> Exportar CSV
             </Button>
           </div>
@@ -95,7 +95,7 @@ function HistoricoPage() {
             { label: "Custo total", value: "R$ 6.094" },
             { label: "Qualificação", value: "23,4%" },
           ].map((k) => (
-            <Card key={k.label} className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+            <Card key={k.label} className="border-border bg-card/20 backdrop-blur-2xl">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">{k.label}</p>
                 <p className="mt-1 text-2xl font-bold text-foreground">{k.value}</p>
@@ -104,7 +104,7 @@ function HistoricoPage() {
           ))}
         </section>
 
-        <Card className="border-white/[0.08] bg-card/20 backdrop-blur-2xl">
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-semibold">Registros</CardTitle>
             <div className="flex items-center gap-2">
@@ -112,10 +112,10 @@ function HistoricoPage() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar telefone, assistente..."
-                  className="h-8 border-white/[0.08] bg-background/40 pl-8 text-xs backdrop-blur-xl"
+                  className="h-8 border-border bg-background/40 pl-8 text-xs backdrop-blur-xl"
                 />
               </div>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/[0.08] bg-background/40 text-xs backdrop-blur-xl">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 border-border bg-background/40 text-xs backdrop-blur-xl">
                 <Filter className="h-3.5 w-3.5" /> Status
               </Button>
             </div>
