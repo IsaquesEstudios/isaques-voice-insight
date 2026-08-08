@@ -149,6 +149,8 @@ interface FormState {
   editingId: string | null;
   loadingInitial: boolean;
   step: 1 | 2;
+  /** Padrão de IA escolhido no passo 2 (null = nenhuma escolha ainda). */
+  presetId: string | null;
   name: string;
   firstMessage: string;
   systemPrompt: string;
@@ -156,6 +158,7 @@ interface FormState {
   model: string;
   voiceProvider: string;
   voiceId: string;
+
 }
 
 const DEFAULT_MODEL_PROVIDER = "openai";
