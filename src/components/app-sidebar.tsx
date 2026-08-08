@@ -25,7 +25,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { getVapiEstimatedCredits } from "@/lib/vapi.functions";
+import { getVapiBilling, getVapiEstimatedCredits } from "@/lib/vapi.functions";
 import { BrandLogo } from "@/components/brand-logo";
 
 
