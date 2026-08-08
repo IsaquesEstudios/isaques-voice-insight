@@ -1130,63 +1130,6 @@ function TelefoniaPage() {
 
 
 
-      <Dialog
-        open={testContactOpen}
-        onOpenChange={(o) => {
-          setTestContactOpen(o);
-          if (!o) setTestContactForm({ label: "", phoneE164: "" });
-        }}
-      >
-        <DialogContent className="max-w-md border-border bg-card/95 backdrop-blur-2xl">
-          <DialogHeader>
-            <DialogTitle>Novo contato de teste</DialogTitle>
-            <DialogDescription>
-              Cadastre um número seu para receber as ligações de teste da assistente.
-              O tronco SIP disca direto, sem verificação por SMS.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Identificação</Label>
-              <Input
-                placeholder="Ex: Meu celular"
-                value={testContactForm.label}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                }
-                disabled={savingContact}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Número (E.164)</Label>
-              <Input
-                placeholder="+5511999999999"
-                value={testContactForm.phoneE164}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                }
-                disabled={savingContact}
-              />
-              <p className="text-[10px] text-muted-foreground">
-                Inclua o código do país (+55 para Brasil).
-              </p>
-            </div>
-            <Button
-              className="w-full gap-2"
-              onClick={handleSaveTestContact}
-              disabled={savingContact}
-            >
-              {savingContact ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Salvar contato
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
 
 
