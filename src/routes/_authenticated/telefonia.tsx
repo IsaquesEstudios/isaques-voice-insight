@@ -85,7 +85,6 @@ import {
   deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
 
-  getVapiCallStatus,
 
   listVapiAssistants,
   listVapiPhoneNumbers,
@@ -289,7 +288,6 @@ function TelefoniaPage() {
 
 
 
-  const callStatusFn = useServerFn(getVapiCallStatus);
   const resyncFn = useServerFn(resyncVapiNumberCredentials);
   const resyncMutation = useMutation({
     mutationFn: (phoneNumberE164: string) => resyncFn({ data: { phoneNumberE164 } }),
@@ -900,9 +898,13 @@ function TelefoniaPage() {
                   <Label>Número (DID) em E.164</Label>
                   <Input
                     placeholder="+551140028922"
+                    inputMode="tel"
                     value={sipForm.phoneNumber}
                     onChange={(e) =>
-                      setSipForm({ ...sipForm, phoneNumber: e.target.value })
+                      setSipForm({
+                        ...sipForm,
+                        phoneNumber: formatDidE164(e.target.value),
+                      })
                     }
                   />
                 </div>
