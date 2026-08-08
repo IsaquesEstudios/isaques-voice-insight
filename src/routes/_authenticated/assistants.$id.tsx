@@ -16,6 +16,7 @@ import {
   Save,
   Loader2,
   Play,
+  Pause,
   FileText,
   Plus,
   Check,
