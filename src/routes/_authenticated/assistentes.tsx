@@ -219,6 +219,8 @@ interface AssistantPreset {
   description: string;
   model: { provider: string; model: string };
   voice: { provider: string; voiceId: string };
+  /** Amostra de áudio da voz para o usuário escutar antes de criar. */
+  sampleUrl?: string;
 }
 
 const ASSISTANT_PRESETS: AssistantPreset[] = [
@@ -228,6 +230,7 @@ const ASSISTANT_PRESETS: AssistantPreset[] = [
     description: "Deepgram Nova-3 (pt-BR) · GPT-4.1 nano · Voz Elliot V2",
     model: { provider: "openai", model: "gpt-4.1-nano" },
     voice: { provider: "vapi", voiceId: "Elliot" },
+    sampleUrl: vozElliotAsset.url,
   },
 ];
 
@@ -237,6 +240,8 @@ const emptyForm: FormState = {
   editingId: null,
   loadingInitial: false,
   step: 1,
+  presetId: null,
+
   name: "",
   firstMessage: "",
   systemPrompt: "",
