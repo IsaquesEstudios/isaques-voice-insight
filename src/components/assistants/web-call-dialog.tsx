@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Mic, MicOff, PhoneOff, PhoneCall, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  Mic,
+  MicOff,
+  PhoneOff,
+  PhoneCall,
+  AlertTriangle,
+  DollarSign,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
