@@ -179,15 +179,25 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       setMuted(false);
       setSpeaker(null);
       setTranscript([]);
+      setCostAck(false);
+      setElapsed(0);
     }
   }, [open]);
 
   useEffect(() => () => teardown(), []);
 
+  // Cronômetro da chamada — usado para alertar sobre o custo por minuto.
+  useEffect(() => {
+    if (status !== "in_call") return;
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
   async function startCall() {
     setStatus("connecting");
     setErrorMsg(null);
     setTranscript([]);
+    setElapsed(0);
     teardown();
 
     // 1. Solicita microfone antes de tudo — falha rápido e clara.
