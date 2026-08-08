@@ -436,6 +436,12 @@ function AssistentesPage() {
   }
 
   async function handleDuplicate(a: VapiAssistant) {
+    if (limitReached) {
+      toast.error(
+        `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um para duplicar outro.`,
+      );
+      return;
+    }
     setDuplicatingId(a.id);
     const toastId = toast.loading(`Duplicando "${a.name ?? "assistente"}"...`);
     try {
@@ -444,7 +450,11 @@ function AssistentesPage() {
       await refresh();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao duplicar assistente.", { id: toastId });
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(
+        msg.includes("Limite de") ? msg : "Erro ao duplicar assistente.",
+        { id: toastId },
+      );
     } finally {
       setDuplicatingId(null);
     }
