@@ -32,9 +32,11 @@ import {
   getVapiConnection,
   saveVapiCredentials,
   updateVapiPublicKey,
+  getVapiBilling,
   getVapiEstimatedCredits,
   saveVapiBudget,
 } from "@/lib/vapi.functions";
+import type { VapiBillingMonth } from "@/lib/vapi.functions";
 import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 
@@ -604,34 +606,62 @@ function NotificacoesSection() {
   );
 }
 
+const usd = (v: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" }).format(v);
+
+const monthLabel = (iso: string) =>
+  new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric", timeZone: "UTC" })
+    .format(new Date(iso))
+    .replace(".", "");
+
 function FaturamentoSection() {
   const qc = useQueryClient();
-  const vapiCreditsQuery = useQuery({
 
+  const billingQuery = useQuery({
+    queryKey: ["vapi-billing"],
+    queryFn: () => getVapiBilling(),
+    staleTime: 60_000,
+  });
+  // Usado apenas para ler/gravar o limite de alerta configurado pelo usuário.
+  const budgetQuery = useQuery({
     queryKey: ["vapi-estimated-credits"],
     queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
 
-
   const [budgetInput, setBudgetInput] = useState<string>("");
 
-  const vapi = vapiCreditsQuery.data;
-  const vapiConnected = vapi?.ok === true;
-  const vapiValue = vapi?.ok && vapi.balance !== null ? vapi.balance : null;
+  const billing = billingQuery.data;
+  const budget =
+    typeof budgetQuery.data?.budget === "number" ? budgetQuery.data.budget : null;
+  const currentCost = billing?.currentMonth?.cost ?? 0;
+  const progress =
+    budget && budget > 0 ? Math.min(1, Math.max(0, currentCost / budget)) : 0;
+  const overBudget = budget !== null && budget > 0 && currentCost >= budget * 0.8;
 
   const saveBudget = useMutation({
-    mutationFn: (budget: number) =>
-      saveVapiBudget({ data: { budget, lowBalanceThreshold: 0.2 } }),
+    mutationFn: (value: number) =>
+      saveVapiBudget({ data: { budget: value, lowBalanceThreshold: 0.2 } }),
     onSuccess: () => {
-      toast.success("Orçamento Vapi salvo!");
+      toast.success("Limite de alerta salvo!");
       setBudgetInput("");
       qc.invalidateQueries({ queryKey: ["vapi-estimated-credits"] });
     },
-    onError: (e) => toast.error(translateError(e, "Falha ao salvar orçamento")),
+    onError: (e) => toast.error(translateError(e, "Falha ao salvar limite")),
   });
 
-  const refreshing = vapiCreditsQuery.isFetching;
+  const refreshing = billingQuery.isFetching;
+  const breakdown = billing?.breakdown;
+  const breakdownItems = breakdown
+    ? [
+        { label: "Modelo de IA (LLM)", value: breakdown.llm },
+        { label: "Transcrição (STT)", value: breakdown.stt },
+        { label: "Voz (TTS)", value: breakdown.tts },
+        { label: "Plataforma Vapi", value: breakdown.vapi },
+        { label: "Telefonia / transporte", value: breakdown.transport },
+      ]
+    : [];
+  const breakdownTotal = breakdownItems.reduce((s, i) => s + i.value, 0);
 
   return (
     <div className="space-y-6">
@@ -640,7 +670,15 @@ function FaturamentoSection() {
           <div>
             <CardTitle className="text-base font-semibold">Faturamento</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Saldo estimado na Vapi (baseado nas chamadas realizadas).
+              Dados reais da sua conta Vapi
+              {billing?.org?.name ? ` — ${billing.org.name}` : ""}
+              {billing?.org?.plan ? ` (plano ${billing.org.plan})` : ""}.
+              {billing?.syncedAt
+                ? ` Atualizado às ${new Intl.DateTimeFormat("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(billing.syncedAt))}.`
+                : ""}
             </p>
           </div>
           <Button
@@ -649,106 +687,213 @@ function FaturamentoSection() {
             className="gap-1.5"
             disabled={refreshing}
             onClick={() => {
-              vapiCreditsQuery.refetch();
+              billingQuery.refetch();
             }}
-            title="Atualizar saldos"
+            title="Atualizar faturamento"
           >
             <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
           </Button>
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {billing && billing.error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+          Não foi possível ler o faturamento na Vapi:{" "}
+          {translateError(billing.error, "erro desconhecido")}
+        </div>
+      )}
 
-
-
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <CompactCreditCard
           icon={Sparkles}
-          title="Vapi"
-          subtitle={
-            vapiConnected
-              ? vapiValue !== null
-                ? "Saldo estimado (orçamento − gastos)"
-                : "Configure um orçamento para ver o saldo"
-              : "Conecte sua conta Vapi"
-          }
-          value={vapiValue}
+          title="Mês atual"
+          subtitle="Gasto real na Vapi"
+          value={billing?.currentMonth ? billing.currentMonth.cost : null}
           currency="USD"
-          badge={vapi?.ok ? "estimado" : undefined}
-          loading={vapiCreditsQuery.isLoading}
-          progress={vapi?.ok ? vapi.usageRatio : 0}
-          lowBalance={vapi?.lowBalance}
+          loading={billingQuery.isLoading}
+          progress={progress}
+          lowBalance={overBudget}
+        />
+        <CompactCreditCard
+          icon={CreditCard}
+          title="Mês anterior"
+          subtitle="Total faturado"
+          value={billing?.previousMonth ? billing.previousMonth.cost : null}
+          currency="USD"
+          loading={billingQuery.isLoading}
+          progress={0}
+        />
+        <StatTile
+          label="Minutos usados (mês)"
+          value={
+            billingQuery.isLoading
+              ? null
+              : `${(billing?.currentMonth?.minutes ?? 0).toLocaleString("pt-BR", {
+                  maximumFractionDigits: 1,
+                })} min`
+          }
+        />
+        <StatTile
+          label="Chamadas (mês)"
+          value={
+            billingQuery.isLoading
+              ? null
+              : `${billing?.currentMonth?.calls ?? 0}`
+          }
         />
       </div>
 
-      {vapiConnected && (
-        <Card className="border-border bg-card/20 backdrop-blur-2xl">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Orçamento Vapi</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              A Vapi não expõe um endpoint de créditos. Informe seu crédito/orçamento para calcularmos o saldo estimado.
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Composição do custo (mês atual)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {billingQuery.isLoading ? (
+            <div className="h-24 animate-pulse rounded-xl bg-foreground/[0.04]" />
+          ) : breakdownTotal <= 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Ainda não há custos registrados neste mês.
             </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Crédito/orçamento (USD)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={budgetInput}
-                  onChange={(e) => setBudgetInput(e.target.value)}
-                  placeholder={
-                    typeof vapi?.budget === "number"
-                      ? new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: "USD",
-                        }).format(vapi.budget)
-                      : "Ex: 100.00"
-                  }
-                  className="border-border bg-background/40 backdrop-blur-xl"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Gasto acumulado (90 dias)</Label>
-                <div className="flex h-9 items-center rounded-md border border-border bg-foreground/[0.04] px-3 text-sm text-foreground">
-                  {typeof vapi?.spent === "number"
-                    ? new Intl.NumberFormat("pt-BR", {
-                        style: "currency",
-                        currency: "USD",
-                      }).format(vapi.spent)
-                    : "—"}
+          ) : (
+            breakdownItems.map((item) => (
+              <div key={item.label} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{item.label}</span>
+                  <span className="font-medium text-foreground">{usd(item.value)}</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.04]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-success"
+                    style={{
+                      width: `${Math.round((item.value / breakdownTotal) * 100)}%`,
+                    }}
+                  />
                 </div>
               </div>
-            </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
-            {vapi?.lowBalance && (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                Seu saldo estimado atingiu o limite de alerta. Considere recarregar seus créditos na Vapi.
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Últimos 12 meses</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {billingQuery.isLoading ? (
+            <div className="h-32 animate-pulse rounded-xl bg-foreground/[0.04]" />
+          ) : (billing?.monthly.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum consumo registrado no período.
+            </p>
+          ) : (
+            (billing?.monthly ?? []).map((m: VapiBillingMonth) => {
+              const max = Math.max(
+                ...(billing?.monthly ?? []).map((x: VapiBillingMonth) => x.cost),
+                0.0001,
+              );
+              return (
+                <div key={m.month} className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs text-muted-foreground">
+                    {monthLabel(m.month)}
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/[0.04]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary to-success"
+                      style={{ width: `${Math.round((m.cost / max) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-24 shrink-0 text-right text-xs font-medium text-foreground">
+                    {usd(m.cost)}
+                  </span>
+                  <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">
+                    {m.calls} lig.
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card/20 backdrop-blur-2xl">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Limite de alerta (opcional)
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Defina um valor mensal de referência. Avisamos quando o gasto real do mês
+            chegar perto dele.
+            {billing?.org?.billingLimit !== null && billing?.org?.billingLimit !== undefined
+              ? ` Limite configurado na Vapi: ${usd(billing.org.billingLimit)}.`
+              : ""}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Limite mensal (USD)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                value={budgetInput}
+                onChange={(e) => setBudgetInput(e.target.value)}
+                placeholder={budget !== null ? usd(budget) : "Ex: 100.00"}
+                className="border-border bg-background/40 backdrop-blur-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Gasto do mês atual</Label>
+              <div className="flex h-9 items-center rounded-md border border-border bg-foreground/[0.04] px-3 text-sm text-foreground">
+                {billingQuery.isLoading ? "—" : usd(currentCost)}
               </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button
-                onClick={() => saveBudget.mutate(Number(budgetInput))}
-                disabled={
-                  saveBudget.isPending || budgetInput === "" || Number.isNaN(Number(budgetInput))
-                }
-                className="gap-2 shadow-glow"
-              >
-                {saveBudget.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                Salvar orçamento
-              </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          {overBudget && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+              O gasto do mês já atingiu 80% do limite definido. Considere revisar o uso
+              ou recarregar créditos na Vapi.
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveBudget.mutate(Number(budgetInput))}
+              disabled={
+                saveBudget.isPending ||
+                budgetInput === "" ||
+                Number.isNaN(Number(budgetInput))
+              }
+              className="gap-2 shadow-glow"
+            >
+              {saveBudget.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Salvar limite
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: string | null }) {
+  return (
+    <Card className="rounded-2xl border border-border bg-card/20 p-5 backdrop-blur-2xl">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      {value === null ? (
+        <div className="mt-2 h-6 w-20 animate-pulse rounded-md bg-foreground/[0.04]" />
+      ) : (
+        <p className="mt-1 text-xl font-bold text-foreground">{value}</p>
+      )}
+    </Card>
   );
 }
 

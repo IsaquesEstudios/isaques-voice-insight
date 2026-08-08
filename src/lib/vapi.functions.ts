@@ -3018,6 +3018,206 @@ export const getVapiCredits = createServerFn({ method: "GET" })
     };
   });
 
+// ---------- faturamento real (API de analytics da Vapi) ----------
+
+export interface VapiBillingMonth {
+  month: string; // ISO do primeiro dia do mês
+  cost: number;
+  minutes: number;
+  calls: number;
+}
+
+export interface VapiBillingDTO {
+  ok: boolean;
+  currency: string;
+  currentMonth: VapiBillingMonth | null;
+  previousMonth: VapiBillingMonth | null;
+  monthly: VapiBillingMonth[];
+  breakdown: {
+    llm: number;
+    stt: number;
+    tts: number;
+    vapi: number;
+    transport: number;
+  } | null;
+  org: {
+    name: string | null;
+    plan: string | null;
+    billingLimit: number | null;
+  } | null;
+  syncedAt: string;
+  error: string | null;
+}
+
+const TZ = "America/Sao_Paulo";
+
+function monthKey(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function toNumber(v: unknown): number {
+  const n = typeof v === "string" ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : 0;
+}
+
+export const getVapiBilling = createServerFn({ method: "GET" })
+  .middleware([withVapiCredentials])
+  .handler(async (): Promise<VapiBillingDTO> => {
+    const now = new Date();
+    const syncedAt = now.toISOString();
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), 1, 0, 0, 0),
+    );
+    const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    const prevDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const prevKey = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0),
+    );
+
+    const empty = (error: string | null): VapiBillingDTO => ({
+      ok: error === null,
+      currency: "USD",
+      currentMonth: null,
+      previousMonth: null,
+      monthly: [],
+      breakdown: null,
+      org: null,
+      syncedAt,
+      error,
+    });
+
+    let rows: Array<Record<string, unknown>> = [];
+    let breakdownRows: Array<Record<string, unknown>> = [];
+    try {
+      const res = (await vapiFetch("/analytics", {
+        method: "POST",
+        body: JSON.stringify({
+          queries: [
+            {
+              name: "monthly",
+              table: "call",
+              timeRange: {
+                start: start.toISOString(),
+                end: syncedAt,
+                step: "month",
+                timezone: TZ,
+              },
+              operations: [
+                { operation: "sum", column: "cost", alias: "cost" },
+                { operation: "sum", column: "minutesUsed", alias: "minutes" },
+                { operation: "count", column: "id", alias: "calls" },
+              ],
+            },
+            {
+              name: "breakdown",
+              table: "call",
+              timeRange: {
+                start: monthStart.toISOString(),
+                end: syncedAt,
+                timezone: TZ,
+              },
+              operations: [
+                { operation: "sum", column: "costBreakdown.llm", alias: "llm" },
+                { operation: "sum", column: "costBreakdown.stt", alias: "stt" },
+                { operation: "sum", column: "costBreakdown.tts", alias: "tts" },
+                { operation: "sum", column: "costBreakdown.vapi", alias: "vapi" },
+                {
+                  operation: "sum",
+                  column: "costBreakdown.transport",
+                  alias: "transport",
+                },
+              ],
+            },
+          ],
+        }),
+      })) as unknown;
+
+      const list = Array.isArray(res) ? res : [];
+      for (const q of list as Array<Record<string, unknown>>) {
+        const result = Array.isArray(q.result)
+          ? (q.result as Array<Record<string, unknown>>)
+          : [];
+        if (q.name === "monthly") rows = result;
+        if (q.name === "breakdown") breakdownRows = result;
+      }
+    } catch (err) {
+      return empty(err instanceof Error ? err.message : String(err));
+    }
+
+    const monthly: VapiBillingMonth[] = rows
+      .map((r) => {
+        const key = monthKey(r.date ?? r.month ?? r.timestamp);
+        if (!key) return null;
+        return {
+          month: `${key}-01`,
+          cost: Math.round(toNumber(r.cost) * 10000) / 10000,
+          minutes: Math.round(toNumber(r.minutes) * 100) / 100,
+          calls: Math.round(toNumber(r.calls)),
+        } satisfies VapiBillingMonth;
+      })
+      .filter((m): m is VapiBillingMonth => m !== null)
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    const find = (key: string) =>
+      monthly.find((m) => m.month.startsWith(key)) ?? null;
+
+    const b = breakdownRows[0] ?? null;
+    const breakdown = b
+      ? {
+          llm: Math.round(toNumber(b.llm) * 10000) / 10000,
+          stt: Math.round(toNumber(b.stt) * 10000) / 10000,
+          tts: Math.round(toNumber(b.tts) * 10000) / 10000,
+          vapi: Math.round(toNumber(b.vapi) * 10000) / 10000,
+          transport: Math.round(toNumber(b.transport) * 10000) / 10000,
+        }
+      : null;
+
+    // Dados da organização são um extra: a rota não é documentada e pode mudar.
+    let org: VapiBillingDTO["org"] = null;
+    try {
+      const raw = (await vapiFetch("/org", { method: "GET" })) as unknown;
+      const o = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null;
+      if (o && typeof o === "object") {
+        org = {
+          name: typeof o.name === "string" ? o.name : null,
+          plan:
+            typeof o.plan === "string"
+              ? o.plan
+              : typeof (o.subscription as Record<string, unknown> | undefined)?.type ===
+                  "string"
+                ? ((o.subscription as Record<string, unknown>).type as string)
+                : null,
+          billingLimit:
+            typeof o.billingLimit === "number" ? (o.billingLimit as number) : null,
+        };
+      }
+    } catch {
+      org = null;
+    }
+
+    return {
+      ok: true,
+      currency: "USD",
+      currentMonth: find(currentKey) ?? {
+        month: `${currentKey}-01`,
+        cost: 0,
+        minutes: 0,
+        calls: 0,
+      },
+      previousMonth: find(prevKey),
+      monthly,
+      breakdown,
+      org,
+      syncedAt,
+      error: null,
+    };
+  });
+
+
 /* --------------------- Dashboard overview --------------------- */
 
 export interface DashboardCallRow {
