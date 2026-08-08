@@ -550,7 +550,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               </Button>
               <Button
                 onClick={startCall}
-                disabled={webCallMutation.isPending}
+                disabled={webCallMutation.isPending || !costAck}
+                title={!costAck ? "Confirme o aviso de custo para iniciar." : undefined}
                 className="gap-2"
               >
                 {webCallMutation.isPending ? (
