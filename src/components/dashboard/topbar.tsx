@@ -1,4 +1,6 @@
-import { Bell, CreditCard, LogOut, Search, Settings, UserRound } from "lucide-react";
+import { CreditCard, LogOut, Search, Settings, UserRound } from "lucide-react";
+import { NotificationsBell } from "@/components/dashboard/notifications-bell";
+
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
