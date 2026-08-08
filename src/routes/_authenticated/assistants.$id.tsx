@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import vozElliotAsset from "@/assets/voz-elliot.wav.asset.json";
 import { WebCallDialog } from "@/components/assistants/web-call-dialog";
 import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 import { PhoneCall } from "lucide-react";
