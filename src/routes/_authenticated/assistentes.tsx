@@ -326,6 +326,7 @@ function AssistentesPage() {
   );
 
   const total = enriched.length;
+  const limitReached = total >= MAX_ASSISTANTS;
   const active = enriched.filter((a) => a.metrics.status === "Ativo").length;
   const totalCalls = enriched.reduce((s, a) => s + a.metrics.calls, 0);
   const withRate = enriched.filter((a) => a.metrics.successRate != null);
