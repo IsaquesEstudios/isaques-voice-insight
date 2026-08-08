@@ -437,7 +437,53 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
                 )}
               </div>
             </div>
+            {(status === "in_call" || status === "ended") && (
+              <span
+                className={cn(
+                  "rounded-full border px-2.5 py-1 font-mono text-xs font-semibold tabular-nums",
+                  elapsed >= 60
+                    ? "border-warning/40 bg-warning/10 text-warning"
+                    : "border-border bg-background/40 text-muted-foreground",
+                )}
+                title={
+                  elapsed >= 60
+                    ? "Você passou de 1 minuto — encerre para evitar custos extras."
+                    : "Duração do teste"
+                }
+              >
+                {formatElapsed(elapsed)}
+              </span>
+            )}
           </div>
+
+          {!isActive && (
+            <Alert className="border-warning/40 bg-warning/10">
+              <DollarSign className="h-4 w-4 text-warning" />
+              <AlertDescription className="space-y-2 text-xs leading-relaxed text-foreground">
+                <p className="font-semibold">
+                  Atenção: este teste tem custo real em dólar americano (USD).
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                  <li>A ligação de teste consome créditos da sua conta e é cobrada por minuto em USD.</li>
+                  <li>
+                    Recomendação: <span className="font-semibold text-foreground">não ultrapasse 1 minuto</span> de teste.
+                  </li>
+                  <li>
+                    Consulte sua provedora (Vapi e provedores de voz/modelo) para entender o custo exato por minuto.
+                  </li>
+                </ul>
+                <label className="flex cursor-pointer items-start gap-2 pt-1 text-foreground">
+                  <Checkbox
+                    checked={costAck}
+                    onCheckedChange={(v) => setCostAck(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>Entendi que o teste tem custo em dólar e será cobrado por minuto.</span>
+                </label>
+              </AlertDescription>
+            </Alert>
+          )}
+
 
           {errorMsg && (
             <Alert variant="destructive">
