@@ -72,6 +72,9 @@ import {
 
 import { cn } from "@/lib/utils";
 
+/** Limite de assistentes por conta (validado também no servidor). */
+const MAX_ASSISTANTS = 4;
+
 export const Route = createFileRoute("/_authenticated/assistentes")({
   head: () => ({
     meta: [{ title: "Assistentes Virtuais — Omniasyn" }],
