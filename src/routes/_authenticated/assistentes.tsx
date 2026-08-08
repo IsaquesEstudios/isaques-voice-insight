@@ -611,7 +611,7 @@ function AssistentesPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => handleDuplicate(raw)}
-                          disabled={duplicatingId === raw.id}
+                          disabled={duplicatingId === raw.id || limitReached}
                         >
                           <Copy className="mr-2 h-3.5 w-3.5" />
                           Duplicar
