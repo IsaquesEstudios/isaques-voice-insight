@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Plus,
@@ -16,8 +16,13 @@ import {
   MessageSquare,
   Trash2,
   Loader2,
+  Play,
+  Pause,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import vozElliotAsset from "@/assets/voz-elliot.wav.asset.json";
+
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
