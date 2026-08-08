@@ -337,6 +337,12 @@ function AssistentesPage() {
 
 
   function openCreate() {
+    if (limitReached) {
+      toast.error(
+        `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um para criar outro.`,
+      );
+      return;
+    }
     setForm({
       ...emptyForm,
       open: true,
@@ -345,6 +351,7 @@ function AssistentesPage() {
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
     });
   }
+
 
   async function openEdit(a: VapiAssistant) {
     setForm({
