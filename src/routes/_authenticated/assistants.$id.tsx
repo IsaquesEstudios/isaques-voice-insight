@@ -1197,6 +1197,107 @@ function AssistantDetailPage() {
                 </CardContent>
               </Card>
 
+              {/* Voz do assistente */}
+              <Card className="border-border bg-card/20 backdrop-blur-2xl">
+                <CardContent className="space-y-4 p-6">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Voz</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Escolha o provedor e a voz do assistente. Ouça a prévia antes de salvar.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Provedor de voz</Label>
+                      <Select
+                        value={form.voiceProvider}
+                        onValueChange={(v) => {
+                          stopVoicePreview();
+                          setForm((f) => ({ ...f, voiceProvider: v, voiceId: "" }));
+                        }}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger className="border-border bg-background/40 backdrop-blur-xl">
+                          <SelectValue placeholder="Selecione o provedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VOICE_PROVIDERS.map((p) => (
+                            <SelectItem key={p.value} value={p.value}>
+                              {p.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Voz</Label>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={form.voiceId}
+                          onValueChange={(v) => {
+                            stopVoicePreview();
+                            setForm((f) => ({ ...f, voiceId: v }));
+                          }}
+                          disabled={isLoading || voiceOptions.length === 0}
+                        >
+                          <SelectTrigger className="flex-1 border-border bg-background/40 backdrop-blur-xl">
+                            <SelectValue
+                              placeholder={
+                                voicesQuery.isLoading
+                                  ? "Carregando vozes..."
+                                  : voiceOptions.length === 0
+                                    ? "Nenhuma voz disponível"
+                                    : "Selecione a voz"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {voiceOptions.map((v) => (
+                              <SelectItem key={v.value} value={v.value}>
+                                {v.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={!currentVoiceSampleUrl}
+                          onClick={toggleVoicePreview}
+                          title={
+                            currentVoiceSampleUrl
+                              ? isVoicePreviewPlaying
+                                ? "Pausar prévia"
+                                : "Ouvir prévia"
+                              : "Amostra ainda não disponível para esta voz"
+                          }
+                          aria-label="Ouvir prévia da voz"
+                        >
+                          {isVoicePreviewPlaying ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {!currentVoiceSampleUrl && form.voiceId && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Amostra ainda não disponível para esta voz.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <audio
+                    ref={voiceAudioRef}
+                    onEnded={() => setIsVoicePreviewPlaying(false)}
+                    className="hidden"
+                  />
+                </CardContent>
+              </Card>
+
             </div>
           </TabsContent>
 
