@@ -32,9 +32,11 @@ import {
   getVapiConnection,
   saveVapiCredentials,
   updateVapiPublicKey,
+  getVapiBilling,
   getVapiEstimatedCredits,
   saveVapiBudget,
 } from "@/lib/vapi.functions";
+import type { VapiBillingMonth } from "@/lib/vapi.functions";
 import { getSipConnection, saveSipTrunk } from "@/lib/sip.functions";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 
