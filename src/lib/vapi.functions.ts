@@ -83,6 +83,22 @@ async function removeOwnership(
   // No-op.
 }
 
+/** Limite de assistentes por conta. */
+export const MAX_ASSISTANTS = 4;
+
+/** Recusa a criação quando a conta já atingiu o limite de assistentes. */
+async function assertAssistantQuota(): Promise<void> {
+  const data = await vapiFetch("/assistant", { method: "GET" });
+  const count = Array.isArray(data) ? data.length : 0;
+  if (count >= MAX_ASSISTANTS) {
+    throw new Error(
+      `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um assistente para criar outro.`,
+    );
+  }
+}
+
+
+
 
 
 export interface VapiAssistantDTO {
