@@ -103,28 +103,34 @@ export function AppSidebar() {
 }
 
 function SidebarCredits() {
-  const vapiCredits = useQuery({
+  const billing = useQuery({
+    queryKey: ["vapi-billing"],
+    queryFn: () => getVapiBilling(),
+    staleTime: 60_000,
+  });
+  const budgetQuery = useQuery({
     queryKey: ["vapi-estimated-credits"],
     queryFn: () => getVapiEstimatedCredits(),
     staleTime: 60_000,
   });
 
-  const vapiValue =
-    vapiCredits.data?.ok && vapiCredits.data?.balance !== null
-      ? vapiCredits.data.balance
-      : null;
+  const spent = billing.data?.ok ? (billing.data.currentMonth?.cost ?? 0) : null;
+  const budget =
+    typeof budgetQuery.data?.budget === "number" ? budgetQuery.data.budget : null;
+  const ratio =
+    budget && budget > 0 && spent !== null ? Math.min(1, spent / budget) : undefined;
 
   return (
     <div className="space-y-3 group-data-[collapsible=icon]:hidden">
       <SidebarCreditRow
         icon={Sparkles}
-        title="Vapi"
-        value={vapiValue}
-        currency="USD"
-        badge={vapiCredits.data?.ok ? "estimado" : undefined}
-        loading={vapiCredits.isLoading}
-        usageRatio={vapiCredits.data?.usageRatio}
-        lowBalance={vapiCredits.data?.lowBalance}
+        title="Vapi — mês atual"
+        value={spent}
+        currency={billing.data?.currency ?? "USD"}
+        badge={billing.data?.ok ? "real" : undefined}
+        loading={billing.isLoading}
+        usageRatio={ratio}
+        lowBalance={typeof ratio === "number" && ratio >= 0.8}
       />
     </div>
   );
