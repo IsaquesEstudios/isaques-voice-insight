@@ -66,10 +66,7 @@ import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   listMyNumbers,
-  listTestContacts,
   releaseNumber,
-  removeTestContact,
-  saveTestContact,
 } from "@/lib/numbers.functions";
 
 
@@ -84,7 +81,6 @@ import {
 import {
   connectSipNumber,
   attachAssistantToNumber,
-  createOutboundTestCall,
   detachAssistantFromNumber,
   deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
@@ -183,10 +179,6 @@ function TelefoniaPage() {
   const connectSipNumberFn = useServerFn(connectSipNumber);
   const disconnectSipFn = useServerFn(disconnectSipTrunk);
 
-  // Contatos de teste (armazenados localmente, sem depender de operadora)
-  const listTestContactsFn = useServerFn(listTestContacts);
-  const saveTestContactFn = useServerFn(saveTestContact);
-  const removeTestContactFn = useServerFn(removeTestContact);
 
 
 
@@ -293,7 +285,6 @@ function TelefoniaPage() {
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sipError, setSipError] = useState<string | null>(null);
-  const outboundCallFn = useServerFn(createOutboundTestCall);
 
 
 
@@ -322,32 +313,6 @@ function TelefoniaPage() {
 
 
 
-  const [lastCallDiag, setLastCallDiag] = useState<{
-    status: string | null;
-    endedReason: string | null;
-  } | null>(null);
-
-  const watchCall = async (callId: string) => {
-    for (let i = 0; i < 12; i++) {
-      await new Promise((r) => setTimeout(r, 4000));
-      try {
-        const s = await callStatusFn({ data: { callId } });
-        setLastCallDiag({ status: s.status, endedReason: s.endedReason });
-        if (s.endedReason || s.status === "ended") {
-          const reason = s.endedReason ?? "";
-          if (/assistant-forwarded-call/.test(reason)) {
-            toast.success("Chamada transferida para o número de destino.");
-          } else if (reason && !/customer-ended-call|assistant-ended-call/.test(reason)) {
-            toast.error(`Chamada encerrada pela Vapi: ${reason}`);
-          }
-          return;
-        }
-
-      } catch {
-        return;
-      }
-    }
-  };
 
 
 
