@@ -458,6 +458,12 @@ function AssistentesPage() {
       toast.error("Informe um nome para o assistente.");
       return;
     }
+    if (!form.presetId) {
+      toast.error("Selecione um padrão de IA para continuar.");
+      return;
+    }
+    stopPreview();
+
     setIsSubmitting(true);
     try {
       const payload = {
