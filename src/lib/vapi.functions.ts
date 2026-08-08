@@ -682,6 +682,7 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertAssistantQuota();
     const created = (await vapiFetch("/assistant", {
       method: "POST",
       body: JSON.stringify(buildPayload(data)),
