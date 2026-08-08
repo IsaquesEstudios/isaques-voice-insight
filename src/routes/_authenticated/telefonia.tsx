@@ -293,66 +293,8 @@ function TelefoniaPage() {
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sipError, setSipError] = useState<string | null>(null);
-  const [testContactOpen, setTestContactOpen] = useState(false);
-  const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
-  const [savingContact, setSavingContact] = useState(false);
-  const [callingContactId, setCallingContactId] = useState<string | null>(null);
-
-  // Per-row call controls (assistant + origin number)
-  const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
-  const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
-
   const outboundCallFn = useServerFn(createOutboundTestCall);
 
-  // Contatos de teste ficam salvos na própria plataforma: o tronco SIP não possui
-  // um serviço externo de verificação por OTP.
-  const testContactsQuery = useQuery({
-    queryKey: ["test-contacts"],
-    queryFn: () => listTestContactsFn(),
-  });
-  const testContacts = (
-    (testContactsQuery.data ?? []) as Array<{
-      id: string;
-      label: string;
-      phone_e164: string;
-      verified: boolean | null;
-    }>
-  ).map((c) => ({
-    id: c.id,
-    label: c.label || c.phone_e164,
-    phone_e164: c.phone_e164,
-    verified: Boolean(c.verified),
-  }));
-
-  const removeTestContactMutation = useMutation({
-    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
-    onSuccess: async () => {
-      toast.success("Contato de teste removido.");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-    },
-    onError: (err) =>
-      toast.error(translateError(err, "Falha ao remover contato")),
-  });
-
-  const handleSaveTestContact = async () => {
-    const label = testContactForm.label.trim();
-    const phone = testContactForm.phoneE164.trim();
-    if (!label) return toast.error("Informe uma identificação.");
-    if (!/^\+[1-9]\d{7,14}$/.test(phone))
-      return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
-    setSavingContact(true);
-    try {
-      await saveTestContactFn({ data: { label, phoneE164: phone } });
-      toast.success("Contato de teste salvo!");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      setTestContactOpen(false);
-      setTestContactForm({ label: "", phoneE164: "" });
-    } catch (err) {
-      toast.error(translateError(err, "Falha ao salvar contato"));
-    } finally {
-      setSavingContact(false);
-    }
-  };
 
 
 
