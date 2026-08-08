@@ -410,6 +410,13 @@ function AssistentesPage() {
       ...emptyForm,
       open: true,
       mode: "edit",
+      // Na edição o padrão já está definido pelo assistente existente.
+      presetId:
+        ASSISTANT_PRESETS.find(
+          (p) =>
+            p.model.model === a.model?.model && p.voice.voiceId === a.voice?.voiceId,
+        )?.id ?? "custom",
+
       editingId: a.id,
       loadingInitial: true,
       name: a.name ?? "",
