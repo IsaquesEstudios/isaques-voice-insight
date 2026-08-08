@@ -158,6 +158,20 @@ interface AvailableNumber {
   mms: boolean;
 }
 
+/**
+ * Formata o DID em E.164 enquanto o usuário digita: mantém só dígitos e
+ * assume +55 quando o número parece brasileiro sem código de país.
+ */
+function formatDidE164(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (raw.trim().startsWith("+")) return `+${digits}`;
+  if (digits.startsWith("55") && digits.length > 11) return `+${digits}`;
+  if (digits.length <= 11) return `+55${digits}`;
+  return `+${digits}`;
+}
+
+
 function TelefoniaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
