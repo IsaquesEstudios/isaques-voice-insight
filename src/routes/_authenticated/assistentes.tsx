@@ -762,7 +762,11 @@ function AssistentesPage() {
       {/* Create / Edit dialog */}
       <Dialog
         open={form.open}
-        onOpenChange={(open) => !isSubmitting && setForm((f) => ({ ...f, open }))}
+        onOpenChange={(open) => {
+          if (isSubmitting) return;
+          if (!open) stopPreview();
+          setForm((f) => ({ ...f, open }));
+        }}
       >
         <DialogContent className="max-w-lg border-border bg-card/80 backdrop-blur-2xl">
           <DialogHeader>
