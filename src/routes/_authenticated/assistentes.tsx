@@ -917,7 +917,10 @@ function AssistentesPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setForm((f) => ({ ...f, step: 1 }))}
+                  onClick={() => {
+                    stopPreview();
+                    setForm((f) => ({ ...f, step: 1 }));
+                  }}
                   disabled={isSubmitting}
                   className="border-border bg-card/20 backdrop-blur-xl"
                 >
@@ -927,7 +930,10 @@ function AssistentesPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setForm(emptyForm)}
+                  onClick={() => {
+                    stopPreview();
+                    setForm(emptyForm);
+                  }}
                   disabled={isSubmitting}
                   className="border-border bg-card/20 backdrop-blur-xl"
                 >
@@ -952,9 +958,10 @@ function AssistentesPage() {
               ) : (
                 <Button
                   type="submit"
-                  disabled={isSubmitting || form.loadingInitial}
+                  disabled={isSubmitting || form.loadingInitial || !form.presetId}
                   className="gap-2"
                 >
+
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {form.mode === "create" ? "Criar Assistente" : "Salvar Alterações"}
                 </Button>
