@@ -142,6 +142,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState<"user" | "assistant" | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [costAck, setCostAck] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const webCallMutation = useMutation({
     mutationFn: () => createWebCallFn({ data: { assistantId } }),
