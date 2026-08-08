@@ -479,10 +479,29 @@ function AssistentesPage() {
               Crie, edite e monitore seus agentes de voz.
             </p>
           </div>
-          <Button className="gap-2 shadow-glow" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Novo Assistente
-          </Button>
+          <div className="flex flex-col items-end gap-1.5">
+            <Button
+              className="gap-2 shadow-glow"
+              onClick={openCreate}
+              disabled={limitReached}
+              title={
+                limitReached
+                  ? `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um para criar outro.`
+                  : undefined
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Novo Assistente
+            </Button>
+            <span
+              className={cn(
+                "text-[11px] text-muted-foreground",
+                limitReached && "text-destructive",
+              )}
+            >
+              {isLoading ? "—" : `${total} de ${MAX_ASSISTANTS} assistentes`}
+            </span>
+          </div>
         </div>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
