@@ -913,6 +913,7 @@ export const duplicateVapiAssistant = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertAssistantQuota();
     await assertOwnership(context.supabase, context.userId, data.id);
     const source = (await vapiFetch(`/assistant/${data.id}`, {
       method: "GET",
