@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Mic, MicOff, PhoneOff, PhoneCall, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  Mic,
+  MicOff,
+  PhoneOff,
+  PhoneCall,
+  AlertTriangle,
+  DollarSign,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -18,6 +26,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { createVapiWebCall } from "@/lib/vapi.functions";
 import { translateError } from "@/lib/error-messages";
+import { Checkbox } from "@/components/ui/checkbox";
+
+/** mm:ss da duração da chamada de teste. */
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+
 
 type BrowserCallInstance = {
   stop: () => void | Promise<void>;
@@ -142,6 +160,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState<"user" | "assistant" | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [costAck, setCostAck] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const webCallMutation = useMutation({
     mutationFn: () => createWebCallFn({ data: { assistantId } }),
@@ -177,15 +197,25 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
       setMuted(false);
       setSpeaker(null);
       setTranscript([]);
+      setCostAck(false);
+      setElapsed(0);
     }
   }, [open]);
 
   useEffect(() => () => teardown(), []);
 
+  // Cronômetro da chamada — usado para alertar sobre o custo por minuto.
+  useEffect(() => {
+    if (status !== "in_call") return;
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
   async function startCall() {
     setStatus("connecting");
     setErrorMsg(null);
     setTranscript([]);
+    setElapsed(0);
     teardown();
 
     // 1. Solicita microfone antes de tudo — falha rápido e clara.
@@ -425,7 +455,53 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
                 )}
               </div>
             </div>
+            {(status === "in_call" || status === "ended") && (
+              <span
+                className={cn(
+                  "rounded-full border px-2.5 py-1 font-mono text-xs font-semibold tabular-nums",
+                  elapsed >= 60
+                    ? "border-warning/40 bg-warning/10 text-warning"
+                    : "border-border bg-background/40 text-muted-foreground",
+                )}
+                title={
+                  elapsed >= 60
+                    ? "Você passou de 1 minuto — encerre para evitar custos extras."
+                    : "Duração do teste"
+                }
+              >
+                {formatElapsed(elapsed)}
+              </span>
+            )}
           </div>
+
+          {!isActive && (
+            <Alert className="border-warning/40 bg-warning/10">
+              <DollarSign className="h-4 w-4 text-warning" />
+              <AlertDescription className="space-y-2 text-xs leading-relaxed text-foreground">
+                <p className="font-semibold">
+                  Atenção: este teste tem custo real em dólar americano (USD).
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                  <li>A ligação de teste consome créditos da sua conta e é cobrada por minuto em USD.</li>
+                  <li>
+                    Recomendação: <span className="font-semibold text-foreground">não ultrapasse 1 minuto</span> de teste.
+                  </li>
+                  <li>
+                    Consulte sua provedora (Vapi e provedores de voz/modelo) para entender o custo exato por minuto.
+                  </li>
+                </ul>
+                <label className="flex cursor-pointer items-start gap-2 pt-1 text-foreground">
+                  <Checkbox
+                    checked={costAck}
+                    onCheckedChange={(v) => setCostAck(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>Entendi que o teste tem custo em dólar e será cobrado por minuto.</span>
+                </label>
+              </AlertDescription>
+            </Alert>
+          )}
+
 
           {errorMsg && (
             <Alert variant="destructive">
@@ -474,7 +550,8 @@ export function WebCallDialog({ assistantId, assistantName, open, onOpenChange }
               </Button>
               <Button
                 onClick={startCall}
-                disabled={webCallMutation.isPending}
+                disabled={webCallMutation.isPending || !costAck}
+                title={!costAck ? "Confirme o aviso de custo para iniciar." : undefined}
                 className="gap-2"
               >
                 {webCallMutation.isPending ? (

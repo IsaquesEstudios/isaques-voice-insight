@@ -83,6 +83,20 @@ async function removeOwnership(
   // No-op.
 }
 
+/** Recusa a criação quando a conta já atingiu o limite de assistentes. */
+async function assertAssistantQuota(): Promise<void> {
+  const max = 4;
+  const data = await vapiFetch("/assistant", { method: "GET" });
+  const count = Array.isArray(data) ? data.length : 0;
+  if (count >= max) {
+    throw new Error(
+      `Limite de ${max} assistentes atingido. Exclua um assistente para criar outro.`,
+    );
+  }
+}
+
+
+
 
 
 export interface VapiAssistantDTO {
@@ -666,6 +680,7 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertAssistantQuota();
     const created = (await vapiFetch("/assistant", {
       method: "POST",
       body: JSON.stringify(buildPayload(data)),
@@ -896,6 +911,7 @@ export const duplicateVapiAssistant = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
+    await assertAssistantQuota();
     await assertOwnership(context.supabase, context.userId, data.id);
     const source = (await vapiFetch(`/assistant/${data.id}`, {
       method: "GET",

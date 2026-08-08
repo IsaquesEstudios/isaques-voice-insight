@@ -72,6 +72,9 @@ import {
 
 import { cn } from "@/lib/utils";
 
+/** Limite de assistentes por conta (validado também no servidor). */
+const MAX_ASSISTANTS = 4;
+
 export const Route = createFileRoute("/_authenticated/assistentes")({
   head: () => ({
     meta: [{ title: "Assistentes Virtuais — Omniasyn" }],
@@ -326,6 +329,7 @@ function AssistentesPage() {
   );
 
   const total = enriched.length;
+  const limitReached = total >= MAX_ASSISTANTS;
   const active = enriched.filter((a) => a.metrics.status === "Ativo").length;
   const totalCalls = enriched.reduce((s, a) => s + a.metrics.calls, 0);
   const withRate = enriched.filter((a) => a.metrics.successRate != null);
@@ -337,6 +341,12 @@ function AssistentesPage() {
 
 
   function openCreate() {
+    if (limitReached) {
+      toast.error(
+        `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um para criar outro.`,
+      );
+      return;
+    }
     setForm({
       ...emptyForm,
       open: true,
@@ -345,6 +355,7 @@ function AssistentesPage() {
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
     });
   }
+
 
   async function openEdit(a: VapiAssistant) {
     setForm({
@@ -425,6 +436,12 @@ function AssistentesPage() {
   }
 
   async function handleDuplicate(a: VapiAssistant) {
+    if (limitReached) {
+      toast.error(
+        `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um para duplicar outro.`,
+      );
+      return;
+    }
     setDuplicatingId(a.id);
     const toastId = toast.loading(`Duplicando "${a.name ?? "assistente"}"...`);
     try {
@@ -433,7 +450,11 @@ function AssistentesPage() {
       await refresh();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao duplicar assistente.", { id: toastId });
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(
+        msg.includes("Limite de") ? msg : "Erro ao duplicar assistente.",
+        { id: toastId },
+      );
     } finally {
       setDuplicatingId(null);
     }
@@ -468,10 +489,29 @@ function AssistentesPage() {
               Crie, edite e monitore seus agentes de voz.
             </p>
           </div>
-          <Button className="gap-2 shadow-glow" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Novo Assistente
-          </Button>
+          <div className="flex flex-col items-end gap-1.5">
+            <Button
+              className="gap-2 shadow-glow"
+              onClick={openCreate}
+              disabled={limitReached}
+              title={
+                limitReached
+                  ? `Limite de ${MAX_ASSISTANTS} assistentes atingido. Exclua um para criar outro.`
+                  : undefined
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Novo Assistente
+            </Button>
+            <span
+              className={cn(
+                "text-[11px] text-muted-foreground",
+                limitReached && "text-destructive",
+              )}
+            >
+              {isLoading ? "—" : `${total} de ${MAX_ASSISTANTS} assistentes`}
+            </span>
+          </div>
         </div>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -581,7 +621,7 @@ function AssistentesPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => handleDuplicate(raw)}
-                          disabled={duplicatingId === raw.id}
+                          disabled={duplicatingId === raw.id || limitReached}
                         >
                           <Copy className="mr-2 h-3.5 w-3.5" />
                           Duplicar
