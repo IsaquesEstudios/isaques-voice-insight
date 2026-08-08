@@ -26,6 +26,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { createVapiWebCall } from "@/lib/vapi.functions";
 import { translateError } from "@/lib/error-messages";
+import { Checkbox } from "@/components/ui/checkbox";
+
+/** mm:ss da duração da chamada de teste. */
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+
 
 type BrowserCallInstance = {
   stop: () => void | Promise<void>;
