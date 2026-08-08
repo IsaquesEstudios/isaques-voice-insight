@@ -824,48 +824,93 @@ function AssistentesPage() {
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Escolha um padrão de IA pré-configurado. Mais opções em breve.
+                  Escolha um padrão de IA pré-configurado e escute a voz antes de
+                  concluir. Mais opções em breve.
                 </p>
                 {ASSISTANT_PRESETS.map((preset) => {
-                  const selected =
-                    form.modelProvider === preset.model.provider &&
-                    form.model === preset.model.model &&
-                    form.voiceProvider === preset.voice.provider &&
-                    form.voiceId === preset.voice.voiceId;
+                  const selected = form.presetId === preset.id;
+                  const isPlaying = playingPresetId === preset.id;
                   return (
-                    <button
+                    <div
                       key={preset.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
+                          presetId: preset.id,
                           modelProvider: preset.model.provider,
                           model: preset.model.model,
                           voiceProvider: preset.voice.provider,
                           voiceId: preset.voice.voiceId,
                         }))
                       }
-                      className={`w-full rounded-xl border p-4 text-left transition ${
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setForm((f) => ({
+                            ...f,
+                            presetId: preset.id,
+                            modelProvider: preset.model.provider,
+                            model: preset.model.model,
+                            voiceProvider: preset.voice.provider,
+                            voiceId: preset.voice.voiceId,
+                          }));
+                        }
+                      }}
+                      className={`w-full cursor-pointer rounded-xl border p-4 text-left transition ${
                         selected
                           ? "border-primary/60 bg-primary/[0.08] shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
                           : "border-border bg-background/40 hover:border-border"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="font-medium">{preset.label}</div>
-                        {selected && (
-                          <span className="text-[10px] uppercase tracking-wider text-primary">
-                            Selecionado
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {selected && (
+                            <span className="text-[10px] uppercase tracking-wider text-primary">
+                              Selecionado
+                            </span>
+                          )}
+                          {preset.sampleUrl && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePreview(preset);
+                              }}
+                              className="h-8 gap-1.5 border-border bg-card/40 text-xs backdrop-blur-xl"
+                            >
+                              {isPlaying ? (
+                                <Pause className="h-3.5 w-3.5" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5" />
+                              )}
+                              {isPlaying ? "Parar" : "Escutar voz"}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {preset.description}
                       </p>
-                    </button>
+                    </div>
                   );
                 })}
+                {!form.presetId && (
+                  <p className="text-xs text-amber-500">
+                    Selecione um padrão de IA para continuar.
+                  </p>
+                )}
+                <audio
+                  ref={audioRef}
+                  onEnded={() => setPlayingPresetId(null)}
+                  className="hidden"
+                />
               </div>
+
             )}
             <DialogFooter>
               {form.step === 2 ? (
