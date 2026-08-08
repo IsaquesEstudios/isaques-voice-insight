@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Plus,
@@ -16,8 +16,13 @@ import {
   MessageSquare,
   Trash2,
   Loader2,
+  Play,
+  Pause,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import vozElliotAsset from "@/assets/voz-elliot.wav.asset.json";
+
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
@@ -144,6 +149,8 @@ interface FormState {
   editingId: string | null;
   loadingInitial: boolean;
   step: 1 | 2;
+  /** Padrão de IA escolhido no passo 2 (null = nenhuma escolha ainda). */
+  presetId: string | null;
   name: string;
   firstMessage: string;
   systemPrompt: string;
@@ -151,6 +158,7 @@ interface FormState {
   model: string;
   voiceProvider: string;
   voiceId: string;
+
 }
 
 const DEFAULT_MODEL_PROVIDER = "openai";
@@ -211,6 +219,8 @@ interface AssistantPreset {
   description: string;
   model: { provider: string; model: string };
   voice: { provider: string; voiceId: string };
+  /** Amostra de áudio da voz para o usuário escutar antes de criar. */
+  sampleUrl?: string;
 }
 
 const ASSISTANT_PRESETS: AssistantPreset[] = [
@@ -220,6 +230,7 @@ const ASSISTANT_PRESETS: AssistantPreset[] = [
     description: "Deepgram Nova-3 (pt-BR) · GPT-4.1 nano · Voz Elliot V2",
     model: { provider: "openai", model: "gpt-4.1-nano" },
     voice: { provider: "vapi", voiceId: "Elliot" },
+    sampleUrl: vozElliotAsset.url,
   },
 ];
 
@@ -229,6 +240,8 @@ const emptyForm: FormState = {
   editingId: null,
   loadingInitial: false,
   step: 1,
+  presetId: null,
+
   name: "",
   firstMessage: "",
   systemPrompt: "",
@@ -263,6 +276,41 @@ function AssistentesPage() {
   const assistants = useMemo(() => assistantsData ?? [], [assistantsData]);
 
   const [form, setForm] = useState<FormState>(emptyForm);
+
+  // Prévia de voz: um único <audio> reaproveitado por todos os padrões.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
+
+  const stopPreview = useCallback(() => {
+    const el = audioRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+    setPlayingPresetId(null);
+  }, []);
+
+  const togglePreview = useCallback(
+    (preset: AssistantPreset) => {
+      if (!preset.sampleUrl) return;
+      const el = audioRef.current;
+      if (!el) return;
+      if (playingPresetId === preset.id) {
+        stopPreview();
+        return;
+      }
+      el.pause();
+      el.src = preset.sampleUrl;
+      el.currentTime = 0;
+      void el.play().catch(() => {
+        toast.error("Não foi possível reproduzir a amostra de voz.");
+        setPlayingPresetId(null);
+      });
+      setPlayingPresetId(preset.id);
+    },
+    [playingPresetId, stopPreview],
+  );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VapiAssistant | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -362,6 +410,13 @@ function AssistentesPage() {
       ...emptyForm,
       open: true,
       mode: "edit",
+      // Na edição o padrão já está definido pelo assistente existente.
+      presetId:
+        ASSISTANT_PRESETS.find(
+          (p) =>
+            p.model.model === a.model?.model && p.voice.voiceId === a.voice?.voiceId,
+        )?.id ?? "custom",
+
       editingId: a.id,
       loadingInitial: true,
       name: a.name ?? "",
@@ -403,6 +458,12 @@ function AssistentesPage() {
       toast.error("Informe um nome para o assistente.");
       return;
     }
+    if (!form.presetId) {
+      toast.error("Selecione um padrão de IA para continuar.");
+      return;
+    }
+    stopPreview();
+
     setIsSubmitting(true);
     try {
       const payload = {
@@ -701,7 +762,11 @@ function AssistentesPage() {
       {/* Create / Edit dialog */}
       <Dialog
         open={form.open}
-        onOpenChange={(open) => !isSubmitting && setForm((f) => ({ ...f, open }))}
+        onOpenChange={(open) => {
+          if (isSubmitting) return;
+          if (!open) stopPreview();
+          setForm((f) => ({ ...f, open }));
+        }}
       >
         <DialogContent className="max-w-lg border-border bg-card/80 backdrop-blur-2xl">
           <DialogHeader>
@@ -763,55 +828,103 @@ function AssistentesPage() {
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Escolha um padrão de IA pré-configurado. Mais opções em breve.
+                  Escolha um padrão de IA pré-configurado e escute a voz antes de
+                  concluir. Mais opções em breve.
                 </p>
                 {ASSISTANT_PRESETS.map((preset) => {
-                  const selected =
-                    form.modelProvider === preset.model.provider &&
-                    form.model === preset.model.model &&
-                    form.voiceProvider === preset.voice.provider &&
-                    form.voiceId === preset.voice.voiceId;
+                  const selected = form.presetId === preset.id;
+                  const isPlaying = playingPresetId === preset.id;
                   return (
-                    <button
+                    <div
                       key={preset.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
+                          presetId: preset.id,
                           modelProvider: preset.model.provider,
                           model: preset.model.model,
                           voiceProvider: preset.voice.provider,
                           voiceId: preset.voice.voiceId,
                         }))
                       }
-                      className={`w-full rounded-xl border p-4 text-left transition ${
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setForm((f) => ({
+                            ...f,
+                            presetId: preset.id,
+                            modelProvider: preset.model.provider,
+                            model: preset.model.model,
+                            voiceProvider: preset.voice.provider,
+                            voiceId: preset.voice.voiceId,
+                          }));
+                        }
+                      }}
+                      className={`w-full cursor-pointer rounded-xl border p-4 text-left transition ${
                         selected
                           ? "border-primary/60 bg-primary/[0.08] shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
                           : "border-border bg-background/40 hover:border-border"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="font-medium">{preset.label}</div>
-                        {selected && (
-                          <span className="text-[10px] uppercase tracking-wider text-primary">
-                            Selecionado
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {selected && (
+                            <span className="text-[10px] uppercase tracking-wider text-primary">
+                              Selecionado
+                            </span>
+                          )}
+                          {preset.sampleUrl && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePreview(preset);
+                              }}
+                              className="h-8 gap-1.5 border-border bg-card/40 text-xs backdrop-blur-xl"
+                            >
+                              {isPlaying ? (
+                                <Pause className="h-3.5 w-3.5" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5" />
+                              )}
+                              {isPlaying ? "Parar" : "Escutar voz"}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {preset.description}
                       </p>
-                    </button>
+                    </div>
                   );
                 })}
+                {!form.presetId && (
+                  <p className="text-xs text-amber-500">
+                    Selecione um padrão de IA para continuar.
+                  </p>
+                )}
+                <audio
+                  ref={audioRef}
+                  onEnded={() => setPlayingPresetId(null)}
+                  className="hidden"
+                />
               </div>
+
             )}
             <DialogFooter>
               {form.step === 2 ? (
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setForm((f) => ({ ...f, step: 1 }))}
+                  onClick={() => {
+                    stopPreview();
+                    setForm((f) => ({ ...f, step: 1 }));
+                  }}
                   disabled={isSubmitting}
                   className="border-border bg-card/20 backdrop-blur-xl"
                 >
@@ -821,7 +934,10 @@ function AssistentesPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setForm(emptyForm)}
+                  onClick={() => {
+                    stopPreview();
+                    setForm(emptyForm);
+                  }}
                   disabled={isSubmitting}
                   className="border-border bg-card/20 backdrop-blur-xl"
                 >
@@ -846,9 +962,10 @@ function AssistentesPage() {
               ) : (
                 <Button
                   type="submit"
-                  disabled={isSubmitting || form.loadingInitial}
+                  disabled={isSubmitting || form.loadingInitial || !form.presetId}
                   className="gap-2"
                 >
+
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {form.mode === "create" ? "Criar Assistente" : "Salvar Alterações"}
                 </Button>
