@@ -66,10 +66,7 @@ import { cn } from "@/lib/utils";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   listMyNumbers,
-  listTestContacts,
   releaseNumber,
-  removeTestContact,
-  saveTestContact,
 } from "@/lib/numbers.functions";
 
 
@@ -84,12 +81,10 @@ import {
 import {
   connectSipNumber,
   attachAssistantToNumber,
-  createOutboundTestCall,
   detachAssistantFromNumber,
   deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
 
-  getVapiCallStatus,
 
   listVapiAssistants,
   listVapiPhoneNumbers,
@@ -163,6 +158,20 @@ interface AvailableNumber {
   mms: boolean;
 }
 
+/**
+ * Formata o DID em E.164 enquanto o usuário digita: mantém só dígitos e
+ * assume +55 quando o número parece brasileiro sem código de país.
+ */
+function formatDidE164(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (raw.trim().startsWith("+")) return `+${digits}`;
+  if (digits.startsWith("55") && digits.length > 11) return `+${digits}`;
+  if (digits.length <= 11) return `+55${digits}`;
+  return `+${digits}`;
+}
+
+
 function TelefoniaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -183,10 +192,6 @@ function TelefoniaPage() {
   const connectSipNumberFn = useServerFn(connectSipNumber);
   const disconnectSipFn = useServerFn(disconnectSipTrunk);
 
-  // Contatos de teste (armazenados localmente, sem depender de operadora)
-  const listTestContactsFn = useServerFn(listTestContacts);
-  const saveTestContactFn = useServerFn(saveTestContact);
-  const removeTestContactFn = useServerFn(removeTestContact);
 
 
 
@@ -293,70 +298,10 @@ function TelefoniaPage() {
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sipError, setSipError] = useState<string | null>(null);
-  const [testContactOpen, setTestContactOpen] = useState(false);
-  const [testContactForm, setTestContactForm] = useState({ label: "", phoneE164: "" });
-  const [savingContact, setSavingContact] = useState(false);
-  const [callingContactId, setCallingContactId] = useState<string | null>(null);
-
-  // Per-row call controls (assistant + origin number)
-  const [rowCallAssistant, setRowCallAssistant] = useState<Record<string, string>>({});
-  const [rowCallFrom, setRowCallFrom] = useState<Record<string, string>>({});
-
-  const outboundCallFn = useServerFn(createOutboundTestCall);
-
-  // Contatos de teste ficam salvos na própria plataforma: o tronco SIP não possui
-  // um serviço externo de verificação por OTP.
-  const testContactsQuery = useQuery({
-    queryKey: ["test-contacts"],
-    queryFn: () => listTestContactsFn(),
-  });
-  const testContacts = (
-    (testContactsQuery.data ?? []) as Array<{
-      id: string;
-      label: string;
-      phone_e164: string;
-      verified: boolean | null;
-    }>
-  ).map((c) => ({
-    id: c.id,
-    label: c.label || c.phone_e164,
-    phone_e164: c.phone_e164,
-    verified: Boolean(c.verified),
-  }));
-
-  const removeTestContactMutation = useMutation({
-    mutationFn: (id: string) => removeTestContactFn({ data: { id } }),
-    onSuccess: async () => {
-      toast.success("Contato de teste removido.");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-    },
-    onError: (err) =>
-      toast.error(translateError(err, "Falha ao remover contato")),
-  });
-
-  const handleSaveTestContact = async () => {
-    const label = testContactForm.label.trim();
-    const phone = testContactForm.phoneE164.trim();
-    if (!label) return toast.error("Informe uma identificação.");
-    if (!/^\+[1-9]\d{7,14}$/.test(phone))
-      return toast.error("Número inválido. Use formato E.164 (ex: +5511999999999).");
-    setSavingContact(true);
-    try {
-      await saveTestContactFn({ data: { label, phoneE164: phone } });
-      toast.success("Contato de teste salvo!");
-      await queryClient.invalidateQueries({ queryKey: ["test-contacts"] });
-      setTestContactOpen(false);
-      setTestContactForm({ label: "", phoneE164: "" });
-    } catch (err) {
-      toast.error(translateError(err, "Falha ao salvar contato"));
-    } finally {
-      setSavingContact(false);
-    }
-  };
 
 
 
-  const callStatusFn = useServerFn(getVapiCallStatus);
+
   const resyncFn = useServerFn(resyncVapiNumberCredentials);
   const resyncMutation = useMutation({
     mutationFn: (phoneNumberE164: string) => resyncFn({ data: { phoneNumberE164 } }),
@@ -380,68 +325,7 @@ function TelefoniaPage() {
 
 
 
-  const [lastCallDiag, setLastCallDiag] = useState<{
-    status: string | null;
-    endedReason: string | null;
-  } | null>(null);
 
-  const watchCall = async (callId: string) => {
-    for (let i = 0; i < 12; i++) {
-      await new Promise((r) => setTimeout(r, 4000));
-      try {
-        const s = await callStatusFn({ data: { callId } });
-        setLastCallDiag({ status: s.status, endedReason: s.endedReason });
-        if (s.endedReason || s.status === "ended") {
-          const reason = s.endedReason ?? "";
-          if (/assistant-forwarded-call/.test(reason)) {
-            toast.success("Chamada transferida para o número de destino.");
-          } else if (reason && !/customer-ended-call|assistant-ended-call/.test(reason)) {
-            toast.error(`Chamada encerrada pela Vapi: ${reason}`);
-          }
-          return;
-        }
-
-      } catch {
-        return;
-      }
-    }
-  };
-
-  const testCallMutation = useMutation({
-    mutationFn: (contact: { id: string; phone_e164: string }) => {
-      setCallingContactId(contact.id);
-      const assistantId = rowCallAssistant[contact.id];
-      const fromNumberE164 =
-        rowCallFrom[contact.id] || numbers[0]?.phone_number || "";
-      if (!assistantId) {
-        setCallingContactId(null);
-        return Promise.reject(new Error("Selecione uma assistente."));
-      }
-      if (!fromNumberE164) {
-        setCallingContactId(null);
-        return Promise.reject(
-          new Error("Conecte um número em 'Conectar Número' antes de testar a ligação."),
-        );
-      }
-      setLastCallDiag(null);
-      return outboundCallFn({
-        data: {
-          assistantId,
-          fromNumberE164,
-          customerNumber: contact.phone_e164,
-        },
-      });
-    },
-    onSuccess: (res) => {
-      toast.success(
-        "Chamada iniciada! Atenda o celular e, se solicitado, pressione qualquer tecla.",
-      );
-      if (res?.callId) void watchCall(res.callId);
-    },
-    onError: (err) =>
-      toast.error(translateError(err, "Falha ao iniciar chamada")),
-    onSettled: () => setCallingContactId(null),
-  });
 
 
 
@@ -721,8 +605,8 @@ function TelefoniaPage() {
 
 
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="border-border bg-card/20 backdrop-blur-2xl lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4">
+          <Card className="border-border bg-card/20 backdrop-blur-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Números (DIDs)</CardTitle>
             </CardHeader>
@@ -900,190 +784,6 @@ function TelefoniaPage() {
               </div>
             </CardContent>
           </Card>
-
-          <Card className="border-border bg-card/20 backdrop-blur-2xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <div>
-                <CardTitle className="text-base font-semibold">Contatos de teste</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Números seus, usados para testar ligações da assistente.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1.5"
-                  disabled={testContactsQuery.isFetching}
-                  onClick={() => testContactsQuery.refetch()}
-                  title="Atualizar lista"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${testContactsQuery.isFetching ? "animate-spin" : ""}`}
-                  />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => setTestContactOpen(true)}
-                >
-                  <Plus className="h-4 w-4" /> Novo contato
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {testContactsQuery.isLoading ? (
-                Array.from({ length: 2 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-14 animate-pulse rounded-xl border border-border bg-foreground/[0.04]"
-                  />
-                ))
-              ) : testContacts.length === 0 ? (
-                <div className="space-y-2 py-4 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    Nenhum contato de teste cadastrado.
-                  </p>
-                  <p className="text-[11px] text-muted-foreground/80">
-                    Cadastre um número seu para receber a ligação da assistente.
-                  </p>
-                </div>
-              ) : (
-                testContacts.map((c) => {
-                  const from = rowCallFrom[c.id] || numbers[0]?.phone_number || "";
-                  const assistantId = rowCallAssistant[c.id] ?? "";
-                  return (
-                    <div
-                      key={c.id}
-                      className="space-y-3 rounded-xl border border-border bg-foreground/[0.04] p-3 backdrop-blur-xl transition-colors hover:border-primary/30"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {c.label}
-                            </p>
-                            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                              Verificado
-                            </span>
-                          </div>
-                          <p className="truncate font-mono text-xs text-muted-foreground">
-                            {c.phone_e164}
-                          </p>
-                        </div>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => removeTestContactMutation.mutate(c.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {numbers.length === 0 ? (
-                          <Alert className="border-warning/30 bg-warning/10 py-2">
-                            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                            <AlertDescription className="text-[11px] text-muted-foreground">
-                              Nenhum número de origem disponível.{" "}
-                              <button
-                                type="button"
-                                className="underline underline-offset-2 hover:text-foreground"
-                                onClick={() => {
-                                  setOpen(true);
-                                }}
-                              >
-                                {isSipConnected
-                                  ? "Cadastrar número do tronco SIP"
-                                  : "Conectar número"}
-                              </button>{" "}
-                              para poder disparar testes.
-                            </AlertDescription>
-                          </Alert>
-                        ) : (
-                          <div className="space-y-1">
-                            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                              Número de origem
-                            </Label>
-                            <Select
-                              value={from}
-                              onValueChange={(v) =>
-                                setRowCallFrom((prev) => ({ ...prev, [c.id]: v }))
-                              }
-                            >
-                              <SelectTrigger className="h-9 border-border bg-background/40 backdrop-blur-xl">
-                                <SelectValue placeholder="Selecione o número de origem" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {numbers.map((n) => (
-                                  <SelectItem key={n.id} value={n.phone_number}>
-                                    <span className="font-mono">{n.phone_number}</span>
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      {n.provider}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Assistente
-                          </Label>
-                          <Select
-                            value={assistantId}
-                            onValueChange={(v) =>
-                              setRowCallAssistant((prev) => ({ ...prev, [c.id]: v }))
-                            }
-                          >
-                            <SelectTrigger className="h-9 border-border bg-background/40 backdrop-blur-xl">
-                              <SelectValue placeholder="Selecione uma assistente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(assistantsQuery.data ?? []).map((a) => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  {a.name ?? "Sem nome"}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="w-full gap-1.5 shadow-glow"
-                          title={
-                            !from
-                              ? "Selecione um número de origem"
-                              : !assistantId
-                                ? "Selecione uma assistente"
-                                : "Disparar ligação de teste"
-                          }
-                          disabled={!from || !assistantId || callingContactId === c.id}
-                          onClick={() =>
-                            testCallMutation.mutate({
-                              id: c.id,
-                              phone_e164: c.phone_e164,
-                            })
-                          }
-                        >
-                          {callingContactId === c.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <PhoneCall className="h-3.5 w-3.5" />
-                          )}
-                          Ligar
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
         </div>
 
 
@@ -1130,63 +830,6 @@ function TelefoniaPage() {
 
 
 
-      <Dialog
-        open={testContactOpen}
-        onOpenChange={(o) => {
-          setTestContactOpen(o);
-          if (!o) setTestContactForm({ label: "", phoneE164: "" });
-        }}
-      >
-        <DialogContent className="max-w-md border-border bg-card/95 backdrop-blur-2xl">
-          <DialogHeader>
-            <DialogTitle>Novo contato de teste</DialogTitle>
-            <DialogDescription>
-              Cadastre um número seu para receber as ligações de teste da assistente.
-              O tronco SIP disca direto, sem verificação por SMS.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Identificação</Label>
-              <Input
-                placeholder="Ex: Meu celular"
-                value={testContactForm.label}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, label: e.target.value }))
-                }
-                disabled={savingContact}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Número (E.164)</Label>
-              <Input
-                placeholder="+5511999999999"
-                value={testContactForm.phoneE164}
-                onChange={(e) =>
-                  setTestContactForm((f) => ({ ...f, phoneE164: e.target.value }))
-                }
-                disabled={savingContact}
-              />
-              <p className="text-[10px] text-muted-foreground">
-                Inclua o código do país (+55 para Brasil).
-              </p>
-            </div>
-            <Button
-              className="w-full gap-2"
-              onClick={handleSaveTestContact}
-              disabled={savingContact}
-            >
-              {savingContact ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Salvar contato
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
 
 
@@ -1269,9 +912,13 @@ function TelefoniaPage() {
                   <Label>Número (DID) em E.164</Label>
                   <Input
                     placeholder="+551140028922"
+                    inputMode="tel"
                     value={sipForm.phoneNumber}
                     onChange={(e) =>
-                      setSipForm({ ...sipForm, phoneNumber: e.target.value })
+                      setSipForm({
+                        ...sipForm,
+                        phoneNumber: formatDidE164(e.target.value),
+                      })
                     }
                   />
                 </div>

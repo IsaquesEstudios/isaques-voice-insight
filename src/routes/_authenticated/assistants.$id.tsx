@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import vozElliotAsset from "@/assets/voz-elliot.wav.asset.json";
 import { WebCallDialog } from "@/components/assistants/web-call-dialog";
 import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 import { PhoneCall } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   Save,
   Loader2,
   Play,
+  Pause,
   FileText,
   Plus,
   Check,
@@ -883,6 +885,50 @@ function AssistantDetailPage() {
     };
   });
 
+  // Prévia de voz: hoje só a voz Elliot (Vapi) tem amostra hospedada; quando a
+  // Vapi devolve um previewUrl para a voz selecionada, usamos ele.
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
+
+  const currentVoiceSampleUrl = useMemo(() => {
+    if (!form.voiceId) return undefined;
+    const selected = voiceOptions.find((v) => v.value === form.voiceId);
+    if (selected?.previewUrl) return selected.previewUrl;
+    if (form.voiceProvider === "vapi" && form.voiceId === "Elliot") {
+      return vozElliotAsset.url;
+    }
+    return undefined;
+  }, [form.voiceId, form.voiceProvider, voiceOptions]);
+
+  const stopVoicePreview = useCallback(() => {
+    const el = voiceAudioRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+    setIsVoicePreviewPlaying(false);
+  }, []);
+
+  const toggleVoicePreview = useCallback(() => {
+    const el = voiceAudioRef.current;
+    if (!el || !currentVoiceSampleUrl) return;
+    if (isVoicePreviewPlaying) {
+      stopVoicePreview();
+      return;
+    }
+    if (el.src !== currentVoiceSampleUrl) el.src = currentVoiceSampleUrl;
+    el.currentTime = 0;
+    void el.play().catch(() => {
+      toast.error("Não foi possível reproduzir a amostra de voz.");
+      setIsVoicePreviewPlaying(false);
+    });
+    setIsVoicePreviewPlaying(true);
+  }, [currentVoiceSampleUrl, isVoicePreviewPlaying, stopVoicePreview]);
+
+  useEffect(() => stopVoicePreview, [stopVoicePreview]);
+
+
+
 
   async function handleSave() {
     if (elevenLabsVoiceUnavailable) {
@@ -1194,6 +1240,107 @@ function AssistantDetailPage() {
                       {form.transcriberLanguage ? ` · ${form.transcriberLanguage}` : ""}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Voz do assistente */}
+              <Card className="border-border bg-card/20 backdrop-blur-2xl">
+                <CardContent className="space-y-4 p-6">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Voz</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Escolha o provedor e a voz do assistente. Ouça a prévia antes de salvar.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Provedor de voz</Label>
+                      <Select
+                        value={form.voiceProvider}
+                        onValueChange={(v) => {
+                          stopVoicePreview();
+                          setForm((f) => ({ ...f, voiceProvider: v, voiceId: "" }));
+                        }}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger className="border-border bg-background/40 backdrop-blur-xl">
+                          <SelectValue placeholder="Selecione o provedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VOICE_PROVIDERS.map((p) => (
+                            <SelectItem key={p.value} value={p.value}>
+                              {p.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Voz</Label>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={form.voiceId}
+                          onValueChange={(v) => {
+                            stopVoicePreview();
+                            setForm((f) => ({ ...f, voiceId: v }));
+                          }}
+                          disabled={isLoading || voiceOptions.length === 0}
+                        >
+                          <SelectTrigger className="flex-1 border-border bg-background/40 backdrop-blur-xl">
+                            <SelectValue
+                              placeholder={
+                                voicesQuery.isLoading
+                                  ? "Carregando vozes..."
+                                  : voiceOptions.length === 0
+                                    ? "Nenhuma voz disponível"
+                                    : "Selecione a voz"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {voiceOptions.map((v) => (
+                              <SelectItem key={v.value} value={v.value}>
+                                {v.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={!currentVoiceSampleUrl}
+                          onClick={toggleVoicePreview}
+                          title={
+                            currentVoiceSampleUrl
+                              ? isVoicePreviewPlaying
+                                ? "Pausar prévia"
+                                : "Ouvir prévia"
+                              : "Amostra ainda não disponível para esta voz"
+                          }
+                          aria-label="Ouvir prévia da voz"
+                        >
+                          {isVoicePreviewPlaying ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {!currentVoiceSampleUrl && form.voiceId && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Amostra ainda não disponível para esta voz.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <audio
+                    ref={voiceAudioRef}
+                    onEnded={() => setIsVoicePreviewPlaying(false)}
+                    className="hidden"
+                  />
                 </CardContent>
               </Card>
 
