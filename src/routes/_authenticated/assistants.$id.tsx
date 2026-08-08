@@ -885,6 +885,50 @@ function AssistantDetailPage() {
     };
   });
 
+  // Prévia de voz: hoje só a voz Elliot (Vapi) tem amostra hospedada; quando a
+  // Vapi devolve um previewUrl para a voz selecionada, usamos ele.
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
+
+  const currentVoiceSampleUrl = useMemo(() => {
+    if (!form.voiceId) return undefined;
+    const selected = voiceOptions.find((v) => v.value === form.voiceId);
+    if (selected?.previewUrl) return selected.previewUrl;
+    if (form.voiceProvider === "vapi" && form.voiceId === "Elliot") {
+      return vozElliotAsset.url;
+    }
+    return undefined;
+  }, [form.voiceId, form.voiceProvider, voiceOptions]);
+
+  const stopVoicePreview = useCallback(() => {
+    const el = voiceAudioRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+    setIsVoicePreviewPlaying(false);
+  }, []);
+
+  const toggleVoicePreview = useCallback(() => {
+    const el = voiceAudioRef.current;
+    if (!el || !currentVoiceSampleUrl) return;
+    if (isVoicePreviewPlaying) {
+      stopVoicePreview();
+      return;
+    }
+    if (el.src !== currentVoiceSampleUrl) el.src = currentVoiceSampleUrl;
+    el.currentTime = 0;
+    void el.play().catch(() => {
+      toast.error("Não foi possível reproduzir a amostra de voz.");
+      setIsVoicePreviewPlaying(false);
+    });
+    setIsVoicePreviewPlaying(true);
+  }, [currentVoiceSampleUrl, isVoicePreviewPlaying, stopVoicePreview]);
+
+  useEffect(() => stopVoicePreview, [stopVoicePreview]);
+
+
+
 
   async function handleSave() {
     if (elevenLabsVoiceUnavailable) {
