@@ -276,6 +276,41 @@ function AssistentesPage() {
   const assistants = useMemo(() => assistantsData ?? [], [assistantsData]);
 
   const [form, setForm] = useState<FormState>(emptyForm);
+
+  // Prévia de voz: um único <audio> reaproveitado por todos os padrões.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingPresetId, setPlayingPresetId] = useState<string | null>(null);
+
+  const stopPreview = useCallback(() => {
+    const el = audioRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+    setPlayingPresetId(null);
+  }, []);
+
+  const togglePreview = useCallback(
+    (preset: AssistantPreset) => {
+      if (!preset.sampleUrl) return;
+      const el = audioRef.current;
+      if (!el) return;
+      if (playingPresetId === preset.id) {
+        stopPreview();
+        return;
+      }
+      el.pause();
+      el.src = preset.sampleUrl;
+      el.currentTime = 0;
+      void el.play().catch(() => {
+        toast.error("Não foi possível reproduzir a amostra de voz.");
+        setPlayingPresetId(null);
+      });
+      setPlayingPresetId(preset.id);
+    },
+    [playingPresetId, stopPreview],
+  );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VapiAssistant | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
