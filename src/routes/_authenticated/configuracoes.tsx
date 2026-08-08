@@ -789,8 +789,11 @@ function FaturamentoSection() {
               Nenhum consumo registrado no período.
             </p>
           ) : (
-            (billing?.monthly ?? []).map((m) => {
-              const max = Math.max(...(billing?.monthly ?? []).map((x) => x.cost), 0.0001);
+            (billing?.monthly ?? []).map((m: VapiBillingMonth) => {
+              const max = Math.max(
+                ...(billing?.monthly ?? []).map((x: VapiBillingMonth) => x.cost),
+                0.0001,
+              );
               return (
                 <div key={m.month} className="flex items-center gap-3">
                   <span className="w-20 shrink-0 text-xs text-muted-foreground">
