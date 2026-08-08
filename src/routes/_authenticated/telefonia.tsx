@@ -721,8 +721,8 @@ function TelefoniaPage() {
 
 
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="border-border bg-card/20 backdrop-blur-2xl lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4">
+          <Card className="border-border bg-card/20 backdrop-blur-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Números (DIDs)</CardTitle>
             </CardHeader>
