@@ -70,14 +70,8 @@ export function Topbar() {
 
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative rounded-xl text-muted-foreground hover:text-foreground"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary shadow-glow" />
-        </Button>
+        <NotificationsBell />
+
 
 
         <DropdownMenu>
