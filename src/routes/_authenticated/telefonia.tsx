@@ -349,41 +349,6 @@ function TelefoniaPage() {
     }
   };
 
-  const testCallMutation = useMutation({
-    mutationFn: (contact: { id: string; phone_e164: string }) => {
-      setCallingContactId(contact.id);
-      const assistantId = rowCallAssistant[contact.id];
-      const fromNumberE164 =
-        rowCallFrom[contact.id] || numbers[0]?.phone_number || "";
-      if (!assistantId) {
-        setCallingContactId(null);
-        return Promise.reject(new Error("Selecione uma assistente."));
-      }
-      if (!fromNumberE164) {
-        setCallingContactId(null);
-        return Promise.reject(
-          new Error("Conecte um número em 'Conectar Número' antes de testar a ligação."),
-        );
-      }
-      setLastCallDiag(null);
-      return outboundCallFn({
-        data: {
-          assistantId,
-          fromNumberE164,
-          customerNumber: contact.phone_e164,
-        },
-      });
-    },
-    onSuccess: (res) => {
-      toast.success(
-        "Chamada iniciada! Atenda o celular e, se solicitado, pressione qualquer tecla.",
-      );
-      if (res?.callId) void watchCall(res.callId);
-    },
-    onError: (err) =>
-      toast.error(translateError(err, "Falha ao iniciar chamada")),
-    onSettled: () => setCallingContactId(null),
-  });
 
 
 
