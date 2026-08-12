@@ -58,5 +58,19 @@ export const Route = createFileRoute("/_authenticated")({
     return { user };
   },
   component: () => <Outlet />,
+  errorComponent: () => (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+      <p className="text-sm text-muted-foreground">
+        Não foi possível carregar esta página. Tente novamente.
+      </p>
+      <button
+        onClick={() => window.location.reload()}
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+      >
+        Recarregar
+      </button>
+    </div>
+  ),
 });
+
 
