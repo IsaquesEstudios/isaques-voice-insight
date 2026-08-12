@@ -381,19 +381,22 @@ function OnboardingPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <Button
-                variant="ghost"
-                disabled={!vapiReady || connectNumber.isPending}
+                variant="outline"
+                disabled={connectNumber.isPending}
                 onClick={() => {
                   skipSipStep();
+                  toast.info(
+                    "Você pode cadastrar seu número depois em Telefonia.",
+                  );
                   navigate({ to: "/dashboard", replace: true });
                 }}
-                className="text-muted-foreground"
               >
-                Já tenho número na Vapi — pular
+                Cadastrar depois
               </Button>
               <Button
+
                 disabled={
                   !vapiReady ||
                   connectNumber.isPending ||
