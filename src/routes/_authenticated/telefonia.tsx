@@ -607,8 +607,18 @@ function TelefoniaPage() {
 
         <div className="grid grid-cols-1 gap-4">
           <Card className="border-border bg-card/20 backdrop-blur-2xl">
-            <CardHeader className="pb-3">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
               <CardTitle className="text-base font-semibold">Números (DIDs)</CardTitle>
+              <button
+                type="button"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+                  queryClient.invalidateQueries({ queryKey: ["my-numbers"] });
+                }}
+                className="rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {vapiPhoneNumbersQuery.isFetching ? "Sincronizando…" : "Sincronizar com a Vapi"}
+              </button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -625,7 +635,7 @@ function TelefoniaPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {numbersQuery.isLoading ? (
+                    {numbersQuery.isLoading || vapiPhoneNumbersQuery.isLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i} className="border-border/50">
                           <TableCell className="px-6">
@@ -639,7 +649,20 @@ function TelefoniaPage() {
                     ) : numbers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                          Nenhum número ainda. Clique em <b>Adquirir número</b> para começar.
+                          {vapiPhoneNumbersQuery.isError ? (
+                            <>
+                              Não foi possível sincronizar com a Vapi:{" "}
+                              {translateError(
+                                vapiPhoneNumbersQuery.error,
+                                "verifique sua chave Vapi em Configurações.",
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              Nenhum número ainda. Clique em <b>Conectar Número</b> para cadastrar
+                              seu DID (o cadastro é feito direto na Vapi).
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ) : (
