@@ -1240,21 +1240,71 @@ export const connectSipNumber = createServerFn({ method: "POST" })
   );
 
 
-// Lists phone numbers imported on the Vapi account. Filtered/paginated by
-// caller — Vapi returns all numbers on the account.
+// Lists phone numbers imported on the Vapi account (all pages) and mirrors
+// them into `user_phone_numbers`, so números que já existiam na conta Vapi
+// aparecem automaticamente no painel.
 export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
   .middleware([withVapiCredentials])
-  .handler(async (): Promise<VapiPhoneNumberDTO[]> => {
-    const data = await vapiFetch("/phone-number", { method: "GET" });
-    if (!Array.isArray(data)) return [];
-    return (data as VapiPhoneNumberRaw[]).map((n) => ({
+  .handler(async ({ context }): Promise<VapiPhoneNumberDTO[]> => {
+    const all: VapiPhoneNumberRaw[] = [];
+    for (let page = 0; page < 10; page++) {
+      const qs = new URLSearchParams({ limit: "100" });
+      if (page > 0) qs.set("page", String(page + 1));
+      const chunk = (await vapiFetch(`/phone-number?${qs.toString()}`, {
+        method: "GET",
+      })) as unknown;
+      if (!Array.isArray(chunk) || chunk.length === 0) break;
+      all.push(...(chunk as VapiPhoneNumberRaw[]));
+      if (chunk.length < 100) break;
+    }
+
+    const dtos: VapiPhoneNumberDTO[] = all.map((n) => ({
       id: n.id,
       provider: (n.provider as string) ?? "sip",
       number: (n.number as string | undefined) ?? null,
       name: (n.name as string | undefined) ?? null,
       assistantId: (n.assistantId as string | undefined) ?? null,
     }));
+
+    // Espelha na tabela local (não fatal se falhar).
+    try {
+      const { data: existing } = await context.supabase
+        .from("user_phone_numbers")
+        .select("id, phone_number")
+        .eq("user_id", context.userId);
+      const byNumber = new Map(
+        (existing ?? []).map((r) => [r.phone_number as string, r.id as string]),
+      );
+      for (const n of dtos) {
+        if (!n.number) continue;
+        const row = {
+          friendly_name: n.name,
+          provider: n.provider,
+          assistant_id: n.assistantId,
+          vapi_phone_number_id: n.id,
+          updated_at: new Date().toISOString(),
+        };
+        const id = byNumber.get(n.number);
+        if (id) {
+          await context.supabase
+            .from("user_phone_numbers")
+            .update(row)
+            .eq("id", id);
+        } else {
+          await context.supabase.from("user_phone_numbers").insert({
+            user_id: context.userId,
+            phone_number: n.number,
+            ...row,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("sync user_phone_numbers failed (non-fatal)", e);
+    }
+
+    return dtos;
   });
+
 
 // Deletes a phone number from the Vapi account (used for the free test number).
 export const deleteVapiPhoneNumber = createServerFn({ method: "POST" })
