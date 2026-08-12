@@ -25,7 +25,7 @@ import {
   updateVapiPublicKey,
 } from "@/lib/vapi.functions";
 
-import { resetSetupCache, skipSipStep } from "./route";
+import { resetSetupCache, skipSipStep } from "@/lib/setup-gate";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({

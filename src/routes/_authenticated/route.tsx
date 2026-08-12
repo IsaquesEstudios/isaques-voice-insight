@@ -2,6 +2,7 @@ import { createFileRoute, redirect, isRedirect, Outlet } from "@tanstack/react-r
 import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
 import { getSupabaseBrowser, initSupabaseBrowser } from "@/integrations/supabase/browser";
 import { getSetupStatus } from "@/lib/vapi.functions";
+import { getSetupCache, setSetupCache, sipSkipped } from "@/lib/setup-gate";
 
 async function ensureSupabaseBrowser() {
   try {
@@ -9,35 +10,6 @@ async function ensureSupabaseBrowser() {
   } catch {
     const cfg = await getPublicSupabaseConfig();
     return initSupabaseBrowser(cfg.url, cfg.anonKey);
-  }
-}
-
-// Cache do status de setup: evita um roundtrip ao servidor a cada navegação.
-let setupCache: { ok: boolean; at: number } | null = null;
-const SETUP_TTL = 5 * 60_000;
-
-/** Limpa o cache do gate de onboarding (usar após salvar credenciais). */
-export function resetSetupCache() {
-  setupCache = null;
-}
-
-const SKIP_SIP_KEY = "onboarding:skip-sip";
-
-/** Marca que o usuário optou por pular o cadastro do tronco SIP. */
-export function skipSipStep() {
-  try {
-    localStorage.setItem(SKIP_SIP_KEY, "1");
-  } catch {
-    /* ignore */
-  }
-  setupCache = null;
-}
-
-function sipSkipped() {
-  try {
-    return localStorage.getItem(SKIP_SIP_KEY) === "1";
-  } catch {
-    return false;
   }
 }
 
@@ -55,18 +27,16 @@ export const Route = createFileRoute("/_authenticated")({
     // Onboarding gate: exige a Vapi conectada e pelo menos um número cadastrado
     // (tronco SIP importado na conta Vapi do usuário).
     if (location.pathname !== "/onboarding") {
-      const fresh = setupCache && Date.now() - setupCache.at < SETUP_TTL;
-      if (fresh) {
-        if (!setupCache!.ok) throw redirect({ to: "/onboarding" });
+      const cached = getSetupCache();
+      if (cached) {
+        if (!cached.ok) throw redirect({ to: "/onboarding" });
       } else {
         try {
           const status = await getSetupStatus();
-          setupCache = {
-            ok: Boolean(status.vapi && (status.sip || sipSkipped())),
-            at: Date.now(),
-          };
+          const ok = Boolean(status.vapi && (status.sip || sipSkipped()));
+          setSetupCache(ok);
 
-          if (!setupCache.ok) {
+          if (!ok) {
             throw redirect({ to: "/onboarding" });
           }
         } catch (e) {
