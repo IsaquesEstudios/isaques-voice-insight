@@ -326,9 +326,11 @@ function OnboardingPage() {
             <div className="rounded-xl border border-border bg-foreground/[0.04] p-3 text-[11px] text-muted-foreground">
               Peça à sua operadora os dados de autenticação do tronco SIP
               (host/domínio, usuário e senha) e informe o número (DID) que você
-              já possui. Nós criamos a credencial SIP e importamos o número na
-              sua conta Vapi.
+              já possui. Criamos a credencial SIP e importamos o número
+              diretamente na sua conta Vapi pela API oficial. Este passo é
+              opcional — você pode cadastrar depois na página Telefonia.
             </div>
+
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
