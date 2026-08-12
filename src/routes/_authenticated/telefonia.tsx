@@ -905,9 +905,32 @@ function TelefoniaPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label>Gateway / Host SIP</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label>Gateway / Host SIP</Label>
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex rounded-full p-0.5 text-muted-foreground hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          aria-label="Como descobrir o IP do domínio SIP"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-[11px] leading-relaxed">
+                        A Vapi exige o host em formato de IP (ex.: 187.45.123.10).
+                        Pegue o domínio que a operadora forneceu, abra o terminal e rode:
+                        <code className="mt-1 block rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">
+                          ping sip.suaoperadora.com.br
+                        </code>
+                        O IP aparecerá entre colchetes na resposta.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <Input
-                  placeholder="ex: sip.suaoperadora.com.br"
+                  placeholder="ex: 187.45.123.10"
                   value={sipForm.sipHost}
                   onChange={(e) => setSipForm({ ...sipForm, sipHost: e.target.value })}
                 />
