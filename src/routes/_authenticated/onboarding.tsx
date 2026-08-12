@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Check,
   ExternalLink,
+  HelpCircle,
   KeyRound,
   Loader2,
   Phone,
@@ -17,6 +18,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   connectSipNumber,
