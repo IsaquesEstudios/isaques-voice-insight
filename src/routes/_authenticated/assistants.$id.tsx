@@ -2179,15 +2179,20 @@ type TransferDestination =
   | ({ type: "number"; number: string } & TransferDestinationBase)
   | ({ type: "sip"; sipUri: string } & TransferDestinationBase);
 
+/** Frase padrão (pt-BR) dita antes de transferir. Evita o texto em inglês da Vapi. */
+const DEFAULT_TRANSFER_SAY_MESSAGE =
+  "Só um momento, vou transferir a sua ligação. Por favor, aguarde na linha.";
+
 const EMPTY_TRANSFER_FIELDS: TransferDestinationBase = {
   description: "",
-  message: "",
+  message: DEFAULT_TRANSFER_SAY_MESSAGE,
   mode: "blind-transfer",
   warmMessage: "",
   sipVerb: "dial",
   fallbackMessage:
     "Não consegui completar a transferência agora. Posso continuar te ajudando por aqui.",
 };
+
 
 
 type TransferMessageType =
@@ -2554,7 +2559,10 @@ function ToolsTab({
           dests.map((d) => {
             const base: TransferDestinationBase = {
               description: typeof d?.description === "string" ? d.description : "",
-              message: typeof d?.message === "string" ? d.message : "",
+              message:
+                typeof d?.message === "string" && d.message.trim()
+                  ? d.message
+                  : DEFAULT_TRANSFER_SAY_MESSAGE,
               // Padronizado: os dois valores que comprovadamente funcionam
               // no tronco SIP (blind + discar nova perna).
               mode: (d?.transferPlan?.mode?.toString().startsWith("blind-transfer")
@@ -2894,18 +2902,24 @@ function ToolsTab({
               ? { type: "number" as const, number: d.number.trim() }
               : { type: "sip" as const, sipUri: d.sipUri.trim() }),
             ...(d.description.trim() ? { description: d.description.trim() } : {}),
-            ...(d.message.trim() ? { message: d.message.trim() } : {}),
+            message: d.message.trim() || DEFAULT_TRANSFER_SAY_MESSAGE,
             transferPlan,
           };
         }),
       };
       if (tcDescription.trim()) tool.description = tcDescription.trim();
-      if (tcMessages.length > 0) {
-        tool.messages = tcMessages.map((m) => ({
-          type: m.type,
-          content: m.content,
-        }));
-      }
+      // A Vapi fala um texto padrão em INGLÊS ("I am forwarding your call...")
+      // quando não há mensagem "request-start". Garantimos sempre a frase pt-BR.
+      const startSay =
+        tcMessages.find((m) => m.type === "request-start")?.content.trim() ||
+        tcDestinations[0]?.message.trim() ||
+        DEFAULT_TRANSFER_SAY_MESSAGE;
+      const otherMessages = tcMessages.filter((m) => m.type !== "request-start");
+      tool.messages = [
+        { type: "request-start", content: startSay },
+        ...otherMessages.map((m) => ({ type: m.type, content: m.content })),
+      ];
+
       return tool;
     }
     if (selected.kind === "dtmf") {
