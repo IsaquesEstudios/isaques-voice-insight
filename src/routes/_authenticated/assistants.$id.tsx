@@ -2179,15 +2179,20 @@ type TransferDestination =
   | ({ type: "number"; number: string } & TransferDestinationBase)
   | ({ type: "sip"; sipUri: string } & TransferDestinationBase);
 
+/** Frase padrão (pt-BR) dita antes de transferir. Evita o texto em inglês da Vapi. */
+const DEFAULT_TRANSFER_SAY_MESSAGE =
+  "Só um momento, vou transferir a sua ligação. Por favor, aguarde na linha.";
+
 const EMPTY_TRANSFER_FIELDS: TransferDestinationBase = {
   description: "",
-  message: "",
+  message: DEFAULT_TRANSFER_SAY_MESSAGE,
   mode: "blind-transfer",
   warmMessage: "",
   sipVerb: "dial",
   fallbackMessage:
     "Não consegui completar a transferência agora. Posso continuar te ajudando por aqui.",
 };
+
 
 
 type TransferMessageType =
