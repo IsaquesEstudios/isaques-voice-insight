@@ -2899,18 +2899,24 @@ function ToolsTab({
               ? { type: "number" as const, number: d.number.trim() }
               : { type: "sip" as const, sipUri: d.sipUri.trim() }),
             ...(d.description.trim() ? { description: d.description.trim() } : {}),
-            ...(d.message.trim() ? { message: d.message.trim() } : {}),
+            message: d.message.trim() || DEFAULT_TRANSFER_SAY_MESSAGE,
             transferPlan,
           };
         }),
       };
       if (tcDescription.trim()) tool.description = tcDescription.trim();
-      if (tcMessages.length > 0) {
-        tool.messages = tcMessages.map((m) => ({
-          type: m.type,
-          content: m.content,
-        }));
-      }
+      // A Vapi fala um texto padrão em INGLÊS ("I am forwarding your call...")
+      // quando não há mensagem "request-start". Garantimos sempre a frase pt-BR.
+      const startSay =
+        tcMessages.find((m) => m.type === "request-start")?.content.trim() ||
+        tcDestinations[0]?.message.trim() ||
+        DEFAULT_TRANSFER_SAY_MESSAGE;
+      const otherMessages = tcMessages.filter((m) => m.type !== "request-start");
+      tool.messages = [
+        { type: "request-start", content: startSay },
+        ...otherMessages.map((m) => ({ type: m.type, content: m.content })),
+      ];
+
       return tool;
     }
     if (selected.kind === "dtmf") {
