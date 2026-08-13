@@ -1049,7 +1049,12 @@ export interface VapiPhoneNumberDTO {
   number?: string | null;
   name?: string | null;
   assistantId?: string | null;
+  credentialId?: string | null;
+  status?: string | null;
+  /** true quando a Vapi consegue atender ligações recebidas nesse número. */
+  inboundReady?: boolean;
 }
+
 
 type AttachAssistantResult =
   | { ok: true; vapiNumberId: string; assistantId: string }
