@@ -665,6 +665,7 @@ function TelefoniaPage() {
                       <TableHead>Assistente</TableHead>
                       <TableHead>Hoje</TableHead>
                       <TableHead>Atendimento</TableHead>
+                      <TableHead>Entrada</TableHead>
                       <TableHead>Saúde</TableHead>
                       <TableHead className="px-6" />
                     </TableRow>
