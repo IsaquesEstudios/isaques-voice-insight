@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/")({
+  // A sessão vive no localStorage do navegador — sem SSR evitamos mismatch de hidratação.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Entrar — Omniasyn" },
@@ -59,14 +61,24 @@ function LoginHomePage() {
 
   // Usuário já autenticado → mandar para o dashboard.
   useEffect(() => {
-    const supabase = getSupabaseBrowser();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        navigate({ to: "/dashboard", replace: true });
-      } else {
-        setChecking(false);
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = getSupabaseBrowser();
+        const { data } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (data.user) {
+          navigate({ to: "/dashboard", replace: true });
+          return;
+        }
+      } catch (e) {
+        console.error("auth check failed", e);
       }
-    });
+      if (!cancelled) setChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   const handleForgot = async (e: React.FormEvent) => {
