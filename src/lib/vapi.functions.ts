@@ -906,8 +906,11 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
           : [];
         const toolIds = await syncPersistentTools(data.tools, previousIds);
         model.toolIds = toolIds;
-        model.tools = [];
+        // A Vapi recusa `tools` e `toolIds` juntos no mesmo model — removemos
+        // as tools transientes para que o vínculo apareça no assistente.
+        delete model.tools;
       }
+
 
       body.model = model;
     }
