@@ -631,6 +631,91 @@ function sanitizeModelTool(tool: any): any {
   return tool;
 }
 
+// --- Tools persistentes (aparecem na página "Tools" da Vapi) ---------------
+// A Vapi trata tools declaradas dentro de `model.tools` como "transient":
+// funcionam na chamada, mas não existem como recurso e por isso não aparecem
+// no painel da Vapi. Aqui criamos/atualizamos cada tool via POST/PATCH /tool
+// e vinculamos ao assistente por `model.toolIds`.
+
+const TOOL_META_KEYS = ["id", "orgId", "createdAt", "updatedAt", "toolCall"];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stripToolMeta(tool: any): any {
+  if (!tool || typeof tool !== "object") return tool;
+  const out = { ...tool };
+  for (const k of TOOL_META_KEYS) delete out[k];
+  return out;
+}
+
+/**
+ * Cria/atualiza as tools do assistente como recursos reais na Vapi e devolve
+ * os IDs na mesma ordem. Tools removidas no painel são apagadas da Vapi.
+ */
+async function syncPersistentTools(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tools: any[],
+  previousIds: string[],
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (const raw of tools) {
+    const payload = stripToolMeta(sanitizeModelTool(raw));
+    const existingId = typeof raw?.id === "string" && raw.id ? raw.id : null;
+    if (existingId) {
+      try {
+        const patch = { ...payload };
+        delete patch.type; // a Vapi não permite trocar o tipo de uma tool
+        await vapiFetch(`/tool/${existingId}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+        });
+        ids.push(existingId);
+        continue;
+      } catch {
+        // tool sumiu da conta / patch recusado → recria abaixo
+      }
+    }
+    const created = (await vapiFetch("/tool", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })) as { id?: string } | null;
+    if (created?.id) ids.push(created.id);
+  }
+
+  for (const oldId of previousIds) {
+    if (ids.includes(oldId)) continue;
+    try {
+      await vapiFetch(`/tool/${oldId}`, { method: "DELETE" });
+    } catch {
+      // ignora: tool já removida ou em uso por outro assistente
+    }
+  }
+
+  return ids;
+}
+
+/** Busca as tools persistentes de um assistente para exibir no painel. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function hydrateAssistantTools(assistant: any): Promise<any> {
+  const toolIds = assistant?.model?.toolIds;
+  if (!Array.isArray(toolIds) || toolIds.length === 0) return assistant;
+  const fetched = await Promise.all(
+    toolIds.map(async (tid: string) => {
+      try {
+        return await vapiFetch(`/tool/${tid}`, { method: "GET" });
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const persistent = fetched.filter(Boolean);
+  const transient = Array.isArray(assistant?.model?.tools) ? assistant.model.tools : [];
+  return {
+    ...assistant,
+    model: { ...assistant.model, tools: [...persistent, ...transient] },
+  };
+}
+
+
 export const listVapiAssistants = createServerFn({ method: "GET" })
   .middleware([withVapiCredentials])
   .handler(async (): Promise<VapiAssistantDTO[]> => {
