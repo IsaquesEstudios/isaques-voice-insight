@@ -1451,7 +1451,39 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
       number: (n.number as string | undefined) ?? null,
       name: (n.name as string | undefined) ?? null,
       assistantId: (n.assistantId as string | undefined) ?? null,
+      credentialId: (n.credentialId as string | undefined) ?? null,
+      status: (n.status as string | undefined) ?? null,
     }));
+
+    // Descobre quais credenciais SIP aceitam tráfego de entrada, para marcar
+    // cada número como pronto (ou não) para receber ligações.
+    const inboundByCredential = new Map<string, boolean>();
+    for (const credId of new Set(
+      dtos.map((d) => d.credentialId).filter((v): v is string => !!v),
+    )) {
+      try {
+        const cred = (await vapiFetch(`/credential/${credId}`, { method: "GET" })) as {
+          gateways?: { inboundEnabled?: boolean }[];
+        } | null;
+        const gws = cred?.gateways ?? [];
+        inboundByCredential.set(
+          credId,
+          gws.length === 0 || gws.some((g) => g?.inboundEnabled !== false),
+        );
+      } catch {
+        inboundByCredential.set(credId, false);
+      }
+    }
+    for (const d of dtos) {
+      const trunkOk =
+        d.provider === "vapi" || d.provider === "twilio" || d.provider === "telnyx"
+          ? true
+          : d.credentialId
+            ? (inboundByCredential.get(d.credentialId) ?? false)
+            : false;
+      d.inboundReady = Boolean(d.assistantId) && trunkOk;
+    }
+
 
     // Espelha na tabela local (não fatal se falhar).
     try {
