@@ -91,6 +91,7 @@ import {
   detachAssistantFromNumber,
   deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
+  enableSipInbound,
 
 
   listVapiAssistants,
