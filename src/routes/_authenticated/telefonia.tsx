@@ -677,14 +677,14 @@ function TelefoniaPage() {
                           <TableCell className="px-6">
                             <div className="h-3 w-32 animate-pulse rounded bg-foreground/10" />
                           </TableCell>
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={7}>
                             <div className="h-3 w-full animate-pulse rounded bg-white/5" />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : numbers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                           {vapiPhoneNumbersQuery.isError ? (
                             <>
                               Não foi possível sincronizar com a Vapi:{" "}
@@ -758,6 +758,20 @@ function TelefoniaPage() {
                             />
                           </TableCell>
 
+
+                          <TableCell>
+                            {inboundByPhone.get(n.phone_number) ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                                <Circle className="h-1.5 w-1.5 fill-current" />
+                                Entrada ativa
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                                <Circle className="h-1.5 w-1.5 fill-current" />
+                                Somente saída
+                              </span>
+                            )}
+                          </TableCell>
 
                           <TableCell className="text-xs">{n.calls_today}</TableCell>
                           <TableCell className="text-xs">
