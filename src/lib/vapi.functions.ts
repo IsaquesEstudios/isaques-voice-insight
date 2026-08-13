@@ -747,7 +747,8 @@ export const getVapiAssistant = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
     await assertOwnership(context.supabase, context.userId, data.id);
     const res = (await vapiFetch(`/assistant/${data.id}`, { method: "GET" })) as VapiAssistantRaw;
-    return res;
+    return (await hydrateAssistantTools(res)) as VapiAssistantRaw;
+
   });
 
 export const createVapiAssistant = createServerFn({ method: "POST" })
