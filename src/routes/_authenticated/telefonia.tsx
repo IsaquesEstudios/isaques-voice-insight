@@ -304,8 +304,35 @@ function TelefoniaPage() {
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedInbound, setCopiedInbound] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sipError, setSipError] = useState<string | null>(null);
+
+  // Prontidão para RECEBER ligações, por número (dados vindos da Vapi).
+  const inboundByPhone = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const n of vapiPhoneNumbersQuery.data ?? []) {
+      if (n.number) map.set(n.number, n.inboundReady === true);
+    }
+    return map;
+  }, [vapiPhoneNumbersQuery.data]);
+
+  const enableInboundFn = useServerFn(enableSipInbound);
+  const enableInboundMutation = useMutation({
+    mutationFn: () => enableInboundFn(),
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success("Entrada habilitada no tronco SIP.");
+        queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+        queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
+      } else {
+        toast.error(translateError(res));
+      }
+    },
+    onError: (err) =>
+      toast.error(translateError(err, "Falha ao habilitar a entrada.")),
+  });
+
 
 
 
