@@ -898,7 +898,17 @@ export const saveVapiAssistantConfig = createServerFn({ method: "POST" })
       if (typeof data.systemPrompt === "string") {
         model.messages = [{ role: "system", content: data.systemPrompt }];
       }
-      if (Array.isArray(data.tools)) model.tools = data.tools.map(sanitizeModelTool);
+      if (Array.isArray(data.tools)) {
+        // Cria/atualiza as tools como recursos reais na Vapi (ficam visíveis
+        // na página "Tools" da conta) e vincula ao assistente por toolIds.
+        const previousIds = Array.isArray(currentModel.toolIds)
+          ? (currentModel.toolIds as string[])
+          : [];
+        const toolIds = await syncPersistentTools(data.tools, previousIds);
+        model.toolIds = toolIds;
+        model.tools = [];
+      }
+
       body.model = model;
     }
 
