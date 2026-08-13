@@ -335,7 +335,9 @@ function OnboardingPage() {
               (host/domínio, usuário e senha) e informe o número (DID) que você
               já possui. Criamos a credencial SIP e importamos o número
               diretamente na sua conta Vapi pela API oficial. Este passo é
-              opcional — você pode cadastrar depois na página Telefonia.
+              opcional — você pode cadastrar depois na página Telefonia. O mesmo
+              número serve para fazer e <b>receber</b> ligações: para receber,
+              basta vincular um assistente a ele em Telefonia.
             </div>
 
 

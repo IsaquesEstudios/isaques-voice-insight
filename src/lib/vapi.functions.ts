@@ -1049,7 +1049,12 @@ export interface VapiPhoneNumberDTO {
   number?: string | null;
   name?: string | null;
   assistantId?: string | null;
+  credentialId?: string | null;
+  status?: string | null;
+  /** true quando a Vapi consegue atender ligações recebidas nesse número. */
+  inboundReady?: boolean;
 }
+
 
 type AttachAssistantResult =
   | { ok: true; vapiNumberId: string; assistantId: string }
@@ -1160,6 +1165,89 @@ export const ensureSipCredential = createServerFn({ method: "POST" })
       };
     }
   });
+
+/**
+ * Habilita o tráfego de ENTRADA no tronco SIP do usuário: recria a credencial
+ * `byo-sip-trunk` com `inboundEnabled: true` (a Vapi exige IPv4 numérico nesse
+ * modo) e reaponta todos os números BYO para a nova credencial.
+ */
+export const enableSipInbound = createServerFn({ method: "POST" })
+  .middleware([withVapiCredentials])
+  .handler(
+    async ({
+      context,
+    }): Promise<{ ok: true; credentialId: string } | { ok: false; message: string }> => {
+      const trunk = await loadSipTrunk(context.supabase, context.userId);
+      if (!trunk) return { ok: false, message: "Conecte seu tronco SIP primeiro." };
+
+      const rawHost = trunk.sipHost.replace(/^sips?:\/\//i, "").split("/")[0]!.trim();
+      const [hostOnly, portStr] = rawHost.split(":");
+      const host = (hostOnly ?? rawHost).trim();
+      const port = portStr ? Number(portStr) : undefined;
+      if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+        return {
+          ok: false,
+          message:
+            "Para receber ligações, o host do tronco precisa ser um IP numérico (ex.: 200.100.50.10). Rode `ping seu-dominio.com` no terminal, pegue o IP e atualize o tronco SIP.",
+        };
+      }
+
+      const gateway: Record<string, unknown> = { ip: host, inboundEnabled: true };
+      if (port && Number.isFinite(port)) gateway["port"] = port;
+
+      let credentialId: string;
+      try {
+        const created = (await vapiFetch("/credential", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: "byo-sip-trunk",
+            name: `SIP inbound (${trunk.sipUsername})`,
+            gateways: [gateway],
+            outboundAuthenticationPlan: {
+              authUsername: trunk.sipUsername,
+              authPassword: trunk.sipPassword,
+              sipRegisterPlan: { realm: host },
+            },
+          }),
+        })) as { id: string };
+        credentialId = created.id;
+      } catch (e) {
+        return {
+          ok: false,
+          message: `A Vapi recusou habilitar a entrada no tronco: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        };
+      }
+
+      await context.supabase
+        .from("user_nvoip_credentials")
+        .update({
+          vapi_credential_id: credentialId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", context.userId);
+
+      // Reaponta os números BYO existentes para a nova credencial.
+      try {
+        const all = (await vapiFetch("/phone-number?limit=100", { method: "GET" })) as
+          | VapiPhoneNumberRaw[]
+          | null;
+        for (const n of all ?? []) {
+          if ((n.provider as string) !== "byo-phone-number") continue;
+          await vapiFetch(`/phone-number/${n.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ credentialId }),
+          });
+        }
+      } catch (e) {
+        console.warn("repoint numbers to inbound credential failed", e);
+      }
+
+      return { ok: true, credentialId };
+    },
+  );
+
 
 // Fluxo completo de cadastro de número: salva o tronco SIP do usuário, cria a
 // credencial `byo-sip-trunk` na Vapi e importa o DID como `byo-phone-number`,
@@ -1363,7 +1451,39 @@ export const listVapiPhoneNumbers = createServerFn({ method: "GET" })
       number: (n.number as string | undefined) ?? null,
       name: (n.name as string | undefined) ?? null,
       assistantId: (n.assistantId as string | undefined) ?? null,
+      credentialId: (n.credentialId as string | undefined) ?? null,
+      status: (n.status as string | undefined) ?? null,
     }));
+
+    // Descobre quais credenciais SIP aceitam tráfego de entrada, para marcar
+    // cada número como pronto (ou não) para receber ligações.
+    const inboundByCredential = new Map<string, boolean>();
+    for (const credId of new Set(
+      dtos.map((d) => d.credentialId).filter((v): v is string => !!v),
+    )) {
+      try {
+        const cred = (await vapiFetch(`/credential/${credId}`, { method: "GET" })) as {
+          gateways?: { inboundEnabled?: boolean }[];
+        } | null;
+        const gws = cred?.gateways ?? [];
+        inboundByCredential.set(
+          credId,
+          gws.length === 0 || gws.some((g) => g?.inboundEnabled !== false),
+        );
+      } catch {
+        inboundByCredential.set(credId, false);
+      }
+    }
+    for (const d of dtos) {
+      const trunkOk =
+        d.provider === "vapi" || d.provider === "twilio" || d.provider === "telnyx"
+          ? true
+          : d.credentialId
+            ? (inboundByCredential.get(d.credentialId) ?? false)
+            : false;
+      d.inboundReady = Boolean(d.assistantId) && trunkOk;
+    }
+
 
     // Espelha na tabela local (não fatal se falhar).
     try {

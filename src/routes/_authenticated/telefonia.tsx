@@ -91,6 +91,7 @@ import {
   detachAssistantFromNumber,
   deleteVapiPhoneNumber,
   resyncVapiNumberCredentials,
+  enableSipInbound,
 
 
   listVapiAssistants,
@@ -303,8 +304,35 @@ function TelefoniaPage() {
   const [assignAssistantId, setAssignAssistantId] = useState<string>("");
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedInbound, setCopiedInbound] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sipError, setSipError] = useState<string | null>(null);
+
+  // Prontidão para RECEBER ligações, por número (dados vindos da Vapi).
+  const inboundByPhone = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const n of vapiPhoneNumbersQuery.data ?? []) {
+      if (n.number) map.set(n.number, n.inboundReady === true);
+    }
+    return map;
+  }, [vapiPhoneNumbersQuery.data]);
+
+  const enableInboundFn = useServerFn(enableSipInbound);
+  const enableInboundMutation = useMutation({
+    mutationFn: () => enableInboundFn(),
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success("Entrada habilitada no tronco SIP.");
+        queryClient.invalidateQueries({ queryKey: ["vapi-phone-numbers"] });
+        queryClient.invalidateQueries({ queryKey: ["sip-connection"] });
+      } else {
+        toast.error(translateError(res));
+      }
+    },
+    onError: (err) =>
+      toast.error(translateError(err, "Falha ao habilitar a entrada.")),
+  });
+
 
 
 
@@ -637,6 +665,7 @@ function TelefoniaPage() {
                       <TableHead>Assistente</TableHead>
                       <TableHead>Hoje</TableHead>
                       <TableHead>Atendimento</TableHead>
+                      <TableHead>Entrada</TableHead>
                       <TableHead>Saúde</TableHead>
                       <TableHead className="px-6" />
                     </TableRow>
@@ -648,14 +677,14 @@ function TelefoniaPage() {
                           <TableCell className="px-6">
                             <div className="h-3 w-32 animate-pulse rounded bg-foreground/10" />
                           </TableCell>
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={7}>
                             <div className="h-3 w-full animate-pulse rounded bg-white/5" />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : numbers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                           {vapiPhoneNumbersQuery.isError ? (
                             <>
                               Não foi possível sincronizar com a Vapi:{" "}
@@ -729,6 +758,20 @@ function TelefoniaPage() {
                             />
                           </TableCell>
 
+
+                          <TableCell>
+                            {inboundByPhone.get(n.phone_number) ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                                <Circle className="h-1.5 w-1.5 fill-current" />
+                                Entrada ativa
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                                <Circle className="h-1.5 w-1.5 fill-current" />
+                                Somente saída
+                              </span>
+                            )}
+                          </TableCell>
 
                           <TableCell className="text-xs">{n.calls_today}</TableCell>
                           <TableCell className="text-xs">
@@ -817,6 +860,98 @@ function TelefoniaPage() {
         </div>
 
 
+
+        <Card className="border-border bg-card/20 backdrop-blur-2xl">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">
+              Recebimento de ligações
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              O mesmo número serve para ligar e para receber. Para a Vapi atender uma
+              chamada recebida, o número precisa ter um <b>assistente vinculado</b> na
+              tabela acima — sem isso a ligação é recusada.
+            </p>
+
+            {isSipConnected ? (
+              <>
+                <div className="rounded-xl border border-border bg-foreground/[0.04] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-foreground">
+                      Dados para a sua operadora apontar as chamadas recebidas
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-border bg-background/40"
+                      onClick={() => {
+                        const text = [
+                          `Host SIP de destino: sip.vapi.ai`,
+                          `Usuário do tronco: ${sipConn?.sipUsername ?? ""}`,
+                          `Números (E.164): ${numbers.map((n) => n.phone_number).join(", ")}`,
+                        ].join("\n");
+                        navigator.clipboard.writeText(text);
+                        setCopiedInbound(true);
+                        setTimeout(() => setCopiedInbound(false), 2000);
+                      }}
+                    >
+                      {copiedInbound ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      Copiar
+                    </Button>
+                  </div>
+                  <ul className="mt-2 space-y-1 font-mono text-[11px] text-muted-foreground">
+                    <li>Host SIP de destino: sip.vapi.ai</li>
+                    <li>Usuário do tronco: {sipConn?.sipUsername}</li>
+                    <li>
+                      Números (E.164):{" "}
+                      {numbers.length
+                        ? numbers.map((n) => n.phone_number).join(", ")
+                        : "—"}
+                    </li>
+                  </ul>
+                </div>
+
+                {!/^(\d{1,3}\.){3}\d{1,3}$/.test(
+                  (sipConn?.sipHost ?? "").replace(/^sips?:\/\//i, "").split(":")[0] ?? "",
+                ) ? (
+                  <Alert className="border-chart-3/40 bg-chart-3/10">
+                    <AlertTriangle className="h-4 w-4 text-chart-3" />
+                    <AlertDescription className="text-xs">
+                      Seu tronco está cadastrado com um domínio. Para receber ligações, a
+                      Vapi exige um <b>IP numérico</b>. Rode <code>ping {sipConn?.sipHost}</code>{" "}
+                      no terminal, pegue o IP e reconecte o número com esse IP no host SIP.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+
+                <Button
+                  variant="outline"
+                  className="gap-2 border-border bg-background/40"
+                  disabled={enableInboundMutation.isPending}
+                  onClick={() => enableInboundMutation.mutate()}
+                >
+                  {enableInboundMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <PhoneCall className="h-4 w-4" />
+                  )}
+                  Habilitar entrada no tronco
+                </Button>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Números provisionados na própria Vapi já recebem ligações assim que você
+                vincula um assistente — não é preciso tronco SIP. Para receber no seu DID
+                próprio, conecte o tronco da sua operadora.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="border-border bg-card/20 backdrop-blur-2xl">
           <CardHeader className="pb-3">
