@@ -2559,7 +2559,10 @@ function ToolsTab({
           dests.map((d) => {
             const base: TransferDestinationBase = {
               description: typeof d?.description === "string" ? d.description : "",
-              message: typeof d?.message === "string" ? d.message : "",
+              message:
+                typeof d?.message === "string" && d.message.trim()
+                  ? d.message
+                  : DEFAULT_TRANSFER_SAY_MESSAGE,
               // Padronizado: os dois valores que comprovadamente funcionam
               // no tronco SIP (blind + discar nova perna).
               mode: (d?.transferPlan?.mode?.toString().startsWith("blind-transfer")
