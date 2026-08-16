@@ -736,7 +736,7 @@ async function hydrateAssistantTools(assistant: any): Promise<any> {
 export const listVapiAssistants = createServerFn({ method: "GET" })
   .middleware([withVapiCredentials])
   .handler(async (): Promise<VapiAssistantDTO[]> => {
-    const data = await vapiFetch("/assistant", { method: "GET" });
+    const data = await vapiFetch("/assistant?limit=1000", { method: "GET" });
     if (!Array.isArray(data)) return [];
     return (data as VapiAssistantDTO[]).map((a) => ({
       id: a.id,

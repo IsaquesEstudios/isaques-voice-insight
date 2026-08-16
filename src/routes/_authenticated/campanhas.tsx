@@ -267,8 +267,10 @@ function CampanhasPage() {
     refetchInterval: 30_000,
   });
   const assistantsQuery = useQuery({
-    queryKey: ["vapi", "assistants"],
+    queryKey: ["assistants", "list"],
     queryFn: () => fetchAssistants(),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const numbersQuery = useQuery({
     queryKey: ["vapi", "phone-numbers"],
