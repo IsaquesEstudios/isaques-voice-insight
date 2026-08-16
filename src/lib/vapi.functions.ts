@@ -122,6 +122,9 @@ export interface AssistantInput {
   model?: string;
   voiceProvider?: string;
   voiceId?: string;
+  transcriberProvider?: string;
+  transcriberModel?: string;
+  transcriberLanguage?: string;
 }
 
 function getKey(): string {
