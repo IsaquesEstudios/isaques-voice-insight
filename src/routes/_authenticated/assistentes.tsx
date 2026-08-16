@@ -158,7 +158,9 @@ interface FormState {
   model: string;
   voiceProvider: string;
   voiceId: string;
-
+  transcriberProvider: string;
+  transcriberModel: string;
+  transcriberLanguage: string;
 }
 
 const DEFAULT_MODEL_PROVIDER = "openai";
@@ -178,7 +180,7 @@ const MODEL_OPTIONS: Record<string, string[]> = {
     "claude-3-opus-20240229",
   ],
   google: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+  groq: ["openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
   xai: ["grok-2"],
 };
 
@@ -219,6 +221,7 @@ interface AssistantPreset {
   description: string;
   model: { provider: string; model: string };
   voice: { provider: string; voiceId: string };
+  transcriber: { provider: string; model: string; language: string };
   /** Amostra de áudio da voz para o usuário escutar antes de criar. */
   sampleUrl?: string;
 }
@@ -230,7 +233,16 @@ const ASSISTANT_PRESETS: AssistantPreset[] = [
     description: "Deepgram Nova-3 (pt-BR) · GPT-4.1 nano · Voz Elliot V2",
     model: { provider: "openai", model: "gpt-4.1-nano" },
     voice: { provider: "vapi", voiceId: "Elliot" },
+    transcriber: { provider: "deepgram", model: "nova-3", language: "multi" },
     sampleUrl: vozElliotAsset.url,
+  },
+  {
+    id: "layla",
+    label: "Layla",
+    description: "Deepgram Nova-2 (pt-BR) · GPT OSS 20B (Groq) · Voz Layla V2",
+    model: { provider: "groq", model: "openai/gpt-oss-20b" },
+    voice: { provider: "vapi", voiceId: "Layla" },
+    transcriber: { provider: "deepgram", model: "nova-2", language: "pt-BR" },
   },
 ];
 
@@ -249,6 +261,9 @@ const emptyForm: FormState = {
   model: DEFAULT_MODEL,
   voiceProvider: DEFAULT_VOICE_PROVIDER,
   voiceId: DEFAULT_VOICE_ID,
+  transcriberProvider: "deepgram",
+  transcriberModel: "nova-3",
+  transcriberLanguage: "multi",
 };
 
 
@@ -443,6 +458,9 @@ function AssistentesPage() {
         model: full?.model?.model ?? prev.model,
         voiceProvider: full?.voice?.provider ?? prev.voiceProvider,
         voiceId: full?.voice?.voiceId ?? prev.voiceId,
+        transcriberProvider: full?.transcriber?.provider ?? prev.transcriberProvider,
+        transcriberModel: full?.transcriber?.model ?? prev.transcriberModel,
+        transcriberLanguage: full?.transcriber?.language ?? prev.transcriberLanguage,
         loadingInitial: false,
       }));
     } catch (err) {
@@ -474,6 +492,9 @@ function AssistentesPage() {
         model: form.model,
         voiceProvider: form.voiceProvider,
         voiceId: form.voiceId,
+        transcriberProvider: form.transcriberProvider,
+        transcriberModel: form.transcriberModel,
+        transcriberLanguage: form.transcriberLanguage,
       };
       if (form.mode === "create") {
         await createAssistant({ data: payload });
@@ -847,6 +868,9 @@ function AssistentesPage() {
                           model: preset.model.model,
                           voiceProvider: preset.voice.provider,
                           voiceId: preset.voice.voiceId,
+                          transcriberProvider: preset.transcriber.provider,
+                          transcriberModel: preset.transcriber.model,
+                          transcriberLanguage: preset.transcriber.language,
                         }))
                       }
                       onKeyDown={(e) => {
@@ -859,6 +883,9 @@ function AssistentesPage() {
                             model: preset.model.model,
                             voiceProvider: preset.voice.provider,
                             voiceId: preset.voice.voiceId,
+                            transcriberProvider: preset.transcriber.provider,
+                            transcriberModel: preset.transcriber.model,
+                            transcriberLanguage: preset.transcriber.language,
                           }));
                         }
                       }}

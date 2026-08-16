@@ -122,6 +122,9 @@ export interface AssistantInput {
   model?: string;
   voiceProvider?: string;
   voiceId?: string;
+  transcriberProvider?: string;
+  transcriberModel?: string;
+  transcriberLanguage?: string;
 }
 
 function getKey(): string {
@@ -137,6 +140,8 @@ const DEFAULT_MODEL = "gpt-4.1";
 const DEFAULT_VOICE_PROVIDER = "vapi";
 const DEFAULT_VOICE_ID = "Elliot";
 const DEFAULT_VOICE_VERSION = 2;
+/** Vozes Vapi que possuem versão V2. */
+const VAPI_V2_VOICES = new Set(["Elliot", "Layla"]);
 const DEFAULT_TRANSCRIBER_BLOCK = {
   provider: "deepgram",
   model: "nova-3",
@@ -168,17 +173,29 @@ function buildPayload(input: AssistantInput) {
   const voiceProvider = input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER;
   const voiceId = input.voiceId?.trim() || DEFAULT_VOICE_ID;
   const voice: Record<string, unknown> = { provider: voiceProvider, voiceId };
-  // A Vapi só aceita "version" quando o provider é "vapi".
-  if (voiceProvider === "vapi" && voiceId === DEFAULT_VOICE_ID) {
+  // A Vapi só aceita "version" quando o provider é "vapi" (vozes com V2).
+  if (voiceProvider === "vapi" && VAPI_V2_VOICES.has(voiceId)) {
     voice.version = DEFAULT_VOICE_VERSION;
   }
+  const transcriber: Record<string, unknown> =
+    input.transcriberProvider?.trim() && input.transcriberModel?.trim()
+      ? {
+          provider: input.transcriberProvider.trim(),
+          ...(input.transcriberProvider.trim() !== "vapi"
+            ? { model: input.transcriberModel.trim() }
+            : {}),
+          ...(input.transcriberLanguage?.trim()
+            ? { language: input.transcriberLanguage.trim() }
+            : {}),
+        }
+      : { ...DEFAULT_TRANSCRIBER_BLOCK };
   return {
     name: input.name,
     firstMessage: input.firstMessage,
     firstMessageMode: input.firstMessage?.trim()
       ? "assistant-speaks-first"
       : "assistant-speaks-first-with-model-generated-message",
-    transcriber: { ...DEFAULT_TRANSCRIBER_BLOCK },
+    transcriber,
     model: {
       provider: input.modelProvider?.trim() || DEFAULT_MODEL_PROVIDER,
       model:
@@ -763,6 +780,9 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
       model: input.model,
       voiceProvider: input.voiceProvider,
       voiceId: input.voiceId,
+      transcriberProvider: input.transcriberProvider,
+      transcriberModel: input.transcriberModel,
+      transcriberLanguage: input.transcriberLanguage,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
@@ -789,6 +809,9 @@ export const updateVapiAssistant = createServerFn({ method: "POST" })
       model: input.model,
       voiceProvider: input.voiceProvider,
       voiceId: input.voiceId,
+      transcriberProvider: input.transcriberProvider,
+      transcriberModel: input.transcriberModel,
+      transcriberLanguage: input.transcriberLanguage,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {

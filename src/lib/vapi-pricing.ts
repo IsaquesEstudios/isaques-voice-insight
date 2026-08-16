@@ -58,6 +58,14 @@ export const TRANSCRIBER_SPECS: Record<string, Record<string, TranscriberSpec>> 
   },
   deepgram: {
     "nova-3": DEFAULT_TRANSCRIBER,
+    "nova-2": {
+      provider: "Deepgram",
+      label: "Nova 2",
+      model: "nova-2",
+      costPerMin: 0.0059,
+      latencyMs: 290,
+      accuracyWer: 3.3,
+    },
   },
 };
 
@@ -90,6 +98,7 @@ export const MODEL_SPECS: Record<string, Record<string, ModelSpec>> = {
   groq: {
     "llama-3.3-70b-versatile": { costPerMin: 0.012, latencyMs: 380, intelligence: 12 },
     "llama-3.1-8b-instant": { costPerMin: 0.003, latencyMs: 320, intelligence: 8 },
+    "openai/gpt-oss-20b": { costPerMin: 0.01, latencyMs: 410, intelligence: 15 },
   },
   xai: {
     "grok-2": { costPerMin: 0.06, latencyMs: 700, intelligence: 13 },
@@ -115,7 +124,7 @@ export const VOICE_SPECS: Record<string, Record<string, VoiceSpec>> = {
     Sagar: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
     Godfrey: { costPerMin: 0.02, latencyMs: 260, humanness: 66 },
     Neil: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
-    Layla: { costPerMin: 0.02, latencyMs: 260, humanness: 70 },
+    Layla: { costPerMin: 0.02, latencyMs: 430, humanness: 92 },
     Sid: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
     Naina: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
   },
