@@ -319,8 +319,8 @@ interface AiPreset {
 
 const AI_PRESETS: AiPreset[] = [
   {
-    id: "matteus",
-    label: "Matteus",
+    id: "felipe",
+    label: "Felipe",
     description: "Deepgram Nova-3 · GPT-4.1 nano · Elliot v2",
     transcriber: { provider: "deepgram", model: "nova-3", language: "pt-BR" },
     model: { provider: "openai", model: "gpt-4.1-nano" },

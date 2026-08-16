@@ -228,8 +228,8 @@ interface AssistantPreset {
 
 const ASSISTANT_PRESETS: AssistantPreset[] = [
   {
-    id: "matteus",
-    label: "Matteus",
+    id: "felipe",
+    label: "Felipe",
     description: "Deepgram Nova-3 (pt-BR) · GPT-4.1 nano · Voz Elliot V2",
     model: { provider: "openai", model: "gpt-4.1-nano" },
     voice: { provider: "vapi", voiceId: "Elliot" },
