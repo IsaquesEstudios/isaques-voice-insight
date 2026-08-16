@@ -141,7 +141,7 @@ const DEFAULT_VOICE_PROVIDER = "vapi";
 const DEFAULT_VOICE_ID = "Elliot";
 const DEFAULT_VOICE_VERSION = 2;
 /** Vozes Vapi que possuem versão V2. */
-const VAPI_V2_VOICES = new Set(["Elliot", "Layla"]);
+const VAPI_V2_VOICES = new Set(["Elliot", "Layla", "Naina"]);
 const DEFAULT_TRANSCRIBER_BLOCK = {
   provider: "deepgram",
   model: "nova-3",

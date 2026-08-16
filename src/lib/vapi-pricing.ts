@@ -126,7 +126,7 @@ export const VOICE_SPECS: Record<string, Record<string, VoiceSpec>> = {
     Neil: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
     Layla: { costPerMin: 0.02, latencyMs: 430, humanness: 92 },
     Sid: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
-    Naina: { costPerMin: 0.02, latencyMs: 260, humanness: 68 },
+    Naina: { costPerMin: 0.02, latencyMs: 430, humanness: 90 },
   },
   openai: {
     _default: { costPerMin: 0.015, latencyMs: 600, humanness: 55 },
