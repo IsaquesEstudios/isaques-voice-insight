@@ -458,6 +458,9 @@ function AssistentesPage() {
         model: full?.model?.model ?? prev.model,
         voiceProvider: full?.voice?.provider ?? prev.voiceProvider,
         voiceId: full?.voice?.voiceId ?? prev.voiceId,
+        transcriberProvider: full?.transcriber?.provider ?? prev.transcriberProvider,
+        transcriberModel: full?.transcriber?.model ?? prev.transcriberModel,
+        transcriberLanguage: full?.transcriber?.language ?? prev.transcriberLanguage,
         loadingInitial: false,
       }));
     } catch (err) {
