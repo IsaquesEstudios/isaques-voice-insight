@@ -244,6 +244,14 @@ const ASSISTANT_PRESETS: AssistantPreset[] = [
     voice: { provider: "vapi", voiceId: "Layla" },
     transcriber: { provider: "deepgram", model: "nova-2", language: "pt-BR" },
   },
+  {
+    id: "fernanda",
+    label: "Fernanda",
+    description: "Deepgram Nova-2 (pt-BR) · GPT OSS 20B (Groq) · Voz Naina V2",
+    model: { provider: "groq", model: "openai/gpt-oss-20b" },
+    voice: { provider: "vapi", voiceId: "Naina" },
+    transcriber: { provider: "deepgram", model: "nova-2", language: "pt-BR" },
+  },
 ];
 
 const emptyForm: FormState = {
