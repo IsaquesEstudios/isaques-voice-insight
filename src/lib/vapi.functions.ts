@@ -195,7 +195,7 @@ function buildPayload(input: AssistantInput) {
     firstMessageMode: input.firstMessage?.trim()
       ? "assistant-speaks-first"
       : "assistant-speaks-first-with-model-generated-message",
-    transcriber: { ...DEFAULT_TRANSCRIBER_BLOCK },
+    transcriber,
     model: {
       provider: input.modelProvider?.trim() || DEFAULT_MODEL_PROVIDER,
       model:
@@ -780,6 +780,9 @@ export const createVapiAssistant = createServerFn({ method: "POST" })
       model: input.model,
       voiceProvider: input.voiceProvider,
       voiceId: input.voiceId,
+      transcriberProvider: input.transcriberProvider,
+      transcriberModel: input.transcriberModel,
+      transcriberLanguage: input.transcriberLanguage,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
@@ -806,6 +809,9 @@ export const updateVapiAssistant = createServerFn({ method: "POST" })
       model: input.model,
       voiceProvider: input.voiceProvider,
       voiceId: input.voiceId,
+      transcriberProvider: input.transcriberProvider,
+      transcriberModel: input.transcriberModel,
+      transcriberLanguage: input.transcriberLanguage,
     };
   })
   .handler(async ({ data, context }): Promise<VapiAssistantRaw> => {
