@@ -171,10 +171,22 @@ function buildPayload(input: AssistantInput) {
   const voiceProvider = input.voiceProvider?.trim() || DEFAULT_VOICE_PROVIDER;
   const voiceId = input.voiceId?.trim() || DEFAULT_VOICE_ID;
   const voice: Record<string, unknown> = { provider: voiceProvider, voiceId };
-  // A Vapi só aceita "version" quando o provider é "vapi".
-  if (voiceProvider === "vapi" && voiceId === DEFAULT_VOICE_ID) {
+  // A Vapi só aceita "version" quando o provider é "vapi" (vozes com V2).
+  if (voiceProvider === "vapi" && VAPI_V2_VOICES.has(voiceId)) {
     voice.version = DEFAULT_VOICE_VERSION;
   }
+  const transcriber: Record<string, unknown> =
+    input.transcriberProvider?.trim() && input.transcriberModel?.trim()
+      ? {
+          provider: input.transcriberProvider.trim(),
+          ...(input.transcriberProvider.trim() !== "vapi"
+            ? { model: input.transcriberModel.trim() }
+            : {}),
+          ...(input.transcriberLanguage?.trim()
+            ? { language: input.transcriberLanguage.trim() }
+            : {}),
+        }
+      : { ...DEFAULT_TRANSCRIBER_BLOCK };
   return {
     name: input.name,
     firstMessage: input.firstMessage,
