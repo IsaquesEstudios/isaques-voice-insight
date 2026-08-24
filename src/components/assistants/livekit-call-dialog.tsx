@@ -262,69 +262,48 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
             </Alert>
           )}
 
-          {/* Sala LiveKit: montada apenas quando há token. RoomAudioRenderer
-              é obrigatório para o áudio do agente tocar no navegador. */}
-          {session && (
-            <LiveKitRoom
-              token={session.token}
-              serverUrl={session.serverUrl}
-              connect={true}
-              audio={true}
-              video={false}
-              onConnected={() => setStatus("in_call")}
-              onDisconnected={() => {
-                sessionRef.current = null;
-                setSession(null);
-                setStatus((s) => (s === "error" ? s : "ended"));
-              }}
-              onError={(e) => {
-                const msg = formatLivekitError(e);
-                setStatus("error");
-                setErrorMsg(msg);
-                toast.error("Erro na chamada", { description: msg.split("\n")[0] });
-              }}
-            >
-              <RoomAudioRenderer />
-              <div className="hidden">
-                <MicControl muted={muted} onMutedChange={setMuted} />
-              </div>
-            </LiveKitRoom>
-          )}
-
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              {session && status === "in_call" && (
-                <MicControl muted={muted} onMutedChange={setMuted} />
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {isActive ? (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={endCall}
-                  disabled={status === "connecting"}
-                  className="gap-2"
-                >
-                  {status === "connecting" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PhoneOff className="h-4 w-4" />
-                  )}
-                  Encerrar
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => void startCall()}
-                  disabled={!costAck && status !== "error"}
-                  className="gap-2 shadow-glow"
-                >
-                  <PhoneCall className="h-4 w-4" />
-                  {status === "error" ? "Tentar novamente" : "Iniciar chamada"}
-                </Button>
-              )}
-            </div>
+          <div className="flex items-center justify-end gap-2">
+            {/* Sala LiveKit: montada apenas quando há token. RoomAudioRenderer
+                é obrigatório para o áudio do agente tocar no navegador. */}
+            {session ? (
+              <LiveKitRoom
+                token={session.token}
+                serverUrl={session.serverUrl}
+                connect={true}
+                audio={true}
+                video={false}
+                onConnected={() => setStatus("in_call")}
+                onDisconnected={() => {
+                  sessionRef.current = null;
+                  setSession(null);
+                  setStatus((s) => (s === "error" ? s : "ended"));
+                }}
+                onError={(e) => {
+                  const msg = formatLivekitError(e);
+                  setStatus("error");
+                  setErrorMsg(msg);
+                  toast.error("Erro na chamada", { description: msg.split("\n")[0] });
+                }}
+              >
+                <RoomAudioRenderer />
+                <SessionControls muted={muted} onMutedChange={setMuted} onEnd={endCall} />
+              </LiveKitRoom>
+            ) : isActive ? (
+              <Button variant="destructive" size="sm" disabled className="gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Encerrar
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => void startCall()}
+                disabled={!costAck && status !== "error"}
+                className="gap-2 shadow-glow"
+              >
+                <PhoneCall className="h-4 w-4" />
+                {status === "error" ? "Tentar novamente" : "Iniciar chamada"}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
