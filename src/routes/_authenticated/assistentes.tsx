@@ -74,6 +74,7 @@ import {
   type VapiAssistantDTO,
   type AssistantCardSummary,
 } from "@/lib/vapi.functions";
+import { LivekitAgentsSection } from "@/components/assistants/livekit-agents-section";
 
 import { cn } from "@/lib/utils";
 
@@ -786,6 +787,9 @@ function AssistentesPage() {
             ))
           )}
         </section>
+
+        {/* Agentes próprios (LiveKit) — alternativa à Vapi, destaque Omniasyn */}
+        <LivekitAgentsSection />
       </div>
 
       {/* Create / Edit dialog */}
