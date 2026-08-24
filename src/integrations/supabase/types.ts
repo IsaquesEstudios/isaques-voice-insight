@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      livekit_agents: {
+        Row: {
+          contexto: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          name: string
+          perfil: string | null
+          updated_at: string
+          user_id: string
+          voz: string | null
+        }
+        Insert: {
+          contexto?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name: string
+          perfil?: string | null
+          updated_at?: string
+          user_id: string
+          voz?: string | null
+        }
+        Update: {
+          contexto?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name?: string
+          perfil?: string | null
+          updated_at?: string
+          user_id?: string
+          voz?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
