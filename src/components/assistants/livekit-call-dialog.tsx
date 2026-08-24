@@ -65,13 +65,15 @@ function formatLivekitError(error: unknown): string {
   ].join("\n");
 }
 
-/** Controles dentro do contexto da sala (mute do microfone local). */
-function MicControl({
+/** Controles da chamada — precisam viver dentro do <LiveKitRoom> (contexto). */
+function SessionControls({
   muted,
   onMutedChange,
+  onEnd,
 }: {
   muted: boolean;
   onMutedChange: (muted: boolean) => void;
+  onEnd: () => void;
 }) {
   const { localParticipant } = useLocalParticipant();
 
@@ -82,15 +84,21 @@ function MicControl({
   }, [muted, localParticipant]);
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => onMutedChange(!muted)}
-      className="gap-2 border-border bg-card/40 backdrop-blur-xl"
-    >
-      {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-      {muted ? "Desmutar" : "Mutar"}
-    </Button>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onMutedChange(!muted)}
+        className="gap-2 border-border bg-card/40 backdrop-blur-xl"
+      >
+        {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        {muted ? "Desmutar" : "Mutar"}
+      </Button>
+      <Button variant="destructive" size="sm" onClick={onEnd} className="gap-2">
+        <PhoneOff className="h-4 w-4" />
+        Encerrar
+      </Button>
+    </>
   );
 }
 
