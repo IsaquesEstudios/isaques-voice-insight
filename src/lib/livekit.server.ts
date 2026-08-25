@@ -31,6 +31,8 @@ interface TokenOptions {
   displayName?: string;
   room: string;
   metadata?: string;
+  roomMetadata?: string;
+  dispatchAgent?: boolean;
   /** Grants extras de serviço (ex: roomCreate para chamar a API de salas). */
   service?: boolean;
   ttlSeconds?: number;
@@ -51,6 +53,15 @@ export async function signLivekitJwt(env: LivekitEnv, opts: TokenOptions): Promi
     payload.sub = opts.identity;
     if (opts.displayName) payload.name = opts.displayName;
     if (opts.metadata) payload.metadata = opts.metadata;
+    if (opts.dispatchAgent) {
+      payload.roomConfig = {
+        name: opts.room,
+        metadata: opts.roomMetadata ?? opts.metadata ?? "",
+        emptyTimeout: 300,
+        maxParticipants: 4,
+        agents: [{ metadata: opts.metadata ?? "" }],
+      };
+    }
   }
 
   return new SignJWT(payload)
@@ -63,10 +74,9 @@ export async function signLivekitJwt(env: LivekitEnv, opts: TokenOptions): Promi
 }
 
 /**
- * Cria a sala via API Twirp do LiveKit já com a metadata do agente —
- * é a criação da sala que dispara o dispatch automático do worker.
- * Se a sala já existir ou a chamada falhar, apenas registramos: o join do
- * participante auto-cria a sala e a metadata do participante serve de fallback.
+ * Cria a sala via API Twirp do LiveKit já com a metadata do agente.
+ * Mantido para fluxos administrativos; no teste de navegador, a sala é criada
+ * pelo token no momento do join para o agente não falar antes do áudio conectar.
  */
 export async function createLivekitRoom(
   env: LivekitEnv,
@@ -100,6 +110,6 @@ export async function createLivekitRoom(
     const body = await res.text().catch(() => "");
     // Sala duplicada não é erro fatal.
     if (/already exists/i.test(body)) return;
-    console.warn(`[livekit] CreateRoom retornou ${res.status}: ${body}`);
+    throw new Error(`LiveKit CreateRoom retornou ${res.status}: ${body || "sem detalhes"}`);
   }
 }
