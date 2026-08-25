@@ -636,15 +636,16 @@ function MeetingChat({ open, onClose }: { open: boolean; onClose: () => void }) 
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Escreva uma mensagem…"
+          placeholder={connected ? "Escreva uma mensagem…" : "Conectando à sala…"}
           aria-label="Escreva uma mensagem"
           className="h-9"
+          disabled={!connected}
         />
         <Button
           type="submit"
           size="icon"
           className="h-9 w-9 shrink-0"
-          disabled={!draft.trim() || isSending}
+          disabled={!draft.trim() || isSending || !connected}
           aria-label="Enviar mensagem"
         >
           {isSending ? (
