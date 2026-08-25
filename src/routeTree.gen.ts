@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
 import { Route as AuthenticatedTelefoniaRouteImport } from './routes/_authenticated/telefonia'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
@@ -35,6 +36,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReuniaoCodeRoute = ReuniaoCodeRouteImport.update({
+  id: '/reuniao/$code',
+  path: '/reuniao/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTelefoniaRoute = AuthenticatedTelefoniaRouteImport.update({
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/telefonia': typeof AuthenticatedTelefoniaRoute
+  '/reuniao/$code': typeof ReuniaoCodeRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
 }
 export interface FileRoutesByTo {
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/telefonia': typeof AuthenticatedTelefoniaRoute
+  '/reuniao/$code': typeof ReuniaoCodeRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
 }
 export interface FileRoutesById {
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
   '/_authenticated/telefonia': typeof AuthenticatedTelefoniaRoute
+  '/reuniao/$code': typeof ReuniaoCodeRoute
   '/_authenticated/assistants/$id': typeof AuthenticatedAssistantsIdRoute
 }
 export interface FileRouteTypes {
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/reunioes'
     | '/telefonia'
+    | '/reuniao/$code'
     | '/assistants/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/reunioes'
     | '/telefonia'
+    | '/reuniao/$code'
     | '/assistants/$id'
   id:
     | '__root__'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/reunioes'
     | '/_authenticated/telefonia'
+    | '/reuniao/$code'
     | '/_authenticated/assistants/$id'
   fileRoutesById: FileRoutesById
 }
@@ -185,6 +197,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ReuniaoCodeRoute: typeof ReuniaoCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reuniao/$code': {
+      id: '/reuniao/$code'
+      path: '/reuniao/$code'
+      fullPath: '/reuniao/$code'
+      preLoaderRoute: typeof ReuniaoCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/telefonia': {
@@ -316,6 +336,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
+  ReuniaoCodeRoute: ReuniaoCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
