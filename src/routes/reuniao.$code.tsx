@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Video, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, UserX, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -14,7 +14,10 @@ import {
   MeetingEndedScreen,
   type MeetingSession,
 } from "@/components/reunioes/livekit-meeting-room";
-import { joinLivekitMeetingAsGuest } from "@/lib/livekit.functions";
+import {
+  getMeetingJoinRequestStatus,
+  requestMeetingJoin,
+} from "@/lib/livekit.functions";
 import { translateError } from "@/lib/error-messages";
 
 export const Route = createFileRoute("/reuniao/$code")({
@@ -43,7 +46,45 @@ function GuestMeetingPage() {
   const [ended, setEnded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const joinAsGuest = useServerFn(joinLivekitMeetingAsGuest);
+  const [denied, setDenied] = useState(false);
+  const [waiting, setWaiting] = useState<{
+    requestId: string;
+    meetingName: string;
+  } | null>(null);
+  const requestJoin = useServerFn(requestMeetingJoin);
+  const checkStatus = useServerFn(getMeetingJoinRequestStatus);
+  const waitingRequestId = waiting?.requestId ?? null;
+
+  // Sala de espera: consulta o pedido até o organizador aprovar/recusar.
+  useEffect(() => {
+    if (!waitingRequestId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await checkStatus({ data: { requestId: waitingRequestId } });
+        if (cancelled) return;
+        if (res.status === "approved" && res.session) {
+          setSession(res.session);
+          setWaiting(null);
+        } else if (res.status === "denied") {
+          setDenied(true);
+          setWaiting(null);
+        } else if (res.status === "expired") {
+          setError("Seu pedido de entrada expirou. Envie novamente.");
+          setWaiting(null);
+        }
+      } catch {
+        /* falha de rede — tenta no próximo ciclo */
+      }
+    };
+    void poll();
+    const id = setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingRequestId]);
 
   const handleJoin = async () => {
     if (!displayName.trim()) {
@@ -52,11 +93,12 @@ function GuestMeetingPage() {
     }
     setBusy(true);
     setError(null);
+    setDenied(false);
     try {
-      const s = await joinAsGuest({
+      const r = await requestJoin({
         data: { code, displayName: displayName.trim() },
       });
-      setSession(s);
+      setWaiting({ requestId: r.requestId, meetingName: r.meetingName });
     } catch (e) {
       setError(translateError(e, "Não foi possível entrar na reunião."));
       toast.error("Não foi possível entrar na reunião.");
@@ -89,6 +131,62 @@ function GuestMeetingPage() {
           onLeave={() => setSession(null)}
           onEnded={() => setEnded(true)}
         />
+      </div>
+    );
+  }
+
+  if (waiting) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <Card className="w-full max-w-md border-primary/30 bg-gradient-to-br from-primary/10 to-transparent text-center">
+          <CardHeader>
+            <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-xl bg-primary/15 text-primary">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+            <CardTitle className="text-lg">Aguardando aprovação</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              O organizador de{" "}
+              <span className="font-medium text-foreground">{waiting.meetingName}</span>{" "}
+              foi avisado e vai liberar sua entrada em instantes.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Não feche esta página — você entra automaticamente quando for aprovado.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => setWaiting(null)}>
+              Cancelar e voltar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (denied) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <Card className="w-full max-w-md border-destructive/40 text-center">
+          <CardHeader>
+            <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-xl bg-destructive/15 text-destructive">
+              <UserX className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-lg">Entrada não autorizada</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              O organizador recusou sua entrada nesta reunião. Se acredita que
+              isso foi um engano, fale com quem enviou o convite.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setDenied(false)}
+            >
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -133,10 +231,11 @@ function GuestMeetingPage() {
             ) : (
               <Video className="h-4 w-4" />
             )}
-            Entrar na reunião
+            Pedir para entrar
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            Áudio e vídeo direto no navegador — nenhuma instalação necessária.
+            O organizador vai aprovar sua entrada. Áudio e vídeo direto no
+            navegador — nenhuma instalação necessária.
           </p>
         </CardContent>
       </Card>
