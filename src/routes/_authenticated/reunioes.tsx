@@ -97,7 +97,15 @@ function ReunioesPage() {
           </div>
         </header>
 
-        {!session ? (
+        {session && ended ? (
+          <MeetingEndedScreen
+            actionLabel="Voltar para o início"
+            onAction={() => {
+              setSession(null);
+              setEnded(false);
+            }}
+          />
+        ) : !session ? (
           <div className="grid min-h-[55vh] place-items-center">
             <Card className="w-full max-w-md border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardHeader className="text-center">
