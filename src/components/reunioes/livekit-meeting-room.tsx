@@ -5,6 +5,7 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useChat,
+  useConnectionState,
   useCreateLayoutContext,
   useIsMuted,
   useIsSpeaking,
@@ -14,7 +15,13 @@ import {
   useTracks,
   VideoTrack,
 } from "@livekit/components-react";
-import { DisconnectReason, ParticipantKind, RoomEvent, Track } from "livekit-client";
+import {
+  ConnectionState,
+  DisconnectReason,
+  ParticipantKind,
+  RoomEvent,
+  Track,
+} from "livekit-client";
 import type { Participant } from "livekit-client";
 import type {
   TrackReference,
