@@ -40,6 +40,7 @@ function GuestMeetingPage() {
   const { code } = Route.useParams();
   const [displayName, setDisplayName] = useState("");
   const [session, setSession] = useState<MeetingSession | null>(null);
+  const [ended, setEnded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const joinAsGuest = useServerFn(joinLivekitMeetingAsGuest);
@@ -64,10 +65,30 @@ function GuestMeetingPage() {
     }
   };
 
+  if (session && ended) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <div className="w-full max-w-md">
+          <MeetingEndedScreen
+            actionLabel="Voltar"
+            onAction={() => {
+              setSession(null);
+              setEnded(false);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (session) {
     return (
       <div className="flex min-h-screen flex-col bg-background p-4 sm:p-6">
-        <LivekitMeetingRoom session={session} onLeave={() => setSession(null)} />
+        <LivekitMeetingRoom
+          session={session}
+          onLeave={() => setSession(null)}
+          onEnded={() => setEnded(true)}
+        />
       </div>
     );
   }

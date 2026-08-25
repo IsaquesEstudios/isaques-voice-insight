@@ -33,6 +33,7 @@ function ReunioesPage() {
   const [roomInput, setRoomInput] = useState("");
   const [joinInput, setJoinInput] = useState("");
   const [session, setSession] = useState<MeetingSession | null>(null);
+  const [ended, setEnded] = useState(false);
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const startMeeting = useServerFn(startLivekitMeeting);
   const joinMeeting = useServerFn(joinLivekitMeeting);
