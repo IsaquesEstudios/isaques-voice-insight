@@ -137,6 +137,11 @@ export async function createLivekitRoom(
         // Encerra a sala após ficar vazia, para não acumular custo.
         empty_timeout: opts?.emptyTimeout ?? 300,
         max_participants: opts?.maxParticipants ?? 4,
+        // Tempo que a sala sobrevive depois que o último participante sai
+        // (padrão do LiveKit é ~20s, o que encerrava reuniões em recargas).
+        ...(opts?.departureTimeout
+          ? { departure_timeout: opts.departureTimeout }
+          : {}),
       }),
     },
   );

@@ -268,7 +268,8 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
 
     try {
       await createLivekitRoom(env, roomName, metadata, {
-        emptyTimeout: 600,
+        emptyTimeout: 3600, // sala vazia sobrevive 1h (convidado pode chegar antes)
+        departureTimeout: 600, // se todos caírem, sala aguenta 10min (recarga/rede)
         maxParticipants: 20,
       });
     } catch (e) {
