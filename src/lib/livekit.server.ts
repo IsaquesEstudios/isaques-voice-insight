@@ -268,6 +268,39 @@ export async function updateLivekitRoomMetadata(
   }
 }
 
+/**
+ * Encerra a sala imediatamente, desconectando todos os participantes.
+ * Usada pelo botão "Encerrar reunião" do organizador.
+ */
+export async function deleteLivekitRoom(
+  env: LivekitEnv,
+  roomName: string,
+): Promise<void> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: roomName,
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/DeleteRoom`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ room: roomName }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    // Sala já encerrada não é erro fatal.
+    if (res.status === 404 || /not found|does not exist/i.test(body)) return;
+    throw new Error(`LiveKit DeleteRoom retornou ${res.status}: ${body || "sem detalhes"}`);
+  }
+}
+
 /** Slug seguro para nomear salas de reunião (minúsculas, sem acentos). */
 export function slugifyMeetingName(name: string): string {
   const slug = name
