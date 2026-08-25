@@ -54,6 +54,7 @@ import {
   Send,
   Settings,
   UserCheck,
+  UserPlus,
   UserX,
   Video,
   X,
@@ -96,10 +97,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   callLivekitMeetingAgent,
   endLivekitMeeting,
   getMeetingState,
+  listMeetingJoinRequests,
+  respondMeetingJoinRequest,
   setMeetingPresenter,
+  type MeetingJoinRequestDTO,
 } from "@/lib/livekit.functions";
 import { translateError } from "@/lib/error-messages";
 
@@ -956,6 +965,126 @@ function MeetingStage({
 }
 
 // ---------------------------------------------------------------------------
+// Sala de espera: pedidos de entrada de convidados (somente organizador).
+// Polling a cada 4s — o convidado recebe o token assim que é aprovado e
+// entra automaticamente na sala.
+// ---------------------------------------------------------------------------
+
+function JoinRequestsPanel({ roomCode }: { roomCode: string }) {
+  const fetchRequests = useServerFn(listMeetingJoinRequests);
+  const respond = useServerFn(respondMeetingJoinRequest);
+  const [requests, setRequests] = useState<MeetingJoinRequestDTO[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const knownRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const list = await fetchRequests({ data: { code: roomCode } });
+        if (cancelled) return;
+        if (initializedRef.current) {
+          for (const r of list) {
+            if (!knownRef.current.has(r.id)) {
+              toast.info(`${r.guestName} quer entrar na reunião.`);
+            }
+          }
+        }
+        initializedRef.current = true;
+        knownRef.current = new Set(list.map((r) => r.id));
+        setRequests(list);
+      } catch {
+        /* falha de rede — tenta no próximo ciclo */
+      }
+    };
+    void poll();
+    const id = setInterval(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomCode]);
+
+  const handleRespond = async (requestId: string, approve: boolean, guestName: string) => {
+    setBusyId(requestId);
+    try {
+      await respond({ data: { requestId, approve } });
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      if (approve) toast.success(`Entrada liberada para ${guestName}.`);
+      else toast.info(`Entrada recusada para ${guestName}.`);
+    } catch (e) {
+      toast.error(translateError(e, "Não foi possível responder à solicitação."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="relative gap-2">
+          <UserPlus className="h-4 w-4" />
+          Entradas
+          {requests.length > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+              {requests.length}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Solicitações de entrada</p>
+          {requests.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Ninguém aguardando no momento.</p>
+          ) : (
+            <ul className="space-y-2">
+              {requests.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5"
+                >
+                  <span className="min-w-0 truncate text-sm">{r.guestName}</span>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={busyId === r.id}
+                      onClick={() => void handleRespond(r.id, true, r.guestName)}
+                      aria-label={`Aprovar entrada de ${r.guestName}`}
+                      title="Aprovar"
+                    >
+                      {busyId === r.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      disabled={busyId === r.id}
+                      onClick={() => void handleRespond(r.id, false, r.guestName)}
+                      aria-label={`Recusar entrada de ${r.guestName}`}
+                      title="Recusar"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Tela de fim de reunião (compartilhada entre painel e rota de convidado).
 // ---------------------------------------------------------------------------
 
@@ -1251,6 +1380,7 @@ function MeetingShell(props: ShellProps) {
                   {props.aiState === "waiting" ? "IA a caminho…" : "Chamar IA"}
                 </Button>
               )}
+              {props.isHost && <JoinRequestsPanel roomCode={props.session.roomName} />}
               {props.isHost && (
                 <Button
                   variant="outline"
