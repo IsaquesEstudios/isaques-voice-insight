@@ -200,3 +200,173 @@ export const startLivekitCall = createServerFn({ method: "POST" })
 
     return { token, serverUrl: env.url, roomName };
   });
+
+// ---------------------------------------------------------------------------
+// Reuniões em vídeo (LiveKit): criação de sala, entrada por código, acesso de
+// convidado via link público e botão "Chamar IA" sob demanda.
+// ---------------------------------------------------------------------------
+
+export interface LivekitMeetingSession {
+  token: string;
+  serverUrl: string;
+  roomName: string;
+}
+
+type MeetingCreatePayload = { meetingName: string; displayName?: string };
+type MeetingJoinPayload = { code: string; displayName?: string };
+
+function parseMeetingCreate(data: unknown): MeetingCreatePayload {
+  const d = (data ?? {}) as Record<string, unknown>;
+  const meetingName = typeof d.meetingName === "string" ? d.meetingName.trim() : "";
+  if (!meetingName) throw new Error("Informe um nome para a reunião.");
+  if (meetingName.length > 60) throw new Error("Nome muito longo (máx. 60 caracteres).");
+  const displayName =
+    typeof d.displayName === "string" && d.displayName.trim()
+      ? d.displayName.trim().slice(0, 60)
+      : undefined;
+  return { meetingName, displayName };
+}
+
+function parseMeetingJoin(data: unknown, requireName: boolean): MeetingJoinPayload {
+  const d = (data ?? {}) as Record<string, unknown>;
+  const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+  if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+    throw new Error("Código de reunião inválido.");
+  }
+  const displayName =
+    typeof d.displayName === "string" && d.displayName.trim()
+      ? d.displayName.trim().slice(0, 60)
+      : undefined;
+  if (requireName && !displayName) {
+    throw new Error("Informe seu nome para entrar na reunião.");
+  }
+  return { code, displayName };
+}
+
+function parseMeetingCode(data: unknown): { code: string } {
+  const { code } = parseMeetingJoin(data, false);
+  return { code };
+}
+
+/** Cria a sala de reunião e devolve o token do organizador (painel). */
+export const startLivekitMeeting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(parseMeetingCreate)
+  .handler(async ({ data, context }): Promise<LivekitMeetingSession> => {
+    const { createLivekitRoom, getLivekitEnv, signLivekitJwt, slugifyMeetingName } =
+      await import("./livekit.server");
+    const env = getLivekitEnv();
+
+    const roomName = `reuniao-${slugifyMeetingName(data.meetingName)}-${Math.random()
+      .toString(36)
+      .slice(2, 6)}`;
+    const metadata = JSON.stringify({
+      tipo: "reuniao",
+      nome: data.meetingName,
+      criadoPor: context.userId,
+    });
+
+    try {
+      await createLivekitRoom(env, roomName, metadata, {
+        emptyTimeout: 600,
+        maxParticipants: 20,
+      });
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(
+        `Não consegui criar a sala de reunião.\nDetalhe técnico: ${detail}`,
+      );
+    }
+
+    const token = await signLivekitJwt(env, {
+      identity: `painel-${context.userId.slice(0, 8)}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`,
+      displayName: data.displayName ?? "Organizador",
+      room: roomName,
+      ttlSeconds: 14400, // 4h — reuniões duram mais que chamadas de teste
+    });
+
+    return { token, serverUrl: env.url, roomName };
+  });
+
+/** Usuário logado entra em uma sala existente pelo código. */
+export const joinLivekitMeeting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => parseMeetingJoin(data, false))
+  .handler(async ({ data, context }): Promise<LivekitMeetingSession> => {
+    const { getLivekitEnv, livekitRoomExists, signLivekitJwt } = await import(
+      "./livekit.server"
+    );
+    const env = getLivekitEnv();
+
+    if (!(await livekitRoomExists(env, data.code))) {
+      throw new Error("Reunião não encontrada ou já encerrada.");
+    }
+
+    const token = await signLivekitJwt(env, {
+      identity: `painel-${context.userId.slice(0, 8)}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`,
+      displayName: data.displayName ?? "Participante",
+      room: data.code,
+      ttlSeconds: 14400,
+    });
+
+    return { token, serverUrl: env.url, roomName: data.code };
+  });
+
+/**
+ * Convidado externo entra pela rota pública /reuniao/<codigo>.
+ * Sem autenticação: valida o padrão do código e confirma que a sala existe
+ * antes de emitir o token — não expõe nada além do acesso àquela sala.
+ */
+export const joinLivekitMeetingAsGuest = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => parseMeetingJoin(data, true))
+  .handler(async ({ data }): Promise<LivekitMeetingSession> => {
+    const { getLivekitEnv, livekitRoomExists, signLivekitJwt } = await import(
+      "./livekit.server"
+    );
+    const env = getLivekitEnv();
+
+    if (!(await livekitRoomExists(env, data.code))) {
+      throw new Error("Reunião não encontrada ou já encerrada.");
+    }
+
+    const token = await signLivekitJwt(env, {
+      identity: `convidado-${Math.random().toString(36).slice(2, 10)}`,
+      displayName: data.displayName ?? "Convidado",
+      room: data.code,
+      ttlSeconds: 14400,
+    });
+
+    return { token, serverUrl: env.url, roomName: data.code };
+  });
+
+/**
+ * Botão "Chamar IA": despacha o agente para a sala de reunião sob demanda.
+ * Pública (convidados também podem chamar), mas exige código válido e sala ativa.
+ */
+export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
+  .inputValidator(parseMeetingCode)
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const { dispatchLivekitAgent, getLivekitEnv, livekitRoomExists } = await import(
+      "./livekit.server"
+    );
+    const env = getLivekitEnv();
+
+    if (!(await livekitRoomExists(env, data.code))) {
+      throw new Error("Reunião não encontrada ou já encerrada.");
+    }
+
+    const metadata = JSON.stringify({ tipo: "reuniao", acao: "chamar_ia" });
+    try {
+      await dispatchLivekitAgent(env, data.code, metadata);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(
+        `Não consegui chamar a IA para a reunião.\nDetalhe técnico: ${detail}`,
+      );
+    }
+    return { ok: true };
+  });
