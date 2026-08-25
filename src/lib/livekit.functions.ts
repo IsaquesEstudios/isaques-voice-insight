@@ -148,7 +148,8 @@ export const startLivekitCall = createServerFn({ method: "POST" })
     ),
   }))
   .handler(async ({ data, context }): Promise<LivekitCallSession> => {
-    const { createLivekitRoom, getLivekitEnv, signLivekitJwt } = await import("./livekit.server");
+    const { createLivekitRoom, dispatchLivekitAgent, getLivekitEnv, signLivekitJwt } =
+      await import("./livekit.server");
     const env = getLivekitEnv();
 
     const { data: agent, error } = await context.supabase
@@ -172,7 +173,19 @@ export const startLivekitCall = createServerFn({ method: "POST" })
       .toString(36)
       .slice(2, 6)}`;
 
-    await createLivekitRoom(env, roomName, metadata);
+    try {
+      await createLivekitRoom(env, roomName, metadata);
+      await dispatchLivekitAgent(env, roomName, metadata);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(
+        [
+          "Não consegui enviar o agente LiveKit para a sala de teste.",
+          `Detalhe técnico: ${detail}`,
+          "Verifique se o worker Python está rodando, conectado ao mesmo projeto LiveKit e, se ele usa nome de agente, configure LIVEKIT_AGENT_NAME.",
+        ].join("\n"),
+      );
+    }
 
     const token = await signLivekitJwt(env, {
       identity,

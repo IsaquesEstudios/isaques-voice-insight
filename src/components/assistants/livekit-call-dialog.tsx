@@ -16,7 +16,7 @@ import {
   useAudioPlayback,
   useLocalParticipant,
 } from "@livekit/components-react";
-import { Room } from "livekit-client";
+import { Room, RoomEvent, Track } from "livekit-client";
 
 import {
   Dialog,
@@ -62,6 +62,20 @@ function formatLivekitError(error: unknown): string {
     return [
       "Problema: as credenciais do LiveKit não estão configuradas no servidor.",
       "Como resolver: confira LIVEKIT_URL, LIVEKIT_API_KEY e LIVEKIT_API_SECRET nas configurações do projeto.",
+    ].join("\n");
+  }
+  if (raw.includes("agentdispatch") || raw.includes("enviar o agente")) {
+    return [
+      "Problema: o agente LiveKit não entrou na sala de teste.",
+      `Motivo provável: ${detail}`,
+      "Como resolver: confira se o worker Python está rodando e conectado ao mesmo projeto LiveKit.",
+    ].join("\n");
+  }
+  if (raw.includes("401") || raw.includes("unauthorized") || raw.includes("not authorized")) {
+    return [
+      "Problema: o LiveKit recusou a operação por autorização.",
+      `Motivo provável: ${detail}`,
+      "Como resolver: confira LIVEKIT_API_KEY, LIVEKIT_API_SECRET e permissões do projeto LiveKit.",
     ].join("\n");
   }
   return [
@@ -141,6 +155,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
   const [muted, setMuted] = useState(false);
   const [costAck, setCostAck] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [agentJoined, setAgentJoined] = useState(false);
+  const [agentAudioReady, setAgentAudioReady] = useState(false);
+  const [agentWaitNotice, setAgentWaitNotice] = useState<string | null>(null);
   // Token usado de fato na sala (evita reconectar durante rerenders).
   const sessionRef = useRef<LivekitCallSession | null>(null);
   const roomRef = useRef<Room | null>(null);
@@ -169,6 +186,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
       setMuted(false);
       setCostAck(false);
       setElapsed(0);
+      setAgentJoined(false);
+      setAgentAudioReady(false);
+      setAgentWaitNotice(null);
     }
   }, [open, disconnectRoom]);
 
@@ -179,10 +199,72 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
     return () => clearInterval(timer);
   }, [status]);
 
+  // Observa se o worker entrou na sala e publicou áudio remoto.
+  useEffect(() => {
+    if (!room) return;
+
+    const updateAgentState = () => {
+      const participants = Array.from(room.remoteParticipants.values());
+      const hasParticipant = participants.length > 0;
+      const hasAudio = participants.some((participant) =>
+        Array.from(participant.trackPublications.values()).some(
+          (publication) => publication.kind === Track.Kind.Audio && publication.isSubscribed,
+        ),
+      );
+
+      setAgentJoined(hasParticipant);
+      setAgentAudioReady(hasAudio);
+      if (hasAudio) setAgentWaitNotice(null);
+    };
+
+    updateAgentState();
+    room.on(RoomEvent.ParticipantConnected, updateAgentState);
+    room.on(RoomEvent.ParticipantDisconnected, updateAgentState);
+    room.on(RoomEvent.TrackPublished, updateAgentState);
+    room.on(RoomEvent.TrackSubscribed, updateAgentState);
+    room.on(RoomEvent.TrackUnsubscribed, updateAgentState);
+    room.on(RoomEvent.TrackUnpublished, updateAgentState);
+
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, updateAgentState);
+      room.off(RoomEvent.ParticipantDisconnected, updateAgentState);
+      room.off(RoomEvent.TrackPublished, updateAgentState);
+      room.off(RoomEvent.TrackSubscribed, updateAgentState);
+      room.off(RoomEvent.TrackUnsubscribed, updateAgentState);
+      room.off(RoomEvent.TrackUnpublished, updateAgentState);
+    };
+  }, [room]);
+
+  // Se a sala conectou, mas o agente/áudio não apareceu, mostra onde travou.
+  useEffect(() => {
+    if (status !== "in_call" || agentAudioReady) {
+      setAgentWaitNotice(null);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      const currentRoom = roomRef.current;
+      const hasParticipant = currentRoom
+        ? Array.from(currentRoom.remoteParticipants.values()).length > 0
+        : agentJoined;
+
+      setAgentWaitNotice(
+        hasParticipant
+          ? "O agente entrou na sala, mas ainda não publicou áudio. Verifique no terminal do worker os provedores de voz, transcrição e IA."
+          : "O navegador entrou na sala, mas o worker do agente ainda não entrou. Verifique se o worker Python está rodando no mesmo projeto LiveKit.",
+      );
+    }, agentJoined ? 12000 : 8000);
+
+    return () => window.clearTimeout(timeout);
+  }, [agentAudioReady, agentJoined, status]);
+
   async function startCall() {
     setStatus("connecting");
     setErrorMsg(null);
     setElapsed(0);
+    setAgentJoined(false);
+    setAgentAudioReady(false);
+    setAgentWaitNotice(null);
     disconnectRoom();
 
     const nextRoom = new Room();
@@ -208,7 +290,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
       return;
     }
 
-    // 2. Pede ao servidor a sala + token (a sala aciona o dispatch automático do worker).
+    // 2. Pede ao servidor a sala, o dispatch explícito do agente e o token do navegador.
     try {
       const res = await sessionMutation.mutateAsync();
       sessionRef.current = res;
@@ -226,6 +308,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
     sessionRef.current = null;
     disconnectRoom();
     setSession(null);
+    setAgentJoined(false);
+    setAgentAudioReady(false);
+    setAgentWaitNotice(null);
     setStatus("ended");
   }
 
@@ -238,6 +323,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
     roomRef.current = null;
     setRoom(null);
     setSession(null);
+    setAgentJoined(false);
+    setAgentAudioReady(false);
+    setAgentWaitNotice(null);
     setStatus((s) => (s === "error" ? s : "ended"));
   }, []);
 
@@ -280,7 +368,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
               <p className="text-sm font-semibold">
                 {status === "idle" && "Pronto para iniciar"}
                 {status === "connecting" && "Conectando..."}
-                {status === "in_call" && "Em ligação"}
+                {status === "in_call" && !agentJoined && "Em ligação · aguardando agente"}
+                {status === "in_call" && agentJoined && !agentAudioReady && "Em ligação · aguardando áudio"}
+                {status === "in_call" && agentAudioReady && "Em ligação"}
                 {status === "ended" && "Chamada encerrada"}
                 {status === "error" && "Erro na chamada"}
               </p>
@@ -333,6 +423,14 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
             <Alert className="border-destructive/40 bg-destructive/10">
               <AlertDescription className="whitespace-pre-line text-xs leading-relaxed text-foreground">
                 {errorMsg}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {status === "in_call" && agentWaitNotice && (
+            <Alert className="border-warning/40 bg-warning/10">
+              <AlertDescription className="text-xs leading-relaxed text-foreground">
+                {agentWaitNotice}
               </AlertDescription>
             </Alert>
           )}
