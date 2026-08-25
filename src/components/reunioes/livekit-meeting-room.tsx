@@ -543,10 +543,21 @@ function MeetingRoomContent({
     }
   }, [meta.presenter, participants, myIdentity]);
 
-  const tracks = useTracks([
+  const rawTracks = useTracks([
     { source: Track.Source.Camera, withPlaceholder: true },
     { source: Track.Source.ScreenShare, withPlaceholder: false },
   ]);
+  // Durante a publicação, o SDK pode emitir placeholder + track real da mesma
+  // fonte ao mesmo tempo — manter um só por participante/fonte (real primeiro).
+  const seenKeys = new Set<string>();
+  const tracks = [...rawTracks]
+    .sort((a, b) => Number(!!b.publication?.track) - Number(!!a.publication?.track))
+    .filter((t) => {
+      const k = tileKey(t);
+      if (seenKeys.has(k)) return false;
+      seenKeys.add(k);
+      return true;
+    });
 
   const screenshare = tracks.find((t) => t.source === Track.Source.ScreenShare);
   const presenterTrack = meta.presenter
