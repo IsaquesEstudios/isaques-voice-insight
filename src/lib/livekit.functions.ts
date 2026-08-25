@@ -212,8 +212,17 @@ export interface LivekitMeetingSession {
   roomName: string;
 }
 
-type MeetingCreatePayload = { meetingName: string; displayName?: string };
+type MeetingCreatePayload = {
+  meetingName: string;
+  displayName?: string;
+  scheduledAt?: string;
+};
 type MeetingJoinPayload = { code: string; displayName?: string };
+
+/** Resultado da criação: reunião instantânea (sessão pronta) ou agendada. */
+export type StartMeetingResult =
+  | ({ kind: "started" } & LivekitMeetingSession)
+  | { kind: "scheduled"; code: string; scheduledAt: string };
 
 function parseMeetingCreate(data: unknown): MeetingCreatePayload {
   const d = (data ?? {}) as Record<string, unknown>;
@@ -224,7 +233,17 @@ function parseMeetingCreate(data: unknown): MeetingCreatePayload {
     typeof d.displayName === "string" && d.displayName.trim()
       ? d.displayName.trim().slice(0, 60)
       : undefined;
-  return { meetingName, displayName };
+  let scheduledAt: string | undefined;
+  if (typeof d.scheduledAt === "string" && d.scheduledAt.trim()) {
+    const ts = new Date(d.scheduledAt);
+    if (Number.isNaN(ts.getTime())) throw new Error("Data de agendamento inválida.");
+    // Datas no passado (ou agora) viram reunião instantânea.
+    if (ts.getTime() > Date.now() + 60_000) scheduledAt = ts.toISOString();
+  }
+  const payload: MeetingCreatePayload = { meetingName };
+  if (displayName) payload.displayName = displayName;
+  if (scheduledAt) payload.scheduledAt = scheduledAt;
+  return payload;
 }
 
 function parseMeetingJoin(data: unknown, requireName: boolean): MeetingJoinPayload {
@@ -248,18 +267,35 @@ function parseMeetingCode(data: unknown): { code: string } {
   return { code };
 }
 
-/** Cria a sala de reunião e devolve o token do organizador (painel). */
+/**
+ * Cria a reunião: instantânea (sala LiveKit criada na hora) ou agendada
+ * (registrada no histórico para iniciar depois). Quando a sala já começa,
+ * devolve a sessão do organizador (painel).
+ */
 export const startLivekitMeeting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCreate)
-  .handler(async ({ data, context }): Promise<LivekitMeetingSession> => {
+  .handler(async ({ data, context }): Promise<StartMeetingResult> => {
     const { createLivekitRoom, getLivekitEnv, signLivekitJwt, slugifyMeetingName } =
       await import("./livekit.server");
-    const env = getLivekitEnv();
 
     const roomName = `reuniao-${slugifyMeetingName(data.meetingName)}-${Math.random()
       .toString(36)
       .slice(2, 6)}`;
+
+    // Reunião agendada: só registra no histórico — a sala é criada no início.
+    if (data.scheduledAt) {
+      const { error } = await context.supabase.from("meeting_rooms").insert({
+        user_id: context.userId,
+        code: roomName,
+        name: data.meetingName,
+        scheduled_at: data.scheduledAt,
+      });
+      if (error) throw new Error(`Falha ao agendar a reunião: ${error.message}`);
+      return { kind: "scheduled", code: roomName, scheduledAt: data.scheduledAt };
+    }
+
+    const env = getLivekitEnv();
     const metadata = JSON.stringify({
       tipo: "reuniao",
       nome: data.meetingName,
@@ -279,6 +315,14 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       );
     }
 
+    // Registra no histórico do usuário.
+    await context.supabase.from("meeting_rooms").insert({
+      user_id: context.userId,
+      code: roomName,
+      name: data.meetingName,
+      started_at: new Date().toISOString(),
+    });
+
     const token = await signLivekitJwt(env, {
       identity: `painel-${context.userId.slice(0, 8)}-${Math.random()
         .toString(36)
@@ -290,7 +334,7 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       ttlSeconds: 14400, // 4h — reuniões duram mais que chamadas de teste
     });
 
-    return { token, serverUrl: env.url, roomName };
+    return { kind: "started", token, serverUrl: env.url, roomName };
   });
 
 /** Usuário logado entra em uma sala existente pelo código. */
@@ -322,35 +366,6 @@ export const joinLivekitMeeting = createServerFn({ method: "POST" })
     return { token, serverUrl: env.url, roomName: data.code };
   });
 
-/**
- * Convidado externo entra pela rota pública /reuniao/<codigo>.
- * Sem autenticação: valida o padrão do código e confirma que a sala existe
- * antes de emitir o token — não expõe nada além do acesso àquela sala.
- */
-export const joinLivekitMeetingAsGuest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => parseMeetingJoin(data, true))
-  .handler(async ({ data }): Promise<LivekitMeetingSession> => {
-    const { getLivekitEnv, livekitRoomExists, signLivekitJwt } = await import(
-      "./livekit.server"
-    );
-    const env = getLivekitEnv();
-
-    if (!(await livekitRoomExists(env, data.code))) {
-      throw new Error(
-        "Reunião não encontrada ou já encerrada. Confira o código ou peça um novo link ao organizador.",
-      );
-    }
-
-    const token = await signLivekitJwt(env, {
-      identity: `convidado-${Math.random().toString(36).slice(2, 10)}`,
-      displayName: data.displayName ?? "Convidado",
-      room: data.code,
-      metadata: JSON.stringify({ role: "guest" }),
-      ttlSeconds: 14400,
-    });
-
-    return { token, serverUrl: env.url, roomName: data.code };
-  });
 
 /**
  * Botão "Chamar IA": despacha o agente para a sala de reunião sob demanda.
@@ -541,5 +556,344 @@ export const endLivekitMeeting = createServerFn({ method: "POST" })
         `Não consegui encerrar a reunião.\nDetalhe técnico: ${detail}`,
       );
     }
+
+    // Marca o fim no histórico (melhor esforço — salas antigas podem não estar gravadas).
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("meeting_rooms")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("code", data.code)
+        .is("ended_at", null);
+    } catch {
+      /* histórico é complementar; a sala já foi encerrada */
+    }
+    return { ok: true };
+  });
+
+// ---------------------------------------------------------------------------
+// Histórico de reuniões + sala de espera com aprovação do organizador.
+// ---------------------------------------------------------------------------
+
+export type MeetingStatus = "live" | "scheduled" | "ready" | "ended";
+
+export interface MeetingDTO {
+  id: string;
+  code: string;
+  name: string;
+  scheduledAt: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  status: MeetingStatus;
+}
+
+/** Lista as reuniões do usuário com o status calculado ("ao vivo" = sala ativa no LiveKit). */
+export const listMyMeetings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<MeetingDTO[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("meeting_rooms")
+      .select("id, code, name, scheduled_at, started_at, ended_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(`Falha ao carregar reuniões: ${error.message}`);
+    if (!rows || rows.length === 0) return [];
+
+    const { getLivekitEnv, listLivekitRoomNames } = await import("./livekit.server");
+    let active = new Set<string>();
+    try {
+      active = await listLivekitRoomNames(getLivekitEnv());
+    } catch {
+      active = new Set();
+    }
+
+    const now = Date.now();
+    const staleIds: string[] = [];
+    const meetings: MeetingDTO[] = rows.map((m) => {
+      let status: MeetingStatus;
+      if (m.ended_at) status = "ended";
+      else if (active.has(m.code)) status = "live";
+      else if (m.scheduled_at && new Date(m.scheduled_at).getTime() > now)
+        status = "scheduled";
+      else if (m.scheduled_at) status = "ready";
+      else {
+        // Reunião instantânea cuja sala já expirou: encerra no histórico.
+        status = "ended";
+        staleIds.push(m.id);
+      }
+      return {
+        id: m.id,
+        code: m.code,
+        name: m.name,
+        scheduledAt: m.scheduled_at,
+        startedAt: m.started_at,
+        endedAt: m.ended_at,
+        createdAt: m.created_at,
+        status,
+      };
+    });
+
+    if (staleIds.length > 0) {
+      const endedAt = new Date().toISOString();
+      await context.supabase
+        .from("meeting_rooms")
+        .update({ ended_at: endedAt })
+        .in("id", staleIds);
+      for (const m of meetings) {
+        if (staleIds.includes(m.id)) m.endedAt = endedAt;
+      }
+    }
+    return meetings;
+  });
+
+/**
+ * Organizador entra (ou inicia) a própria reunião: cria a sala quando ela
+ * ainda não está ativa (agendada/pronta) e devolve o token com papel de host.
+ */
+export const enterMeetingAsHost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(parseMeetingCode)
+  .handler(async ({ data, context }): Promise<LivekitMeetingSession> => {
+    const { createLivekitRoom, getLivekitEnv, livekitRoomExists, signLivekitJwt } =
+      await import("./livekit.server");
+    const env = getLivekitEnv();
+
+    const { data: meeting, error } = await context.supabase
+      .from("meeting_rooms")
+      .select("id, code, name, started_at, ended_at")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (error) throw new Error(`Falha ao abrir a reunião: ${error.message}`);
+    if (!meeting) throw new Error("Reunião não encontrada.");
+    if (meeting.ended_at) {
+      throw new Error("Esta reunião já foi encerrada. Crie uma nova reunião.");
+    }
+
+    if (!(await livekitRoomExists(env, meeting.code))) {
+      const metadata = JSON.stringify({
+        tipo: "reuniao",
+        nome: meeting.name,
+        criadoPor: context.userId,
+      });
+      try {
+        await createLivekitRoom(env, meeting.code, metadata, {
+          emptyTimeout: 3600,
+          departureTimeout: 600,
+          maxParticipants: 20,
+        });
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+        throw new Error(
+          `Não consegui iniciar a sala da reunião.\nDetalhe técnico: ${detail}`,
+        );
+      }
+      if (!meeting.started_at) {
+        await context.supabase
+          .from("meeting_rooms")
+          .update({ started_at: new Date().toISOString() })
+          .eq("id", meeting.id);
+      }
+    }
+
+    const token = await signLivekitJwt(env, {
+      identity: `painel-${context.userId.slice(0, 8)}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`,
+      displayName: "Organizador",
+      room: meeting.code,
+      metadata: JSON.stringify({ role: "host" }),
+      ttlSeconds: 14400,
+    });
+
+    return { token, serverUrl: env.url, roomName: meeting.code };
+  });
+
+/** Encerra uma reunião do histórico (apaga a sala no LiveKit e marca o fim). */
+export const closeMeeting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(parseMeetingCode)
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { deleteLivekitRoom, getLivekitEnv } = await import("./livekit.server");
+
+    const { data: meeting, error } = await context.supabase
+      .from("meeting_rooms")
+      .select("id, ended_at")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (error) throw new Error(`Falha ao encerrar a reunião: ${error.message}`);
+    if (!meeting) throw new Error("Reunião não encontrada.");
+
+    try {
+      await deleteLivekitRoom(getLivekitEnv(), data.code);
+    } catch {
+      // Sala já inexistente no LiveKit — apenas registra o encerramento.
+    }
+    if (!meeting.ended_at) {
+      await context.supabase
+        .from("meeting_rooms")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("id", meeting.id);
+    }
+    return { ok: true };
+  });
+
+export interface MeetingJoinRequestStart {
+  requestId: string;
+  meetingName: string;
+}
+
+/**
+ * Sala de espera: o convidado (sem login) pede para entrar. O token da sala
+ * NUNCA é emitido aqui — só depois da aprovação do organizador.
+ */
+export const requestMeetingJoin = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => parseMeetingJoin(data, true))
+  .handler(async ({ data }): Promise<MeetingJoinRequestStart> => {
+    const { getLivekitEnv, livekitRoomExists } = await import("./livekit.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const env = getLivekitEnv();
+
+    const { data: infoRows } = await supabaseAdmin.rpc("get_guest_meeting_info", {
+      p_code: data.code,
+    });
+    const info = infoRows?.[0];
+    if (!info) {
+      throw new Error(
+        "Reunião não encontrada. Confira o código ou peça um novo link ao organizador.",
+      );
+    }
+    if (info.ended_at) throw new Error("Esta reunião já foi encerrada.");
+
+    if (!(await livekitRoomExists(env, data.code))) {
+      if (info.scheduled_at && new Date(info.scheduled_at).getTime() > Date.now()) {
+        const when = new Date(info.scheduled_at).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "America/Sao_Paulo",
+        });
+        throw new Error(`A reunião ainda não começou. Agendada para ${when}.`);
+      }
+      throw new Error(
+        "Reunião não encontrada ou já encerrada. Confira o código ou peça um novo link ao organizador.",
+      );
+    }
+
+    const { data: row, error } = await supabaseAdmin
+      .from("meeting_join_requests")
+      .insert({ room_code: data.code, guest_name: data.displayName ?? "Convidado" })
+      .select("id")
+      .single();
+    if (error || !row) throw new Error("Não foi possível enviar o pedido de entrada.");
+
+    return { requestId: row.id, meetingName: info.name };
+  });
+
+export interface MeetingJoinStatusResult {
+  status: "pending" | "approved" | "denied" | "expired";
+  session?: LivekitMeetingSession;
+}
+
+/** Polling do convidado: devolve a sessão somente após aprovação do organizador. */
+export const getMeetingJoinRequestStatus = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => {
+    const id = (data as Record<string, unknown> | null)?.requestId;
+    if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id.trim())) {
+      throw new Error("Pedido de entrada inválido.");
+    }
+    return { requestId: id.trim() };
+  })
+  .handler(async ({ data }): Promise<MeetingJoinStatusResult> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin.rpc("get_meeting_join_status", {
+      p_id: data.requestId,
+    });
+    const row = rows?.[0];
+    if (error || !row) return { status: "expired" };
+    if (row.status === "approved" && row.token) {
+      const { getLivekitEnv } = await import("./livekit.server");
+      return {
+        status: "approved",
+        session: {
+          token: row.token,
+          serverUrl: getLivekitEnv().url,
+          roomName: row.room_code,
+        },
+      };
+    }
+    if (row.status === "denied") return { status: "denied" };
+    return { status: "pending" };
+  });
+
+export interface MeetingJoinRequestDTO {
+  id: string;
+  guestName: string;
+  createdAt: string;
+}
+
+/** Pedidos pendentes da sala de espera (somente o organizador da reunião, via RLS). */
+export const listMeetingJoinRequests = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(parseMeetingCode)
+  .handler(async ({ data, context }): Promise<MeetingJoinRequestDTO[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("meeting_join_requests")
+      .select("id, guest_name, created_at")
+      .eq("room_code", data.code)
+      .eq("status", "pending")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(`Falha ao carregar solicitações: ${error.message}`);
+    return (rows ?? []).map((r) => ({
+      id: r.id,
+      guestName: r.guest_name,
+      createdAt: r.created_at,
+    }));
+  });
+
+/** Organizador aprova (emite o token do convidado) ou recusa a entrada. */
+export const respondMeetingJoinRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const requestId = typeof d.requestId === "string" ? d.requestId.trim() : "";
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) throw new Error("Pedido inválido.");
+    return { requestId, approve: d.approve === true };
+  })
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { data: req, error } = await context.supabase
+      .from("meeting_join_requests")
+      .select("id, room_code, guest_name, status")
+      .eq("id", data.requestId)
+      .maybeSingle();
+    if (error) throw new Error(`Falha ao responder: ${error.message}`);
+    if (!req) throw new Error("Pedido não encontrado.");
+    if (req.status !== "pending") throw new Error("Este pedido já foi respondido.");
+
+    if (!data.approve) {
+      const { error: upErr } = await context.supabase
+        .from("meeting_join_requests")
+        .update({ status: "denied" })
+        .eq("id", req.id);
+      if (upErr) throw new Error(`Falha ao recusar a entrada: ${upErr.message}`);
+      return { ok: true };
+    }
+
+    const { getLivekitEnv, signLivekitJwt } = await import("./livekit.server");
+    const env = getLivekitEnv();
+    const token = await signLivekitJwt(env, {
+      identity: `convidado-${Math.random().toString(36).slice(2, 10)}`,
+      displayName: req.guest_name,
+      room: req.room_code,
+      metadata: JSON.stringify({ role: "guest" }),
+      ttlSeconds: 14400,
+    });
+    const { error: upErr } = await context.supabase
+      .from("meeting_join_requests")
+      .update({ status: "approved", token })
+      .eq("id", req.id);
+    if (upErr) throw new Error(`Falha ao aprovar a entrada: ${upErr.message}`);
     return { ok: true };
   });

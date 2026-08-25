@@ -202,6 +202,36 @@ export async function livekitRoomExists(env: LivekitEnv, roomName: string): Prom
   return !!body?.rooms?.some((r) => r.name === roomName);
 }
 
+/** Lista os nomes de todas as salas ativas no projeto LiveKit. */
+export async function listLivekitRoomNames(env: LivekitEnv): Promise<Set<string>> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: "omnia-server",
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/ListRooms`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    },
+  );
+  if (!res.ok) return new Set();
+  const body = (await res.json().catch(() => null)) as
+    | { rooms?: Array<{ name?: string }> }
+    | null;
+  return new Set(
+    (body?.rooms ?? [])
+      .map((r) => r.name)
+      .filter((n): n is string => typeof n === "string" && n.length > 0),
+  );
+}
+
 /** Lê a metadata atual da sala (null quando a sala não existe). */
 export async function getLivekitRoomMetadata(
   env: LivekitEnv,
