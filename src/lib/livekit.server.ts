@@ -51,7 +51,7 @@ interface TokenOptions {
 export async function signLivekitJwt(env: LivekitEnv, opts: TokenOptions): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const video: Record<string, unknown> = opts.service
-    ? { roomCreate: true, roomAdmin: true, roomList: true }
+    ? { roomCreate: true, roomAdmin: true, roomList: true, room: opts.room }
     : { roomJoin: true, room: opts.room, canPublish: true, canSubscribe: true };
 
   const payload: Record<string, unknown> = { video };
