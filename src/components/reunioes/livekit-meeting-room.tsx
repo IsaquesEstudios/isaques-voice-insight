@@ -583,7 +583,7 @@ function MeetingRoomContent({
       onWidgetChange={(state) => setShowChat(!!state.showChat)}
     >
       <AgentPresence onJoined={onAgentJoined} />
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-[70vh] min-h-0 flex-col">
         <div className="flex min-h-0 flex-1">
           <div className="relative min-w-0 flex-1">
             {focus ? (
