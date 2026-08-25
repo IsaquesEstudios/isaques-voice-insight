@@ -115,6 +115,7 @@ export async function createLivekitRoom(
   env: LivekitEnv,
   roomName: string,
   metadata: string,
+  opts?: { emptyTimeout?: number; maxParticipants?: number },
 ): Promise<void> {
   const serviceJwt = await signLivekitJwt(env, {
     identity: "omnia-server",
@@ -133,9 +134,9 @@ export async function createLivekitRoom(
       body: JSON.stringify({
         name: roomName,
         metadata,
-        // Encerra a sala 5 min após ficar vazia, para não acumular custo.
-        empty_timeout: 300,
-        max_participants: 4,
+        // Encerra a sala após ficar vazia, para não acumular custo.
+        empty_timeout: opts?.emptyTimeout ?? 300,
+        max_participants: opts?.maxParticipants ?? 4,
       }),
     },
   );
@@ -145,4 +146,42 @@ export async function createLivekitRoom(
     if (/already exists/i.test(body)) return;
     throw new Error(`LiveKit CreateRoom retornou ${res.status}: ${body || "sem detalhes"}`);
   }
+}
+
+/** Verifica se uma sala existe e está ativa no projeto LiveKit. */
+export async function livekitRoomExists(env: LivekitEnv, roomName: string): Promise<boolean> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: roomName,
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/ListRooms`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ names: [roomName] }),
+    },
+  );
+  if (!res.ok) return false;
+  const body = (await res.json().catch(() => null)) as
+    | { rooms?: Array<{ name?: string }> }
+    | null;
+  return !!body?.rooms?.some((r) => r.name === roomName);
+}
+
+/** Slug seguro para nomear salas de reunião (minúsculas, sem acentos). */
+export function slugifyMeetingName(name: string): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return slug || "sala";
 }
