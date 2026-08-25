@@ -10,7 +10,13 @@ import {
   DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
-import { LiveKitRoom, RoomAudioRenderer, useLocalParticipant } from "@livekit/components-react";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useAudioPlayback,
+  useLocalParticipant,
+} from "@livekit/components-react";
+import { Room } from "livekit-client";
 
 import {
   Dialog,
@@ -102,26 +108,61 @@ function SessionControls({
   );
 }
 
+function AudioPlaybackGuard() {
+  const { canPlayAudio, startAudio } = useAudioPlayback();
+
+  if (canPlayAudio) return null;
+
+  return (
+    <Alert className="border-warning/40 bg-warning/10">
+      <AlertDescription className="flex flex-col gap-3 text-xs leading-relaxed text-foreground sm:flex-row sm:items-center sm:justify-between">
+        <span>O navegador bloqueou a reprodução do áudio da chamada.</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="border-border bg-card/40"
+          onClick={() => void startAudio()}
+        >
+          Ativar áudio
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Props) {
   const startCallFn = useServerFn(startLivekitCall);
 
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [session, setSession] = useState<LivekitCallSession | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const [muted, setMuted] = useState(false);
   const [costAck, setCostAck] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   // Token usado de fato na sala (evita reconectar durante rerenders).
   const sessionRef = useRef<LivekitCallSession | null>(null);
+  const roomRef = useRef<Room | null>(null);
 
   const sessionMutation = useMutation({
     mutationFn: () => startCallFn({ data: { agentId } }),
   });
 
+  const disconnectRoom = useCallback(() => {
+    const currentRoom = roomRef.current;
+    roomRef.current = null;
+    if (currentRoom) {
+      void currentRoom.disconnect();
+    }
+    setRoom(null);
+  }, []);
+
   // Reset completo ao fechar.
   useEffect(() => {
     if (!open) {
       sessionRef.current = null;
+      disconnectRoom();
       setSession(null);
       setStatus("idle");
       setErrorMsg(null);
@@ -129,7 +170,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
       setCostAck(false);
       setElapsed(0);
     }
-  }, [open]);
+  }, [open, disconnectRoom]);
 
   // Cronômetro da chamada.
   useEffect(() => {
@@ -142,6 +183,17 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
     setStatus("connecting");
     setErrorMsg(null);
     setElapsed(0);
+    disconnectRoom();
+
+    const nextRoom = new Room();
+    roomRef.current = nextRoom;
+    setRoom(nextRoom);
+
+    // Precisa acontecer dentro do clique do usuário; evita autoplay bloquear
+    // a saudação inicial do agente quando o track remoto chegar.
+    void nextRoom.startAudio().catch(() => {
+      /* o aviso de ativar áudio aparece se o navegador ainda bloquear */
+    });
 
     // 1. Permissão de microfone primeiro — falha rápido e clara.
     try {
@@ -149,6 +201,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
       stream.getTracks().forEach((t) => t.stop());
     } catch (e) {
       const msg = formatLivekitError(e);
+      disconnectRoom();
       setStatus("error");
       setErrorMsg(msg);
       toast.error("Erro na chamada", { description: msg.split("\n")[0] });
@@ -162,6 +215,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
       setSession(res);
     } catch (e) {
       const msg = formatLivekitError(e);
+      disconnectRoom();
       setStatus("error");
       setErrorMsg(msg);
       toast.error("Erro na chamada", { description: msg.split("\n")[0] });
@@ -170,6 +224,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
 
   function endCall() {
     sessionRef.current = null;
+    disconnectRoom();
     setSession(null);
     setStatus("ended");
   }
@@ -180,16 +235,19 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
 
   const handleDisconnected = useCallback(() => {
     sessionRef.current = null;
+    roomRef.current = null;
+    setRoom(null);
     setSession(null);
     setStatus((s) => (s === "error" ? s : "ended"));
   }, []);
 
   const handleRoomError = useCallback((e: Error) => {
     const msg = formatLivekitError(e);
+    disconnectRoom();
     setStatus("error");
     setErrorMsg(msg);
     toast.error("Erro na chamada", { description: msg.split("\n")[0] });
-  }, []);
+  }, [disconnectRoom]);
 
   const isActive = status === "connecting" || status === "in_call";
 
@@ -282,8 +340,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
           <div className="flex items-center justify-end gap-2">
             {/* Sala LiveKit: montada apenas quando há token. RoomAudioRenderer
                 é obrigatório para o áudio do agente tocar no navegador. */}
-            {session ? (
+            {session && room ? (
               <LiveKitRoom
+                room={room}
                 token={session.token}
                 serverUrl={session.serverUrl}
                 connect={true}
@@ -293,6 +352,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
                 onDisconnected={handleDisconnected}
                 onError={handleRoomError}
               >
+                <AudioPlaybackGuard />
                 <RoomAudioRenderer />
                 <SessionControls muted={muted} onMutedChange={setMuted} onEnd={endCall} />
               </LiveKitRoom>
