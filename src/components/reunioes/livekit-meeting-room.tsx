@@ -104,7 +104,10 @@ function useRoomMeta(): RoomMetaState {
   const room = useRoomContext();
   const [meta, setMeta] = useState<RoomMetaState>(() => parseRoomMeta(room.metadata));
   useEffect(() => {
-    const update = () => setMeta(parseRoomMeta(room.metadata));
+    const update = () => {
+      console.log("[reuniao] room metadata changed:", room.metadata);
+      setMeta(parseRoomMeta(room.metadata));
+    };
     update();
     room.on(RoomEvent.RoomMetadataChanged, update);
     return () => {
