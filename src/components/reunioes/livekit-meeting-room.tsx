@@ -554,7 +554,7 @@ function MeetingChat({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   const handleSend = async () => {
     const text = draft.trim();
-    if (!text || isSending) return;
+    if (!text || isSending || !connected) return;
     setDraft("");
     try {
       await send(text);
