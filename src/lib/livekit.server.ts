@@ -115,7 +115,7 @@ export async function createLivekitRoom(
   env: LivekitEnv,
   roomName: string,
   metadata: string,
-  opts?: { emptyTimeout?: number; maxParticipants?: number },
+  opts?: { emptyTimeout?: number; maxParticipants?: number; departureTimeout?: number },
 ): Promise<void> {
   const serviceJwt = await signLivekitJwt(env, {
     identity: "omnia-server",
