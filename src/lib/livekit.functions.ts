@@ -302,7 +302,9 @@ export const joinLivekitMeeting = createServerFn({ method: "POST" })
     const env = getLivekitEnv();
 
     if (!(await livekitRoomExists(env, data.code))) {
-      throw new Error("Reunião não encontrada ou já encerrada.");
+      throw new Error(
+        "Reunião não encontrada ou já encerrada. Confira o código ou peça um novo link ao organizador.",
+      );
     }
 
     const token = await signLivekitJwt(env, {
@@ -331,7 +333,9 @@ export const joinLivekitMeetingAsGuest = createServerFn({ method: "POST" })
     const env = getLivekitEnv();
 
     if (!(await livekitRoomExists(env, data.code))) {
-      throw new Error("Reunião não encontrada ou já encerrada.");
+      throw new Error(
+        "Reunião não encontrada ou já encerrada. Confira o código ou peça um novo link ao organizador.",
+      );
     }
 
     const token = await signLivekitJwt(env, {
