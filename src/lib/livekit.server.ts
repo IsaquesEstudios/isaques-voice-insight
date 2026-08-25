@@ -31,8 +31,6 @@ interface TokenOptions {
   displayName?: string;
   room: string;
   metadata?: string;
-  roomMetadata?: string;
-  dispatchAgent?: boolean;
   /** Grants extras de serviço (ex: roomCreate para chamar a API de salas). */
   service?: boolean;
   ttlSeconds?: number;
@@ -53,15 +51,6 @@ export async function signLivekitJwt(env: LivekitEnv, opts: TokenOptions): Promi
     payload.sub = opts.identity;
     if (opts.displayName) payload.name = opts.displayName;
     if (opts.metadata) payload.metadata = opts.metadata;
-    if (opts.dispatchAgent) {
-      payload.roomConfig = {
-        name: opts.room,
-        metadata: opts.roomMetadata ?? opts.metadata ?? "",
-        emptyTimeout: 300,
-        maxParticipants: 4,
-        agents: [{ metadata: opts.metadata ?? "" }],
-      };
-    }
   }
 
   return new SignJWT(payload)
@@ -75,8 +64,7 @@ export async function signLivekitJwt(env: LivekitEnv, opts: TokenOptions): Promi
 
 /**
  * Cria a sala via API Twirp do LiveKit já com a metadata do agente.
- * Mantido para fluxos administrativos; no teste de navegador, a sala é criada
- * pelo token no momento do join para o agente não falar antes do áudio conectar.
+ * Esse fluxo mantém compatibilidade com workers que usam dispatch automático.
  */
 export async function createLivekitRoom(
   env: LivekitEnv,

@@ -133,8 +133,9 @@ export const deleteLivekitAgent = createServerFn({ method: "POST" })
   });
 
 // ---------------------------------------------------------------------------
-// Sessão de chamada: cria a sala (com metadata do agente → dispatch automático)
-// e devolve o token de acesso para o navegador conectar.
+// Sessão de chamada: cria a sala com metadata do agente e devolve o token de
+// acesso para o navegador conectar. A criação explícita da sala é necessária
+// para acionar workers LiveKit em modo de dispatch automático.
 // ---------------------------------------------------------------------------
 
 export const startLivekitCall = createServerFn({ method: "POST" })
@@ -147,7 +148,7 @@ export const startLivekitCall = createServerFn({ method: "POST" })
     ),
   }))
   .handler(async ({ data, context }): Promise<LivekitCallSession> => {
-    const { getLivekitEnv, signLivekitJwt } = await import("./livekit.server");
+    const { createLivekitRoom, getLivekitEnv, signLivekitJwt } = await import("./livekit.server");
     const env = getLivekitEnv();
 
     const { data: agent, error } = await context.supabase
@@ -170,13 +171,14 @@ export const startLivekitCall = createServerFn({ method: "POST" })
     const identity = `painel-${context.userId.slice(0, 8)}-${Math.random()
       .toString(36)
       .slice(2, 6)}`;
+
+    await createLivekitRoom(env, roomName, metadata);
+
     const token = await signLivekitJwt(env, {
       identity,
       displayName: "Teste Painel",
       room: roomName,
       metadata,
-      roomMetadata: metadata,
-      dispatchAgent: true,
     });
 
     return { token, serverUrl: env.url, roomName };

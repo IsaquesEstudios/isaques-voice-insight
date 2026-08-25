@@ -208,7 +208,7 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
       return;
     }
 
-    // 2. Pede ao servidor a sala + token (agente entra por dispatch automático).
+    // 2. Pede ao servidor a sala + token (a sala aciona o dispatch automático do worker).
     try {
       const res = await sessionMutation.mutateAsync();
       sessionRef.current = res;
