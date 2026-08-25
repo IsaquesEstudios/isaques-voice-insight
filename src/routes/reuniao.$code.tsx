@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   LivekitMeetingRoom,
+  MeetingEndedScreen,
   type MeetingSession,
 } from "@/components/reunioes/livekit-meeting-room";
 import { joinLivekitMeetingAsGuest } from "@/lib/livekit.functions";

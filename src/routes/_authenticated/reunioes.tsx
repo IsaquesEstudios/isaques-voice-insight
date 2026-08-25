@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
   LivekitMeetingRoom,
+  MeetingEndedScreen,
   type MeetingSession,
 } from "@/components/reunioes/livekit-meeting-room";
 import { joinLivekitMeeting, startLivekitMeeting } from "@/lib/livekit.functions";
