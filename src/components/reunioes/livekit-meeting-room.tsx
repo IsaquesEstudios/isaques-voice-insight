@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import {
   ControlBar,
   LayoutContextProvider,
@@ -683,11 +692,12 @@ function DeviceSelectField({
       <Label>{label}</Label>
       <Select
         value={activeDeviceId || undefined}
-        onValueChange={(v) =>
-          void setActiveMediaDevice(v).catch((e) =>
-            toast.error(translateError(e, "Não foi possível trocar o dispositivo.")),
-          )
-        }
+        onValueChange={(deviceId) => {
+          if (!deviceId || !devices.some((device) => device.deviceId === deviceId)) return;
+          void Promise.resolve(setActiveMediaDevice(deviceId)).catch((error) => {
+            toast.error(translateError(error, "Não foi possível trocar o dispositivo."));
+          });
+        }}
       >
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Dispositivo padrão" />
@@ -992,6 +1002,50 @@ interface Props {
   onEnded?: () => void;
 }
 
+class MeetingErrorBoundary extends Component<
+  { children: ReactNode; onLeave: () => void },
+  { error: Error | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      error:
+        error instanceof Error
+          ? error
+          : new Error("A sala encontrou uma falha inesperada de áudio ou vídeo."),
+    };
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    console.error(error instanceof Error ? error : new Error("Falha interna da reunião."), info);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+
+    return (
+      <Card className="mx-auto w-full max-w-lg border-destructive/40">
+        <CardHeader>
+          <CardTitle>Não foi possível abrir a sala</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            O navegador encontrou uma falha ao iniciar os dispositivos da reunião. Tente
+            novamente ou saia da sala para continuar usando o painel.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => this.setState({ error: null })}>Tentar novamente</Button>
+            <Button variant="outline" onClick={this.props.onLeave}>
+              Sair da sala
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+}
+
 export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -1057,40 +1111,42 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
 
   return (
     <>
-      <LiveKitRoom
-        token={session.token}
-        serverUrl={session.serverUrl}
-        connect
-        audio
-        video
-        data-lk-theme="default"
-        className="lk-room-container block w-full"
-        onDisconnected={(reason) => {
-          // Sala apagada pelo organizador → tela de fim de reunião.
-          if (reason === DisconnectReason.ROOM_DELETED) onEnded?.();
-          else onLeave();
-        }}
-        onError={(e) =>
-          toast.error(translateError(e, "Erro na conexão da reunião."))
-        }
-      >
-        <MeetingShell
-          session={session}
-          isHost={isHost}
-          aiState={aiState}
-          copied={copied}
-          copiedCode={copiedCode}
-          showChat={showChat}
-          ending={ending}
-          onAgentJoined={() => setAiState("joined")}
-          onCopyCode={handleCopyCode}
-          onCopyLink={handleCopyLink}
-          onCallAgent={handleCallAgent}
-          onChatChange={setShowChat}
-          onLeave={onLeave}
-          onRequestEnd={() => setConfirmEnd(true)}
-        />
-      </LiveKitRoom>
+      <MeetingErrorBoundary onLeave={onLeave}>
+        <LiveKitRoom
+          token={session.token}
+          serverUrl={session.serverUrl}
+          connect
+          audio
+          video
+          data-lk-theme="default"
+          className="lk-room-container block w-full"
+          onDisconnected={(reason) => {
+            // Sala apagada pelo organizador → tela de fim de reunião.
+            if (reason === DisconnectReason.ROOM_DELETED) onEnded?.();
+            else onLeave();
+          }}
+          onError={(error) =>
+            toast.error(translateError(error, "Erro na conexão da reunião."))
+          }
+        >
+          <MeetingShell
+            session={session}
+            isHost={isHost}
+            aiState={aiState}
+            copied={copied}
+            copiedCode={copiedCode}
+            showChat={showChat}
+            ending={ending}
+            onAgentJoined={() => setAiState("joined")}
+            onCopyCode={handleCopyCode}
+            onCopyLink={handleCopyLink}
+            onCallAgent={handleCallAgent}
+            onChatChange={setShowChat}
+            onLeave={onLeave}
+            onRequestEnd={() => setConfirmEnd(true)}
+          />
+        </LiveKitRoom>
+      </MeetingErrorBoundary>
 
       <AlertDialog open={confirmEnd} onOpenChange={setConfirmEnd}>
         <AlertDialogContent>
