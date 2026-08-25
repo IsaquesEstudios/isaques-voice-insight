@@ -186,7 +186,11 @@ function ReunioesPage() {
             </Card>
           </div>
         ) : (
-          <LivekitMeetingRoom session={session} onLeave={() => setSession(null)} />
+          <LivekitMeetingRoom
+            session={session}
+            onLeave={() => setSession(null)}
+            onEnded={() => setEnded(true)}
+          />
         )}
       </div>
     </DashboardShell>
