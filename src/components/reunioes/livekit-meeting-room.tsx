@@ -47,7 +47,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { callLivekitMeetingAgent, setMeetingPresenter } from "@/lib/livekit.functions";
+import {
+  callLivekitMeetingAgent,
+  getMeetingState,
+  setMeetingPresenter,
+} from "@/lib/livekit.functions";
 import { translateError } from "@/lib/error-messages";
 
 export interface MeetingSession {
@@ -476,7 +480,7 @@ function MeetingRoomContent({
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
-  const meta = useRoomMeta();
+  const [meta, setMetaLocal] = useRoomMeta(session.roomName);
   const applyPresenter = useServerFn(setMeetingPresenter);
   const [presentBusy, setPresentBusy] = useState(false);
   const layoutContext = useCreateLayoutContext();
@@ -498,6 +502,8 @@ function MeetingRoomContent({
           allowed: next.allowed,
         },
       });
+      // Atualização otimista: o polling (3s) confirma o estado do servidor.
+      setMetaLocal(next);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível atualizar a apresentação."));
     } finally {
