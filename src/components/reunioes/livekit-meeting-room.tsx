@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Chat,
   ControlBar,
   LayoutContextProvider,
   LiveKitRoom,
   RoomAudioRenderer,
+  useChat,
+  useConnectionState,
   useCreateLayoutContext,
   useIsMuted,
   useIsSpeaking,
+  useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
   useTracks,
   VideoTrack,
 } from "@livekit/components-react";
-import { DisconnectReason, ParticipantKind, RoomEvent, Track } from "livekit-client";
+import {
+  ConnectionState,
+  DisconnectReason,
+  ParticipantKind,
+  RoomEvent,
+  Track,
+} from "livekit-client";
 import type { Participant } from "livekit-client";
 import type {
   TrackReference,
@@ -28,11 +36,14 @@ import {
   Copy,
   Loader2,
   LogOut,
+  MessageSquare,
   Mic,
   MicOff,
   MoreVertical,
   PhoneOff,
   Presentation,
+  Send,
+  Settings,
   UserCheck,
   UserX,
   Video,
@@ -54,11 +65,27 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   callLivekitMeetingAgent,
   endLivekitMeeting,
@@ -503,6 +530,216 @@ function FocusStage(props: FocusStageProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Chat lateral (estilo Google Meet): painel próprio, fora do "balão" de
+// vídeo, ocupando toda a altura da reunião. Construído com useChat para
+// controlar 100% do layout/cores (o <Chat> padrão do LiveKit trazia um
+// fundo cinza e um grid que cortava o conteúdo). Fica sempre montado para
+// preservar o histórico de mensagens da sala.
+// ---------------------------------------------------------------------------
+
+function MeetingChat({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const room = useRoomContext();
+  const myIdentity = room.localParticipant.identity;
+  const { send, chatMessages, isSending } = useChat();
+  const [draft, setDraft] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+  // Só permite enviar com a sala realmente conectada — evita envios que
+  // ficam pendentes enquanto a conexão WebRTC ainda está sendo estabelecida.
+  const connected = useConnectionState(room) === ConnectionState.Connected;
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el && open) el.scrollTop = el.scrollHeight;
+  }, [chatMessages.length, open]);
+
+  const handleSend = async () => {
+    const text = draft.trim();
+    if (!text || isSending || !connected) return;
+    setDraft("");
+    try {
+      await send(text);
+    } catch (e) {
+      setDraft(text);
+      toast.error(translateError(e, "Não foi possível enviar a mensagem."));
+    }
+  };
+
+  return (
+    <Card
+      className={`${
+        open ? "flex" : "hidden"
+      } h-[60vh] w-full flex-col overflow-hidden lg:h-auto lg:w-[360px] lg:shrink-0`}
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
+        <span className="text-sm font-medium">Chat da reunião</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          aria-label="Fechar chat"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
+        {chatMessages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <MessageSquare className="h-8 w-8 opacity-40" />
+            <p className="text-sm">
+              Nenhuma mensagem ainda.
+              <br />
+              Envie a primeira para todos da sala.
+            </p>
+          </div>
+        ) : (
+          chatMessages.map((m, i) => {
+            const own = m.from?.identity === myIdentity;
+            const name = own
+              ? "Você"
+              : m.from?.name || m.from?.identity || "Participante";
+            const time = new Date(m.timestamp).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            return (
+              <div
+                key={m.id ?? `${m.timestamp}-${i}`}
+                className={`flex flex-col gap-1 ${own ? "items-end" : "items-start"}`}
+              >
+                <span className="px-1 text-[11px] text-muted-foreground">
+                  {name} · {time}
+                </span>
+                <div
+                  className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm ${
+                    own
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  {m.message}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <form
+        className="flex shrink-0 items-center gap-2 border-t border-border p-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSend();
+        }}
+      >
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={connected ? "Escreva uma mensagem…" : "Conectando à sala…"}
+          aria-label="Escreva uma mensagem"
+          className="h-9"
+          disabled={!connected}
+        />
+        <Button
+          type="submit"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          disabled={!draft.trim() || isSending || !connected}
+          aria-label="Enviar mensagem"
+        >
+          {isSending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Configurações da reunião: seleção de microfone, câmera e alto-falante
+// (o menu de configurações padrão da ControlBar ficava cortado dentro do
+// cartão e não abria). Usa useMediaDeviceSelect, que já troca o dispositivo
+// ativo da sala em tempo real.
+// ---------------------------------------------------------------------------
+
+function DeviceSelectField({
+  kind,
+  label,
+}: {
+  kind: "audioinput" | "videoinput" | "audiooutput";
+  label: string;
+}) {
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({
+    kind,
+    requestPermissions: true,
+  });
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select
+        value={activeDeviceId || undefined}
+        onValueChange={(v) =>
+          void setActiveMediaDevice(v).catch((e) =>
+            toast.error(translateError(e, "Não foi possível trocar o dispositivo.")),
+          )
+        }
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Dispositivo padrão" />
+        </SelectTrigger>
+        <SelectContent>
+          {devices.map((d, i) => (
+            <SelectItem
+              key={d.deviceId || `${kind}-${i}`}
+              value={d.deviceId || `${kind}-${i}`}
+            >
+              {d.label || `${label} ${i + 1}`}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {devices.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Nenhum dispositivo encontrado. Verifique as permissões do navegador.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function MeetingSettingsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Configurações de áudio e vídeo</DialogTitle>
+          <DialogDescription>
+            Escolha quais dispositivos usar nesta reunião. A troca é aplicada
+            na hora.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <DeviceSelectField kind="audioinput" label="Microfone" />
+          <DeviceSelectField kind="videoinput" label="Câmera" />
+          <DeviceSelectField kind="audiooutput" label="Alto-falante" />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Palco da reunião (grade/palco + barra de controle). O chat NÃO fica aqui:
 // ele é um cartão irmão, fora do "balão" de vídeo.
 // ---------------------------------------------------------------------------
@@ -519,6 +756,7 @@ function MeetingStage({
   const [meta, setMetaLocal] = useRoomMeta(session.roomName);
   const applyPresenter = useServerFn(setMeetingPresenter);
   const [presentBusy, setPresentBusy] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const me = room.localParticipant;
   const myIdentity = me.identity;
@@ -683,11 +921,25 @@ function MeetingStage({
         )}
       </div>
 
-      <ControlBar
-        variation="minimal"
-        controls={{ chat: true, settings: true }}
-        className="justify-center border-t border-border bg-background py-1"
-      />
+      <div className="relative border-t border-border bg-background">
+        <ControlBar
+          variation="minimal"
+          controls={{ chat: true, settings: false }}
+          className="justify-center py-1"
+        />
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          <button
+            type="button"
+            aria-label="Configurações de áudio e vídeo"
+            title="Configurações de áudio e vídeo"
+            onClick={() => setShowSettings(true)}
+            className="lk-button"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <MeetingSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
       <RoomAudioRenderer />
     </div>
   );
@@ -973,25 +1225,10 @@ function MeetingShell(props: ShellProps) {
             </CardContent>
           </Card>
 
-          {props.showChat && (
-            <Card className="flex h-[60vh] w-full flex-col overflow-hidden lg:h-auto lg:w-[340px] lg:shrink-0">
-              <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                <span className="text-sm font-medium">Chat da reunião</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  aria-label="Fechar chat"
-                  onClick={() => props.onChatChange(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="min-h-0 flex-1">
-                <Chat className="lk-chat h-full" />
-              </div>
-            </Card>
-          )}
+          <MeetingChat
+            open={props.showChat}
+            onClose={() => props.onChatChange(false)}
+          />
         </div>
       </div>
     </LayoutContextProvider>
