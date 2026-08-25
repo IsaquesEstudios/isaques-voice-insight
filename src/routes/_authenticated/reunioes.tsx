@@ -1,13 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Video, Copy, Check, LogOut, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Video, Sparkles, LogIn, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  LivekitMeetingRoom,
+  type MeetingSession,
+} from "@/components/reunioes/livekit-meeting-room";
+import { joinLivekitMeeting, startLivekitMeeting } from "@/lib/livekit.functions";
+import { translateError } from "@/lib/error-messages";
 
 export const Route = createFileRoute("/_authenticated/reunioes")({
   head: () => ({
@@ -19,137 +27,54 @@ export const Route = createFileRoute("/_authenticated/reunioes")({
   component: ReunioesPage,
 });
 
-const JITSI_DOMAIN = "meet.jit.si";
-
-declare global {
-  interface Window {
-    JitsiMeetExternalAPI?: any;
-  }
-}
-
-function loadJitsiScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") return resolve();
-    if (window.JitsiMeetExternalAPI) return resolve();
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-jitsi="external-api"]',
-    );
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Falha ao carregar Jitsi")));
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = `https://${JITSI_DOMAIN}/external_api.js`;
-    s.async = true;
-    s.dataset.jitsi = "external-api";
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Falha ao carregar Jitsi"));
-    document.body.appendChild(s);
-  });
-}
-
-
 function ReunioesPage() {
   const [displayName, setDisplayName] = useState("");
   const [roomInput, setRoomInput] = useState("");
-  const [activeRoom, setActiveRoom] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const apiRef = useRef<any>(null);
+  const [joinInput, setJoinInput] = useState("");
+  const [session, setSession] = useState<MeetingSession | null>(null);
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
+  const startMeeting = useServerFn(startLivekitMeeting);
+  const joinMeeting = useServerFn(joinLivekitMeeting);
 
-  useEffect(() => {
-    if (!activeRoom || !containerRef.current) return;
-    let disposed = false;
-    let api: any;
-
-    loadJitsiScript()
-      .then(() => {
-        if (disposed || !containerRef.current || !window.JitsiMeetExternalAPI) return;
-        containerRef.current.innerHTML = "";
-        api = new window.JitsiMeetExternalAPI(JITSI_DOMAIN, {
-          roomName: activeRoom,
-          parentNode: containerRef.current,
-          width: "100%",
-          height: "100%",
-          userInfo: displayName ? { displayName } : undefined,
-          configOverwrite: {
-            prejoinPageEnabled: false,
-            disableDeepLinking: true,
-            startWithAudioMuted: false,
-            startWithVideoMuted: false,
-          },
-          interfaceConfigOverwrite: {
-            SHOW_JITSI_WATERMARK: false,
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            DEFAULT_BACKGROUND: "#0b0b12",
-          },
-        });
-        apiRef.current = api;
-        api.addListener("readyToClose", () => {
-          setActiveRoom(null);
-        });
-      })
-      .catch((err: Error) => {
-        toast.error(err.message ?? "Erro ao iniciar reunião");
-        setActiveRoom(null);
-      });
-
-    return () => {
-      disposed = true;
-      try {
-        api?.dispose?.();
-        apiRef.current?.dispose?.();
-      } catch {
-        /* noop */
-      }
-      apiRef.current = null;
-    };
-  }, [activeRoom, displayName]);
-
-  const handleCreate = () => {
-    const typed = roomInput
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-");
-    if (!typed) {
+  const handleCreate = async () => {
+    if (!roomInput.trim()) {
       toast.error("Dê um nome para a reunião");
       return;
     }
-    const name = `${typed}-${Math.random().toString(36).slice(2, 6)}`;
-    setRoomInput(name);
-    setActiveRoom(name);
-  };
-
-  const handleLeave = () => {
-    setActiveRoom(null);
-  };
-
-  const handleCopyCode = async () => {
-    if (!activeRoom) return;
+    setBusy("create");
     try {
-      await navigator.clipboard.writeText(activeRoom);
-      setCopiedCode(true);
-      toast.success("Código copiado");
-      setTimeout(() => setCopiedCode(false), 1500);
-    } catch {
-      toast.error("Não foi possível copiar");
+      const s = await startMeeting({
+        data: {
+          meetingName: roomInput.trim(),
+          displayName: displayName.trim() || undefined,
+        },
+      });
+      setSession(s);
+    } catch (e) {
+      toast.error(translateError(e, "Não foi possível criar a reunião."));
+    } finally {
+      setBusy(null);
     }
   };
 
-
-  const handleCopyLink = async () => {
-    if (!activeRoom) return;
-    const url = `https://${JITSI_DOMAIN}/${activeRoom}`;
+  const handleJoin = async () => {
+    if (!joinInput.trim()) {
+      toast.error("Informe o código da reunião");
+      return;
+    }
+    setBusy("join");
     try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      toast.success("Link copiado");
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error("Não foi possível copiar");
+      const s = await joinMeeting({
+        data: {
+          code: joinInput.trim(),
+          displayName: displayName.trim() || undefined,
+        },
+      });
+      setSession(s);
+    } catch (e) {
+      toast.error(translateError(e, "Não foi possível entrar na reunião."));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -170,7 +95,7 @@ function ReunioesPage() {
           </div>
         </header>
 
-        {!activeRoom ? (
+        {!session ? (
           <div className="grid min-h-[55vh] place-items-center">
             <Card className="w-full max-w-md border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardHeader className="text-center">
@@ -201,46 +126,57 @@ function ReunioesPage() {
                     onChange={(e) => setDisplayName(e.target.value)}
                   />
                 </div>
-                <Button onClick={handleCreate} size="lg" className="w-full gap-2">
-                  <Video className="h-4 w-4" />
+                <Button
+                  onClick={handleCreate}
+                  size="lg"
+                  className="w-full gap-2"
+                  disabled={busy !== null}
+                >
+                  {busy === "create" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Video className="h-4 w-4" />
+                  )}
                   Criar reunião
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  Depois de criar, você recebe um código para enviar aos convidados.
+                  Depois de criar, você recebe um código e um link para enviar aos convidados.
                 </p>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label htmlFor="joinCode">Entrar com código</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="joinCode"
+                      placeholder="reuniao-..."
+                      value={joinInput}
+                      onChange={(e) => setJoinInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleJoin();
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleJoin}
+                      disabled={busy !== null}
+                      className="gap-2"
+                    >
+                      {busy === "join" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <LogIn className="h-4 w-4" />
+                      )}
+                      Entrar
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         ) : (
-          <Card className="overflow-hidden">
-            <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Código da reunião</p>
-                <CardTitle className="truncate font-mono text-base">{activeRoom}</CardTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopyCode} className="gap-2">
-                  {copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  Copiar código
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-2">
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  Copiar link
-                </Button>
-                <Button variant="destructive" size="sm" onClick={handleLeave} className="gap-2">
-                  <LogOut className="h-4 w-4" />
-                  Sair
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div
-                ref={containerRef}
-                className="h-[70vh] w-full bg-black"
-                aria-label="Sala de vídeo"
-              />
-            </CardContent>
-          </Card>
+          <LivekitMeetingRoom session={session} onLeave={() => setSession(null)} />
         )}
       </div>
     </DashboardShell>
