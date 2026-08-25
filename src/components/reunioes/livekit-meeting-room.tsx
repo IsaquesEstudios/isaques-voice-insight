@@ -537,6 +537,12 @@ function MeetingChat({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
+  // PROBE temporário para depuração do envio
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__lkroom = room;
+    (window as unknown as Record<string, unknown>).__lkmsgs = chatMessages;
+  }, [room, chatMessages]);
+
   useEffect(() => {
     const el = listRef.current;
     if (el && open) el.scrollTop = el.scrollHeight;
