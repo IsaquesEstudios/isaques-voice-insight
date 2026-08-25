@@ -536,12 +536,9 @@ function MeetingChat({ open, onClose }: { open: boolean; onClose: () => void }) 
   const { send, chatMessages, isSending } = useChat();
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
-
-  // PROBE temporário para depuração do envio
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__lkroom = room;
-    (window as unknown as Record<string, unknown>).__lkmsgs = chatMessages;
-  }, [room, chatMessages]);
+  // Só permite enviar com a sala realmente conectada — evita envios que
+  // ficam pendentes enquanto a conexão WebRTC ainda está sendo estabelecida.
+  const connected = useConnectionState(room) === ConnectionState.Connected;
 
   useEffect(() => {
     const el = listRef.current;
