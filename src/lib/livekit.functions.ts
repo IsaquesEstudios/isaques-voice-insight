@@ -493,3 +493,53 @@ export const getMeetingState = createServerFn({ method: "GET" })
       return { presenter: null, allowed: [] };
     }
   });
+
+/**
+ * Encerra a reunião para todos: apaga a sala no LiveKit, o que desconecta
+ * imediatamente todos os participantes (motivo ROOM_DELETED no cliente).
+ * Pública, mas exige o token LiveKit da sala com papel de organizador.
+ */
+export const endLivekitMeeting = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+      throw new Error("Código de reunião inválido.");
+    }
+    const token = typeof d.token === "string" ? d.token : "";
+    if (!token) throw new Error("Sessão da reunião inválida.");
+    return { code, token };
+  })
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const { deleteLivekitRoom, getLivekitEnv, verifyLivekitToken } = await import(
+      "./livekit.server"
+    );
+    const env = getLivekitEnv();
+
+    let caller: { identity: string; metadata?: string };
+    try {
+      caller = await verifyLivekitToken(env, data.token, data.code);
+    } catch {
+      throw new Error("Sessão da reunião expirada. Saia e entre novamente.");
+    }
+
+    let isHost = false;
+    try {
+      isHost = JSON.parse(caller.metadata ?? "{}").role === "host";
+    } catch {
+      isHost = false;
+    }
+    if (!isHost) {
+      throw new Error("Somente o organizador pode encerrar a reunião para todos.");
+    }
+
+    try {
+      await deleteLivekitRoom(env, data.code);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(
+        `Não consegui encerrar a reunião.\nDetalhe técnico: ${detail}`,
+      );
+    }
+    return { ok: true };
+  });
