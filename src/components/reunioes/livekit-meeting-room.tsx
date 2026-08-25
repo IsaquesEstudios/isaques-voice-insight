@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Chat,
   ControlBar,
@@ -13,7 +13,7 @@ import {
   useTracks,
   VideoTrack,
 } from "@livekit/components-react";
-import { ParticipantKind, RoomEvent, Track } from "livekit-client";
+import { DisconnectReason, ParticipantKind, RoomEvent, Track } from "livekit-client";
 import type { Participant } from "livekit-client";
 import type {
   TrackReference,
@@ -31,14 +31,26 @@ import {
   Mic,
   MicOff,
   MoreVertical,
+  PhoneOff,
   Presentation,
   UserCheck,
   UserX,
+  Video,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -49,6 +61,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   callLivekitMeetingAgent,
+  endLivekitMeeting,
   getMeetingState,
   setMeetingPresenter,
 } from "@/lib/livekit.functions";
@@ -107,6 +120,21 @@ function participantRole(p: Participant): "host" | "guest" {
 }
 
 /**
+ * Papel do participante local lido direto do JWT da sala — disponível antes
+ * mesmo de a conexão terminar (a metadata do participant só chega depois).
+ */
+function roleFromToken(token: string): "host" | "guest" {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] ?? "")) as {
+      metadata?: string;
+    };
+    return JSON.parse(payload.metadata ?? "{}").role === "host" ? "host" : "guest";
+  } catch {
+    return "guest";
+  }
+}
+
+/**
  * Estado de apresentação da sala. Usa o evento RoomMetadataChanged quando o
  * servidor replica a metadata, com polling de 3s como fallback (nem todo
  * servidor LiveKit empurra RoomUpdate para os participantes).
@@ -152,7 +180,8 @@ function tileKey(t: TrackReferenceOrPlaceholder): string {
 
 // ---------------------------------------------------------------------------
 // Tile de participante: vídeo sem corte (object-contain, adapta câmera em
-// pé ou deitada), avatar quando sem câmera, indicadores e menu do organizador.
+// pé ou deitada), avatar quando sem câmera, coroa no organizador,
+// indicadores e menu do organizador.
 // ---------------------------------------------------------------------------
 
 interface TileHostControls {
@@ -178,6 +207,7 @@ function MeetingTile({ trackRef, isSelf, isPresenter, hostControls, onRatio }: M
   const micMuted = useIsMuted({ participant, source: Track.Source.Microphone });
   const speaking = useIsSpeaking(participant);
   const name = participant.name || participant.identity;
+  const isHostTile = !isScreen && participantRole(participant) === "host";
 
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -228,7 +258,7 @@ function MeetingTile({ trackRef, isSelf, isPresenter, hostControls, onRatio }: M
       ) : (
         <div className="grid h-full w-full place-items-center">
           <div className="grid h-16 w-16 place-items-center rounded-full bg-primary/15 text-xl font-semibold text-primary">
-            {initials(isScreen ? name : name)}
+            {initials(name)}
           </div>
         </div>
       )}
@@ -240,6 +270,11 @@ function MeetingTile({ trackRef, isSelf, isPresenter, hostControls, onRatio }: M
           ) : (
             <Mic className="h-3 w-3" />
           ))}
+        {isHostTile && (
+          <span role="img" aria-label="Organizador" title="Organizador">
+            👑
+          </span>
+        )}
         <span className="max-w-[140px] truncate">
           {isScreen ? `Tela de ${name}` : name}
           {isSelf && !isScreen ? " (você)" : ""}
@@ -468,10 +503,11 @@ function FocusStage(props: FocusStageProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Conteúdo da sala (dentro do LiveKitRoom): grade/palco + barra de controle.
+// Palco da reunião (grade/palco + barra de controle). O chat NÃO fica aqui:
+// ele é um cartão irmão, fora do "balão" de vídeo.
 // ---------------------------------------------------------------------------
 
-function MeetingRoomContent({
+function MeetingStage({
   session,
   onAgentJoined,
 }: {
@@ -483,8 +519,6 @@ function MeetingRoomContent({
   const [meta, setMetaLocal] = useRoomMeta(session.roomName);
   const applyPresenter = useServerFn(setMeetingPresenter);
   const [presentBusy, setPresentBusy] = useState(false);
-  const layoutContext = useCreateLayoutContext();
-  const [showChat, setShowChat] = useState(false);
 
   const me = room.localParticipant;
   const myIdentity = me.identity;
@@ -578,128 +612,146 @@ function MeetingRoomContent({
   const showStartPresent = !meta.presenter && canPresent;
 
   return (
-    <LayoutContextProvider
-      value={layoutContext}
-      onWidgetChange={(state) => setShowChat(!!state.showChat)}
-    >
+    <div className="flex h-[70vh] min-h-0 flex-col">
       <AgentPresence onJoined={onAgentJoined} />
-      <div className="flex h-[70vh] min-h-0 flex-col">
-        <div className="flex min-h-0 flex-1">
-          <div className="relative min-w-0 flex-1">
-            {focus ? (
-              <FocusStage
-                focus={focus}
-                others={others}
-                tracks={tracks}
-                myIdentity={myIdentity}
-                isHost={isHost}
-                meta={meta}
-                presentBusy={presentBusy}
-                onSetPresenter={handleSetPresenter}
-                onToggleAllow={handleToggleAllow}
-              />
-            ) : (
-              <GridStage
-                tracks={tracks}
-                myIdentity={myIdentity}
-                isHost={isHost}
-                meta={meta}
-                presentBusy={presentBusy}
-                onSetPresenter={handleSetPresenter}
-                onToggleAllow={handleToggleAllow}
-              />
-            )}
+      <div className="relative min-h-0 flex-1">
+        {focus ? (
+          <FocusStage
+            focus={focus}
+            others={others}
+            tracks={tracks}
+            myIdentity={myIdentity}
+            isHost={isHost}
+            meta={meta}
+            presentBusy={presentBusy}
+            onSetPresenter={handleSetPresenter}
+            onToggleAllow={handleToggleAllow}
+          />
+        ) : (
+          <GridStage
+            tracks={tracks}
+            myIdentity={myIdentity}
+            isHost={isHost}
+            meta={meta}
+            presentBusy={presentBusy}
+            onSetPresenter={handleSetPresenter}
+            onToggleAllow={handleToggleAllow}
+          />
+        )}
 
-            {(showStartPresent || showStopPresent || (presenterName && meta.presenter !== myIdentity)) && (
-              <div className="pointer-events-none absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-2">
-                {presenterName && meta.presenter !== myIdentity && (
-                  <span className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-background/85 px-3 py-1 text-xs text-foreground shadow ring-1 ring-border backdrop-blur-sm">
-                    <Presentation className="h-3 w-3 text-primary" />
-                    {presenterName} está apresentando
-                  </span>
+        {(showStartPresent || showStopPresent || (presenterName && meta.presenter !== myIdentity)) && (
+          <div className="pointer-events-none absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-2">
+            {presenterName && meta.presenter !== myIdentity && (
+              <span className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-background/85 px-3 py-1 text-xs text-foreground shadow ring-1 ring-border backdrop-blur-sm">
+                <Presentation className="h-3 w-3 text-primary" />
+                {presenterName} está apresentando
+              </span>
+            )}
+            {showStopPresent && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="pointer-events-auto gap-2 shadow"
+                disabled={presentBusy}
+                onClick={() => handleSetPresenter(null)}
+              >
+                {presentBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4" />
                 )}
-                {showStopPresent && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="pointer-events-auto gap-2 shadow"
-                    disabled={presentBusy}
-                    onClick={() => handleSetPresenter(null)}
-                  >
-                    {presentBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <X className="h-4 w-4" />
-                    )}
-                    Encerrar apresentação
-                  </Button>
+                Encerrar apresentação
+              </Button>
+            )}
+            {showStartPresent && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="pointer-events-auto gap-2 shadow"
+                disabled={presentBusy}
+                onClick={() => handleSetPresenter(myIdentity)}
+              >
+                {presentBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Presentation className="h-4 w-4" />
                 )}
-                {showStartPresent && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="pointer-events-auto gap-2 shadow"
-                    disabled={presentBusy}
-                    onClick={() => handleSetPresenter(myIdentity)}
-                  >
-                    {presentBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Presentation className="h-4 w-4" />
-                    )}
-                    Apresentar
-                  </Button>
-                )}
-              </div>
+                Apresentar
+              </Button>
             )}
           </div>
-
-          {showChat && (
-            <div className="flex w-80 shrink-0 flex-col border-l border-border bg-background">
-              <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                <span className="text-sm font-medium">Chat da reunião</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  aria-label="Fechar chat"
-                  onClick={() => setShowChat(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <Chat className="min-h-0 flex-1" />
-            </div>
-          )}
-        </div>
-
-        <ControlBar
-          variation="minimal"
-          controls={{ chat: true, settings: true }}
-          className="justify-center border-t border-border bg-background py-1"
-        />
+        )}
       </div>
+
+      <ControlBar
+        variation="minimal"
+        controls={{ chat: true, settings: true }}
+        className="justify-center border-t border-border bg-background py-1"
+      />
       <RoomAudioRenderer />
-    </LayoutContextProvider>
+    </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Tela de fim de reunião (compartilhada entre painel e rota de convidado).
+// ---------------------------------------------------------------------------
+
+export function MeetingEndedScreen({
+  actionLabel,
+  onAction,
+}: {
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="grid min-h-[55vh] place-items-center">
+      <Card className="w-full max-w-md border-primary/30 bg-gradient-to-br from-primary/10 to-transparent text-center">
+        <CardHeader>
+          <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-xl bg-primary/15 text-primary">
+            <PhoneOff className="h-6 w-6" />
+          </div>
+          <CardTitle className="text-lg">Reunião encerrada</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            O organizador encerrou a reunião e todos os participantes foram
+            desconectados.
+          </p>
+          <Button onClick={onAction} size="lg" className="w-full gap-2">
+            <Video className="h-4 w-4" />
+            {actionLabel}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sala completa: cabeçalho (código, link, IA, sair/encerrar), palco de vídeo
+// e o chat como cartão separado ao lado (fora do "balão" da reunião).
+// ---------------------------------------------------------------------------
 
 interface Props {
   session: MeetingSession;
   onLeave: () => void;
+  /** Chamado quando a reunião é encerrada para todos (sala apagada). */
+  onEnded?: () => void;
 }
 
-/**
- * Sala de reunião LiveKit compartilhada entre o painel (usuário logado) e a
- * rota pública de convidados. Grade adaptativa com paginação, modo
- * apresentação controlado pelo organizador, cópia de código/link e o botão
- * "Chamar IA".
- */
-export function LivekitMeetingRoom({ session, onLeave }: Props) {
+export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [aiState, setAiState] = useState<AiState>("idle");
+  const [showChat, setShowChat] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [ending, setEnding] = useState(false);
   const callAgent = useServerFn(callLivekitMeetingAgent);
+  const endMeeting = useServerFn(endLivekitMeeting);
+
+  // O papel vem do próprio token da sala — disponível antes de conectar.
+  const isHost = useMemo(() => roleFromToken(session.token) === "host", [session.token]);
 
   const handleCopyCode = async () => {
     try {
@@ -737,71 +789,211 @@ export function LivekitMeetingRoom({ session, onLeave }: Props) {
     }
   };
 
+  const handleEndMeeting = async () => {
+    setEnding(true);
+    try {
+      await endMeeting({ data: { code: session.roomName, token: session.token } });
+      // DeleteRoom desconecta todos; para o organizador, vamos direto à tela final.
+      onEnded?.();
+    } catch (e) {
+      toast.error(translateError(e, "Não foi possível encerrar a reunião."));
+    } finally {
+      setEnding(false);
+      setConfirmEnd(false);
+    }
+  };
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Código da reunião</p>
-          <CardTitle className="truncate font-mono text-base">
-            {session.roomName}
-          </CardTitle>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleCopyCode} className="gap-2">
-            {copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            Copiar código
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-2">
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            Copiar link
-          </Button>
-          {aiState === "joined" ? (
-            <Button variant="outline" size="sm" disabled className="gap-2">
-              <Check className="h-4 w-4" />
-              IA na sala
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCallAgent}
-              disabled={aiState === "calling" || aiState === "waiting"}
-              className="gap-2"
+    <>
+      <LiveKitRoom
+        token={session.token}
+        serverUrl={session.serverUrl}
+        connect
+        audio
+        video
+        data-lk-theme="default"
+        className="lk-room-container block w-full"
+        onDisconnected={(reason) => {
+          // Sala apagada pelo organizador → tela de fim de reunião.
+          if (reason === DisconnectReason.ROOM_DELETED) onEnded?.();
+          else onLeave();
+        }}
+        onError={(e) =>
+          toast.error(translateError(e, "Erro na conexão da reunião."))
+        }
+      >
+        <MeetingShell
+          session={session}
+          isHost={isHost}
+          aiState={aiState}
+          copied={copied}
+          copiedCode={copiedCode}
+          showChat={showChat}
+          ending={ending}
+          onAgentJoined={() => setAiState("joined")}
+          onCopyCode={handleCopyCode}
+          onCopyLink={handleCopyLink}
+          onCallAgent={handleCallAgent}
+          onChatChange={setShowChat}
+          onLeave={onLeave}
+          onRequestEnd={() => setConfirmEnd(true)}
+        />
+      </LiveKitRoom>
+
+      <AlertDialog open={confirmEnd} onOpenChange={setConfirmEnd}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar reunião para todos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os participantes serão desconectados e a sala será
+              apagada. Essa ação não pode ser desfeita — para continuar,
+              será preciso criar uma nova reunião.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleEndMeeting();
+              }}
+              disabled={ending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {aiState === "calling" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              {ending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Bot className="h-4 w-4" />
+                <PhoneOff className="mr-2 h-4 w-4" />
               )}
-              {aiState === "waiting" ? "IA a caminho…" : "Chamar IA"}
-            </Button>
+              Encerrar para todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shell interno (dentro do LiveKitRoom): provê o LayoutContext usado pelo
+// botão de chat da ControlBar e organiza cabeçalho + palco + chat lateral.
+// ---------------------------------------------------------------------------
+
+interface ShellProps {
+  session: MeetingSession;
+  isHost: boolean;
+  aiState: AiState;
+  copied: boolean;
+  copiedCode: boolean;
+  showChat: boolean;
+  ending: boolean;
+  onAgentJoined: () => void;
+  onCopyCode: () => void;
+  onCopyLink: () => void;
+  onCallAgent: () => void;
+  onChatChange: (open: boolean) => void;
+  onLeave: () => void;
+  onRequestEnd: () => void;
+}
+
+function MeetingShell(props: ShellProps) {
+  const layoutContext = useCreateLayoutContext();
+
+  return (
+    <LayoutContextProvider
+      value={layoutContext}
+      onWidgetChange={(state) => props.onChatChange(!!state.showChat)}
+    >
+      <div className="flex flex-col gap-4">
+        <Card>
+          <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Código da reunião</p>
+              <CardTitle className="truncate font-mono text-base">
+                {props.session.roomName}
+              </CardTitle>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={props.onCopyCode} className="gap-2">
+                {props.copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                Copiar código
+              </Button>
+              <Button variant="outline" size="sm" onClick={props.onCopyLink} className="gap-2">
+                {props.copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                Copiar link
+              </Button>
+              {props.aiState === "joined" ? (
+                <Button variant="outline" size="sm" disabled className="gap-2">
+                  <Check className="h-4 w-4" />
+                  IA na sala
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={props.onCallAgent}
+                  disabled={props.aiState === "calling" || props.aiState === "waiting"}
+                  className="gap-2"
+                >
+                  {props.aiState === "calling" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bot className="h-4 w-4" />
+                  )}
+                  {props.aiState === "waiting" ? "IA a caminho…" : "Chamar IA"}
+                </Button>
+              )}
+              {props.isHost && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={props.onRequestEnd}
+                  disabled={props.ending}
+                  className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <PhoneOff className="h-4 w-4" />
+                  Encerrar
+                </Button>
+              )}
+              <Button variant="destructive" size="sm" onClick={props.onLeave} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+          <Card className="min-w-0 flex-1 overflow-hidden">
+            <CardContent className="p-0">
+              <MeetingStage
+                session={props.session}
+                onAgentJoined={props.onAgentJoined}
+              />
+            </CardContent>
+          </Card>
+
+          {props.showChat && (
+            <Card className="flex h-[60vh] w-full flex-col overflow-hidden lg:h-auto lg:w-[340px] lg:shrink-0">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                <span className="text-sm font-medium">Chat da reunião</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Fechar chat"
+                  onClick={() => props.onChatChange(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="min-h-0 flex-1">
+                <Chat className="lk-chat h-full" />
+              </div>
+            </Card>
           )}
-          <Button variant="destructive" size="sm" onClick={onLeave} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Sair
-          </Button>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <LiveKitRoom
-          token={session.token}
-          serverUrl={session.serverUrl}
-          connect
-          audio
-          video
-          data-lk-theme="default"
-          className="lk-room-container block h-[70vh] w-full"
-          onDisconnected={onLeave}
-          onError={(e) =>
-            toast.error(translateError(e, "Erro na conexão da reunião."))
-          }
-        >
-          <MeetingRoomContent
-            session={session}
-            onAgentJoined={() => setAiState("joined")}
-          />
-        </LiveKitRoom>
-      </CardContent>
-    </Card>
+      </div>
+    </LayoutContextProvider>
   );
 }
