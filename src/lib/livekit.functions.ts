@@ -175,7 +175,11 @@ export const startLivekitCall = createServerFn({ method: "POST" })
 
     try {
       await createLivekitRoom(env, roomName, metadata);
-      await dispatchLivekitAgent(env, roomName, metadata);
+      // Workers sem agent_name usam dispatch automático ao entrar na sala.
+      // O dispatch explícito só pode ser roteado para um worker nomeado.
+      if (env.agentName) {
+        await dispatchLivekitAgent(env, roomName, metadata);
+      }
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
       throw new Error(
