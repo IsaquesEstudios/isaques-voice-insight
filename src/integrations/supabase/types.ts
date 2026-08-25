@@ -50,6 +50,80 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_join_requests: {
+        Row: {
+          created_at: string
+          guest_name: string
+          id: string
+          room_code: string
+          status: string
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          guest_name: string
+          id?: string
+          room_code: string
+          status?: string
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          guest_name?: string
+          id?: string
+          room_code?: string
+          status?: string
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_join_requests_room_code_fkey"
+            columns: ["room_code"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      meeting_rooms: {
+        Row: {
+          code: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          name: string
+          scheduled_at: string | null
+          started_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          name: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          name?: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -262,7 +336,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_guest_meeting_info: {
+        Args: { p_code: string }
+        Returns: {
+          ended_at: string
+          name: string
+          scheduled_at: string
+        }[]
+      }
+      get_meeting_join_status: {
+        Args: { p_id: string }
+        Returns: {
+          room_code: string
+          status: string
+          token: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
