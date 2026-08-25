@@ -462,3 +462,34 @@ export const setMeetingPresenter = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+/**
+ * Estado de apresentação da reunião (quem está em destaque + permissões).
+ * Pública e sem dados sensíveis: usada como polling pelos participantes,
+ * porque nem todo servidor LiveKit replica RoomUpdate para os clientes.
+ */
+export const getMeetingState = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+      throw new Error("Código de reunião inválido.");
+    }
+    return { code };
+  })
+  .handler(async ({ data }): Promise<{ presenter: string | null; allowed: string[] }> => {
+    const { getLivekitEnv, getLivekitRoomMetadata } = await import("./livekit.server");
+    const raw = await getLivekitRoomMetadata(getLivekitEnv(), data.code);
+    if (!raw) return { presenter: null, allowed: [] };
+    try {
+      const j = JSON.parse(raw) as Record<string, unknown>;
+      return {
+        presenter: typeof j.presenter === "string" ? j.presenter : null,
+        allowed: Array.isArray(j.allowed)
+          ? j.allowed.filter((x): x is string => typeof x === "string")
+          : [],
+      };
+    } catch {
+      return { presenter: null, allowed: [] };
+    }
+  });

@@ -62,7 +62,10 @@ type AiState = "idle" | "calling" | "waiting" | "joined";
 function AgentPresence({ onJoined }: { onJoined: () => void }) {
   const participants = useParticipants();
   const present = participants.some((p) => p.kind === ParticipantKind.AGENT);
-  if (present) onJoined();
+  useEffect(() => {
+    if (present) onJoined();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [present]);
   return null;
 }
 
@@ -99,22 +102,39 @@ function participantRole(p: Participant): "host" | "guest" {
   }
 }
 
-/** Escuta a metadata da sala e reage a mudanças em tempo real. */
-function useRoomMeta(): RoomMetaState {
+/**
+ * Estado de apresentação da sala. Usa o evento RoomMetadataChanged quando o
+ * servidor replica a metadata, com polling de 3s como fallback (nem todo
+ * servidor LiveKit empurra RoomUpdate para os participantes).
+ */
+function useRoomMeta(roomName: string): [RoomMetaState, (m: RoomMetaState) => void] {
   const room = useRoomContext();
+  const fetchState = useServerFn(getMeetingState);
   const [meta, setMeta] = useState<RoomMetaState>(() => parseRoomMeta(room.metadata));
   useEffect(() => {
-    const update = () => {
-      console.log("[reuniao] room metadata changed:", room.metadata);
-      setMeta(parseRoomMeta(room.metadata));
-    };
+    const update = () => setMeta(parseRoomMeta(room.metadata));
     update();
     room.on(RoomEvent.RoomMetadataChanged, update);
+    const poll = async () => {
+      try {
+        const s = await fetchState({ data: { code: roomName } });
+        setMeta((prev) =>
+          prev.presenter === s.presenter && prev.allowed.join("|") === s.allowed.join("|")
+            ? prev
+            : s,
+        );
+      } catch {
+        /* sala encerrada ou falha de rede — ignora e tenta no próximo ciclo */
+      }
+    };
+    const id = setInterval(poll, 3000);
     return () => {
       room.off(RoomEvent.RoomMetadataChanged, update);
+      clearInterval(id);
     };
-  }, [room]);
-  return meta;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room, roomName]);
+  return [meta, setMeta];
 }
 
 function initials(name: string): string {
