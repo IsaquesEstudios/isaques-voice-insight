@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -174,6 +174,23 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
     setStatus("ended");
   }
 
+  const handleConnected = useCallback(() => {
+    setStatus("in_call");
+  }, []);
+
+  const handleDisconnected = useCallback(() => {
+    sessionRef.current = null;
+    setSession(null);
+    setStatus((s) => (s === "error" ? s : "ended"));
+  }, []);
+
+  const handleRoomError = useCallback((e: Error) => {
+    const msg = formatLivekitError(e);
+    setStatus("error");
+    setErrorMsg(msg);
+    toast.error("Erro na chamada", { description: msg.split("\n")[0] });
+  }, []);
+
   const isActive = status === "connecting" || status === "in_call";
 
   return (
@@ -272,18 +289,9 @@ export function LivekitCallDialog({ agentId, agentName, open, onOpenChange }: Pr
                 connect={true}
                 audio={true}
                 video={false}
-                onConnected={() => setStatus("in_call")}
-                onDisconnected={() => {
-                  sessionRef.current = null;
-                  setSession(null);
-                  setStatus((s) => (s === "error" ? s : "ended"));
-                }}
-                onError={(e) => {
-                  const msg = formatLivekitError(e);
-                  setStatus("error");
-                  setErrorMsg(msg);
-                  toast.error("Erro na chamada", { description: msg.split("\n")[0] });
-                }}
+                onConnected={handleConnected}
+                onDisconnected={handleDisconnected}
+                onError={handleRoomError}
               >
                 <RoomAudioRenderer />
                 <SessionControls muted={muted} onMutedChange={setMuted} onEnd={endCall} />
