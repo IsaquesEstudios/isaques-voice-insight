@@ -147,9 +147,7 @@ export const startLivekitCall = createServerFn({ method: "POST" })
     ),
   }))
   .handler(async ({ data, context }): Promise<LivekitCallSession> => {
-    const { getLivekitEnv, createLivekitRoom, signLivekitJwt } = await import(
-      "./livekit.server"
-    );
+    const { getLivekitEnv, signLivekitJwt } = await import("./livekit.server");
     const env = getLivekitEnv();
 
     const { data: agent, error } = await context.supabase
@@ -169,8 +167,6 @@ export const startLivekitCall = createServerFn({ method: "POST" })
       voz: agent.voz ?? "",
     });
 
-    await createLivekitRoom(env, roomName, metadata);
-
     const identity = `painel-${context.userId.slice(0, 8)}-${Math.random()
       .toString(36)
       .slice(2, 6)}`;
@@ -179,6 +175,8 @@ export const startLivekitCall = createServerFn({ method: "POST" })
       displayName: "Teste Painel",
       room: roomName,
       metadata,
+      roomMetadata: metadata,
+      dispatchAgent: true,
     });
 
     return { token, serverUrl: env.url, roomName };
