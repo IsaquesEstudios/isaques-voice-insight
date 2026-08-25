@@ -51,11 +51,24 @@ interface Props {
 function formatLivekitError(error: unknown): string {
   const detail = translateError(error, "erro desconhecido ao conectar.");
   const raw = error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase();
+  const errorName = error instanceof DOMException ? error.name.toLowerCase() : "";
 
-  if (raw.includes("microphone") || raw.includes("notallowederror") || raw.includes("permission")) {
+  if (errorName === "notallowederror" || raw.includes("notallowederror") || raw.includes("permission denied")) {
     return [
       "Problema: o navegador bloqueou o microfone.",
-      "Como resolver: clique no cadeado da barra de endereço, libere o microfone e tente de novo.",
+      "Como resolver: se você acabou de liberar a permissão, recarregue esta página para aplicar a alteração. Caso contrário, clique no cadeado da barra de endereço e libere o microfone.",
+    ].join("\n");
+  }
+  if (errorName === "notreadableerror" || errorName === "aborterror") {
+    return [
+      "Problema: o microfone está liberado, mas não pôde ser iniciado.",
+      "Como resolver: feche outros aplicativos que possam estar usando o microfone, recarregue esta página e tente novamente.",
+    ].join("\n");
+  }
+  if (errorName === "notfounderror" || errorName === "devicesnotfounderror") {
+    return [
+      "Problema: nenhum microfone disponível foi encontrado.",
+      "Como resolver: conecte ou habilite um microfone nas configurações do dispositivo e tente novamente.",
     ].join("\n");
   }
   if (raw.includes("não configurado") || raw.includes("livekit_url")) {
