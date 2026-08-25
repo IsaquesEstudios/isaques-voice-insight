@@ -1,6 +1,6 @@
 // Helpers server-only para a integração LiveKit.
 // Nunca importar em código de cliente — as credenciais ficam no servidor.
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 
 export interface LivekitEnv {
   /** URL websocket do projeto (wss://...). */
@@ -68,6 +68,29 @@ export async function signLivekitJwt(env: LivekitEnv, opts: TokenOptions): Promi
     .setNotBefore(now - 10)
     .setExpirationTime(now + (opts.ttlSeconds ?? 600))
     .sign(new TextEncoder().encode(env.apiSecret));
+}
+
+/**
+ * Verifica um token de participante (assinatura + sala) e devolve a identidade.
+ * Usado para autorizar ações privilegiadas dentro da reunião (ex: apresentar)
+ * sem depender da sessão do painel — o próprio token do LiveKit é a credencial.
+ */
+export async function verifyLivekitToken(
+  env: LivekitEnv,
+  token: string,
+  roomName: string,
+): Promise<{ identity: string; metadata?: string }> {
+  const { payload } = await jwtVerify(token, new TextEncoder().encode(env.apiSecret));
+  const video = (payload as { video?: Record<string, unknown> }).video;
+  if (!video || video.room !== roomName || video.roomJoin !== true) {
+    throw new Error("Token não autorizado para esta sala.");
+  }
+  const identity = typeof payload.sub === "string" ? payload.sub : "";
+  if (!identity) throw new Error("Token sem identidade de participante.");
+  return {
+    identity,
+    ...(typeof payload.metadata === "string" ? { metadata: payload.metadata } : {}),
+  };
 }
 
 /** Despacha explicitamente um worker de agente para a sala recém-criada. */
@@ -174,9 +197,75 @@ export async function livekitRoomExists(env: LivekitEnv, roomName: string): Prom
   );
   if (!res.ok) return false;
   const body = (await res.json().catch(() => null)) as
-    | { rooms?: Array<{ name?: string }> }
+    | { rooms?: Array<{ name?: string; metadata?: string }> }
     | null;
   return !!body?.rooms?.some((r) => r.name === roomName);
+}
+
+/** Lê a metadata atual da sala (null quando a sala não existe). */
+export async function getLivekitRoomMetadata(
+  env: LivekitEnv,
+  roomName: string,
+): Promise<string | null> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: roomName,
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/ListRooms`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ names: [roomName] }),
+    },
+  );
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as
+    | { rooms?: Array<{ name?: string; metadata?: string }> }
+    | null;
+  const room = body?.rooms?.find((r) => r.name === roomName);
+  if (!room) return null;
+  return room.metadata ?? "";
+}
+
+/**
+ * Atualiza a metadata da sala (replicada em tempo real para todos os
+ * participantes via evento RoomMetadataChanged). Preservar o conteúdo
+ * anterior fica a cargo do chamador.
+ */
+export async function updateLivekitRoomMetadata(
+  env: LivekitEnv,
+  roomName: string,
+  metadata: string,
+): Promise<void> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: roomName,
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/UpdateRoomMetadata`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ room: roomName, metadata }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `LiveKit UpdateRoomMetadata retornou ${res.status}: ${body || "sem detalhes"}`,
+    );
+  }
 }
 
 /** Slug seguro para nomear salas de reunião (minúsculas, sem acentos). */

@@ -285,6 +285,8 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
         .slice(2, 6)}`,
       displayName: data.displayName ?? "Organizador",
       room: roomName,
+      // Papel do participante: só o organizador controla a apresentação.
+      metadata: JSON.stringify({ role: "host" }),
       ttlSeconds: 14400, // 4h — reuniões duram mais que chamadas de teste
     });
 
@@ -313,6 +315,7 @@ export const joinLivekitMeeting = createServerFn({ method: "POST" })
         .slice(2, 6)}`,
       displayName: data.displayName ?? "Participante",
       room: data.code,
+      metadata: JSON.stringify({ role: "guest" }),
       ttlSeconds: 14400,
     });
 
@@ -342,6 +345,7 @@ export const joinLivekitMeetingAsGuest = createServerFn({ method: "POST" })
       identity: `convidado-${Math.random().toString(36).slice(2, 10)}`,
       displayName: data.displayName ?? "Convidado",
       room: data.code,
+      metadata: JSON.stringify({ role: "guest" }),
       ttlSeconds: 14400,
     });
 
@@ -374,4 +378,118 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
       );
     }
     return { ok: true };
+  });
+
+/**
+ * Controle de apresentação da reunião (quem aparece em destaque para todos).
+ * Pública, mas exige o token LiveKit da própria sala como credencial:
+ * - organizador (role host no token): define qualquer apresentador e gerencia
+ *   a lista de participantes com permissão para apresentar;
+ * - participante com permissão: só pode iniciar/encerrar a própria
+ *   apresentação, sem alterar a lista de permissões.
+ * Apenas um apresentador por vez: gravar um novo substitui o anterior.
+ */
+export const setMeetingPresenter = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+      throw new Error("Código de reunião inválido.");
+    }
+    const token = typeof d.token === "string" ? d.token : "";
+    if (!token) throw new Error("Sessão da reunião inválida.");
+    const presenter =
+      d.presenter === null || d.presenter === undefined
+        ? null
+        : String(d.presenter).slice(0, 128);
+    const allowed = Array.isArray(d.allowed)
+      ? d.allowed.filter((x): x is string => typeof x === "string").slice(0, 20)
+      : [];
+    return { code, token, presenter, allowed };
+  })
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const { getLivekitEnv, getLivekitRoomMetadata, updateLivekitRoomMetadata, verifyLivekitToken } =
+      await import("./livekit.server");
+    const env = getLivekitEnv();
+
+    let caller: { identity: string; metadata?: string };
+    try {
+      caller = await verifyLivekitToken(env, data.token, data.code);
+    } catch {
+      throw new Error("Sessão da reunião expirada. Saia e entre novamente.");
+    }
+
+    const raw = await getLivekitRoomMetadata(env, data.code);
+    if (raw === null) throw new Error("Reunião não encontrada ou já encerrada.");
+    let base: Record<string, unknown> = {};
+    try {
+      base = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      base = {};
+    }
+    const currentAllowed = Array.isArray(base.allowed)
+      ? (base.allowed as unknown[]).filter((x): x is string => typeof x === "string")
+      : [];
+
+    let isHost = false;
+    try {
+      isHost = JSON.parse(caller.metadata ?? "{}").role === "host";
+    } catch {
+      isHost = false;
+    }
+
+    let next: Record<string, unknown>;
+    if (isHost) {
+      next = { ...base, presenter: data.presenter, allowed: data.allowed };
+    } else {
+      if (!currentAllowed.includes(caller.identity)) {
+        throw new Error("O organizador ainda não liberou você para apresentar.");
+      }
+      if (data.presenter !== null && data.presenter !== caller.identity) {
+        throw new Error("Você só pode iniciar ou encerrar a sua própria apresentação.");
+      }
+      // Participante permitido nunca altera a lista de permissões.
+      next = { ...base, presenter: data.presenter };
+    }
+
+    try {
+      await updateLivekitRoomMetadata(env, data.code, JSON.stringify(next));
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(
+        `Não consegui atualizar a apresentação.\nDetalhe técnico: ${detail}`,
+      );
+    }
+    return { ok: true };
+  });
+
+/**
+ * Estado de apresentação da reunião (quem está em destaque + permissões).
+ * Pública e sem dados sensíveis: usada como polling pelos participantes,
+ * porque nem todo servidor LiveKit replica RoomUpdate para os clientes.
+ */
+export const getMeetingState = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+      throw new Error("Código de reunião inválido.");
+    }
+    return { code };
+  })
+  .handler(async ({ data }): Promise<{ presenter: string | null; allowed: string[] }> => {
+    const { getLivekitEnv, getLivekitRoomMetadata } = await import("./livekit.server");
+    const raw = await getLivekitRoomMetadata(getLivekitEnv(), data.code);
+    if (!raw) return { presenter: null, allowed: [] };
+    try {
+      const j = JSON.parse(raw) as Record<string, unknown>;
+      return {
+        presenter: typeof j.presenter === "string" ? j.presenter : null,
+        allowed: Array.isArray(j.allowed)
+          ? j.allowed.filter((x): x is string => typeof x === "string")
+          : [],
+      };
+    } catch {
+      return { presenter: null, allowed: [] };
+    }
   });
