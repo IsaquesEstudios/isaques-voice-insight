@@ -2,7 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Bot,
   CalendarClock,
+  Captions,
+  FileText,
   Link2,
   Loader2,
   LogIn,
@@ -28,7 +31,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   LivekitMeetingRoom,
   MeetingEndedScreen,
@@ -37,6 +42,7 @@ import {
 import {
   closeMeeting,
   enterMeetingAsHost,
+  getMeetingTranscript,
   joinLivekitMeeting,
   listMyMeetings,
   startLivekitMeeting,
@@ -114,8 +120,11 @@ function ReunioesPage() {
   const [meetingName, setMeetingName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [transcribe, setTranscribe] = useState(false);
+  const [withAgent, setWithAgent] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinName, setJoinName] = useState("");
+  const [transcriptFor, setTranscriptFor] = useState<MeetingDTO | null>(null);
 
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -148,6 +157,8 @@ function ReunioesPage() {
           meetingName: meetingName.trim(),
           displayName: displayName.trim() || undefined,
           scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+          transcribe,
+          withAgent,
         },
       });
       if (result.kind === "started") {
@@ -156,6 +167,7 @@ function ReunioesPage() {
           token: result.token,
           serverUrl: result.serverUrl,
           roomName: result.roomName,
+          transcribe: result.transcribe,
         });
       } else {
         toast.success(`Reunião agendada para ${fmtDate(result.scheduledAt)}.`);
@@ -164,6 +176,8 @@ function ReunioesPage() {
       setCreateOpen(false);
       setMeetingName("");
       setScheduledAt("");
+      setTranscribe(false);
+      setWithAgent(false);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível criar a reunião."));
     } finally {
@@ -306,6 +320,18 @@ function ReunioesPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="truncate font-medium">{m.name}</p>
                           <StatusBadge status={m.status} />
+                          {m.transcribe && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <Captions className="h-3 w-3" />
+                              Transcrição
+                            </Badge>
+                          )}
+                          {m.withAgent && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <Bot className="h-3 w-3" />
+                              IA
+                            </Badge>
+                          )}
                         </div>
                         <p className="truncate font-mono text-xs text-muted-foreground">
                           {m.code}
@@ -315,6 +341,17 @@ function ReunioesPage() {
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2">
+                        {m.hasTranscript && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => setTranscriptFor(m)}
+                          >
+                            <FileText className="h-4 w-4" />
+                            Ver ata
+                          </Button>
+                        )}
                         {(m.status === "live" ||
                           m.status === "ready" ||
                           m.status === "scheduled") && (
@@ -412,6 +449,58 @@ function ReunioesPage() {
                 Deixe em branco para começar imediatamente.
               </p>
             </div>
+            <div className="space-y-3 rounded-lg border border-border/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="optTranscribe" className="flex items-center gap-1.5">
+                    <Captions className="h-3.5 w-3.5" />
+                    Transcrever reunião
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    A IA ouve a conversa e grava a ata com falas e horários.
+                  </p>
+                </div>
+                <Switch
+                  id="optTranscribe"
+                  checked={transcribe}
+                  onCheckedChange={(v) => {
+                    setTranscribe(v);
+                    // Desligou a transcrição: a IA sai junto (ela depende dela).
+                    if (!v) setWithAgent(false);
+                  }}
+                />
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="optAgent"
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      !transcribe && "opacity-50",
+                    )}
+                  >
+                    <Bot className="h-3.5 w-3.5" />
+                    Ativar assistente de IA
+                  </Label>
+                  <p
+                    className={cn(
+                      "text-xs text-muted-foreground",
+                      !transcribe && "opacity-50",
+                    )}
+                  >
+                    {transcribe
+                      ? "A IA entra na sala desde o início e participa da conversa."
+                      : "Ative a transcrição primeiro — a IA precisa ouvir a reunião."}
+                  </p>
+                </div>
+                <Switch
+                  id="optAgent"
+                  checked={withAgent}
+                  disabled={!transcribe}
+                  onCheckedChange={setWithAgent}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
@@ -475,6 +564,67 @@ function ReunioesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TranscriptDialog
+        meeting={transcriptFor}
+        onClose={() => setTranscriptFor(null)}
+      />
     </DashboardShell>
+  );
+}
+
+/** Ata gravada pelo worker de IA (Deepgram) ao final da reunião. */
+function TranscriptDialog({
+  meeting,
+  onClose,
+}: {
+  meeting: MeetingDTO | null;
+  onClose: () => void;
+}) {
+  const fetchTranscript = useServerFn(getMeetingTranscript);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["meeting-transcript", meeting?.code],
+    queryFn: () => fetchTranscript({ data: { code: meeting!.code } }),
+    enabled: !!meeting,
+  });
+
+  return (
+    <Dialog open={!!meeting} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Ata da reunião — {meeting?.name}
+          </DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando transcrição…
+          </div>
+        ) : isError ? (
+          <p className="py-6 text-center text-sm text-destructive">
+            Não foi possível carregar a transcrição.
+          </p>
+        ) : !data ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Nenhuma transcrição gravada para esta reunião ainda. A ata aparece
+            aqui quando o agente de IA finaliza a escuta.
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Gravada em {fmtDate(data.criadoEm)} · transcrita automaticamente
+              pela IA (Deepgram).
+            </p>
+            <ScrollArea className="max-h-[60vh] rounded-lg border border-border/70 bg-muted/30 p-4">
+              <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                {data.conteudo}
+              </pre>
+            </ScrollArea>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

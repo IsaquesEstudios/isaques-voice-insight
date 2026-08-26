@@ -210,12 +210,16 @@ export interface LivekitMeetingSession {
   token: string;
   serverUrl: string;
   roomName: string;
+  /** Quando true, a sala está com a transcrição (Deepgram) ativada. */
+  transcribe?: boolean;
 }
 
 type MeetingCreatePayload = {
   meetingName: string;
   displayName?: string;
   scheduledAt?: string;
+  transcribe: boolean;
+  withAgent: boolean;
 };
 type MeetingJoinPayload = { code: string; displayName?: string };
 
@@ -240,7 +244,11 @@ function parseMeetingCreate(data: unknown): MeetingCreatePayload {
     // Datas no passado (ou agora) viram reunião instantânea.
     if (ts.getTime() > Date.now() + 60_000) scheduledAt = ts.toISOString();
   }
-  const payload: MeetingCreatePayload = { meetingName };
+  // A IA precisa ouvir a conversa para responder: ativar a IA liga a
+  // transcrição automaticamente (mesma regra da tela de criação).
+  const withAgent = d.withAgent === true;
+  const transcribe = d.transcribe === true || withAgent;
+  const payload: MeetingCreatePayload = { meetingName, transcribe, withAgent };
   if (displayName) payload.displayName = displayName;
   if (scheduledAt) payload.scheduledAt = scheduledAt;
   return payload;
@@ -276,8 +284,13 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCreate)
   .handler(async ({ data, context }): Promise<StartMeetingResult> => {
-    const { createLivekitRoom, getLivekitEnv, signLivekitJwt, slugifyMeetingName } =
-      await import("./livekit.server");
+    const {
+      createLivekitRoom,
+      dispatchLivekitAgent,
+      getLivekitEnv,
+      signLivekitJwt,
+      slugifyMeetingName,
+    } = await import("./livekit.server");
 
     const roomName = `reuniao-${slugifyMeetingName(data.meetingName)}-${Math.random()
       .toString(36)
@@ -290,16 +303,22 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
         code: roomName,
         name: data.meetingName,
         scheduled_at: data.scheduledAt,
+        transcrever: data.transcribe,
+        assistente_ativa: data.withAgent,
       });
       if (error) throw new Error(`Falha ao agendar a reunião: ${error.message}`);
       return { kind: "scheduled", code: roomName, scheduledAt: data.scheduledAt };
     }
 
     const env = getLivekitEnv();
+    // O worker Python lê a metadata da sala para decidir o comportamento:
+    // transcrever=true → liga o Deepgram e grava a ata; acao=chamar_ia → a IA fala.
     const metadata = JSON.stringify({
       tipo: "reuniao",
       nome: data.meetingName,
       criadoPor: context.userId,
+      transcrever: data.transcribe,
+      assistente: data.withAgent,
     });
 
     try {
@@ -321,7 +340,27 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       code: roomName,
       name: data.meetingName,
       started_at: new Date().toISOString(),
+      transcrever: data.transcribe,
+      assistente_ativa: data.withAgent,
     });
+
+    // Com transcrição/IA pedidas na criação, o worker entra assim que a sala abre:
+    // acao=chamar_ia (IA completa) ou acao=transcrever (só escuta e grava a ata).
+    // Melhor esforço: se o worker estiver offline, o botão "Chamar IA" segue na sala.
+    if (data.withAgent || data.transcribe) {
+      try {
+        await dispatchLivekitAgent(
+          env,
+          roomName,
+          JSON.stringify({
+            tipo: "reuniao",
+            acao: data.withAgent ? "chamar_ia" : "transcrever",
+          }),
+        );
+      } catch (e) {
+        console.error("Dispatch inicial da reunião falhou:", e);
+      }
+    }
 
     const token = await signLivekitJwt(env, {
       identity: `painel-${context.userId.slice(0, 8)}-${Math.random()
@@ -334,7 +373,13 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       ttlSeconds: 14400, // 4h — reuniões duram mais que chamadas de teste
     });
 
-    return { kind: "started", token, serverUrl: env.url, roomName };
+    return {
+      kind: "started",
+      token,
+      serverUrl: env.url,
+      roomName,
+      transcribe: data.transcribe,
+    };
   });
 
 /** Usuário logado entra em uma sala existente pelo código. */
@@ -393,6 +438,82 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
       );
     }
     return { ok: true };
+  });
+
+/**
+ * Botão "Dispensar IA": remove o agente da sala (a reunião continua sem ele).
+ * Exige o token LiveKit da sala com papel de organizador — convidados não
+ * podem expulsar a IA. A transcrição/gravação da ata é finalizada pelo worker
+ * ao ser desconectado.
+ */
+export const dismissLivekitMeetingAgent = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+      throw new Error("Código de reunião inválido.");
+    }
+    const token = typeof d.token === "string" ? d.token : "";
+    if (!token) throw new Error("Sessão da reunião inválida.");
+    return { code, token };
+  })
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const {
+      getLivekitEnv,
+      listLivekitParticipants,
+      removeLivekitParticipant,
+      verifyLivekitToken,
+    } = await import("./livekit.server");
+    const env = getLivekitEnv();
+
+    let caller: { identity: string; metadata?: string };
+    try {
+      caller = await verifyLivekitToken(env, data.token, data.code);
+    } catch {
+      throw new Error("Sessão da reunião expirada. Saia e entre novamente.");
+    }
+    let isHost = false;
+    try {
+      isHost = JSON.parse(caller.metadata ?? "{}").role === "host";
+    } catch {
+      isHost = false;
+    }
+    if (!isHost) {
+      throw new Error("Somente o organizador pode dispensar a IA da reunião.");
+    }
+
+    const participants = await listLivekitParticipants(env, data.code);
+    const agent = participants.find(
+      (p) => String(p.kind ?? "").toUpperCase() === "AGENT",
+    );
+    // A IA já saiu (ou nunca entrou): trata como sucesso para a UI sincronizar.
+    if (!agent) return { ok: true };
+
+    try {
+      await removeLivekitParticipant(env, data.code, agent.identity);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(`Não consegui dispensar a IA.\nDetalhe técnico: ${detail}`);
+    }
+    return { ok: true };
+  });
+
+/**
+ * Transcrição (ata) de uma reunião, gravada pelo worker de IA via Deepgram.
+ * Somente o organizador lê — a RLS da tabela restringe ao dono da reunião.
+ */
+export const getMeetingTranscript = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(parseMeetingCode)
+  .handler(async ({ data, context }): Promise<{ conteudo: string; criadoEm: string } | null> => {
+    const { data: row, error } = await context.supabase
+      .from("transcricoes_reunioes")
+      .select("conteudo, criado_em")
+      .eq("nome_sala", data.code)
+      .maybeSingle();
+    if (error) throw new Error(`Falha ao carregar a transcrição: ${error.message}`);
+    if (!row || !row.conteudo.trim()) return null;
+    return { conteudo: row.conteudo, criadoEm: row.criado_em };
   });
 
 /**
@@ -586,6 +707,11 @@ export interface MeetingDTO {
   endedAt: string | null;
   createdAt: string;
   status: MeetingStatus;
+  /** Preferências gravadas na criação da reunião. */
+  transcribe: boolean;
+  withAgent: boolean;
+  /** True quando o worker já gravou a ata desta reunião. */
+  hasTranscript: boolean;
 }
 
 /** Lista as reuniões do usuário com o status calculado ("ao vivo" = sala ativa no LiveKit). */
@@ -594,7 +720,9 @@ export const listMyMeetings = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<MeetingDTO[]> => {
     const { data: rows, error } = await context.supabase
       .from("meeting_rooms")
-      .select("id, code, name, scheduled_at, started_at, ended_at, created_at")
+      .select(
+        "id, code, name, scheduled_at, started_at, ended_at, created_at, transcrever, assistente_ativa",
+      )
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) throw new Error(`Falha ao carregar reuniões: ${error.message}`);
@@ -607,6 +735,13 @@ export const listMyMeetings = createServerFn({ method: "GET" })
     } catch {
       active = new Set();
     }
+
+    // Quais reuniões já têm ata gravada pelo worker (RLS limita às do usuário).
+    const { data: transcripts } = await context.supabase
+      .from("transcricoes_reunioes")
+      .select("nome_sala")
+      .in("nome_sala", rows.map((r) => r.code));
+    const withTranscript = new Set((transcripts ?? []).map((t) => t.nome_sala));
 
     const now = Date.now();
     const staleIds: string[] = [];
@@ -631,6 +766,9 @@ export const listMyMeetings = createServerFn({ method: "GET" })
         endedAt: m.ended_at,
         createdAt: m.created_at,
         status,
+        transcribe: m.transcrever,
+        withAgent: m.assistente_ativa,
+        hasTranscript: withTranscript.has(m.code),
       };
     });
 
@@ -655,13 +793,18 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCode)
   .handler(async ({ data, context }): Promise<LivekitMeetingSession> => {
-    const { createLivekitRoom, getLivekitEnv, livekitRoomExists, signLivekitJwt } =
-      await import("./livekit.server");
+    const {
+      createLivekitRoom,
+      dispatchLivekitAgent,
+      getLivekitEnv,
+      livekitRoomExists,
+      signLivekitJwt,
+    } = await import("./livekit.server");
     const env = getLivekitEnv();
 
     const { data: meeting, error } = await context.supabase
       .from("meeting_rooms")
-      .select("id, code, name, started_at, ended_at")
+      .select("id, code, name, started_at, ended_at, transcrever, assistente_ativa")
       .eq("code", data.code)
       .maybeSingle();
     if (error) throw new Error(`Falha ao abrir a reunião: ${error.message}`);
@@ -675,6 +818,8 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
         tipo: "reuniao",
         nome: meeting.name,
         criadoPor: context.userId,
+        transcrever: meeting.transcrever,
+        assistente: meeting.assistente_ativa,
       });
       try {
         await createLivekitRoom(env, meeting.code, metadata, {
@@ -687,6 +832,22 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
         throw new Error(
           `Não consegui iniciar a sala da reunião.\nDetalhe técnico: ${detail}`,
         );
+      }
+      // Sala recém-iniciada: aplica as preferências gravadas no agendamento.
+      // Não despacha em sala já ativa — o organizador pode ter dispensado a IA.
+      if (meeting.assistente_ativa || meeting.transcrever) {
+        try {
+          await dispatchLivekitAgent(
+            env,
+            meeting.code,
+            JSON.stringify({
+              tipo: "reuniao",
+              acao: meeting.assistente_ativa ? "chamar_ia" : "transcrever",
+            }),
+          );
+        } catch (e) {
+          console.error("Dispatch inicial da reunião falhou:", e);
+        }
       }
       if (!meeting.started_at) {
         await context.supabase
@@ -706,7 +867,12 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
       ttlSeconds: 14400,
     });
 
-    return { token, serverUrl: env.url, roomName: meeting.code };
+    return {
+      token,
+      serverUrl: env.url,
+      roomName: meeting.code,
+      transcribe: meeting.transcrever,
+    };
   });
 
 /** Encerra uma reunião do histórico (apaga a sala no LiveKit e marca o fim). */

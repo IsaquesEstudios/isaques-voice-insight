@@ -39,6 +39,8 @@ import type {
 import "@livekit/components-styles";
 import {
   Bot,
+  BotOff,
+  Captions,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -72,6 +74,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -103,6 +106,7 @@ import {
 } from "@/components/ui/popover";
 import {
   callLivekitMeetingAgent,
+  dismissLivekitMeetingAgent,
   endLivekitMeeting,
   getMeetingState,
   listMeetingJoinRequests,
@@ -116,16 +120,22 @@ export interface MeetingSession {
   token: string;
   serverUrl: string;
   roomName: string;
+  /** Quando true, a sala está com a transcrição (Deepgram) ativada. */
+  transcribe?: boolean;
 }
 
 type AiState = "idle" | "calling" | "waiting" | "joined";
 
-/** Detecta quando o agente (worker LiveKit) entra na sala. */
-function AgentPresence({ onJoined }: { onJoined: () => void }) {
+/** Detecta quando o agente (worker LiveKit) entra ou sai da sala. */
+function AgentPresence({
+  onPresenceChange,
+}: {
+  onPresenceChange: (present: boolean) => void;
+}) {
   const participants = useParticipants();
   const present = participants.some((p) => p.kind === ParticipantKind.AGENT);
   useEffect(() => {
-    if (present) onJoined();
+    onPresenceChange(present);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [present]);
   return null;
@@ -768,7 +778,8 @@ function MeetingStage({
   onAgentJoined,
 }: {
   session: MeetingSession;
-  onAgentJoined: () => void;
+  /** Recebe true/false conforme o agente entra ou sai da sala. */
+  onAgentJoined: (present: boolean) => void;
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
@@ -870,7 +881,7 @@ function MeetingStage({
 
   return (
     <div className="flex h-[70vh] min-h-0 flex-col">
-      <AgentPresence onJoined={onAgentJoined} />
+      <AgentPresence onPresenceChange={onAgentJoined} />
       <div className="relative min-h-0 flex-1">
         {focus ? (
           <FocusStage
@@ -1182,7 +1193,9 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
   const [showChat, setShowChat] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
   const callAgent = useServerFn(callLivekitMeetingAgent);
+  const dismissAgent = useServerFn(dismissLivekitMeetingAgent);
   const endMeeting = useServerFn(endLivekitMeeting);
 
   // O papel vem do próprio token da sala — disponível antes de conectar.
@@ -1222,6 +1235,29 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
       setAiState("idle");
       toast.error(translateError(e, "Não foi possível chamar a IA."));
     }
+  };
+
+  const handleDismissAgent = async () => {
+    setDismissing(true);
+    try {
+      await dismissAgent({
+        data: { code: session.roomName, token: session.token },
+      });
+      setAiState("idle");
+      toast.success("IA dispensada. A reunião continua sem ela.");
+    } catch (e) {
+      toast.error(translateError(e, "Não foi possível dispensar a IA."));
+    } finally {
+      setDismissing(false);
+    }
+  };
+
+  // Entrada/saída do agente: mantém o botão sincronizado (Chamar ↔ Dispensar).
+  const handleAgentPresence = (present: boolean) => {
+    setAiState((s) => {
+      if (present) return "joined";
+      return s === "joined" ? "idle" : s;
+    });
   };
 
   const handleEndMeeting = async () => {
@@ -1266,10 +1302,12 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
             copiedCode={copiedCode}
             showChat={showChat}
             ending={ending}
-            onAgentJoined={() => setAiState("joined")}
+            dismissing={dismissing}
+            onAgentJoined={handleAgentPresence}
             onCopyCode={handleCopyCode}
             onCopyLink={handleCopyLink}
             onCallAgent={handleCallAgent}
+            onDismissAgent={handleDismissAgent}
             onChatChange={setShowChat}
             onLeave={onLeave}
             onRequestEnd={() => setConfirmEnd(true)}
@@ -1324,10 +1362,12 @@ interface ShellProps {
   copiedCode: boolean;
   showChat: boolean;
   ending: boolean;
-  onAgentJoined: () => void;
+  dismissing: boolean;
+  onAgentJoined: (present: boolean) => void;
   onCopyCode: () => void;
   onCopyLink: () => void;
   onCallAgent: () => void;
+  onDismissAgent: () => void;
   onChatChange: (open: boolean) => void;
   onLeave: () => void;
   onRequestEnd: () => void;
@@ -1346,9 +1386,20 @@ function MeetingShell(props: ShellProps) {
           <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Código da reunião</p>
-              <CardTitle className="truncate font-mono text-base">
-                {props.session.roomName}
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="truncate font-mono text-base">
+                  {props.session.roomName}
+                </CardTitle>
+                {props.session.transcribe && (
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 gap-1 border-primary/40 text-primary"
+                  >
+                    <Captions className="h-3 w-3" />
+                    Transcrição ativa
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={props.onCopyCode} className="gap-2">
@@ -1360,10 +1411,27 @@ function MeetingShell(props: ShellProps) {
                 Copiar link
               </Button>
               {props.aiState === "joined" ? (
-                <Button variant="outline" size="sm" disabled className="gap-2">
-                  <Check className="h-4 w-4" />
-                  IA na sala
-                </Button>
+                props.isHost ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={props.onDismissAgent}
+                    disabled={props.dismissing}
+                    className="gap-2"
+                  >
+                    {props.dismissing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <BotOff className="h-4 w-4" />
+                    )}
+                    Dispensar IA
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled className="gap-2">
+                    <Check className="h-4 w-4" />
+                    IA na sala
+                  </Button>
+                )
               ) : (
                 <Button
                   variant="secondary"
