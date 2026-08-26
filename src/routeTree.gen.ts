@@ -22,6 +22,7 @@ import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/cr
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
 import { Route as AuthenticatedAssistentesRouteImport } from './routes/_authenticated/assistentes'
+import { Route as ApiPublicTranscriptRouteImport } from './routes/api/public/transcript'
 import { Route as AuthenticatedAssistantsIdRouteImport } from './routes/_authenticated/assistants.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -90,6 +91,11 @@ const AuthenticatedAssistentesRoute =
     path: '/assistentes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicTranscriptRoute = ApiPublicTranscriptRouteImport.update({
+  id: '/api/public/transcript',
+  path: '/api/public/transcript',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAssistantsIdRoute =
   AuthenticatedAssistantsIdRouteImport.update({
     id: '/assistants/$id',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
+  '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
+  '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/_authenticated/telefonia': typeof AuthenticatedTelefoniaRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/_authenticated/assistants/$id': typeof AuthenticatedAssistantsIdRoute
+  '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/telefonia'
     | '/reuniao/$code'
     | '/assistants/$id'
+    | '/api/public/transcript'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/telefonia'
     | '/reuniao/$code'
     | '/assistants/$id'
+    | '/api/public/transcript'
   id:
     | '__root__'
     | '/'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/_authenticated/telefonia'
     | '/reuniao/$code'
     | '/_authenticated/assistants/$id'
+    | '/api/public/transcript'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -198,6 +210,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReuniaoCodeRoute: typeof ReuniaoCodeRoute
+  ApiPublicTranscriptRoute: typeof ApiPublicTranscriptRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssistentesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/transcript': {
+      id: '/api/public/transcript'
+      path: '/api/public/transcript'
+      fullPath: '/api/public/transcript'
+      preLoaderRoute: typeof ApiPublicTranscriptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/assistants/$id': {
       id: '/_authenticated/assistants/$id'
       path: '/assistants/$id'
@@ -337,6 +357,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   ReuniaoCodeRoute: ReuniaoCodeRoute,
+  ApiPublicTranscriptRoute: ApiPublicTranscriptRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
