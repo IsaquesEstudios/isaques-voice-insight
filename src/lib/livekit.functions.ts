@@ -317,6 +317,8 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       tipo: "reuniao",
       nome: data.meetingName,
       criadoPor: context.userId,
+      // `acao` é o campo que o worker usa para decidir o modo da sala.
+      acao: data.withAgent ? "chamar_ia" : data.transcribe ? "transcrever" : "nenhuma",
       transcrever: data.transcribe,
       assistente: data.withAgent,
     });
