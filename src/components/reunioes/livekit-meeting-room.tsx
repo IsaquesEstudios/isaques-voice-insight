@@ -1362,10 +1362,12 @@ interface ShellProps {
   copiedCode: boolean;
   showChat: boolean;
   ending: boolean;
-  onAgentJoined: () => void;
+  dismissing: boolean;
+  onAgentJoined: (present: boolean) => void;
   onCopyCode: () => void;
   onCopyLink: () => void;
   onCallAgent: () => void;
+  onDismissAgent: () => void;
   onChatChange: (open: boolean) => void;
   onLeave: () => void;
   onRequestEnd: () => void;
@@ -1384,9 +1386,20 @@ function MeetingShell(props: ShellProps) {
           <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Código da reunião</p>
-              <CardTitle className="truncate font-mono text-base">
-                {props.session.roomName}
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="truncate font-mono text-base">
+                  {props.session.roomName}
+                </CardTitle>
+                {props.session.transcribe && (
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 gap-1 border-primary/40 text-primary"
+                  >
+                    <Captions className="h-3 w-3" />
+                    Transcrição ativa
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={props.onCopyCode} className="gap-2">
@@ -1398,10 +1411,27 @@ function MeetingShell(props: ShellProps) {
                 Copiar link
               </Button>
               {props.aiState === "joined" ? (
-                <Button variant="outline" size="sm" disabled className="gap-2">
-                  <Check className="h-4 w-4" />
-                  IA na sala
-                </Button>
+                props.isHost ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={props.onDismissAgent}
+                    disabled={props.dismissing}
+                    className="gap-2"
+                  >
+                    {props.dismissing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <BotOff className="h-4 w-4" />
+                    )}
+                    Dispensar IA
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled className="gap-2">
+                    <Check className="h-4 w-4" />
+                    IA na sala
+                  </Button>
+                )
               ) : (
                 <Button
                   variant="secondary"
