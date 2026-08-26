@@ -652,16 +652,33 @@ function MeetingDetailsDialog({
             </p>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Gravada em {fmtDate(data.criadoEm)} · transcrita automaticamente
-                pela IA (Deepgram).
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Gravada em {fmtDate(data.criadoEm)} · transcrita automaticamente
+                  pela IA (Deepgram).
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(data.conteudo);
+                      toast.success("Ata copiada para a área de transferência.");
+                    } catch {
+                      toast.error("Não consegui copiar a ata.");
+                    }
+                  }}
+                >
+                  Copiar ata
+                </Button>
+              </div>
               <ScrollArea className="max-h-[50vh] rounded-lg border border-border/70 bg-muted/30 p-4">
                 <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
                   {data.conteudo}
                 </pre>
               </ScrollArea>
             </>
+
           )}
         </div>
       </DialogContent>

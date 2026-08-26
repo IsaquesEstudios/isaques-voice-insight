@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.set_transcricao_user_id() FROM PUBLIC, anon, authenticated;
