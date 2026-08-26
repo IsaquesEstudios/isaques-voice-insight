@@ -6,7 +6,7 @@ import { timingSafeEqual } from "crypto";
  * a transcrição (ata) de uma reunião no banco de dados.
  *
  * Autenticação: header `x-webhook-secret` deve corresponder ao
- * TRANSCRIPT_WEBHOOK_SECRET configurado no ambiente.
+ * LIVEKIT_API_SECRET — o worker já possui essa chave configurada.
  *
  * Body JSON esperado:
  *   { "nome_sala": "reuniao-ABC123", "conteudo": "texto da transcrição..." }
@@ -18,9 +18,9 @@ export const Route = createFileRoute("/api/public/transcript")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // 1. Validar segredo compartilhado
+        // 1. Validar segredo (usa o LIVEKIT_API_SECRET que o worker já possui)
         const secret = request.headers.get("x-webhook-secret") ?? "";
-        const expected = process.env["TRANSCRIPT_WEBHOOK_SECRET"] ?? "";
+        const expected = process.env["LIVEKIT_API_SECRET"] ?? "";
         if (!expected || !secret) {
           return json({ error: "Não autorizado" }, 401);
         }
