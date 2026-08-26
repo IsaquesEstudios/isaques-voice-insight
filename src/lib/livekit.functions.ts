@@ -530,16 +530,19 @@ export const getMeetingTranscript = createServerFn({ method: "GET" })
     // O worker grava a ata pelo backend (sem user_id garantido), então a
     // leitura é feita após a checagem de posse acima.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin
+    // O worker pode gravar o nome da sala com ou sem o prefixo "reuniao-".
+    const semPrefixo = data.code.replace(/^reuniao-/, "");
+    const { data: rows, error } = await supabaseAdmin
       .from("transcricoes_reunioes")
       .select("conteudo, criado_em")
-      .eq("nome_sala", data.code)
+      .in("nome_sala", [data.code, semPrefixo])
       .order("criado_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
     if (error) throw new Error(`Falha ao carregar a transcrição: ${error.message}`);
+    const row = rows?.[0];
     if (!row || !row.conteudo.trim()) return null;
     return { conteudo: row.conteudo, criadoEm: row.criado_em };
+
   });
 
 /**
