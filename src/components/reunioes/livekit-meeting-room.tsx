@@ -39,6 +39,8 @@ import type {
 import "@livekit/components-styles";
 import {
   Bot,
+  BotOff,
+  Captions,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -72,6 +74,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -103,6 +106,7 @@ import {
 } from "@/components/ui/popover";
 import {
   callLivekitMeetingAgent,
+  dismissLivekitMeetingAgent,
   endLivekitMeeting,
   getMeetingState,
   listMeetingJoinRequests,
@@ -116,16 +120,22 @@ export interface MeetingSession {
   token: string;
   serverUrl: string;
   roomName: string;
+  /** Quando true, a sala está com a transcrição (Deepgram) ativada. */
+  transcribe?: boolean;
 }
 
 type AiState = "idle" | "calling" | "waiting" | "joined";
 
-/** Detecta quando o agente (worker LiveKit) entra na sala. */
-function AgentPresence({ onJoined }: { onJoined: () => void }) {
+/** Detecta quando o agente (worker LiveKit) entra ou sai da sala. */
+function AgentPresence({
+  onPresenceChange,
+}: {
+  onPresenceChange: (present: boolean) => void;
+}) {
   const participants = useParticipants();
   const present = participants.some((p) => p.kind === ParticipantKind.AGENT);
   useEffect(() => {
-    if (present) onJoined();
+    onPresenceChange(present);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [present]);
   return null;
