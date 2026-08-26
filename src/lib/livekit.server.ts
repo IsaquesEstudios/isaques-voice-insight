@@ -331,6 +331,79 @@ export async function deleteLivekitRoom(
   }
 }
 
+export interface LivekitParticipantInfo {
+  identity: string;
+  /** kind do participante: "AGENT" para o worker de IA, "STANDARD" para pessoas. */
+  kind?: string;
+}
+
+/** Lista os participantes conectados em uma sala. */
+export async function listLivekitParticipants(
+  env: LivekitEnv,
+  roomName: string,
+): Promise<LivekitParticipantInfo[]> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: roomName,
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/ListParticipants`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ room: roomName }),
+    },
+  );
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as
+    | { participants?: Array<{ identity?: string; kind?: string }> }
+    | null;
+  return (body?.participants ?? [])
+    .filter((p): p is { identity: string; kind?: string } => typeof p.identity === "string")
+    .map((p) => ({ identity: p.identity, ...(p.kind ? { kind: String(p.kind) } : {}) }));
+}
+
+/**
+ * Remove um participante da sala (desconecta na hora).
+ * Usada pelo botão "Dispensar IA": tira o agente da reunião sem encerrá-la.
+ */
+export async function removeLivekitParticipant(
+  env: LivekitEnv,
+  roomName: string,
+  identity: string,
+): Promise<void> {
+  const serviceJwt = await signLivekitJwt(env, {
+    identity: "omnia-server",
+    room: roomName,
+    service: true,
+    ttlSeconds: 60,
+  });
+  const res = await fetch(
+    `${livekitHttpUrl(env.url)}/twirp/livekit.RoomService/RemoveParticipant`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ room: roomName, identity }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    // Participante já saiu não é erro fatal.
+    if (res.status === 404 || /not found|does not exist/i.test(body)) return;
+    throw new Error(
+      `LiveKit RemoveParticipant retornou ${res.status}: ${body || "sem detalhes"}`,
+    );
+  }
+}
+
 /** Slug seguro para nomear salas de reunião (minúsculas, sem acentos). */
 export function slugifyMeetingName(name: string): string {
   const slug = name
