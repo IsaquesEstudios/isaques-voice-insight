@@ -346,8 +346,9 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
 
     // Com transcrição/IA pedidas na criação, o worker entra assim que a sala abre:
     // acao=chamar_ia (IA completa) ou acao=transcrever (só escuta e grava a ata).
-    // Melhor esforço: se o worker estiver offline, o botão "Chamar IA" segue na sala.
-    if (data.withAgent || data.transcribe) {
+    // IMPORTANTE: worker sem agent_name usa dispatch automático e já entra sozinho.
+    // Um dispatch explícito nesse caso criaria uma SEGUNDA instância da IA na sala.
+    if ((data.withAgent || data.transcribe) && env.agentName) {
       try {
         await dispatchLivekitAgent(
           env,
@@ -419,13 +420,25 @@ export const joinLivekitMeeting = createServerFn({ method: "POST" })
 export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
   .inputValidator(parseMeetingCode)
   .handler(async ({ data }): Promise<{ ok: true }> => {
-    const { dispatchLivekitAgent, getLivekitEnv, livekitRoomExists } = await import(
-      "./livekit.server"
-    );
+    const {
+      dispatchLivekitAgent,
+      getLivekitEnv,
+      listLivekitParticipants,
+      livekitRoomExists,
+    } = await import("./livekit.server");
     const env = getLivekitEnv();
 
     if (!(await livekitRoomExists(env, data.code))) {
       throw new Error("Reunião não encontrada ou já encerrada.");
+    }
+
+    // Já existe um agente na sala? Não despacha de novo (evita IA duplicada).
+    try {
+      const participants = await listLivekitParticipants(env, data.code);
+      if (participants.some((p) => String(p.kind ?? "").toUpperCase() === "AGENT"))
+        return { ok: true };
+    } catch {
+      // Sem lista de participantes: segue com o dispatch.
     }
 
     const metadata = JSON.stringify({ tipo: "reuniao", acao: "chamar_ia" });
@@ -506,10 +519,23 @@ export const getMeetingTranscript = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCode)
   .handler(async ({ data, context }): Promise<{ conteudo: string; criadoEm: string } | null> => {
-    const { data: row, error } = await context.supabase
+    // Só o dono da reunião pode ler a ata (RLS de meeting_rooms garante isso).
+    const { data: meeting } = await context.supabase
+      .from("meeting_rooms")
+      .select("id")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (!meeting) throw new Error("Reunião não encontrada.");
+
+    // O worker grava a ata pelo backend (sem user_id garantido), então a
+    // leitura é feita após a checagem de posse acima.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
       .from("transcricoes_reunioes")
       .select("conteudo, criado_em")
       .eq("nome_sala", data.code)
+      .order("criado_em", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (error) throw new Error(`Falha ao carregar a transcrição: ${error.message}`);
     if (!row || !row.conteudo.trim()) return null;
@@ -736,8 +762,10 @@ export const listMyMeetings = createServerFn({ method: "GET" })
       active = new Set();
     }
 
-    // Quais reuniões já têm ata gravada pelo worker (RLS limita às do usuário).
-    const { data: transcripts } = await context.supabase
+    // Quais reuniões já têm ata gravada pelo worker. A busca é restrita aos
+    // códigos das salas do próprio usuário (linhas acima já passaram por RLS).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: transcripts } = await supabaseAdmin
       .from("transcricoes_reunioes")
       .select("nome_sala")
       .in("nome_sala", rows.map((r) => r.code));
@@ -835,7 +863,9 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
       }
       // Sala recém-iniciada: aplica as preferências gravadas no agendamento.
       // Não despacha em sala já ativa — o organizador pode ter dispensado a IA.
-      if (meeting.assistente_ativa || meeting.transcrever) {
+      // Worker sem agent_name entra sozinho (dispatch automático): despachar
+      // explicitamente duplicaria a IA na sala.
+      if ((meeting.assistente_ativa || meeting.transcrever) && env.agentName) {
         try {
           await dispatchLivekitAgent(
             env,
