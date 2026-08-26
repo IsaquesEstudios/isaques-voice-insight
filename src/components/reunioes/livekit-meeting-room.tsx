@@ -1193,7 +1193,9 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
   const [showChat, setShowChat] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
   const callAgent = useServerFn(callLivekitMeetingAgent);
+  const dismissAgent = useServerFn(dismissLivekitMeetingAgent);
   const endMeeting = useServerFn(endLivekitMeeting);
 
   // O papel vem do próprio token da sala — disponível antes de conectar.
@@ -1233,6 +1235,29 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
       setAiState("idle");
       toast.error(translateError(e, "Não foi possível chamar a IA."));
     }
+  };
+
+  const handleDismissAgent = async () => {
+    setDismissing(true);
+    try {
+      await dismissAgent({
+        data: { code: session.roomName, token: session.token },
+      });
+      setAiState("idle");
+      toast.success("IA dispensada. A reunião continua sem ela.");
+    } catch (e) {
+      toast.error(translateError(e, "Não foi possível dispensar a IA."));
+    } finally {
+      setDismissing(false);
+    }
+  };
+
+  // Entrada/saída do agente: mantém o botão sincronizado (Chamar ↔ Dispensar).
+  const handleAgentPresence = (present: boolean) => {
+    setAiState((s) => {
+      if (present) return "joined";
+      return s === "joined" ? "idle" : s;
+    });
   };
 
   const handleEndMeeting = async () => {
@@ -1277,10 +1302,12 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
             copiedCode={copiedCode}
             showChat={showChat}
             ending={ending}
-            onAgentJoined={() => setAiState("joined")}
+            dismissing={dismissing}
+            onAgentJoined={handleAgentPresence}
             onCopyCode={handleCopyCode}
             onCopyLink={handleCopyLink}
             onCallAgent={handleCallAgent}
+            onDismissAgent={handleDismissAgent}
             onChatChange={setShowChat}
             onLeave={onLeave}
             onRequestEnd={() => setConfirmEnd(true)}
