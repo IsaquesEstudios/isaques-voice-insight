@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot,
   CalendarClock,
   Captions,
   FileText,
@@ -49,7 +48,6 @@ import {
   type MeetingDTO,
 } from "@/lib/livekit.functions";
 import { translateError } from "@/lib/error-messages";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/reunioes")({
   head: () => ({
@@ -122,7 +120,6 @@ function ReunioesPage() {
   const [displayName, setDisplayName] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [transcribe, setTranscribe] = useState(false);
-  const [withAgent, setWithAgent] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinName, setJoinName] = useState("");
   const [detailsFor, setDetailsFor] = useState<MeetingDTO | null>(null);
@@ -159,7 +156,7 @@ function ReunioesPage() {
           displayName: displayName.trim() || undefined,
           scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
           transcribe,
-          withAgent,
+          withAgent: false,
         },
       });
       if (result.kind === "started") {
@@ -178,7 +175,6 @@ function ReunioesPage() {
       setMeetingName("");
       setScheduledAt("");
       setTranscribe(false);
-      setWithAgent(false);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível criar a reunião."));
     } finally {
@@ -339,12 +335,6 @@ function ReunioesPage() {
                               Transcrição
                             </Badge>
                           )}
-                          {m.withAgent && (
-                            <Badge variant="outline" className="gap-1 text-xs">
-                              <Bot className="h-3 w-3" />
-                              IA
-                            </Badge>
-                          )}
                         </div>
                         <p className="truncate font-mono text-xs text-muted-foreground">
                           {m.code}
@@ -463,47 +453,14 @@ function ReunioesPage() {
                     Transcrever reunião
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    A IA ouve a conversa e grava a ata com falas e horários.
+                    A conversa é transcrita automaticamente e a ata fica salva no
+                    histórico da reunião.
                   </p>
                 </div>
                 <Switch
                   id="optTranscribe"
                   checked={transcribe}
-                  onCheckedChange={(v) => {
-                    setTranscribe(v);
-                    // Desligou a transcrição: a IA sai junto (ela depende dela).
-                    if (!v) setWithAgent(false);
-                  }}
-                />
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="optAgent"
-                    className={cn(
-                      "flex items-center gap-1.5",
-                      !transcribe && "opacity-50",
-                    )}
-                  >
-                    <Bot className="h-3.5 w-3.5" />
-                    Ativar assistente de IA
-                  </Label>
-                  <p
-                    className={cn(
-                      "text-xs text-muted-foreground",
-                      !transcribe && "opacity-50",
-                    )}
-                  >
-                    {transcribe
-                      ? "A IA entra na sala desde o início e participa da conversa."
-                      : "Ative a transcrição primeiro — a IA precisa ouvir a reunião."}
-                  </p>
-                </div>
-                <Switch
-                  id="optAgent"
-                  checked={withAgent}
-                  disabled={!transcribe}
-                  onCheckedChange={setWithAgent}
+                  onCheckedChange={setTranscribe}
                 />
               </div>
             </div>
@@ -613,12 +570,6 @@ function MeetingDetailsDialog({
                 <Badge variant="outline" className="gap-1 text-xs">
                   <Captions className="h-3 w-3" />
                   Transcrição
-                </Badge>
-              )}
-              {meeting.withAgent && (
-                <Badge variant="outline" className="gap-1 text-xs">
-                  <Bot className="h-3 w-3" />
-                  IA
                 </Badge>
               )}
             </div>

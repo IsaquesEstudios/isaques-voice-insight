@@ -246,8 +246,9 @@ function parseMeetingCreate(data: unknown): MeetingCreatePayload {
   }
   // A IA precisa ouvir a conversa para responder: ativar a IA liga a
   // transcrição automaticamente (mesma regra da tela de criação).
-  const withAgent = d.withAgent === true;
-  const transcribe = d.transcribe === true || withAgent;
+  // A IA que fala foi removida das reuniões: o worker apenas transcreve.
+  const withAgent = false;
+  const transcribe = d.transcribe === true;
   const payload: MeetingCreatePayload = { meetingName, transcribe, withAgent };
   if (displayName) payload.displayName = displayName;
   if (scheduledAt) payload.scheduledAt = scheduledAt;
