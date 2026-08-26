@@ -420,13 +420,24 @@ export const joinLivekitMeeting = createServerFn({ method: "POST" })
 export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
   .inputValidator(parseMeetingCode)
   .handler(async ({ data }): Promise<{ ok: true }> => {
-    const { dispatchLivekitAgent, getLivekitEnv, livekitRoomExists } = await import(
-      "./livekit.server"
-    );
+    const {
+      dispatchLivekitAgent,
+      getLivekitEnv,
+      listLivekitParticipants,
+      livekitRoomExists,
+    } = await import("./livekit.server");
     const env = getLivekitEnv();
 
     if (!(await livekitRoomExists(env, data.code))) {
       throw new Error("Reunião não encontrada ou já encerrada.");
+    }
+
+    // Já existe um agente na sala? Não despacha de novo (evita IA duplicada).
+    try {
+      const participants = await listLivekitParticipants(env, data.code);
+      if (participants.some((p) => p.isAgent)) return { ok: true };
+    } catch {
+      // Sem lista de participantes: segue com o dispatch.
     }
 
     const metadata = JSON.stringify({ tipo: "reuniao", acao: "chamar_ia" });
