@@ -90,6 +90,7 @@ export type Database = {
       }
       meeting_rooms: {
         Row: {
+          assistente_ativa: boolean
           code: string
           created_at: string
           ended_at: string | null
@@ -97,10 +98,12 @@ export type Database = {
           name: string
           scheduled_at: string | null
           started_at: string | null
+          transcrever: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
+          assistente_ativa?: boolean
           code: string
           created_at?: string
           ended_at?: string | null
@@ -108,10 +111,12 @@ export type Database = {
           name: string
           scheduled_at?: string | null
           started_at?: string | null
+          transcrever?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
+          assistente_ativa?: boolean
           code?: string
           created_at?: string
           ended_at?: string | null
@@ -119,6 +124,7 @@ export type Database = {
           name?: string
           scheduled_at?: string | null
           started_at?: string | null
+          transcrever?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -154,6 +160,30 @@ export type Database = {
           id?: string
           timezone?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      transcricoes_reunioes: {
+        Row: {
+          conteudo: string
+          criado_em: string
+          id: string
+          nome_sala: string
+          user_id: string | null
+        }
+        Insert: {
+          conteudo?: string
+          criado_em?: string
+          id?: string
+          nome_sala: string
+          user_id?: string | null
+        }
+        Update: {
+          conteudo?: string
+          criado_em?: string
+          id?: string
+          nome_sala?: string
+          user_id?: string | null
         }
         Relationships: []
       }
