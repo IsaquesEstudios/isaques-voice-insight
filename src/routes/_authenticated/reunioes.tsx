@@ -564,6 +564,67 @@ function ReunioesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TranscriptDialog
+        meeting={transcriptFor}
+        onClose={() => setTranscriptFor(null)}
+      />
     </DashboardShell>
+  );
+}
+
+/** Ata gravada pelo worker de IA (Deepgram) ao final da reunião. */
+function TranscriptDialog({
+  meeting,
+  onClose,
+}: {
+  meeting: MeetingDTO | null;
+  onClose: () => void;
+}) {
+  const fetchTranscript = useServerFn(getMeetingTranscript);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["meeting-transcript", meeting?.code],
+    queryFn: () => fetchTranscript({ data: { code: meeting!.code } }),
+    enabled: !!meeting,
+  });
+
+  return (
+    <Dialog open={!!meeting} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Ata da reunião — {meeting?.name}
+          </DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando transcrição…
+          </div>
+        ) : isError ? (
+          <p className="py-6 text-center text-sm text-destructive">
+            Não foi possível carregar a transcrição.
+          </p>
+        ) : !data ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Nenhuma transcrição gravada para esta reunião ainda. A ata aparece
+            aqui quando o agente de IA finaliza a escuta.
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Gravada em {fmtDate(data.criadoEm)} · transcrita automaticamente
+              pela IA (Deepgram).
+            </p>
+            <ScrollArea className="max-h-[60vh] rounded-lg border border-border/70 bg-muted/30 p-4">
+              <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                {data.conteudo}
+              </pre>
+            </ScrollArea>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
