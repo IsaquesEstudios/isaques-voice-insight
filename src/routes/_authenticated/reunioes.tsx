@@ -320,6 +320,18 @@ function ReunioesPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="truncate font-medium">{m.name}</p>
                           <StatusBadge status={m.status} />
+                          {m.transcribe && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <Captions className="h-3 w-3" />
+                              Transcrição
+                            </Badge>
+                          )}
+                          {m.withAgent && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <Bot className="h-3 w-3" />
+                              IA
+                            </Badge>
+                          )}
                         </div>
                         <p className="truncate font-mono text-xs text-muted-foreground">
                           {m.code}
@@ -329,6 +341,17 @@ function ReunioesPage() {
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2">
+                        {m.hasTranscript && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => setTranscriptFor(m)}
+                          >
+                            <FileText className="h-4 w-4" />
+                            Ver ata
+                          </Button>
+                        )}
                         {(m.status === "live" ||
                           m.status === "ready" ||
                           m.status === "scheduled") && (
