@@ -762,8 +762,10 @@ export const listMyMeetings = createServerFn({ method: "GET" })
       active = new Set();
     }
 
-    // Quais reuniões já têm ata gravada pelo worker (RLS limita às do usuário).
-    const { data: transcripts } = await context.supabase
+    // Quais reuniões já têm ata gravada pelo worker. A busca é restrita aos
+    // códigos das salas do próprio usuário (linhas acima já passaram por RLS).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: transcripts } = await supabaseAdmin
       .from("transcricoes_reunioes")
       .select("nome_sala")
       .in("nome_sala", rows.map((r) => r.code));
