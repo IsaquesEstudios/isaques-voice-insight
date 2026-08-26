@@ -778,7 +778,8 @@ function MeetingStage({
   onAgentJoined,
 }: {
   session: MeetingSession;
-  onAgentJoined: () => void;
+  /** Recebe true/false conforme o agente entra ou sai da sala. */
+  onAgentJoined: (present: boolean) => void;
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
@@ -880,7 +881,7 @@ function MeetingStage({
 
   return (
     <div className="flex h-[70vh] min-h-0 flex-col">
-      <AgentPresence onJoined={onAgentJoined} />
+      <AgentPresence onPresenceChange={onAgentJoined} />
       <div className="relative min-h-0 flex-1">
         {focus ? (
           <FocusStage
