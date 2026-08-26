@@ -1412,7 +1412,6 @@ function MeetingShell(props: ShellProps) {
               </Button>
               {props.isHost && <JoinRequestsPanel roomCode={props.session.roomName} />}
 
-              {props.isHost && <JoinRequestsPanel roomCode={props.session.roomName} />}
               {props.isHost && (
                 <Button
                   variant="outline"
