@@ -492,8 +492,10 @@ export const dismissLivekitMeetingAgent = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ ok: true }> => {
     const {
       getLivekitEnv,
+      getLivekitRoomMetadata,
       listLivekitParticipants,
       removeLivekitParticipant,
+      updateLivekitRoomMetadata,
       verifyLivekitToken,
     } = await import("./livekit.server");
     const env = getLivekitEnv();
@@ -514,6 +516,29 @@ export const dismissLivekitMeetingAgent = createServerFn({ method: "POST" })
       throw new Error("Somente o organizador pode dispensar a IA da reunião.");
     }
 
+    // Se a reunião está transcrevendo, dispensar a IA significa "calar a boca"
+    // (voltar ao modo só-escuta) — remover o agente encerraria a ata.
+    let transcrevendo = false;
+    let base: Record<string, unknown> = { tipo: "reuniao" };
+    try {
+      const atual = await getLivekitRoomMetadata(env, data.code);
+      if (atual) {
+        base = { ...base, ...(JSON.parse(atual) as Record<string, unknown>) };
+        transcrevendo = base.transcrever === true;
+      }
+    } catch {
+      transcrevendo = false;
+    }
+
+    if (transcrevendo) {
+      await updateLivekitRoomMetadata(
+        env,
+        data.code,
+        JSON.stringify({ ...base, acao: "transcrever", assistente: false }),
+      );
+      return { ok: true };
+    }
+
     const participants = await listLivekitParticipants(env, data.code);
     const agent = participants.find(
       (p) => String(p.kind ?? "").toUpperCase() === "AGENT",
@@ -528,6 +553,7 @@ export const dismissLivekitMeetingAgent = createServerFn({ method: "POST" })
       throw new Error(`Não consegui dispensar a IA.\nDetalhe técnico: ${detail}`);
     }
     return { ok: true };
+
   });
 
 /**
