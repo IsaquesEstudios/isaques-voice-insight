@@ -700,13 +700,18 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCode)
   .handler(async ({ data, context }): Promise<LivekitMeetingSession> => {
-    const { createLivekitRoom, getLivekitEnv, livekitRoomExists, signLivekitJwt } =
-      await import("./livekit.server");
+    const {
+      createLivekitRoom,
+      dispatchLivekitAgent,
+      getLivekitEnv,
+      livekitRoomExists,
+      signLivekitJwt,
+    } = await import("./livekit.server");
     const env = getLivekitEnv();
 
     const { data: meeting, error } = await context.supabase
       .from("meeting_rooms")
-      .select("id, code, name, started_at, ended_at")
+      .select("id, code, name, started_at, ended_at, transcrever, assistente_ativa")
       .eq("code", data.code)
       .maybeSingle();
     if (error) throw new Error(`Falha ao abrir a reunião: ${error.message}`);
@@ -720,6 +725,8 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
         tipo: "reuniao",
         nome: meeting.name,
         criadoPor: context.userId,
+        transcrever: meeting.transcrever,
+        assistente: meeting.assistente_ativa,
       });
       try {
         await createLivekitRoom(env, meeting.code, metadata, {
@@ -732,6 +739,22 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
         throw new Error(
           `Não consegui iniciar a sala da reunião.\nDetalhe técnico: ${detail}`,
         );
+      }
+      // Sala recém-iniciada: aplica as preferências gravadas no agendamento.
+      // Não despacha em sala já ativa — o organizador pode ter dispensado a IA.
+      if (meeting.assistente_ativa || meeting.transcrever) {
+        try {
+          await dispatchLivekitAgent(
+            env,
+            meeting.code,
+            JSON.stringify({
+              tipo: "reuniao",
+              acao: meeting.assistente_ativa ? "chamar_ia" : "transcrever",
+            }),
+          );
+        } catch (e) {
+          console.error("Dispatch inicial da reunião falhou:", e);
+        }
       }
       if (!meeting.started_at) {
         await context.supabase
@@ -751,7 +774,12 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
       ttlSeconds: 14400,
     });
 
-    return { token, serverUrl: env.url, roomName: meeting.code };
+    return {
+      token,
+      serverUrl: env.url,
+      roomName: meeting.code,
+      transcribe: meeting.transcrever,
+    };
   });
 
 /** Encerra uma reunião do histórico (apaga a sala no LiveKit e marca o fim). */
