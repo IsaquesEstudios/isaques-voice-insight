@@ -836,7 +836,9 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
       }
       // Sala recém-iniciada: aplica as preferências gravadas no agendamento.
       // Não despacha em sala já ativa — o organizador pode ter dispensado a IA.
-      if (meeting.assistente_ativa || meeting.transcrever) {
+      // Worker sem agent_name entra sozinho (dispatch automático): despachar
+      // explicitamente duplicaria a IA na sala.
+      if ((meeting.assistente_ativa || meeting.transcrever) && env.agentName) {
         try {
           await dispatchLivekitAgent(
             env,
