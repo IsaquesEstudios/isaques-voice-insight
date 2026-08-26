@@ -346,8 +346,9 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
 
     // Com transcrição/IA pedidas na criação, o worker entra assim que a sala abre:
     // acao=chamar_ia (IA completa) ou acao=transcrever (só escuta e grava a ata).
-    // Melhor esforço: se o worker estiver offline, o botão "Chamar IA" segue na sala.
-    if (data.withAgent || data.transcribe) {
+    // IMPORTANTE: worker sem agent_name usa dispatch automático e já entra sozinho.
+    // Um dispatch explícito nesse caso criaria uma SEGUNDA instância da IA na sala.
+    if ((data.withAgent || data.transcribe) && env.agentName) {
       try {
         await dispatchLivekitAgent(
           env,
