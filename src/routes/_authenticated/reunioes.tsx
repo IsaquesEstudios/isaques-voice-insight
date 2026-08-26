@@ -579,8 +579,8 @@ function ReunioesPage() {
   );
 }
 
-/** Ata gravada pelo worker de IA (Deepgram) ao final da reunião. */
-function TranscriptDialog({
+/** Detalhes da reunião (clique no card): informações + ata transcrita pela IA. */
+function MeetingDetailsDialog({
   meeting,
   onClose,
 }: {
@@ -599,37 +599,71 @@ function TranscriptDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Ata da reunião — {meeting?.name}
+            <Video className="h-5 w-5 text-primary" />
+            {meeting?.name}
           </DialogTitle>
+          <DialogDescription>Detalhes e ata da reunião.</DialogDescription>
         </DialogHeader>
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando transcrição…
-          </div>
-        ) : isError ? (
-          <p className="py-6 text-center text-sm text-destructive">
-            Não foi possível carregar a transcrição.
-          </p>
-        ) : !data ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Nenhuma transcrição gravada para esta reunião ainda. A ata aparece
-            aqui quando o agente de IA finaliza a escuta.
-          </p>
-        ) : (
-          <>
-            <p className="text-xs text-muted-foreground">
-              Gravada em {fmtDate(data.criadoEm)} · transcrita automaticamente
-              pela IA (Deepgram).
+
+        {meeting && (
+          <div className="space-y-2 rounded-lg border border-border/70 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={meeting.status} />
+              {meeting.transcribe && (
+                <Badge variant="outline" className="gap-1 text-xs">
+                  <Captions className="h-3 w-3" />
+                  Transcrição
+                </Badge>
+              )}
+              {meeting.withAgent && (
+                <Badge variant="outline" className="gap-1 text-xs">
+                  <Bot className="h-3 w-3" />
+                  IA
+                </Badge>
+              )}
+            </div>
+            <p className="font-mono text-xs text-muted-foreground">
+              Código: {meeting.code}
             </p>
-            <ScrollArea className="max-h-[60vh] rounded-lg border border-border/70 bg-muted/30 p-4">
-              <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
-                {data.conteudo}
-              </pre>
-            </ScrollArea>
-          </>
+            <p className="text-xs text-muted-foreground">
+              {meetingDateLine(meeting)}
+            </p>
+          </div>
         )}
+
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <FileText className="h-4 w-4 text-primary" />
+            Transcrição
+          </p>
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando transcrição…
+            </div>
+          ) : isError ? (
+            <p className="py-4 text-center text-sm text-destructive">
+              Não foi possível carregar a transcrição.
+            </p>
+          ) : !data ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Nenhuma transcrição gravada para esta reunião ainda. A ata aparece
+              aqui quando o agente de IA finaliza a escuta.
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Gravada em {fmtDate(data.criadoEm)} · transcrita automaticamente
+                pela IA (Deepgram).
+              </p>
+              <ScrollArea className="max-h-[50vh] rounded-lg border border-border/70 bg-muted/30 p-4">
+                <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                  {data.conteudo}
+                </pre>
+              </ScrollArea>
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
