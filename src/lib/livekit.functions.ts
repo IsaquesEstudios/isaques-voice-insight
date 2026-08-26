@@ -435,7 +435,8 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
     // Já existe um agente na sala? Não despacha de novo (evita IA duplicada).
     try {
       const participants = await listLivekitParticipants(env, data.code);
-      if (participants.some((p) => p.isAgent)) return { ok: true };
+      if (participants.some((p) => String(p.kind ?? "").toUpperCase() === "AGENT"))
+        return { ok: true };
     } catch {
       // Sem lista de participantes: segue com o dispatch.
     }
