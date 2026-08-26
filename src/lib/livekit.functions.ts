@@ -284,8 +284,13 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCreate)
   .handler(async ({ data, context }): Promise<StartMeetingResult> => {
-    const { createLivekitRoom, getLivekitEnv, signLivekitJwt, slugifyMeetingName } =
-      await import("./livekit.server");
+    const {
+      createLivekitRoom,
+      dispatchLivekitAgent,
+      getLivekitEnv,
+      signLivekitJwt,
+      slugifyMeetingName,
+    } = await import("./livekit.server");
 
     const roomName = `reuniao-${slugifyMeetingName(data.meetingName)}-${Math.random()
       .toString(36)
@@ -298,16 +303,22 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
         code: roomName,
         name: data.meetingName,
         scheduled_at: data.scheduledAt,
+        transcrever: data.transcribe,
+        assistente_ativa: data.withAgent,
       });
       if (error) throw new Error(`Falha ao agendar a reunião: ${error.message}`);
       return { kind: "scheduled", code: roomName, scheduledAt: data.scheduledAt };
     }
 
     const env = getLivekitEnv();
+    // O worker Python lê a metadata da sala para decidir o comportamento:
+    // transcrever=true → liga o Deepgram e grava a ata; acao=chamar_ia → a IA fala.
     const metadata = JSON.stringify({
       tipo: "reuniao",
       nome: data.meetingName,
       criadoPor: context.userId,
+      transcrever: data.transcribe,
+      assistente: data.withAgent,
     });
 
     try {
@@ -329,7 +340,27 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       code: roomName,
       name: data.meetingName,
       started_at: new Date().toISOString(),
+      transcrever: data.transcribe,
+      assistente_ativa: data.withAgent,
     });
+
+    // Com transcrição/IA pedidas na criação, o worker entra assim que a sala abre:
+    // acao=chamar_ia (IA completa) ou acao=transcrever (só escuta e grava a ata).
+    // Melhor esforço: se o worker estiver offline, o botão "Chamar IA" segue na sala.
+    if (data.withAgent || data.transcribe) {
+      try {
+        await dispatchLivekitAgent(
+          env,
+          roomName,
+          JSON.stringify({
+            tipo: "reuniao",
+            acao: data.withAgent ? "chamar_ia" : "transcrever",
+          }),
+        );
+      } catch (e) {
+        console.error("Dispatch inicial da reunião falhou:", e);
+      }
+    }
 
     const token = await signLivekitJwt(env, {
       identity: `painel-${context.userId.slice(0, 8)}-${Math.random()
@@ -342,7 +373,13 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       ttlSeconds: 14400, // 4h — reuniões duram mais que chamadas de teste
     });
 
-    return { kind: "started", token, serverUrl: env.url, roomName };
+    return {
+      kind: "started",
+      token,
+      serverUrl: env.url,
+      roomName,
+      transcribe: data.transcribe,
+    };
   });
 
 /** Usuário logado entra em uma sala existente pelo código. */
