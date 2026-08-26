@@ -210,12 +210,16 @@ export interface LivekitMeetingSession {
   token: string;
   serverUrl: string;
   roomName: string;
+  /** Quando true, a sala está com a transcrição (Deepgram) ativada. */
+  transcribe?: boolean;
 }
 
 type MeetingCreatePayload = {
   meetingName: string;
   displayName?: string;
   scheduledAt?: string;
+  transcribe: boolean;
+  withAgent: boolean;
 };
 type MeetingJoinPayload = { code: string; displayName?: string };
 
@@ -240,7 +244,11 @@ function parseMeetingCreate(data: unknown): MeetingCreatePayload {
     // Datas no passado (ou agora) viram reunião instantânea.
     if (ts.getTime() > Date.now() + 60_000) scheduledAt = ts.toISOString();
   }
-  const payload: MeetingCreatePayload = { meetingName };
+  // A IA precisa ouvir a conversa para responder: ativar a IA liga a
+  // transcrição automaticamente (mesma regra da tela de criação).
+  const withAgent = d.withAgent === true;
+  const transcribe = d.transcribe === true || withAgent;
+  const payload: MeetingCreatePayload = { meetingName, transcribe, withAgent };
   if (displayName) payload.displayName = displayName;
   if (scheduledAt) payload.scheduledAt = scheduledAt;
   return payload;
