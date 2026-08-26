@@ -519,10 +519,23 @@ export const getMeetingTranscript = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCode)
   .handler(async ({ data, context }): Promise<{ conteudo: string; criadoEm: string } | null> => {
-    const { data: row, error } = await context.supabase
+    // Só o dono da reunião pode ler a ata (RLS de meeting_rooms garante isso).
+    const { data: meeting } = await context.supabase
+      .from("meeting_rooms")
+      .select("id")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (!meeting) throw new Error("Reunião não encontrada.");
+
+    // O worker grava a ata pelo backend (sem user_id garantido), então a
+    // leitura é feita após a checagem de posse acima.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
       .from("transcricoes_reunioes")
       .select("conteudo, criado_em")
       .eq("nome_sala", data.code)
+      .order("criado_em", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (error) throw new Error(`Falha ao carregar a transcrição: ${error.message}`);
     if (!row || !row.conteudo.trim()) return null;
