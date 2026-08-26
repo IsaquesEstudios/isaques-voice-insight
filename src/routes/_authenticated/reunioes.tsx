@@ -449,6 +449,58 @@ function ReunioesPage() {
                 Deixe em branco para começar imediatamente.
               </p>
             </div>
+            <div className="space-y-3 rounded-lg border border-border/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="optTranscribe" className="flex items-center gap-1.5">
+                    <Captions className="h-3.5 w-3.5" />
+                    Transcrever reunião
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    A IA ouve a conversa e grava a ata com falas e horários.
+                  </p>
+                </div>
+                <Switch
+                  id="optTranscribe"
+                  checked={transcribe}
+                  onCheckedChange={(v) => {
+                    setTranscribe(v);
+                    // Desligou a transcrição: a IA sai junto (ela depende dela).
+                    if (!v) setWithAgent(false);
+                  }}
+                />
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="optAgent"
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      !transcribe && "opacity-50",
+                    )}
+                  >
+                    <Bot className="h-3.5 w-3.5" />
+                    Ativar assistente de IA
+                  </Label>
+                  <p
+                    className={cn(
+                      "text-xs text-muted-foreground",
+                      !transcribe && "opacity-50",
+                    )}
+                  >
+                    {transcribe
+                      ? "A IA entra na sala desde o início e participa da conversa."
+                      : "Ative a transcrição primeiro — a IA precisa ouvir a reunião."}
+                  </p>
+                </div>
+                <Switch
+                  id="optAgent"
+                  checked={withAgent}
+                  disabled={!transcribe}
+                  onCheckedChange={setWithAgent}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
