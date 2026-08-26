@@ -441,6 +441,82 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
   });
 
 /**
+ * Botão "Dispensar IA": remove o agente da sala (a reunião continua sem ele).
+ * Exige o token LiveKit da sala com papel de organizador — convidados não
+ * podem expulsar a IA. A transcrição/gravação da ata é finalizada pelo worker
+ * ao ser desconectado.
+ */
+export const dismissLivekitMeetingAgent = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code.trim().toLowerCase() : "";
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) {
+      throw new Error("Código de reunião inválido.");
+    }
+    const token = typeof d.token === "string" ? d.token : "";
+    if (!token) throw new Error("Sessão da reunião inválida.");
+    return { code, token };
+  })
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const {
+      getLivekitEnv,
+      listLivekitParticipants,
+      removeLivekitParticipant,
+      verifyLivekitToken,
+    } = await import("./livekit.server");
+    const env = getLivekitEnv();
+
+    let caller: { identity: string; metadata?: string };
+    try {
+      caller = await verifyLivekitToken(env, data.token, data.code);
+    } catch {
+      throw new Error("Sessão da reunião expirada. Saia e entre novamente.");
+    }
+    let isHost = false;
+    try {
+      isHost = JSON.parse(caller.metadata ?? "{}").role === "host";
+    } catch {
+      isHost = false;
+    }
+    if (!isHost) {
+      throw new Error("Somente o organizador pode dispensar a IA da reunião.");
+    }
+
+    const participants = await listLivekitParticipants(env, data.code);
+    const agent = participants.find(
+      (p) => String(p.kind ?? "").toUpperCase() === "AGENT",
+    );
+    // A IA já saiu (ou nunca entrou): trata como sucesso para a UI sincronizar.
+    if (!agent) return { ok: true };
+
+    try {
+      await removeLivekitParticipant(env, data.code, agent.identity);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e ?? "erro sem detalhes");
+      throw new Error(`Não consegui dispensar a IA.\nDetalhe técnico: ${detail}`);
+    }
+    return { ok: true };
+  });
+
+/**
+ * Transcrição (ata) de uma reunião, gravada pelo worker de IA via Deepgram.
+ * Somente o organizador lê — a RLS da tabela restringe ao dono da reunião.
+ */
+export const getMeetingTranscript = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(parseMeetingCode)
+  .handler(async ({ data, context }): Promise<{ conteudo: string; criadoEm: string } | null> => {
+    const { data: row, error } = await context.supabase
+      .from("transcricoes_reunioes")
+      .select("conteudo, criado_em")
+      .eq("nome_sala", data.code)
+      .maybeSingle();
+    if (error) throw new Error(`Falha ao carregar a transcrição: ${error.message}`);
+    if (!row || !row.conteudo.trim()) return null;
+    return { conteudo: row.conteudo, criadoEm: row.criado_em };
+  });
+
+/**
  * Controle de apresentação da reunião (quem aparece em destaque para todos).
  * Pública, mas exige o token LiveKit da própria sala como credencial:
  * - organizador (role host no token): define qualquer apresentador e gerencia
