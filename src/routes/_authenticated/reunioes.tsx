@@ -48,7 +48,6 @@ import {
   type MeetingDTO,
 } from "@/lib/livekit.functions";
 import { translateError } from "@/lib/error-messages";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/reunioes")({
   head: () => ({
@@ -176,7 +175,6 @@ function ReunioesPage() {
       setMeetingName("");
       setScheduledAt("");
       setTranscribe(false);
-      setWithAgent(false);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível criar a reunião."));
     } finally {
