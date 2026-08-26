@@ -315,7 +315,19 @@ function ReunioesPage() {
             ) : (
               <div className="space-y-3">
                 {meetings.map((m) => (
-                  <Card key={m.id}>
+                  <Card
+                    key={m.id}
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/40"
+                    onClick={() => setDetailsFor(m)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailsFor(m);
+                      }
+                    }}
+                  >
                     <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
