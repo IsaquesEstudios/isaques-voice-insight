@@ -125,7 +125,7 @@ function ReunioesPage() {
   const [withAgent, setWithAgent] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinName, setJoinName] = useState("");
-  const [transcriptFor, setTranscriptFor] = useState<MeetingDTO | null>(null);
+  const [detailsFor, setDetailsFor] = useState<MeetingDTO | null>(null);
 
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
