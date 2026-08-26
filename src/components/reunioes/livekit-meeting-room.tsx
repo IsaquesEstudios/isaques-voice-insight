@@ -1410,44 +1410,8 @@ function MeetingShell(props: ShellProps) {
                 {props.copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 Copiar link
               </Button>
-              {props.aiState === "joined" ? (
-                props.isHost ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={props.onDismissAgent}
-                    disabled={props.dismissing}
-                    className="gap-2"
-                  >
-                    {props.dismissing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <BotOff className="h-4 w-4" />
-                    )}
-                    Dispensar IA
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled className="gap-2">
-                    <Check className="h-4 w-4" />
-                    IA na sala
-                  </Button>
-                )
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={props.onCallAgent}
-                  disabled={props.aiState === "calling" || props.aiState === "waiting"}
-                  className="gap-2"
-                >
-                  {props.aiState === "calling" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bot className="h-4 w-4" />
-                  )}
-                  {props.aiState === "waiting" ? "IA a caminho…" : "Chamar IA"}
-                </Button>
-              )}
+              {props.isHost && <JoinRequestsPanel roomCode={props.session.roomName} />}
+
               {props.isHost && <JoinRequestsPanel roomCode={props.session.roomName} />}
               {props.isHost && (
                 <Button
