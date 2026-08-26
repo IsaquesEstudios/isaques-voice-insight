@@ -120,8 +120,11 @@ function ReunioesPage() {
   const [meetingName, setMeetingName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [transcribe, setTranscribe] = useState(false);
+  const [withAgent, setWithAgent] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinName, setJoinName] = useState("");
+  const [transcriptFor, setTranscriptFor] = useState<MeetingDTO | null>(null);
 
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -154,6 +157,8 @@ function ReunioesPage() {
           meetingName: meetingName.trim(),
           displayName: displayName.trim() || undefined,
           scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+          transcribe,
+          withAgent,
         },
       });
       if (result.kind === "started") {
@@ -162,6 +167,7 @@ function ReunioesPage() {
           token: result.token,
           serverUrl: result.serverUrl,
           roomName: result.roomName,
+          transcribe: result.transcribe,
         });
       } else {
         toast.success(`Reunião agendada para ${fmtDate(result.scheduledAt)}.`);
@@ -170,6 +176,8 @@ function ReunioesPage() {
       setCreateOpen(false);
       setMeetingName("");
       setScheduledAt("");
+      setTranscribe(false);
+      setWithAgent(false);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível criar a reunião."));
     } finally {
