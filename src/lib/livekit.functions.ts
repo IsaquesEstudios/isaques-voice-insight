@@ -707,6 +707,11 @@ export interface MeetingDTO {
   endedAt: string | null;
   createdAt: string;
   status: MeetingStatus;
+  /** Preferências gravadas na criação da reunião. */
+  transcribe: boolean;
+  withAgent: boolean;
+  /** True quando o worker já gravou a ata desta reunião. */
+  hasTranscript: boolean;
 }
 
 /** Lista as reuniões do usuário com o status calculado ("ao vivo" = sala ativa no LiveKit). */
@@ -715,7 +720,9 @@ export const listMyMeetings = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<MeetingDTO[]> => {
     const { data: rows, error } = await context.supabase
       .from("meeting_rooms")
-      .select("id, code, name, scheduled_at, started_at, ended_at, created_at")
+      .select(
+        "id, code, name, scheduled_at, started_at, ended_at, created_at, transcrever, assistente_ativa",
+      )
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) throw new Error(`Falha ao carregar reuniões: ${error.message}`);
@@ -728,6 +735,13 @@ export const listMyMeetings = createServerFn({ method: "GET" })
     } catch {
       active = new Set();
     }
+
+    // Quais reuniões já têm ata gravada pelo worker (RLS limita às do usuário).
+    const { data: transcripts } = await context.supabase
+      .from("transcricoes_reunioes")
+      .select("nome_sala")
+      .in("nome_sala", rows.map((r) => r.code));
+    const withTranscript = new Set((transcripts ?? []).map((t) => t.nome_sala));
 
     const now = Date.now();
     const staleIds: string[] = [];
@@ -752,6 +766,9 @@ export const listMyMeetings = createServerFn({ method: "GET" })
         endedAt: m.ended_at,
         createdAt: m.created_at,
         status,
+        transcribe: m.transcrever,
+        withAgent: m.assistente_ativa,
+        hasTranscript: withTranscript.has(m.code),
       };
     });
 
