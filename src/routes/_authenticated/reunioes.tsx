@@ -571,9 +571,9 @@ function ReunioesPage() {
         </DialogContent>
       </Dialog>
 
-      <TranscriptDialog
-        meeting={transcriptFor}
-        onClose={() => setTranscriptFor(null)}
+      <MeetingDetailsDialog
+        meeting={detailsFor}
+        onClose={() => setDetailsFor(null)}
       />
     </DashboardShell>
   );
