@@ -423,8 +423,10 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
     const {
       dispatchLivekitAgent,
       getLivekitEnv,
+      getLivekitRoomMetadata,
       listLivekitParticipants,
       livekitRoomExists,
+      updateLivekitRoomMetadata,
     } = await import("./livekit.server");
     const env = getLivekitEnv();
 
@@ -432,7 +434,24 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
       throw new Error("Reunião não encontrada ou já encerrada.");
     }
 
-    // Já existe um agente na sala? Não despacha de novo (evita IA duplicada).
+    // Metadata da sala é a fonte de verdade do modo atual: o worker escuta
+    // RoomMetadataChanged e alterna entre "só transcrever" e "assistir falando".
+    let base: Record<string, unknown> = { tipo: "reuniao" };
+    try {
+      const atual = await getLivekitRoomMetadata(env, data.code);
+      if (atual) base = { ...base, ...(JSON.parse(atual) as Record<string, unknown>) };
+    } catch {
+      // metadata inválida/ausente: usa a base padrão.
+    }
+    const metadata = JSON.stringify({ ...base, acao: "chamar_ia", assistente: true });
+
+    try {
+      await updateLivekitRoomMetadata(env, data.code, metadata);
+    } catch {
+      // Sem metadata atualizada ainda dá para despachar abaixo.
+    }
+
+    // Agente já na sala (ex.: transcrevendo): a mudança de metadata basta.
     try {
       const participants = await listLivekitParticipants(env, data.code);
       if (participants.some((p) => String(p.kind ?? "").toUpperCase() === "AGENT"))
@@ -441,7 +460,6 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
       // Sem lista de participantes: segue com o dispatch.
     }
 
-    const metadata = JSON.stringify({ tipo: "reuniao", acao: "chamar_ia" });
     try {
       await dispatchLivekitAgent(env, data.code, metadata);
     } catch (e) {
@@ -452,6 +470,7 @@ export const callLivekitMeetingAgent = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
 
 /**
  * Botão "Dispensar IA": remove o agente da sala (a reunião continua sem ele).
