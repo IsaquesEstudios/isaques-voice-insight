@@ -896,6 +896,11 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
         tipo: "reuniao",
         nome: meeting.name,
         criadoPor: context.userId,
+        acao: meeting.assistente_ativa
+          ? "chamar_ia"
+          : meeting.transcrever
+            ? "transcrever"
+            : "nenhuma",
         transcrever: meeting.transcrever,
         assistente: meeting.assistente_ativa,
       });
