@@ -353,18 +353,11 @@ function ReunioesPage() {
                           {meetingDateLine(m)}
                         </p>
                       </div>
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        {m.hasTranscript && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => setTranscriptFor(m)}
-                          >
-                            <FileText className="h-4 w-4" />
-                            Ver ata
-                          </Button>
-                        )}
+                      <div
+                        className="flex shrink-0 flex-wrap gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         {(m.status === "live" ||
                           m.status === "ready" ||
                           m.status === "scheduled") && (
