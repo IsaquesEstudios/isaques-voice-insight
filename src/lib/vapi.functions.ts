@@ -2,7 +2,7 @@ import { createServerFn, createMiddleware } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSupabaseAuth } from "@/integrations/supabase/external-auth-middleware";
 
 // AsyncLocalStorage carrega a chave Vapi do usuário durante toda a execução
 // do handler, para que `vapiFetch` (helper compartilhado) consiga usá-la sem
