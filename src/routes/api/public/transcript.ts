@@ -49,7 +49,7 @@ export const Route = createFileRoute("/api/public/transcript")({
         }
 
         // 3. Inserir usando service_role (bypassa RLS)
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
 
         // Upsert: se já existe transcrição para esta sala, atualiza;
         // senão, insere nova linha.

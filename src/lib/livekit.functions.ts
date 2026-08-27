@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSupabaseAuth } from "@/integrations/supabase/external-auth-middleware";
 
 // ---------------------------------------------------------------------------
 // DTOs (tipos apagados no build — seguros para o cliente)
@@ -577,7 +577,7 @@ export const getMeetingTranscript = createServerFn({ method: "GET" })
 
     // O worker grava a ata pelo backend (sem user_id garantido), então a
     // leitura é feita após a checagem de posse acima.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     // O worker pode gravar o nome da sala com ou sem o prefixo "reuniao-".
     const semPrefixo = data.code.replace(/^reuniao-/, "");
     const { data: rows, error } = await supabaseAdmin
@@ -757,7 +757,7 @@ export const endLivekitMeeting = createServerFn({ method: "POST" })
 
     // Marca o fim no histórico (melhor esforço — salas antigas podem não estar gravadas).
     try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
       await supabaseAdmin
         .from("meeting_rooms")
         .update({ ended_at: new Date().toISOString() })
@@ -815,7 +815,7 @@ export const listMyMeetings = createServerFn({ method: "GET" })
 
     // Quais reuniões já têm ata gravada pelo worker. A busca é restrita aos
     // códigos das salas do próprio usuário (linhas acima já passaram por RLS).
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     const { data: transcripts } = await supabaseAdmin
       .from("transcricoes_reunioes")
       .select("nome_sala")
@@ -1003,7 +1003,7 @@ export const requestMeetingJoin = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => parseMeetingJoin(data, true))
   .handler(async ({ data }): Promise<MeetingJoinRequestStart> => {
     const { getLivekitEnv, livekitRoomExists } = await import("./livekit.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     const env = getLivekitEnv();
 
     const { data: infoRows } = await supabaseAdmin.rpc("get_guest_meeting_info", {
@@ -1059,7 +1059,7 @@ export const getMeetingJoinRequestStatus = createServerFn({ method: "GET" })
     return { requestId: id.trim() };
   })
   .handler(async ({ data }): Promise<MeetingJoinStatusResult> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     const { data: rows, error } = await supabaseAdmin.rpc("get_meeting_join_status", {
       p_id: data.requestId,
     });
