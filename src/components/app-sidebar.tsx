@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Bot,
+  PhoneCall,
   Video,
   Settings,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const nav: NavItem[] = [
     icon: Bot,
     activePaths: ["/assistentes"],
   },
+  { title: "Ligação", url: "/ligacao", icon: PhoneCall },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
 ];
