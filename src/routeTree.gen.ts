@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
+import { Route as AuthenticatedLigacaoRouteImport } from './routes/_authenticated/ligacao'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
@@ -43,6 +44,11 @@ const ReuniaoCodeRoute = ReuniaoCodeRouteImport.update({
 const AuthenticatedReunioesRoute = AuthenticatedReunioesRouteImport.update({
   id: '/reunioes',
   path: '/reunioes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLigacaoRoute = AuthenticatedLigacaoRouteImport.update({
+  id: '/ligacao',
+  path: '/ligacao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/historico': typeof AuthenticatedHistoricoRoute
+  '/ligacao': typeof AuthenticatedLigacaoRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/historico': typeof AuthenticatedHistoricoRoute
+  '/ligacao': typeof AuthenticatedLigacaoRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
+  '/_authenticated/ligacao': typeof AuthenticatedLigacaoRoute
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/dashboard'
     | '/historico'
+    | '/ligacao'
     | '/reunioes'
     | '/reuniao/$code'
     | '/api/public/transcript'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/dashboard'
     | '/historico'
+    | '/ligacao'
     | '/reunioes'
     | '/reuniao/$code'
     | '/api/public/transcript'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
     | '/_authenticated/historico'
+    | '/_authenticated/ligacao'
     | '/_authenticated/reunioes'
     | '/reuniao/$code'
     | '/api/public/transcript'
@@ -199,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/reunioes'
       fullPath: '/reunioes'
       preLoaderRoute: typeof AuthenticatedReunioesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ligacao': {
+      id: '/_authenticated/ligacao'
+      path: '/ligacao'
+      fullPath: '/ligacao'
+      preLoaderRoute: typeof AuthenticatedLigacaoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/historico': {
@@ -252,6 +271,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
+  AuthenticatedLigacaoRoute: typeof AuthenticatedLigacaoRoute
   AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
 }
 
@@ -261,6 +281,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
+  AuthenticatedLigacaoRoute: AuthenticatedLigacaoRoute,
   AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
 }
 
