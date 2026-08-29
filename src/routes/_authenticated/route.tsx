@@ -33,8 +33,8 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: "/" });
     }
 
-    // Onboarding gate: exige a Vapi conectada e pelo menos um número cadastrado
-    // (tronco SIP importado na conta Vapi do usuário).
+    // Onboarding gate: exige pelo menos um número cadastrado (tronco SIP)
+    // ou a escolha explícita de pular essa etapa.
     if (location.pathname !== "/onboarding") {
       const cached = getSetupCache();
       if (cached) {
@@ -42,7 +42,7 @@ export const Route = createFileRoute("/_authenticated")({
       } else {
         try {
           const status = await getSetupStatus();
-          const ok = Boolean(status.vapi && (status.sip || sipSkipped()));
+          const ok = Boolean(status.sip || sipSkipped());
           setSetupCache(ok);
 
           if (!ok) {
