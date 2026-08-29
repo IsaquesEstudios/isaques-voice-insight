@@ -1,4 +1,4 @@
-import { Bell, Check, ChevronRight, Bot, Megaphone, Phone } from "lucide-react";
+import { Bell, Check, ChevronRight, Bot, Video } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
@@ -8,56 +8,40 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { listMyNumbers } from "@/lib/numbers.functions";
-import { listVapiAssistants, listVapiCampaigns } from "@/lib/vapi.functions";
+import { listLivekitAgents } from "@/lib/livekit.functions";
 
 type Task = {
   id: string;
   title: string;
   description: string;
   to: string;
-  icon: typeof Phone;
+  icon: typeof Bot;
   done: boolean;
 };
 
 export function NotificationsBell() {
-  const numbers = useQuery({
-    queryKey: ["my-numbers"],
-    queryFn: () => listMyNumbers(),
-  });
-  const assistants = useQuery({
-    queryKey: ["vapi-assistants"],
-    queryFn: () => listVapiAssistants(),
-  });
-  const campaigns = useQuery({
-    queryKey: ["vapi-campaigns"],
-    queryFn: () => listVapiCampaigns(),
+  const agents = useQuery({
+    queryKey: ["livekit-agents"],
+    queryFn: () => listLivekitAgents().catch(() => []),
+    retry: false,
   });
 
   const tasks: Task[] = [
-    {
-      id: "number",
-      title: "Adicione seu primeiro número!",
-      description: "Conecte um número para começar a fazer e receber ligações.",
-      to: "/telefonia",
-      icon: Phone,
-      done: (numbers.data?.length ?? 0) > 0,
-    },
     {
       id: "assistant",
       title: "Construa seu atendente",
       description: "Crie sua assistente virtual e defina como ela deve atender.",
       to: "/assistentes",
       icon: Bot,
-      done: (assistants.data?.length ?? 0) > 0,
+      done: (agents.data?.length ?? 0) > 0,
     },
     {
-      id: "campaign",
-      title: "Realize sua campanha",
-      description: "Suba sua lista de contatos e dispare as ligações.",
-      to: "/campanhas",
-      icon: Megaphone,
-      done: (campaigns.data?.length ?? 0) > 0,
+      id: "meeting",
+      title: "Crie sua primeira reunião",
+      description: "Use as salas de vídeo com transcrição automática.",
+      to: "/reunioes",
+      icon: Video,
+      done: false,
     },
   ];
 
@@ -105,18 +89,12 @@ export function NotificationsBell() {
                         : "bg-gradient-to-br from-primary to-chart-3 text-primary-foreground"
                     }`}
                   >
-                    {task.done ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Icon className="h-4 w-4" />
-                    )}
+                    {task.done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span
                       className={`block text-sm font-medium ${
-                        task.done
-                          ? "text-muted-foreground line-through"
-                          : "text-foreground"
+                        task.done ? "text-muted-foreground line-through" : "text-foreground"
                       }`}
                     >
                       {task.title}

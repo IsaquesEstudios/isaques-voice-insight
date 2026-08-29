@@ -1,5 +1,5 @@
 /**
- * Tradução de mensagens de erro técnicas (Vapi, Supabase, rede, SIP)
+ * Tradução de mensagens de erro técnicas (Supabase, rede, voz)
  * para português do Brasil, usada em todos os toasts do painel.
  */
 
@@ -27,7 +27,6 @@ const RULES: Rule[] = [
   { test: /foreign key constraint/i, message: "Este item está vinculado a outro registro e não pode ser removido." },
 
   // ---------- Credenciais das integrações ----------
-  { test: /vapi.*(not configured|missing|credentials)|configure.*vapi/i, message: "Configure sua chave da Vapi em Configurações → API & Chaves." },
   { test: /sip.*(not configured|missing|credentials)/i, message: "Configure seu tronco SIP em Configurações." },
   { test: /invalid (api )?key|invalid token|api key/i, message: "Chave de API inválida. Verifique suas credenciais." },
   { test: /\b401\b|unauthorized/i, message: "Acesso não autorizado. Verifique suas credenciais de API." },

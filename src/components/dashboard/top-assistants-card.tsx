@@ -36,8 +36,8 @@ export function TopAssistantsCard({ items, loading }: TopAssistantsCardProps) {
           items.map((a, i) => (
             <Link
               key={a.id}
-              to="/assistants/$id"
-              params={{ id: a.id }}
+              to="/assistentes"
+
               className="flex items-center gap-3 rounded-xl border border-border bg-foreground/[0.04] p-3 transition-colors hover:border-primary/30 hover:bg-foreground/[0.04]"
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
