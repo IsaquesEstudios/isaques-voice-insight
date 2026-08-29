@@ -619,15 +619,18 @@ function FaturamentoSection() {
 
   const billingQuery = useQuery({
     queryKey: ["vapi-billing"],
-    queryFn: () => getVapiBilling(),
+    queryFn: () => getVapiBilling().catch(() => null),
     staleTime: 60_000,
+    retry: false,
   });
   // Usado apenas para ler/gravar o limite de alerta configurado pelo usuário.
   const budgetQuery = useQuery({
     queryKey: ["vapi-estimated-credits"],
-    queryFn: () => getVapiEstimatedCredits(),
+    queryFn: () => getVapiEstimatedCredits().catch(() => null),
     staleTime: 60_000,
+    retry: false,
   });
+
 
   const [budgetInput, setBudgetInput] = useState<string>("");
 
