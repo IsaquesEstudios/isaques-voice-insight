@@ -105,14 +105,17 @@ export function AppSidebar() {
 function SidebarCredits() {
   const billing = useQuery({
     queryKey: ["vapi-billing"],
-    queryFn: () => getVapiBilling(),
+    queryFn: () => getVapiBilling().catch(() => null),
     staleTime: 60_000,
+    retry: false,
   });
   const budgetQuery = useQuery({
     queryKey: ["vapi-estimated-credits"],
-    queryFn: () => getVapiEstimatedCredits(),
+    queryFn: () => getVapiEstimatedCredits().catch(() => null),
     staleTime: 60_000,
+    retry: false,
   });
+
 
   const spent = billing.data?.ok ? (billing.data.currentMonth?.cost ?? 0) : null;
   const budget =
