@@ -87,7 +87,7 @@ const emptyForm: FormState = {
 };
 
 /**
- * Seção "Agentes Omniasyn — LiveKit": alternativa própria à Vapi, com
+ * Seção "Agentes Omniasyn — LiveKit": infraestrutura própria de voz, com
  * identidade visual da marca (gradiente cyan → verde) e chamada de teste
  * direto no navegador via LiveKit.
  */
@@ -194,7 +194,7 @@ export function LivekitAgentsSection() {
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Agentes de voz na nossa infraestrutura própria — sem depender da Vapi.
+              Agentes de voz na nossa infraestrutura própria.
             </p>
           </div>
         </div>
