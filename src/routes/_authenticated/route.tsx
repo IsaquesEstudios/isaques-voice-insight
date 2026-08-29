@@ -14,7 +14,7 @@ async function ensureSupabaseBrowser() {
 export const Route = createFileRoute("/_authenticated")({
   // Session lives in browser localStorage — skip SSR gating to avoid loops.
   ssr: false,
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     // Falhas ao inicializar o cliente (ex.: server fn retornando Response)
     // não podem virar "Uncaught undefined" / tela branca — mandamos ao login.
     let user;
