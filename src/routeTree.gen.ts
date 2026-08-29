@@ -13,17 +13,13 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
-import { Route as AuthenticatedTelefoniaRouteImport } from './routes/_authenticated/telefonia'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
-import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
-import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
 import { Route as AuthenticatedAssistentesRouteImport } from './routes/_authenticated/assistentes'
 import { Route as ApiPublicTranscriptRouteImport } from './routes/api/public/transcript'
-import { Route as AuthenticatedAssistantsIdRouteImport } from './routes/_authenticated/assistants.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -44,19 +40,9 @@ const ReuniaoCodeRoute = ReuniaoCodeRouteImport.update({
   path: '/reuniao/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedTelefoniaRoute = AuthenticatedTelefoniaRouteImport.update({
-  id: '/telefonia',
-  path: '/telefonia',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedReunioesRoute = AuthenticatedReunioesRouteImport.update({
   id: '/reunioes',
   path: '/reunioes',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
@@ -80,11 +66,6 @@ const AuthenticatedConfiguracoesRoute =
     path: '/configuracoes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedCampanhasRoute = AuthenticatedCampanhasRouteImport.update({
-  id: '/campanhas',
-  path: '/campanhas',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAssistentesRoute =
   AuthenticatedAssistentesRouteImport.update({
     id: '/assistentes',
@@ -96,43 +77,29 @@ const ApiPublicTranscriptRoute = ApiPublicTranscriptRouteImport.update({
   path: '/api/public/transcript',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAssistantsIdRoute =
-  AuthenticatedAssistantsIdRouteImport.update({
-    id: '/assistants/$id',
-    path: '/assistants/$id',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/reset-password': typeof ResetPasswordRoute
   '/assistentes': typeof AuthenticatedAssistentesRoute
-  '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/historico': typeof AuthenticatedHistoricoRoute
-  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
-  '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
-  '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/reset-password': typeof ResetPasswordRoute
   '/assistentes': typeof AuthenticatedAssistentesRoute
-  '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/historico': typeof AuthenticatedHistoricoRoute
-  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
-  '/telefonia': typeof AuthenticatedTelefoniaRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
-  '/assistants/$id': typeof AuthenticatedAssistantsIdRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
 export interface FileRoutesById {
@@ -141,16 +108,12 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/assistentes': typeof AuthenticatedAssistentesRoute
-  '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
-  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
-  '/_authenticated/telefonia': typeof AuthenticatedTelefoniaRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
-  '/_authenticated/assistants/$id': typeof AuthenticatedAssistantsIdRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
 export interface FileRouteTypes {
@@ -159,32 +122,24 @@ export interface FileRouteTypes {
     | '/'
     | '/reset-password'
     | '/assistentes'
-    | '/campanhas'
     | '/configuracoes'
     | '/crm'
     | '/dashboard'
     | '/historico'
-    | '/onboarding'
     | '/reunioes'
-    | '/telefonia'
     | '/reuniao/$code'
-    | '/assistants/$id'
     | '/api/public/transcript'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/reset-password'
     | '/assistentes'
-    | '/campanhas'
     | '/configuracoes'
     | '/crm'
     | '/dashboard'
     | '/historico'
-    | '/onboarding'
     | '/reunioes'
-    | '/telefonia'
     | '/reuniao/$code'
-    | '/assistants/$id'
     | '/api/public/transcript'
   id:
     | '__root__'
@@ -192,16 +147,12 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/reset-password'
     | '/_authenticated/assistentes'
-    | '/_authenticated/campanhas'
     | '/_authenticated/configuracoes'
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
     | '/_authenticated/historico'
-    | '/_authenticated/onboarding'
     | '/_authenticated/reunioes'
-    | '/_authenticated/telefonia'
     | '/reuniao/$code'
-    | '/_authenticated/assistants/$id'
     | '/api/public/transcript'
   fileRoutesById: FileRoutesById
 }
@@ -243,25 +194,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReuniaoCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/telefonia': {
-      id: '/_authenticated/telefonia'
-      path: '/telefonia'
-      fullPath: '/telefonia'
-      preLoaderRoute: typeof AuthenticatedTelefoniaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/reunioes': {
       id: '/_authenticated/reunioes'
       path: '/reunioes'
       fullPath: '/reunioes'
       preLoaderRoute: typeof AuthenticatedReunioesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/onboarding': {
-      id: '/_authenticated/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/historico': {
@@ -292,13 +229,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/campanhas': {
-      id: '/_authenticated/campanhas'
-      path: '/campanhas'
-      fullPath: '/campanhas'
-      preLoaderRoute: typeof AuthenticatedCampanhasRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/assistentes': {
       id: '/_authenticated/assistentes'
       path: '/assistentes'
@@ -313,40 +243,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTranscriptRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/assistants/$id': {
-      id: '/_authenticated/assistants/$id'
-      path: '/assistants/$id'
-      fullPath: '/assistants/$id'
-      preLoaderRoute: typeof AuthenticatedAssistantsIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssistentesRoute: typeof AuthenticatedAssistentesRoute
-  AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
-  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
-  AuthenticatedTelefoniaRoute: typeof AuthenticatedTelefoniaRoute
-  AuthenticatedAssistantsIdRoute: typeof AuthenticatedAssistantsIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssistentesRoute: AuthenticatedAssistentesRoute,
-  AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
-  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
-  AuthenticatedTelefoniaRoute: AuthenticatedTelefoniaRoute,
-  AuthenticatedAssistantsIdRoute: AuthenticatedAssistantsIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
