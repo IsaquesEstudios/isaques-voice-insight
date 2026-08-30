@@ -13,7 +13,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { getPublicSupabaseConfig } from "@/integrations/supabase/config.functions";
+
 import { initSupabaseBrowser, getSupabaseBrowser } from "@/integrations/supabase/browser";
 import { RouteProgress } from "@/components/route-progress";
 import { useQueryCachePersistence } from "@/components/query-persist";
@@ -122,12 +122,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
   }),
 
-  loader: async () => {
-    const cfg = await getPublicSupabaseConfig();
-    // Initialize on the server so SSR-rendered code can call getSupabaseBrowser().
-    initSupabaseBrowser(cfg.url, cfg.anonKey);
-    return { supabase: cfg };
-  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -150,15 +144,15 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { supabase: cfg } = Route.useLoaderData();
   const router = useRouter();
   const { theme } = useTheme();
 
   // Keep the query cache in localStorage for instant repeat navigation.
   useQueryCachePersistence(queryClient);
 
-  // Initialize the browser Supabase client as early as possible.
-  initSupabaseBrowser(cfg.url, cfg.anonKey);
+  // Initialize the browser Supabase client as early as possible (usa os
+  // valores públicos padrão — sem depender de um loader que pode falhar).
+  initSupabaseBrowser();
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
