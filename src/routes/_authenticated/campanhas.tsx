@@ -152,8 +152,8 @@ function parseCsvContatos(file: File): Promise<ContatoCampanha[]> {
 }
 
 function CampanhasPage() {
-  const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [dialogAberto, setDialogAberto] = useState(false);
+  const queryClient = useQueryClient();
 
   // Formulário
   const [nome, setNome] = useState("");
@@ -174,6 +174,18 @@ function CampanhasPage() {
     retry: false,
   });
   const linhas = linhasQuery.data ?? [];
+
+  const campanhasQuery = useQuery({
+    queryKey: ["campanhas"],
+    queryFn: async () => {
+      const r = await listarCampanhas();
+      if (!r.ok) throw new Error(r.erro);
+      return r.campanhas;
+    },
+    retry: false,
+    refetchInterval: 15_000,
+  });
+  const campanhas = campanhasQuery.data ?? [];
 
   const resetarFormulario = () => {
     setNome("");
@@ -223,39 +235,30 @@ function CampanhasPage() {
     Number(simultaneas) >= 1 &&
     contatos.length > 0;
 
-  const criarCampanha = () => {
-    if (!podeCriar) return;
-    const linha = linhas.find((l) => l.id === linhaId);
-    const nova: Campanha = {
-      id: crypto.randomUUID(),
-      nome: nome.trim(),
-      linha_sip_id: linhaId,
-      linha_sip_nome: linha?.nome_identificacao ?? "Linha",
-      simultaneas: Math.max(1, Math.floor(Number(simultaneas))),
-      contatos,
-      status: "rascunho",
-      progresso: 0,
-    };
-    // Estado local por enquanto — payload pronto para enviar à API futuramente.
-    setCampanhas((prev) => [nova, ...prev]);
-    toast.success("Campanha criada como rascunho!", {
-      description: `${nova.contatos.length} contatos prontos para discagem.`,
-    });
-    resetarFormulario();
-    setDialogAberto(false);
-  };
-
-  const alternarStatus = (campanha: Campanha) => {
-    setCampanhas((prev) =>
-      prev.map((c) => {
-        if (c.id !== campanha.id) return c;
-        if (c.status === "rascunho") return { ...c, status: "ativa" };
-        if (c.status === "ativa") return { ...c, status: "pausada" };
-        if (c.status === "pausada") return { ...c, status: "ativa" };
-        return c;
+  const criarMutation = useMutation({
+    mutationFn: () =>
+      criarCampanha({
+        data: {
+          nome: nome.trim(),
+          id_configuracao_sip: linhaId,
+          simultaneas: Math.max(1, Math.floor(Number(simultaneas))),
+          leads: contatos,
+        },
       }),
-    );
-  };
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.erro);
+        return;
+      }
+      toast.success(r.mensagem, {
+        description: `${contatos.length} contatos enviados para discagem.`,
+      });
+      resetarFormulario();
+      setDialogAberto(false);
+      queryClient.invalidateQueries({ queryKey: ["campanhas"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
 
   return (
     <DashboardShell>
