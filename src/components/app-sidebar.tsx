@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Bot,
   PhoneCall,
+  Megaphone,
   Video,
   Settings,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const nav: NavItem[] = [
     activePaths: ["/assistentes"],
   },
   { title: "Ligação", url: "/ligacao", icon: PhoneCall },
+  { title: "Campanhas", url: "/campanhas", icon: Megaphone },
   { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
   { title: "Configurações / API", url: "/configuracoes", icon: Settings },
 ];
