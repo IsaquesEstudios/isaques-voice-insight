@@ -80,9 +80,11 @@ export const getMeuNumeroLigacao = createServerFn({ method: "GET" })
       .select("telefone, updated_at")
       .eq("user_id", context.userId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    // Tabela ausente ou sem permissão: a página segue funcionando sem número salvo.
+    if (error) return null;
     return data;
   });
+
 
 export const salvarNumeroLigacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
