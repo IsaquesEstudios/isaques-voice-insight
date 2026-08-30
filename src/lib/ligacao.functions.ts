@@ -161,3 +161,64 @@ export const fazerLigacao = createServerFn({ method: "POST" })
       sala: (result.data.sala as string) ?? null,
     };
   });
+
+// ============= Campanhas (discador automático) =============
+
+export type LeadCampanha = { nome: string; telefone: string };
+
+export type CampanhaBackend = {
+  id: string;
+  nome: string;
+  status: string;
+  progresso: number;
+  total_leads: number;
+  simultaneas: number;
+};
+
+/** Cria a campanha no backend (POST /api/criar_campanha). */
+export const criarCampanha = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        nome: z.string().trim().min(1, "Informe o nome da campanha"),
+        id_configuracao_sip: z.string().min(1, "Escolha a linha SIP"),
+        simultaneas: z.number().int().min(1).max(50),
+        leads: z
+          .array(z.object({ nome: z.string().trim().min(1), telefone: e164 }))
+          .min(1, "Importe ao menos um contato válido"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const result = await callBackend("POST", "/api/criar_campanha", data);
+    if (!result.ok) return { ok: false as const, erro: result.erro };
+    return {
+      ok: true as const,
+      mensagem: (result.data.mensagem as string) ?? "Campanha iniciada!",
+    };
+  });
+
+/** Lista as campanhas do usuário (GET /api/minhas_campanhas). */
+export const listarCampanhas = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const result = await callBackend("GET", "/api/minhas_campanhas");
+    if (!result.ok) {
+      return { ok: false as const, erro: result.erro, campanhas: [] as CampanhaBackend[] };
+    }
+    const bruto = Array.isArray(result.data.campanhas)
+      ? (result.data.campanhas as Record<string, unknown>[])
+      : Array.isArray(result.data)
+        ? (result.data as unknown as Record<string, unknown>[])
+        : [];
+    const campanhas: CampanhaBackend[] = bruto.map((c) => ({
+      id: String(c.id ?? crypto.randomUUID()),
+      nome: String(c.nome ?? "Campanha"),
+      status: String(c.status ?? "ativa"),
+      progresso: Number(c.progresso ?? 0),
+      total_leads: Number(c.total_leads ?? c.leads ?? 0),
+      simultaneas: Number(c.simultaneas ?? 1),
+    }));
+    return { ok: true as const, campanhas };
+  });

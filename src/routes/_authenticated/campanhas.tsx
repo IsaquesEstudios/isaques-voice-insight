@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import {
   Megaphone,
@@ -10,9 +10,6 @@ import {
   FileText,
   X,
   Users,
-  Play,
-  Pause,
-  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +24,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -54,7 +50,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listarLinhasSip, type LinhaSip } from "@/lib/ligacao.functions";
+import {
+  criarCampanha,
+  listarCampanhas,
+  listarLinhasSip,
+  type LinhaSip,
+} from "@/lib/ligacao.functions";
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
   head: () => ({
@@ -81,21 +82,8 @@ type ContatoCampanha = {
   telefone: string;
 };
 
-type StatusCampanha = "rascunho" | "ativa" | "pausada" | "concluida";
-
-type Campanha = {
-  id: string;
-  nome: string;
-  linha_sip_id: string;
-  linha_sip_nome: string;
-  simultaneas: number;
-  contatos: ContatoCampanha[];
-  status: StatusCampanha;
-  progresso: number; // 0-100
-};
-
 const STATUS_META: Record<
-  StatusCampanha,
+  string,
   { label: string; variant: "default" | "secondary" | "outline" }
 > = {
   rascunho: { label: "Rascunho", variant: "outline" },
@@ -103,6 +91,15 @@ const STATUS_META: Record<
   pausada: { label: "Pausada", variant: "secondary" },
   concluida: { label: "Concluída", variant: "secondary" },
 };
+
+function metaStatus(status: string) {
+  return (
+    STATUS_META[status] ?? {
+      label: status.charAt(0).toUpperCase() + status.slice(1),
+      variant: "outline" as const,
+    }
+  );
+}
 
 function normalizarTelefone(valor: string): string {
   const limpo = valor.replace(/[^\d+]/g, "");
@@ -155,8 +152,8 @@ function parseCsvContatos(file: File): Promise<ContatoCampanha[]> {
 }
 
 function CampanhasPage() {
-  const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [dialogAberto, setDialogAberto] = useState(false);
+  const queryClient = useQueryClient();
 
   // Formulário
   const [nome, setNome] = useState("");
@@ -177,6 +174,18 @@ function CampanhasPage() {
     retry: false,
   });
   const linhas = linhasQuery.data ?? [];
+
+  const campanhasQuery = useQuery({
+    queryKey: ["campanhas"],
+    queryFn: async () => {
+      const r = await listarCampanhas();
+      if (!r.ok) throw new Error(r.erro);
+      return r.campanhas;
+    },
+    retry: false,
+    refetchInterval: 15_000,
+  });
+  const campanhas = campanhasQuery.data ?? [];
 
   const resetarFormulario = () => {
     setNome("");
@@ -226,39 +235,30 @@ function CampanhasPage() {
     Number(simultaneas) >= 1 &&
     contatos.length > 0;
 
-  const criarCampanha = () => {
-    if (!podeCriar) return;
-    const linha = linhas.find((l) => l.id === linhaId);
-    const nova: Campanha = {
-      id: crypto.randomUUID(),
-      nome: nome.trim(),
-      linha_sip_id: linhaId,
-      linha_sip_nome: linha?.nome_identificacao ?? "Linha",
-      simultaneas: Math.max(1, Math.floor(Number(simultaneas))),
-      contatos,
-      status: "rascunho",
-      progresso: 0,
-    };
-    // Estado local por enquanto — payload pronto para enviar à API futuramente.
-    setCampanhas((prev) => [nova, ...prev]);
-    toast.success("Campanha criada como rascunho!", {
-      description: `${nova.contatos.length} contatos prontos para discagem.`,
-    });
-    resetarFormulario();
-    setDialogAberto(false);
-  };
-
-  const alternarStatus = (campanha: Campanha) => {
-    setCampanhas((prev) =>
-      prev.map((c) => {
-        if (c.id !== campanha.id) return c;
-        if (c.status === "rascunho") return { ...c, status: "ativa" };
-        if (c.status === "ativa") return { ...c, status: "pausada" };
-        if (c.status === "pausada") return { ...c, status: "ativa" };
-        return c;
+  const criarMutation = useMutation({
+    mutationFn: () =>
+      criarCampanha({
+        data: {
+          nome: nome.trim(),
+          id_configuracao_sip: linhaId,
+          simultaneas: Math.max(1, Math.floor(Number(simultaneas))),
+          leads: contatos,
+        },
       }),
-    );
-  };
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.erro);
+        return;
+      }
+      toast.success(r.mensagem, {
+        description: `${contatos.length} contatos enviados para discagem.`,
+      });
+      resetarFormulario();
+      setDialogAberto(false);
+      queryClient.invalidateQueries({ queryKey: ["campanhas"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
 
   return (
     <DashboardShell>
@@ -427,8 +427,14 @@ function CampanhasPage() {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={criarCampanha} disabled={!podeCriar}>
-                  Criar campanha
+                <Button
+                  onClick={() => criarMutation.mutate()}
+                  disabled={!podeCriar || criarMutation.isPending}
+                >
+                  {criarMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Iniciar campanha
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -446,7 +452,28 @@ function CampanhasPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {campanhas.length === 0 ? (
+            {campanhasQuery.isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando campanhas…
+              </div>
+            ) : campanhasQuery.isError ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                <p className="text-sm font-medium">
+                  Não foi possível carregar as campanhas
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {(campanhasQuery.error as Error).message}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => campanhasQuery.refetch()}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : campanhas.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
                 <Megaphone className="h-8 w-8 text-muted-foreground/50" />
                 <p className="text-sm font-medium">
@@ -462,27 +489,22 @@ function CampanhasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead>Linha</TableHead>
                       <TableHead className="text-center">Contatos</TableHead>
                       <TableHead className="text-center">Simultâneas</TableHead>
                       <TableHead>Progresso</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {campanhas.map((c) => {
-                      const meta = STATUS_META[c.status];
+                      const meta = metaStatus(c.status);
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">
                             {c.nome}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {c.linha_sip_nome}
-                          </TableCell>
                           <TableCell className="text-center">
-                            {c.contatos.length}
+                            {c.total_leads}
                           </TableCell>
                           <TableCell className="text-center">
                             {c.simultaneas}
@@ -497,29 +519,6 @@ function CampanhasPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant={meta.variant}>{meta.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {c.status === "concluida" ? (
-                              <CheckCircle2 className="ml-auto h-4 w-4 text-primary" />
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => alternarStatus(c)}
-                                aria-label={
-                                  c.status === "ativa"
-                                    ? "Pausar campanha"
-                                    : "Iniciar campanha"
-                                }
-                              >
-                                {c.status === "ativa" ? (
-                                  <Pause className="h-4 w-4" />
-                                ) : (
-                                  <Play className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
                           </TableCell>
                         </TableRow>
                       );
