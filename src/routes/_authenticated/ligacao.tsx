@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PhoneCall, PhoneOutgoing, Loader2, Check, TriangleAlert, Phone } from "lucide-react";
+import {
+  PhoneCall,
+  PhoneOutgoing,
+  Loader2,
+  Check,
+  TriangleAlert,
+  Trash2,
+  Plus,
+  Server,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -11,10 +20,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { translateError } from "@/lib/error-messages";
 import {
-  getMeuNumeroLigacao,
-  salvarNumeroLigacao,
+  listarLinhasSip,
+  criarLinhaSip,
+  deletarLinhaSip,
   fazerLigacao,
 } from "@/lib/ligacao.functions";
 
@@ -22,9 +48,9 @@ export const Route = createFileRoute("/_authenticated/ligacao")({
   head: () => ({
     meta: [
       { title: "Ligação — Omniasyn" },
-      { name: "description", content: "Cadastre seu número e dispare uma ligação de teste com a IA." },
+      { name: "description", content: "Gerencie suas linhas SIP e dispare ligações com a IA." },
       { property: "og:title", content: "Ligação — Omniasyn" },
-      { property: "og:description", content: "Cadastre seu número e dispare uma ligação de teste com a IA." },
+      { property: "og:description", content: "Gerencie suas linhas SIP e dispare ligações com a IA." },
     ],
   }),
   component: LigacaoPage,
@@ -38,40 +64,88 @@ function normalizePhone(raw: string): string {
   return `+${digits}`;
 }
 
+const LINHAS_KEY = ["ligacao-linhas"];
+
 function LigacaoPage() {
   const queryClient = useQueryClient();
-  const [telefone, setTelefone] = useState("");
+  const [destino, setDestino] = useState("");
+  const [linhaId, setLinhaId] = useState("");
+  const [novaAberta, setNovaAberta] = useState(false);
+  const [form, setForm] = useState({
+    nome_identificacao: "",
+    telefone_associado: "",
+    sip_host: "",
+    sip_usuario: "",
+    sip_senha: "",
+  });
 
-  const numeroQuery = useQuery({
-    queryKey: ["ligacao-numero"],
-    queryFn: () => getMeuNumeroLigacao().catch(() => null),
+  const linhasQuery = useQuery({
+    queryKey: LINHAS_KEY,
+    queryFn: () => listarLinhasSip(),
     retry: false,
   });
 
-  const salvar = useMutation({
-    mutationFn: (tel: string) => salvarNumeroLigacao({ data: { telefone: tel } }),
+  const linhas = linhasQuery.data?.ok ? linhasQuery.data.linhas : [];
+  const erroLinhas = linhasQuery.data && !linhasQuery.data.ok ? linhasQuery.data.erro : null;
+
+  useEffect(() => {
+    if (linhas.length && !linhas.some((l) => l.id === linhaId)) {
+      setLinhaId(linhas[0]!.id);
+    }
+  }, [linhas, linhaId]);
+
+  const criar = useMutation({
+    mutationFn: (payload: typeof form) => criarLinhaSip({ data: payload }),
     onSuccess: (r) => {
       if (!r.ok) {
         toast.error(r.erro);
         return;
       }
       toast.success(r.mensagem);
-      queryClient.invalidateQueries({ queryKey: ["ligacao-numero"] });
+      setNovaAberta(false);
+      setForm({
+        nome_identificacao: "",
+        telefone_associado: "",
+        sip_host: "",
+        sip_usuario: "",
+        sip_senha: "",
+      });
+      queryClient.invalidateQueries({ queryKey: LINHAS_KEY });
+    },
+    onError: (e) => toast.error(translateError(e)),
+  });
+
+  const excluir = useMutation({
+    mutationFn: (id: string) => deletarLinhaSip({ data: { id } }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.erro);
+        return;
+      }
+      toast.success(r.mensagem);
+      queryClient.invalidateQueries({ queryKey: LINHAS_KEY });
     },
     onError: (e) => toast.error(translateError(e)),
   });
 
   const ligar = useMutation({
-    mutationFn: () => fazerLigacao(),
+    mutationFn: () =>
+      fazerLigacao({
+        data: { telefone_destino: normalizePhone(destino), id_configuracao_sip: linhaId },
+      }),
     onSuccess: (r) => {
       if (!r.ok) toast.error(r.erro);
     },
     onError: (e) => toast.error(translateError(e)),
   });
 
-
-  const numeroSalvo = numeroQuery.data?.telefone ?? null;
-  const telefoneValido = E164_RE.test(telefone);
+  const destinoValido = E164_RE.test(normalizePhone(destino));
+  const formValido =
+    form.nome_identificacao.trim() &&
+    E164_RE.test(normalizePhone(form.telefone_associado)) &&
+    form.sip_host.trim() &&
+    form.sip_usuario.trim() &&
+    form.sip_senha;
 
   return (
     <DashboardShell>
@@ -79,63 +153,141 @@ function LigacaoPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Ligação</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cadastre seu número e dispare uma ligação de teste atendida pela IA.
+            Gerencie suas linhas SIP e dispare ligações atendidas pela IA.
           </p>
         </div>
 
         <Card className="border-border bg-card/20 backdrop-blur-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Phone className="h-4 w-4 text-primary" />
-              Número de destino
-            </CardTitle>
-            <CardDescription>
-              Número que vai receber a ligação. Use o formato internacional (E.164).
-            </CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Server className="h-4 w-4 text-primary" />
+                Linhas telefônicas (SIP)
+              </CardTitle>
+              <CardDescription>
+                Cadastre um ou mais troncos SIP para originar as chamadas.
+              </CardDescription>
+            </div>
+            <Dialog open={novaAberta} onOpenChange={setNovaAberta}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="mr-1 h-4 w-4" />
+                  Nova linha
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova linha SIP</DialogTitle>
+                  <DialogDescription>
+                    Dados do tronco fornecidos pela sua operadora.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nome">Nome de identificação</Label>
+                    <Input
+                      id="nome"
+                      placeholder="Vendas SP"
+                      value={form.nome_identificacao}
+                      onChange={(e) => setForm({ ...form, nome_identificacao: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tel-assoc">Telefone associado (E.164)</Label>
+                    <Input
+                      id="tel-assoc"
+                      placeholder="+5511999998888"
+                      value={form.telefone_associado}
+                      onChange={(e) => setForm({ ...form, telefone_associado: e.target.value })}
+                      onBlur={() =>
+                        setForm((f) => ({
+                          ...f,
+                          telefone_associado: normalizePhone(f.telefone_associado) || f.telefone_associado,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sip-host">Host SIP</Label>
+                    <Input
+                      id="sip-host"
+                      placeholder="sip.operadora.com.br"
+                      value={form.sip_host}
+                      onChange={(e) => setForm({ ...form, sip_host: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sip-user">Usuário SIP</Label>
+                    <Input
+                      id="sip-user"
+                      value={form.sip_usuario}
+                      onChange={(e) => setForm({ ...form, sip_usuario: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sip-pass">Senha SIP</Label>
+                    <Input
+                      id="sip-pass"
+                      type="password"
+                      value={form.sip_senha}
+                      onChange={(e) => setForm({ ...form, sip_senha: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() =>
+                      criar.mutate({
+                        ...form,
+                        telefone_associado: normalizePhone(form.telefone_associado),
+                      })
+                    }
+                    disabled={!formValido || criar.isPending}
+                  >
+                    {criar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cadastrar linha"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {numeroQuery.isLoading ? (
+          <CardContent className="space-y-3">
+            {linhasQuery.isLoading ? (
               <Skeleton className="h-16 w-full" />
-            ) : numeroSalvo ? (
-              <Alert className="border-primary/30 bg-primary/5">
-                <Check className="h-4 w-4 text-primary" />
-                <AlertDescription>
-                  Número cadastrado: <span className="font-semibold text-foreground">{numeroSalvo}</span>
-                </AlertDescription>
+            ) : erroLinhas ? (
+              <Alert variant="destructive">
+                <TriangleAlert className="h-4 w-4" />
+                <AlertDescription>{erroLinhas}</AlertDescription>
               </Alert>
-            ) : (
+            ) : linhas.length === 0 ? (
               <Alert>
                 <TriangleAlert className="h-4 w-4" />
-                <AlertDescription>Nenhum número cadastrado ainda.</AlertDescription>
+                <AlertDescription>Nenhuma linha cadastrada ainda.</AlertDescription>
               </Alert>
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {linhas.map((linha) => (
+                  <li key={linha.id} className="flex items-center justify-between gap-3 p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {linha.nome_identificacao}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {linha.telefone_associado}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Excluir ${linha.nome_identificacao}`}
+                      onClick={() => excluir.mutate(linha.id)}
+                      disabled={excluir.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             )}
-
-            <div className="space-y-2">
-              <Label htmlFor="telefone">Telefone (E.164)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="telefone"
-                  placeholder="+5511999998888"
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  onBlur={() => {
-                    const n = normalizePhone(telefone);
-                    if (n.length > 1) setTelefone(n);
-                  }}
-                />
-                <Button
-                  onClick={() => salvar.mutate(normalizePhone(telefone))}
-                  disabled={!telefoneValido || salvar.isPending}
-                >
-                  {salvar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar número"}
-                </Button>
-              </div>
-              {telefone && !telefoneValido && (
-                <p className="text-xs text-destructive">
-                  Use o formato E.164, ex: +5511999998888
-                </p>
-              )}
-            </div>
           </CardContent>
         </Card>
 
@@ -146,15 +298,48 @@ function LigacaoPage() {
               Fazer ligação
             </CardTitle>
             <CardDescription>
-              Dispara uma chamada para o número cadastrado. A ligação usa seu tronco SIP e pode gerar custo na operadora.
+              Escolha a linha de origem e o número de destino. A chamada pode gerar custo na operadora.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Linha de origem</Label>
+              <Select value={linhaId} onValueChange={setLinhaId} disabled={linhas.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma linha" />
+                </SelectTrigger>
+                <SelectContent>
+                  {linhas.map((linha) => (
+                    <SelectItem key={linha.id} value={linha.id}>
+                      {linha.nome_identificacao} — {linha.telefone_associado}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="destino">Telefone de destino (E.164)</Label>
+              <Input
+                id="destino"
+                placeholder="+5511999998888"
+                value={destino}
+                onChange={(e) => setDestino(e.target.value)}
+                onBlur={() => {
+                  const n = normalizePhone(destino);
+                  if (n.length > 1) setDestino(n);
+                }}
+              />
+              {destino && !destinoValido && (
+                <p className="text-xs text-destructive">Use o formato E.164, ex: +5511999998888</p>
+              )}
+            </div>
+
             <Button
               size="lg"
               className="w-full"
               onClick={() => ligar.mutate()}
-              disabled={!numeroSalvo || ligar.isPending}
+              disabled={!destinoValido || !linhaId || ligar.isPending}
             >
               {ligar.isPending ? (
                 <>
@@ -168,12 +353,6 @@ function LigacaoPage() {
                 </>
               )}
             </Button>
-
-            {!numeroSalvo && !numeroQuery.isLoading && (
-              <p className="text-center text-xs text-muted-foreground">
-                Salve um número acima para habilitar a ligação.
-              </p>
-            )}
 
             {ligar.isSuccess && ligar.data.ok && (
               <Alert className="border-primary/30 bg-primary/5">
