@@ -144,15 +144,15 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { supabase: cfg } = Route.useLoaderData();
   const router = useRouter();
   const { theme } = useTheme();
 
   // Keep the query cache in localStorage for instant repeat navigation.
   useQueryCachePersistence(queryClient);
 
-  // Initialize the browser Supabase client as early as possible.
-  initSupabaseBrowser(cfg.url, cfg.anonKey);
+  // Initialize the browser Supabase client as early as possible (usa os
+  // valores públicos padrão — sem depender de um loader que pode falhar).
+  initSupabaseBrowser();
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
