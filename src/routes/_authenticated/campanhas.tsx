@@ -162,7 +162,11 @@ function parseCsvContatos(file: File): Promise<ContatoCampanha[]> {
 
 function CampanhasPage() {
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [campanhaAberta, setCampanhaAberta] = useState<CampanhaBackend | null>(
+    null,
+  );
   const queryClient = useQueryClient();
+
 
   // Formulário
   const [nome, setNome] = useState("");
