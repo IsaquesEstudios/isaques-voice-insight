@@ -31,28 +31,44 @@ function getBackendUrl(): string {
   return base;
 }
 
-async function postBackend(path: string, body?: unknown): Promise<Record<string, unknown>> {
-  const url = `${getBackendUrl()}${path}`;
+type BackendResult =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; erro: string };
+
+async function postBackend(path: string, body?: unknown): Promise<BackendResult> {
+  let url: string;
+  let token: string;
+  try {
+    url = `${getBackendUrl()}${path}`;
+    token = getBearerToken();
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message };
+  }
+
   let res: Response;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getBearerToken()}`,
+        Authorization: `Bearer ${token}`,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error("Não foi possível alcançar o servidor de ligação.");
+    return { ok: false, erro: "Não foi possível alcançar o servidor de ligação." };
   }
 
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const detail = typeof data.detail === "string" ? data.detail : `Erro ${res.status}`;
-    throw new Error(detail);
+    let detail = typeof data.detail === "string" ? data.detail : `Erro ${res.status}`;
+    if (/alg value is not allowed|Token inválido/i.test(detail)) {
+      detail =
+        "O backend recusou o token de sessão (assinatura ES256). Configure a verificação do JWT no ligacao.py usando o JWKS do projeto (algorithms=[\"ES256\"]).";
+    }
+    return { ok: false, erro: detail };
   }
-  return data;
+  return { ok: true, data };
 }
 
 /** Lê o número salvo direto do banco (RLS limita ao próprio usuário). */
@@ -73,16 +89,22 @@ export const salvarNumeroLigacao = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ telefone: e164 }).parse(input))
   .handler(async ({ data }) => {
     const result = await postBackend("/api/salvar_numero", { telefone: data.telefone });
-    return { ok: true as const, mensagem: (result.mensagem as string) ?? "Número salvo!" };
+    if (!result.ok) return { ok: false as const, erro: result.erro };
+    return {
+      ok: true as const,
+      mensagem: (result.data.mensagem as string) ?? "Número salvo!",
+    };
   });
 
 export const fazerLigacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const result = await postBackend("/api/fazer_ligacao");
+    if (!result.ok) return { ok: false as const, erro: result.erro };
     return {
       ok: true as const,
-      mensagem: (result.mensagem as string) ?? "Ligação disparada!",
-      sala: (result.sala as string) ?? null,
+      mensagem: (result.data.mensagem as string) ?? "Ligação disparada!",
+      sala: (result.data.sala as string) ?? null,
     };
   });
+
