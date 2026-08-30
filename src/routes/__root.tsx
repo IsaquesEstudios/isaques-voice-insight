@@ -122,12 +122,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
   }),
 
-  loader: async () => {
-    const cfg = await getPublicSupabaseConfig();
-    // Initialize on the server so SSR-rendered code can call getSupabaseBrowser().
-    initSupabaseBrowser(cfg.url, cfg.anonKey);
-    return { supabase: cfg };
-  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
