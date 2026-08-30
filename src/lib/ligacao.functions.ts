@@ -66,10 +66,14 @@ async function callBackend(
   const raw = await res.text().catch(() => "");
   let data: Record<string, unknown> = {};
   try {
-    data = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const parsed = raw ? JSON.parse(raw) : {};
+    data = Array.isArray(parsed)
+      ? ({ itens: parsed } as Record<string, unknown>)
+      : (parsed as Record<string, unknown>);
   } catch {
     data = {};
   }
+
   if (!res.ok) {
     let detail =
       typeof data.detail === "string"
@@ -173,6 +177,22 @@ export type CampanhaBackend = {
   progresso: number;
   total_leads: number;
   simultaneas: number;
+  criado_em: string | null;
+};
+
+export type LeadStatus =
+  | "pendente"
+  | "enfileirado"
+  | "chamando"
+  | "atendido"
+  | "falhou";
+
+export type LeadCampanhaItem = {
+  id: string;
+  nome: string;
+  telefone: string;
+  status: string;
+  atualizado_em: string | null;
 };
 
 /** Cria a campanha no backend (POST /api/criar_campanha). */
@@ -199,26 +219,55 @@ export const criarCampanha = createServerFn({ method: "POST" })
     };
   });
 
-/** Lista as campanhas do usuário (GET /api/minhas_campanhas). */
+/** Lista as campanhas do usuário (GET /api/campanhas). */
 export const listarCampanhas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-    const result = await callBackend("GET", "/api/minhas_campanhas");
+    const result = await callBackend("GET", "/api/campanhas");
     if (!result.ok) {
       return { ok: false as const, erro: result.erro, campanhas: [] as CampanhaBackend[] };
     }
     const bruto = Array.isArray(result.data.campanhas)
       ? (result.data.campanhas as Record<string, unknown>[])
-      : Array.isArray(result.data)
-        ? (result.data as unknown as Record<string, unknown>[])
+      : Array.isArray(result.data.itens)
+        ? (result.data.itens as Record<string, unknown>[])
         : [];
     const campanhas: CampanhaBackend[] = bruto.map((c) => ({
       id: String(c.id ?? crypto.randomUUID()),
       nome: String(c.nome ?? "Campanha"),
-      status: String(c.status ?? "ativa"),
+      status: String(c.status ?? "pendente"),
       progresso: Number(c.progresso ?? 0),
       total_leads: Number(c.total_leads ?? c.leads ?? 0),
       simultaneas: Number(c.simultaneas ?? 1),
+      criado_em: (c.criado_em ?? c.created_at ?? null) as string | null,
     }));
     return { ok: true as const, campanhas };
   });
+
+/** Leads de uma campanha (GET /api/campanhas/{id}/leads). */
+export const listarLeadsCampanha = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().min(1) }).parse(input))
+  .handler(async ({ data }) => {
+    const result = await callBackend(
+      "GET",
+      `/api/campanhas/${encodeURIComponent(data.id)}/leads`,
+    );
+    if (!result.ok) {
+      return { ok: false as const, erro: result.erro, leads: [] as LeadCampanhaItem[] };
+    }
+    const bruto = Array.isArray(result.data.leads)
+      ? (result.data.leads as Record<string, unknown>[])
+      : Array.isArray(result.data.itens)
+        ? (result.data.itens as Record<string, unknown>[])
+        : [];
+    const leads: LeadCampanhaItem[] = bruto.map((l, i) => ({
+      id: String(l.id ?? `${i}`),
+      nome: String(l.nome ?? l.name ?? "—"),
+      telefone: String(l.telefone ?? l.phone ?? ""),
+      status: String(l.status ?? "pendente").toLowerCase(),
+      atualizado_em: (l.atualizado_em ?? l.updated_at ?? null) as string | null,
+    }));
+    return { ok: true as const, leads };
+  });
+
