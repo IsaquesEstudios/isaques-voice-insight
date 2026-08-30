@@ -82,21 +82,8 @@ type ContatoCampanha = {
   telefone: string;
 };
 
-type StatusCampanha = "rascunho" | "ativa" | "pausada" | "concluida";
-
-type Campanha = {
-  id: string;
-  nome: string;
-  linha_sip_id: string;
-  linha_sip_nome: string;
-  simultaneas: number;
-  contatos: ContatoCampanha[];
-  status: StatusCampanha;
-  progresso: number; // 0-100
-};
-
 const STATUS_META: Record<
-  StatusCampanha,
+  string,
   { label: string; variant: "default" | "secondary" | "outline" }
 > = {
   rascunho: { label: "Rascunho", variant: "outline" },
@@ -104,6 +91,15 @@ const STATUS_META: Record<
   pausada: { label: "Pausada", variant: "secondary" },
   concluida: { label: "Concluída", variant: "secondary" },
 };
+
+function metaStatus(status: string) {
+  return (
+    STATUS_META[status] ?? {
+      label: status.charAt(0).toUpperCase() + status.slice(1),
+      variant: "outline" as const,
+    }
+  );
+}
 
 function normalizarTelefone(valor: string): string {
   const limpo = valor.replace(/[^\d+]/g, "");
