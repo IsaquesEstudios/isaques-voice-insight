@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import {
   Megaphone,
@@ -10,9 +10,6 @@ import {
   FileText,
   X,
   Users,
-  Play,
-  Pause,
-  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +24,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -54,7 +50,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listarLinhasSip, type LinhaSip } from "@/lib/ligacao.functions";
+import {
+  criarCampanha,
+  listarCampanhas,
+  listarLinhasSip,
+  type LinhaSip,
+} from "@/lib/ligacao.functions";
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
   head: () => ({
