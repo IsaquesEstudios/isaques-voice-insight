@@ -498,10 +498,11 @@ function CampanhasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead className="text-center">Contatos</TableHead>
-                      <TableHead className="text-center">Simultâneas</TableHead>
-                      <TableHead>Progresso</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Simultâneas</TableHead>
+                      <TableHead>Criada em</TableHead>
+                      <TableHead>Progresso</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -511,12 +512,18 @@ function CampanhasPage() {
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">
                             {c.nome}
+                            <span className="block text-xs font-normal text-muted-foreground">
+                              {c.total_leads} contato(s)
+                            </span>
                           </TableCell>
-                          <TableCell className="text-center">
-                            {c.total_leads}
+                          <TableCell>
+                            <Badge variant={meta.variant}>{meta.label}</Badge>
                           </TableCell>
                           <TableCell className="text-center">
                             {c.simultaneas}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            {formatarData(c.criado_em)}
                           </TableCell>
                           <TableCell className="min-w-[140px]">
                             <div className="flex items-center gap-2">
@@ -526,8 +533,15 @@ function CampanhasPage() {
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant={meta.variant}>{meta.label}</Badge>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCampanhaAberta(c)}
+                            >
+                              <Activity className="mr-2 h-3.5 w-3.5" />
+                              Ver progresso
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -539,6 +553,177 @@ function CampanhasPage() {
           </CardContent>
         </Card>
       </div>
+
+      <MonitorCampanhaDialog
+        campanha={campanhaAberta}
+        onOpenChange={(open) => {
+          if (!open) setCampanhaAberta(null);
+        }}
+      />
     </DashboardShell>
   );
 }
+
+function formatarData(valor: string | null) {
+  if (!valor) return "—";
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const LEAD_STATUS_META: Record<
+  string,
+  { label: string; classe: string; Icone: typeof Clock }
+> = {
+  pendente: {
+    label: "Pendente",
+    classe: "bg-muted text-muted-foreground border-border",
+    Icone: Clock,
+  },
+  enfileirado: {
+    label: "Enfileirado",
+    classe: "bg-muted text-muted-foreground border-border",
+    Icone: Clock,
+  },
+  chamando: {
+    label: "Chamando",
+    classe:
+      "animate-pulse border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    Icone: PhoneCall,
+  },
+  atendido: {
+    label: "Atendido",
+    classe:
+      "border-emerald-500/40 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    Icone: CheckCircle2,
+  },
+  falhou: {
+    label: "Falhou",
+    classe:
+      "border-destructive/40 bg-destructive/15 text-destructive",
+    Icone: XCircle,
+  },
+};
+
+function metaLead(status: string) {
+  return (
+    LEAD_STATUS_META[status] ?? {
+      label: status.charAt(0).toUpperCase() + status.slice(1),
+      classe: "bg-muted text-muted-foreground border-border",
+      Icone: Clock,
+    }
+  );
+}
+
+function MonitorCampanhaDialog({
+  campanha,
+  onOpenChange,
+}: {
+  campanha: CampanhaBackend | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const leadsQuery = useQuery({
+    queryKey: ["campanha-leads", campanha?.id],
+    enabled: !!campanha,
+    queryFn: async () => {
+      const r = await listarLeadsCampanha({ data: { id: campanha!.id } });
+      if (!r.ok) throw new Error(r.erro);
+      return r.leads;
+    },
+    retry: false,
+    refetchInterval: 3000,
+  });
+
+  const leads = leadsQuery.data ?? [];
+  const resumo = leads.reduce<Record<string, number>>((acc, l) => {
+    acc[l.status] = (acc[l.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <Dialog open={!!campanha} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            {campanha?.nome ?? "Campanha"}
+          </DialogTitle>
+          <DialogDescription>
+            Monitoramento ao vivo — a lista atualiza automaticamente a cada 3
+            segundos.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-wrap gap-2">
+          {["chamando", "atendido", "falhou", "pendente"].map((s) => {
+            const m = metaLead(s);
+            return (
+              <span
+                key={s}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${m.classe}`}
+              >
+                {m.label}: {resumo[s] ?? 0}
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="max-h-[50vh] overflow-y-auto rounded-lg border">
+          {leadsQuery.isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando leads…
+            </div>
+          ) : leadsQuery.isError ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              {(leadsQuery.error as Error).message}
+            </div>
+          ) : leads.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Nenhum lead nesta campanha.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((l) => {
+                  const m = metaLead(l.status);
+                  const Icone = m.Icone;
+                  return (
+                    <TableRow key={l.id}>
+                      <TableCell className="font-medium">{l.nome}</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {l.telefone}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${m.classe}`}
+                        >
+                          <Icone className="h-3 w-3" />
+                          {m.label}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
