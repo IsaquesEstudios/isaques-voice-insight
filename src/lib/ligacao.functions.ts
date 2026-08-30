@@ -35,7 +35,11 @@ type BackendResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; erro: string };
 
-async function postBackend(path: string, body?: unknown): Promise<BackendResult> {
+async function callBackend(
+  method: "GET" | "POST" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<BackendResult> {
   let url: string;
   let token: string;
   try {
@@ -48,7 +52,7 @@ async function postBackend(path: string, body?: unknown): Promise<BackendResult>
   let res: Response;
   try {
     res = await fetch(url, {
-      method: "POST",
+      method,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -83,37 +87,73 @@ async function postBackend(path: string, body?: unknown): Promise<BackendResult>
   return { ok: true, data };
 }
 
-/** Lê o número salvo direto do banco (RLS limita ao próprio usuário). */
-export const getMeuNumeroLigacao = createServerFn({ method: "GET" })
+export type LinhaSip = {
+  id: string;
+  nome_identificacao: string;
+  telefone_associado: string;
+};
+
+/** Lista as linhas (troncos SIP) cadastradas pelo usuário. */
+export const listarLinhasSip = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("telefones_usuarios")
-      .select("telefone, updated_at")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    // Tabela ausente ou sem permissão: a página segue funcionando sem número salvo.
-    if (error) return null;
-    return data;
+  .handler(async () => {
+    const result = await callBackend("GET", "/api/meus_sips");
+    if (!result.ok) return { ok: false as const, erro: result.erro, linhas: [] as LinhaSip[] };
+    const linhas = Array.isArray(result.data.linhas)
+      ? (result.data.linhas as LinhaSip[])
+      : [];
+    return { ok: true as const, linhas };
   });
 
-
-export const salvarNumeroLigacao = createServerFn({ method: "POST" })
+export const criarLinhaSip = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ telefone: e164 }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({
+        nome_identificacao: z.string().trim().min(1, "Informe um nome"),
+        telefone_associado: e164,
+        sip_host: z.string().trim().min(1, "Informe o host SIP"),
+        sip_usuario: z.string().trim().min(1, "Informe o usuário SIP"),
+        sip_senha: z.string().min(1, "Informe a senha SIP"),
+      })
+      .parse(input),
+  )
   .handler(async ({ data }) => {
-    const result = await postBackend("/api/salvar_numero", { telefone: data.telefone });
+    const result = await callBackend("POST", "/api/criar_trunk_sip", data);
     if (!result.ok) return { ok: false as const, erro: result.erro };
     return {
       ok: true as const,
-      mensagem: (result.data.mensagem as string) ?? "Número salvo!",
+      mensagem: (result.data.mensagem as string) ?? "Linha cadastrada!",
+    };
+  });
+
+export const deletarLinhaSip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().min(1) }).parse(input))
+  .handler(async ({ data }) => {
+    const result = await callBackend(
+      "DELETE",
+      `/api/deletar_sip/${encodeURIComponent(data.id)}`,
+    );
+    if (!result.ok) return { ok: false as const, erro: result.erro };
+    return {
+      ok: true as const,
+      mensagem: (result.data.mensagem as string) ?? "Linha excluída.",
     };
   });
 
 export const fazerLigacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const result = await postBackend("/api/fazer_ligacao");
+  .inputValidator((input) =>
+    z
+      .object({
+        telefone_destino: e164,
+        id_configuracao_sip: z.string().min(1, "Escolha uma linha"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const result = await callBackend("POST", "/api/fazer_ligacao", data);
     if (!result.ok) return { ok: false as const, erro: result.erro };
     return {
       ok: true as const,
@@ -121,4 +161,3 @@ export const fazerLigacao = createServerFn({ method: "POST" })
       sala: (result.data.sala as string) ?? null,
     };
   });
-
