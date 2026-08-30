@@ -175,7 +175,7 @@ function LigacaoPage() {
               </p>
             )}
 
-            {ligar.isSuccess && (
+            {ligar.isSuccess && ligar.data.ok && (
               <Alert className="border-primary/30 bg-primary/5">
                 <Check className="h-4 w-4 text-primary" />
                 <AlertDescription>
