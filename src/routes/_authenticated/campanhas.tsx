@@ -53,9 +53,12 @@ import {
 import {
   criarCampanha,
   listarCampanhas,
+  listarLeadsCampanha,
   listarLinhasSip,
+  type CampanhaBackend,
   type LinhaSip,
 } from "@/lib/ligacao.functions";
+
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
   head: () => ({
