@@ -66,10 +66,14 @@ async function callBackend(
   const raw = await res.text().catch(() => "");
   let data: Record<string, unknown> = {};
   try {
-    data = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const parsed = raw ? JSON.parse(raw) : {};
+    data = Array.isArray(parsed)
+      ? ({ itens: parsed } as Record<string, unknown>)
+      : (parsed as Record<string, unknown>);
   } catch {
     data = {};
   }
+
   if (!res.ok) {
     let detail =
       typeof data.detail === "string"
