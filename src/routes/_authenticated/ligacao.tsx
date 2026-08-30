@@ -51,6 +51,10 @@ function LigacaoPage() {
   const salvar = useMutation({
     mutationFn: (tel: string) => salvarNumeroLigacao({ data: { telefone: tel } }),
     onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.erro);
+        return;
+      }
       toast.success(r.mensagem);
       queryClient.invalidateQueries({ queryKey: ["ligacao-numero"] });
     },
@@ -59,8 +63,12 @@ function LigacaoPage() {
 
   const ligar = useMutation({
     mutationFn: () => fazerLigacao(),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.erro);
+    },
     onError: (e) => toast.error(translateError(e)),
   });
+
 
   const numeroSalvo = numeroQuery.data?.telefone ?? null;
   const telefoneValido = E164_RE.test(telefone);
