@@ -59,15 +59,27 @@ async function postBackend(path: string, body?: unknown): Promise<BackendResult>
     return { ok: false, erro: "Não foi possível alcançar o servidor de ligação." };
   }
 
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const raw = await res.text().catch(() => "");
+  let data: Record<string, unknown> = {};
+  try {
+    data = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+  } catch {
+    data = {};
+  }
   if (!res.ok) {
-    let detail = typeof data.detail === "string" ? data.detail : `Erro ${res.status}`;
+    let detail =
+      typeof data.detail === "string"
+        ? data.detail
+        : raw
+          ? `Erro ${res.status}: ${raw.slice(0, 300)}`
+          : `Erro ${res.status}`;
     if (/alg value is not allowed|Token inválido/i.test(detail)) {
       detail =
         "O backend recusou o token de sessão (assinatura ES256). Configure a verificação do JWT no ligacao.py usando o JWKS do projeto (algorithms=[\"ES256\"]).";
     }
     return { ok: false, erro: detail };
   }
+
   return { ok: true, data };
 }
 
