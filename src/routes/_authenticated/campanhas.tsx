@@ -427,8 +427,14 @@ function CampanhasPage() {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={criarCampanha} disabled={!podeCriar}>
-                  Criar campanha
+                <Button
+                  onClick={() => criarMutation.mutate()}
+                  disabled={!podeCriar || criarMutation.isPending}
+                >
+                  {criarMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Iniciar campanha
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -446,7 +452,28 @@ function CampanhasPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {campanhas.length === 0 ? (
+            {campanhasQuery.isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando campanhas…
+              </div>
+            ) : campanhasQuery.isError ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                <p className="text-sm font-medium">
+                  Não foi possível carregar as campanhas
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {(campanhasQuery.error as Error).message}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => campanhasQuery.refetch()}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : campanhas.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
                 <Megaphone className="h-8 w-8 text-muted-foreground/50" />
                 <p className="text-sm font-medium">
@@ -462,27 +489,22 @@ function CampanhasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead>Linha</TableHead>
                       <TableHead className="text-center">Contatos</TableHead>
                       <TableHead className="text-center">Simultâneas</TableHead>
                       <TableHead>Progresso</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {campanhas.map((c) => {
-                      const meta = STATUS_META[c.status];
+                      const meta = metaStatus(c.status);
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">
                             {c.nome}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {c.linha_sip_nome}
-                          </TableCell>
                           <TableCell className="text-center">
-                            {c.contatos.length}
+                            {c.total_leads}
                           </TableCell>
                           <TableCell className="text-center">
                             {c.simultaneas}
@@ -497,29 +519,6 @@ function CampanhasPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant={meta.variant}>{meta.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {c.status === "concluida" ? (
-                              <CheckCircle2 className="ml-auto h-4 w-4 text-primary" />
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => alternarStatus(c)}
-                                aria-label={
-                                  c.status === "ativa"
-                                    ? "Pausar campanha"
-                                    : "Iniciar campanha"
-                                }
-                              >
-                                {c.status === "ativa" ? (
-                                  <Pause className="h-4 w-4" />
-                                ) : (
-                                  <Play className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
                           </TableCell>
                         </TableRow>
                       );
