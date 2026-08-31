@@ -75,18 +75,25 @@ async function callBackend(
   }
 
   if (!res.ok) {
-    let detail =
-      typeof data.detail === "string"
-        ? data.detail
-        : raw
-          ? `Erro ${res.status}: ${raw.slice(0, 300)}`
-          : `Erro ${res.status}`;
+    const pareceHtml = /^\s*(<!doctype|<html)/i.test(raw);
+    let detail: string;
+    if (typeof data.detail === "string") {
+      detail = data.detail;
+    } else if (pareceHtml || res.status === 502 || res.status === 503 || res.status === 504) {
+      detail =
+        res.status === 401 || res.status === 403
+          ? "Sessão recusada pelo servidor de ligação."
+          : `O servidor de ligação está fora do ar ou reiniciando (erro ${res.status}). Verifique se o backend está rodando e tente novamente.`;
+    } else {
+      detail = raw ? `Erro ${res.status}: ${raw.slice(0, 300)}` : `Erro ${res.status}`;
+    }
     if (/alg value is not allowed|Token inválido/i.test(detail)) {
       detail =
         "O backend recusou o token de sessão (assinatura ES256). Configure a verificação do JWT no ligacao.py usando o JWKS do projeto (algorithms=[\"ES256\"]).";
     }
     return { ok: false, erro: detail };
   }
+
 
   return { ok: true, data };
 }
