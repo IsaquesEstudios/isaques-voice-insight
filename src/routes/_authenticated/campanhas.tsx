@@ -172,6 +172,7 @@ function CampanhasPage() {
   const [nome, setNome] = useState("");
   const [linhaId, setLinhaId] = useState("");
   const [simultaneas, setSimultaneas] = useState("2");
+  const [numeroTransferencia, setNumeroTransferencia] = useState("");
   const [contatos, setContatos] = useState<ContatoCampanha[]>([]);
   const [arquivoNome, setArquivoNome] = useState<string | null>(null);
   const [lendoCsv, setLendoCsv] = useState(false);
@@ -204,6 +205,7 @@ function CampanhasPage() {
     setNome("");
     setLinhaId("");
     setSimultaneas("2");
+    setNumeroTransferencia("");
     setContatos([]);
     setArquivoNome(null);
     if (inputArquivoRef.current) inputArquivoRef.current.value = "";
