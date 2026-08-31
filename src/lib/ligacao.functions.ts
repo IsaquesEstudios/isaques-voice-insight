@@ -204,6 +204,10 @@ export const criarCampanha = createServerFn({ method: "POST" })
         nome: z.string().trim().min(1, "Informe o nome da campanha"),
         id_configuracao_sip: z.string().min(1, "Escolha a linha SIP"),
         simultaneas: z.number().int().min(1).max(50),
+        numero_transferencia: z
+          .union([e164, z.literal("")])
+          .optional()
+          .transform((v) => (v ? v : undefined)),
         leads: z
           .array(z.object({ nome: z.string().trim().min(1), telefone: e164 }))
           .min(1, "Importe ao menos um contato válido"),
