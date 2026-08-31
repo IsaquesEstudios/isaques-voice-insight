@@ -257,6 +257,7 @@ function CampanhasPage() {
           nome: nome.trim(),
           id_configuracao_sip: linhaId,
           simultaneas: Math.max(1, Math.floor(Number(simultaneas))),
+          numero_transferencia: numeroTransferencia.trim(),
           leads: contatos,
         },
       }),
@@ -361,6 +362,30 @@ function CampanhasPage() {
                       onChange={(e) => setSimultaneas(e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="numero-transferencia">
+                    Número para transferência{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (opcional)
+                    </span>
+                  </Label>
+                  <Input
+                    id="numero-transferencia"
+                    placeholder="Ex: +5511999999999"
+                    value={numeroTransferencia}
+                    onChange={(e) =>
+                      setNumeroTransferencia(
+                        normalizarTelefone(e.target.value),
+                      )
+                    }
+                    maxLength={16}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se preenchido, a IA poderá transferir a ligação para este
+                    número durante o atendimento.
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
