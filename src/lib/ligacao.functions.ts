@@ -165,7 +165,7 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     // Envia também aliases comuns dos campos, pois alguns backends esperam
     // nomes diferentes (host/usuario/senha) ao gravar na tabela.
     const payload = {
