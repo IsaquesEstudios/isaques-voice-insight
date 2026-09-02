@@ -124,10 +124,23 @@ function normalizarLinha(l: Record<string, unknown>, i: number): LinhaSip {
   };
 }
 
-/** Lista as linhas (troncos SIP) cadastradas pelo usuário. */
+/** Lista as linhas (troncos SIP) cadastradas pelo usuário, lendo direto do banco. */
 export const listarLinhasSip = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("configuracoes_sip")
+      .select("*")
+      .eq("user_id", context.userId)
+      .order("criado_em", { ascending: false });
+    if (!error && rows) {
+      return {
+        ok: true as const,
+        linhas: rows.map((l, i) => normalizarLinha(l as Record<string, unknown>, i)),
+      };
+    }
+    // Fallback: tenta o backend caso a tabela não exista no banco externo.
     const result = await callBackend("GET", "/api/meus_sips");
     if (!result.ok) return { ok: false as const, erro: result.erro, linhas: [] as LinhaSip[] };
     const bruto = Array.isArray(result.data.linhas)
