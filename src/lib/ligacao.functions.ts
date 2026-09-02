@@ -102,7 +102,27 @@ export type LinhaSip = {
   id: string;
   nome_identificacao: string;
   telefone_associado: string;
+  /** SID do tronco de saída criado no LiveKit (começa com "ST_"). */
+  livekit_trunk_id: string | null;
+  sip_host?: string | null;
+  sip_usuario?: string | null;
 };
+
+function normalizarLinha(l: Record<string, unknown>, i: number): LinhaSip {
+  return {
+    id: String(l.id ?? `${i}`),
+    nome_identificacao: String(l.nome_identificacao ?? l.nome ?? "Linha"),
+    telefone_associado: String(l.telefone_associado ?? l.telefone ?? ""),
+    livekit_trunk_id:
+      (l.livekit_trunk_id as string) ??
+      (l.trunk_id as string) ??
+      (l.sid as string) ??
+      (l.st_id as string) ??
+      null,
+    sip_host: (l.sip_host as string) ?? null,
+    sip_usuario: (l.sip_usuario as string) ?? null,
+  };
+}
 
 /** Lista as linhas (troncos SIP) cadastradas pelo usuário. */
 export const listarLinhasSip = createServerFn({ method: "GET" })
@@ -110,11 +130,14 @@ export const listarLinhasSip = createServerFn({ method: "GET" })
   .handler(async () => {
     const result = await callBackend("GET", "/api/meus_sips");
     if (!result.ok) return { ok: false as const, erro: result.erro, linhas: [] as LinhaSip[] };
-    const linhas = Array.isArray(result.data.linhas)
-      ? (result.data.linhas as LinhaSip[])
-      : [];
-    return { ok: true as const, linhas };
+    const bruto = Array.isArray(result.data.linhas)
+      ? (result.data.linhas as Record<string, unknown>[])
+      : Array.isArray(result.data.itens)
+        ? (result.data.itens as Record<string, unknown>[])
+        : [];
+    return { ok: true as const, linhas: bruto.map(normalizarLinha) };
   });
+
 
 export const criarLinhaSip = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -132,10 +155,16 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const result = await callBackend("POST", "/api/criar_trunk_sip", data);
     if (!result.ok) return { ok: false as const, erro: result.erro };
+    const trunkId =
+      ((result.data.livekit_trunk_id ??
+        result.data.trunk_id ??
+        result.data.sid) as string | undefined) ?? null;
     return {
       ok: true as const,
       mensagem: (result.data.mensagem as string) ?? "Linha cadastrada!",
+      livekit_trunk_id: trunkId,
     };
+
   });
 
 export const deletarLinhaSip = createServerFn({ method: "POST" })

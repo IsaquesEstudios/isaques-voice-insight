@@ -101,7 +101,12 @@ function LigacaoPage() {
         toast.error(r.erro);
         return;
       }
-      toast.success(r.mensagem);
+      toast.success(
+        r.livekit_trunk_id
+          ? `${r.mensagem} Tronco LiveKit: ${r.livekit_trunk_id}`
+          : r.mensagem,
+      );
+
       setNovaAberta(false);
       setForm({
         nome_identificacao: "",
@@ -274,6 +279,12 @@ function LigacaoPage() {
                       <p className="truncate text-xs text-muted-foreground">
                         {linha.telefone_associado}
                       </p>
+                      {linha.livekit_trunk_id ? (
+                        <p className="truncate font-mono text-[11px] text-muted-foreground/80">
+                          {linha.livekit_trunk_id}
+                        </p>
+                      ) : null}
+
                     </div>
                     <Button
                       variant="ghost"
