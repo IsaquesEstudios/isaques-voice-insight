@@ -140,7 +140,7 @@ export const listarLinhasSip = createServerFn({ method: "GET" })
     if (!error && rows) {
       return {
         ok: true as const,
-        linhas: rows.map((l, i) => normalizarLinha(l as Record<string, unknown>, i)),
+        linhas: (rows as Record<string, unknown>[]).map((l, i) => normalizarLinha(l, i)),
       };
     }
     // Fallback: tenta o backend caso a tabela não exista no banco externo.
