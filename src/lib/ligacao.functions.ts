@@ -129,7 +129,10 @@ export const listarLinhasSip = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
-    const { data: rows, error } = await supabaseAdmin
+    // Tabela do banco externo — não consta nos tipos gerados do projeto.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
+    const { data: rows, error } = await db
       .from("configuracoes_sip")
       .select("*")
       .eq("user_id", context.userId)
