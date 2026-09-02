@@ -153,7 +153,20 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const result = await callBackend("POST", "/api/criar_trunk_sip", data);
+    // Envia também aliases comuns dos campos, pois alguns backends esperam
+    // nomes diferentes (host/usuario/senha) ao gravar na tabela.
+    const payload = {
+      ...data,
+      nome: data.nome_identificacao,
+      telefone: data.telefone_associado,
+      numero: data.telefone_associado,
+      host: data.sip_host,
+      usuario: data.sip_usuario,
+      senha: data.sip_senha,
+      username: data.sip_usuario,
+      password: data.sip_senha,
+    };
+    const result = await callBackend("POST", "/api/criar_trunk_sip", payload);
     if (!result.ok) return { ok: false as const, erro: result.erro };
     const trunkId =
       ((result.data.livekit_trunk_id ??
