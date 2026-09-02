@@ -193,6 +193,8 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
     // como null, então o painel garante a persistência completa (inclui o ST...).
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabaseAdmin as any;
       const registro = {
         user_id: context.userId,
         nome_identificacao: data.nome_identificacao,
