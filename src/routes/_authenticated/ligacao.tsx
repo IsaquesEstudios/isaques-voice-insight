@@ -101,7 +101,12 @@ function LigacaoPage() {
         toast.error(r.erro);
         return;
       }
-      toast.success(r.mensagem);
+      toast.success(
+        r.livekit_trunk_id
+          ? `${r.mensagem} Tronco LiveKit: ${r.livekit_trunk_id}`
+          : r.mensagem,
+      );
+
       setNovaAberta(false);
       setForm({
         nome_identificacao: "",
