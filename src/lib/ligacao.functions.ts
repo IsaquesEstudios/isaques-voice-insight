@@ -155,10 +155,16 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const result = await callBackend("POST", "/api/criar_trunk_sip", data);
     if (!result.ok) return { ok: false as const, erro: result.erro };
+    const trunkId =
+      ((result.data.livekit_trunk_id ??
+        result.data.trunk_id ??
+        result.data.sid) as string | undefined) ?? null;
     return {
       ok: true as const,
       mensagem: (result.data.mensagem as string) ?? "Linha cadastrada!",
+      livekit_trunk_id: trunkId,
     };
+
   });
 
 export const deletarLinhaSip = createServerFn({ method: "POST" })
