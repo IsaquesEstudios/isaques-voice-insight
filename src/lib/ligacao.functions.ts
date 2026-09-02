@@ -205,14 +205,14 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
         livekit_trunk_id: trunkId,
         sip_trunk_id: trunkId,
       };
-      const { data: atualizado } = await supabaseAdmin
+      const { data: atualizado } = await db
         .from("configuracoes_sip")
         .update(registro)
         .eq("user_id", context.userId)
         .eq("telefone_associado", data.telefone_associado)
         .select("id");
       if (!atualizado || atualizado.length === 0) {
-        await supabaseAdmin.from("configuracoes_sip").insert(registro);
+        await db.from("configuracoes_sip").insert(registro);
       }
     } catch {
       // Falha na gravação local não impede o retorno de sucesso do backend.
