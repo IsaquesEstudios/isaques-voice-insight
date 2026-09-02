@@ -124,10 +124,26 @@ function normalizarLinha(l: Record<string, unknown>, i: number): LinhaSip {
   };
 }
 
-/** Lista as linhas (troncos SIP) cadastradas pelo usuário. */
+/** Lista as linhas (troncos SIP) cadastradas pelo usuário, lendo direto do banco. */
 export const listarLinhasSip = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
+    // Tabela do banco externo — não consta nos tipos gerados do projeto.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
+    const { data: rows, error } = await db
+      .from("configuracoes_sip")
+      .select("*")
+      .eq("user_id", context.userId)
+      .order("criado_em", { ascending: false });
+    if (!error && rows) {
+      return {
+        ok: true as const,
+        linhas: (rows as Record<string, unknown>[]).map((l, i) => normalizarLinha(l, i)),
+      };
+    }
+    // Fallback: tenta o backend caso a tabela não exista no banco externo.
     const result = await callBackend("GET", "/api/meus_sips");
     if (!result.ok) return { ok: false as const, erro: result.erro, linhas: [] as LinhaSip[] };
     const bruto = Array.isArray(result.data.linhas)
@@ -152,7 +168,7 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     // Envia também aliases comuns dos campos, pois alguns backends esperam
     // nomes diferentes (host/usuario/senha) ao gravar na tabela.
     const payload = {
@@ -172,6 +188,36 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
       ((result.data.livekit_trunk_id ??
         result.data.trunk_id ??
         result.data.sid) as string | undefined) ?? null;
+
+    // Grava/atualiza direto no banco: o backend às vezes salva host/usuário/senha
+    // como null, então o painel garante a persistência completa (inclui o ST...).
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabaseAdmin as any;
+      const registro = {
+        user_id: context.userId,
+        nome_identificacao: data.nome_identificacao,
+        telefone_associado: data.telefone_associado,
+        sip_host: data.sip_host,
+        sip_usuario: data.sip_usuario,
+        sip_senha: data.sip_senha,
+        livekit_trunk_id: trunkId,
+        sip_trunk_id: trunkId,
+      };
+      const { data: atualizado } = await db
+        .from("configuracoes_sip")
+        .update(registro)
+        .eq("user_id", context.userId)
+        .eq("telefone_associado", data.telefone_associado)
+        .select("id");
+      if (!atualizado || atualizado.length === 0) {
+        await db.from("configuracoes_sip").insert(registro);
+      }
+    } catch {
+      // Falha na gravação local não impede o retorno de sucesso do backend.
+    }
+
     return {
       ok: true as const,
       mensagem: (result.data.mensagem as string) ?? "Linha cadastrada!",
