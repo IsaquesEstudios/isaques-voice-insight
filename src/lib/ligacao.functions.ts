@@ -185,6 +185,34 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
       ((result.data.livekit_trunk_id ??
         result.data.trunk_id ??
         result.data.sid) as string | undefined) ?? null;
+
+    // Grava/atualiza direto no banco: o backend às vezes salva host/usuário/senha
+    // como null, então o painel garante a persistência completa (inclui o ST...).
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
+      const registro = {
+        user_id: context.userId,
+        nome_identificacao: data.nome_identificacao,
+        telefone_associado: data.telefone_associado,
+        sip_host: data.sip_host,
+        sip_usuario: data.sip_usuario,
+        sip_senha: data.sip_senha,
+        livekit_trunk_id: trunkId,
+        sip_trunk_id: trunkId,
+      };
+      const { data: atualizado } = await supabaseAdmin
+        .from("configuracoes_sip")
+        .update(registro)
+        .eq("user_id", context.userId)
+        .eq("telefone_associado", data.telefone_associado)
+        .select("id");
+      if (!atualizado || atualizado.length === 0) {
+        await supabaseAdmin.from("configuracoes_sip").insert(registro);
+      }
+    } catch {
+      // Falha na gravação local não impede o retorno de sucesso do backend.
+    }
+
     return {
       ok: true as const,
       mensagem: (result.data.mensagem as string) ?? "Linha cadastrada!",
