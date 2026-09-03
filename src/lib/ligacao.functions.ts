@@ -183,11 +183,25 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
       password: data.sip_senha,
     };
     const result = await callBackend("POST", "/api/criar_trunk_sip", payload);
-    if (!result.ok) return { ok: false as const, erro: result.erro };
-    const trunkId =
-      ((result.data.livekit_trunk_id ??
-        result.data.trunk_id ??
-        result.data.sid) as string | undefined) ?? null;
+
+    // O backend às vezes cria o tronco no LiveKit e falha ao gravar no banco
+    // (colunas nulas). Nesse caso recuperamos o ST_... da mensagem de erro e
+    // gravamos a linha aqui mesmo, para o usuário não perder o cadastro.
+    let trunkId: string | null = null;
+    let mensagem = "Linha cadastrada!";
+    if (!result.ok) {
+      const recuperado = result.erro.match(/ST_[A-Za-z0-9]+/)?.[0] ?? null;
+      if (!recuperado) return { ok: false as const, erro: result.erro };
+      trunkId = recuperado;
+      mensagem = "Linha cadastrada (gravada pelo painel).";
+    } else {
+      trunkId =
+        ((result.data.livekit_trunk_id ??
+          result.data.trunk_id ??
+          result.data.sid) as string | undefined) ?? null;
+      mensagem = (result.data.mensagem as string) ?? mensagem;
+    }
+
 
     // Grava/atualiza direto no banco: o backend às vezes salva host/usuário/senha
     // como null, então o painel garante a persistência completa (inclui o ST...).
