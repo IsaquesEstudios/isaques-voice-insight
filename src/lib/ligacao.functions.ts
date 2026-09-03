@@ -205,11 +205,12 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
 
     // Grava/atualiza direto no banco: o backend às vezes salva host/usuário/senha
     // como null, então o painel garante a persistência completa (inclui o ST...).
+    let erroGravacao: string | null = null;
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabaseAdmin as any;
-      const registro = {
+      const registro: Record<string, unknown> = {
         user_id: context.userId,
         nome_identificacao: data.nome_identificacao,
         telefone_associado: data.telefone_associado,
@@ -219,24 +220,44 @@ export const criarLinhaSip = createServerFn({ method: "POST" })
         livekit_trunk_id: trunkId,
         sip_trunk_id: trunkId,
       };
-      const { data: atualizado } = await db
-        .from("configuracoes_sip")
-        .update(registro)
-        .eq("user_id", context.userId)
-        .eq("telefone_associado", data.telefone_associado)
-        .select("id");
-      if (!atualizado || atualizado.length === 0) {
-        await db.from("configuracoes_sip").insert(registro);
+      const gravar = async (reg: Record<string, unknown>) => {
+        const { data: atualizado, error: erroUpdate } = await db
+          .from("configuracoes_sip")
+          .update(reg)
+          .eq("user_id", context.userId)
+          .eq("telefone_associado", data.telefone_associado)
+          .select("id");
+        if (erroUpdate) return erroUpdate;
+        if (!atualizado || atualizado.length === 0) {
+          const { error: erroInsert } = await db.from("configuracoes_sip").insert(reg);
+          if (erroInsert) return erroInsert;
+        }
+        return null;
+      };
+      let erro = await gravar(registro);
+      if (erro && /livekit_trunk_id/.test(String(erro.message ?? ""))) {
+        const { livekit_trunk_id: _omit, ...semLivekit } = registro;
+        void _omit;
+        erro = await gravar(semLivekit);
       }
-    } catch {
-      // Falha na gravação local não impede o retorno de sucesso do backend.
+      if (erro) erroGravacao = String(erro.message ?? erro);
+    } catch (e) {
+      erroGravacao = (e as Error).message;
+    }
+
+    if (erroGravacao && !result.ok) {
+      return {
+        ok: false as const,
+        erro: `Tronco criado no LiveKit (${trunkId}), mas não foi possível salvar no banco: ${erroGravacao}`,
+      };
     }
 
     return {
       ok: true as const,
-      mensagem: (result.data.mensagem as string) ?? "Linha cadastrada!",
+      mensagem,
       livekit_trunk_id: trunkId,
     };
+
 
   });
 
