@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      atendentes_ia: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string | null
+          numero_transferencia_padrao: string | null
+          numeros_transferencia: Json
+          prompt: string
+          saudacao: string
+          sip_trunk_id: string
+          telefone: string | null
+          updated_at: string
+          usar_ia: boolean
+          user_id: string
+          voz_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome?: string | null
+          numero_transferencia_padrao?: string | null
+          numeros_transferencia?: Json
+          prompt?: string
+          saudacao?: string
+          sip_trunk_id: string
+          telefone?: string | null
+          updated_at?: string
+          usar_ia?: boolean
+          user_id: string
+          voz_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string | null
+          numero_transferencia_padrao?: string | null
+          numeros_transferencia?: Json
+          prompt?: string
+          saudacao?: string
+          sip_trunk_id?: string
+          telefone?: string | null
+          updated_at?: string
+          usar_ia?: boolean
+          user_id?: string
+          voz_id?: string | null
+        }
+        Relationships: []
+      }
       livekit_agents: {
         Row: {
           contexto: string | null
