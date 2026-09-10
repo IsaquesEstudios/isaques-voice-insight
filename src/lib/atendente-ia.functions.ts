@@ -121,8 +121,9 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
       return { ok: false as const, erro: `Não foi possível salvar: ${error.message}` };
     }
 
-    // Envia ao backend LiveKit
-    const base = process.env.LIGACAO_API_URL?.trim().replace(/\/+$/, "");
+    // Envia ao backend LiveKit (função externa de configuração do receptivo)
+    const base =
+      "https://krumswystdvenzlblibe.supabase.co/functions/v1/smooth-task";
     if (!base) {
       return {
         ok: true as const,
