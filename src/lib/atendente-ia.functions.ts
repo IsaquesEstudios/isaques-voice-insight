@@ -124,12 +124,6 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
     // Envia ao backend LiveKit (função externa de configuração do receptivo)
     const base =
       "https://krumswystdvenzlblibe.supabase.co/functions/v1/smooth-task";
-    if (!base) {
-      return {
-        ok: true as const,
-        mensagem: "Configuração salva no painel (backend de ligação não configurado).",
-      };
-    }
 
     const payload = data.usar_ia
       ? {
