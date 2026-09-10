@@ -24,12 +24,6 @@ export type AtendenteIaConfig = {
   numero_transferencia_padrao: string | null;
 };
 
-function getBearerToken(): string {
-  const authHeader = getRequest()?.headers?.get("authorization") ?? "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!token) throw new Error("Sessão expirada. Entre novamente.");
-  return token;
-}
 
 /** Linhas SIP do usuário + configuração de atendimento salva. */
 export const listarAtendentesIa = createServerFn({ method: "GET" })
