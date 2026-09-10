@@ -3,7 +3,6 @@
 // (POST /api/livekit/configurar-receptivo).
 
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/external-auth-middleware";
@@ -121,59 +120,6 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
       return { ok: false as const, erro: `Não foi possível salvar: ${error.message}` };
     }
 
-    // Envia ao backend LiveKit (função externa de configuração do receptivo)
-    const base =
-      "https://krumswystdvenzlblibe.supabase.co/functions/v1/smooth-task";
-
-    const payload = data.usar_ia
-      ? {
-          usar_ia: true,
-          prompt: data.prompt,
-          saudacao: data.saudacao,
-          voz_id: data.voz_id ?? null,
-          sip_trunk_id: data.sip_trunk_id,
-          numeros_transferencia: data.numeros_transferencia,
-          numero_transferencia_padrao: data.numero_transferencia_padrao ?? null,
-        }
-      : {
-          usar_ia: false,
-          sip_trunk_id: data.sip_trunk_id,
-          numero_transferencia_padrao: data.numero_transferencia_padrao ?? null,
-        };
-
-    let res: Response;
-    try {
-      res = await fetch(base, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getBearerToken()}`,
-        },
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      return {
-        ok: false as const,
-        erro: "Configuração salva no painel, mas o servidor de ligação não respondeu.",
-      };
-    }
-
-    if (!res.ok) {
-      const raw = await res.text().catch(() => "");
-      let detalhe = raw.slice(0, 300);
-      try {
-        const j = JSON.parse(raw) as Record<string, unknown>;
-        if (typeof j.detail === "string") detalhe = j.detail;
-      } catch {
-        if (/^\s*(<!doctype|<html)/i.test(raw) || res.status >= 502) {
-          detalhe = `O servidor de ligação está fora do ar (erro ${res.status}).`;
-        }
-      }
-      return {
-        ok: false as const,
-        erro: `Configuração salva no painel, mas o backend recusou: ${detalhe}`,
-      };
-    }
-
+    // O envio para o backend externo é feito direto do navegador (ver rota Atendente por IA).
     return { ok: true as const, mensagem: "Atendente configurado com sucesso!" };
   });
