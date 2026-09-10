@@ -121,14 +121,9 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
       return { ok: false as const, erro: `Não foi possível salvar: ${error.message}` };
     }
 
-    // Envia ao backend LiveKit
-    const base = process.env.LIGACAO_API_URL?.trim().replace(/\/+$/, "");
-    if (!base) {
-      return {
-        ok: true as const,
-        mensagem: "Configuração salva no painel (backend de ligação não configurado).",
-      };
-    }
+    // Envia ao backend LiveKit (função externa de configuração do receptivo)
+    const base =
+      "https://krumswystdvenzlblibe.supabase.co/functions/v1/smooth-task";
 
     const payload = data.usar_ia
       ? {
@@ -148,7 +143,7 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
 
     let res: Response;
     try {
-      res = await fetch(`${base}/api/livekit/configurar-receptivo`, {
+      res = await fetch(base, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
