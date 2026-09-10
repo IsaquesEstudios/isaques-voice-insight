@@ -143,7 +143,7 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
 
     let res: Response;
     try {
-      res = await fetch(`${base}/api/livekit/configurar-receptivo`, {
+      res = await fetch(base, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
