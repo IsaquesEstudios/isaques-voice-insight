@@ -23,6 +23,9 @@ import {
 import { translateError } from "@/lib/error-messages";
 import { listarAtendentesIa, salvarAtendenteIa } from "@/lib/atendente-ia.functions";
 import { listLivekitAgents } from "@/lib/livekit.functions";
+import { getSupabaseBrowser } from "@/integrations/supabase/browser";
+
+const BACKEND_URL = "https://krumswystdvenzlblibe.supabase.co/functions/v1/smooth-task";
 
 export const Route = createFileRoute("/_authenticated/atendente-ia")({
   head: () => ({
@@ -129,7 +132,7 @@ function AtendenteIaPage() {
       if (form.padrao && !E164_RE.test(form.padrao)) {
         throw new Error("Número de transferência padrão inválido.");
       }
-      return salvarAtendenteIa({
+      const res = await salvarAtendenteIa({
         data: {
           sip_trunk_id: atual.sip_trunk_id,
           telefone: atual.telefone,
@@ -142,13 +145,70 @@ function AtendenteIaPage() {
           numero_transferencia_padrao: form.padrao,
         },
       });
+      if (!res.ok) return res;
+
+      // Envia direto do navegador para o backend externo (sem intermediário).
+      const payload = form.usar_ia
+        ? {
+            usar_ia: true,
+            prompt: form.prompt,
+            saudacao: form.saudacao,
+            voz_id: form.voz_id || null,
+            sip_trunk_id: atual.sip_trunk_id,
+            numeros_transferencia,
+            numero_transferencia_padrao: form.padrao || null,
+          }
+        : {
+            usar_ia: false,
+            sip_trunk_id: atual.sip_trunk_id,
+            numero_transferencia_padrao: form.padrao || null,
+          };
+
+      const { data: sessao } = await getSupabaseBrowser().auth.getSession();
+      const token = sessao.session?.access_token;
+
+      let resposta: Response;
+      try {
+        resposta = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        return {
+          ok: false as const,
+          erro: "Configuração salva no painel, mas o servidor de ligação não respondeu.",
+        };
+      }
+
+      if (!resposta.ok) {
+        const bruto = await resposta.text().catch(() => "");
+        let detalhe = bruto.slice(0, 300);
+        try {
+          const j = JSON.parse(bruto) as Record<string, unknown>;
+          if (typeof j.detail === "string") detalhe = j.detail;
+        } catch {
+          if (/^\s*(<!doctype|<html)/i.test(bruto) || resposta.status >= 502) {
+            detalhe = `O servidor de ligação está fora do ar (erro ${resposta.status}).`;
+          }
+        }
+        return {
+          ok: false as const,
+          erro: `Configuração salva no painel, mas o backend recusou: ${detalhe}`,
+        };
+      }
+
+      return res;
     },
     onSuccess: (res) => {
       if (!res.ok) {
         toast.error(res.erro);
         return;
       }
-      toast.success(res.mensagem);
+      toast.success(res.mensagem ?? "Atendente configurado com sucesso!");
       void queryClient.invalidateQueries({ queryKey: ["atendentes-ia"] });
     },
     onError: (e) => toast.error(translateError(e)),
