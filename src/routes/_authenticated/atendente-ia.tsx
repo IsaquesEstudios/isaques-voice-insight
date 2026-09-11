@@ -148,9 +148,18 @@ function AtendenteIaPage() {
       if (!res.ok) return res;
 
       // Envia direto do navegador para o backend externo (sem intermediário).
+      const numeroCliente = atual.telefone?.trim();
+      if (!numeroCliente) {
+        throw new Error(
+          "Este número não tem telefone cadastrado. Cadastre a linha novamente na página Ligação.",
+        );
+      }
+
       const payload = form.usar_ia
         ? {
             usar_ia: true,
+            numero_do_cliente: numeroCliente,
+            telefone: numeroCliente,
             prompt: form.prompt,
             saudacao: form.saudacao,
             voz_id: form.voz_id || null,
@@ -160,6 +169,8 @@ function AtendenteIaPage() {
           }
         : {
             usar_ia: false,
+            numero_do_cliente: numeroCliente,
+            telefone: numeroCliente,
             sip_trunk_id: atual.sip_trunk_id,
             numero_transferencia_padrao: form.padrao || null,
           };
