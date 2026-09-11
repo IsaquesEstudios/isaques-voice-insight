@@ -25,7 +25,7 @@ import { listarAtendentesIa, salvarAtendenteIa } from "@/lib/atendente-ia.functi
 import { listLivekitAgents } from "@/lib/livekit.functions";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 
-const BACKEND_URL = "https://krumswystdvenzlblibe.supabase.co/functions/v1/smooth-task";
+const BACKEND_URL = "https://krumswystdvenzlbllbe.supabase.co/functions/v1/smooth-task";
 
 export const Route = createFileRoute("/_authenticated/atendente-ia")({
   head: () => ({
