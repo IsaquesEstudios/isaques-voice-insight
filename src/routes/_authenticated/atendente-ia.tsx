@@ -200,7 +200,9 @@ function AtendenteIaPage() {
         let detalhe = bruto.slice(0, 300);
         try {
           const j = JSON.parse(bruto) as Record<string, unknown>;
-          if (typeof j.detail === "string") detalhe = j.detail;
+          if (typeof j.error === "string") detalhe = j.error;
+          else if (typeof j.detail === "string") detalhe = j.detail;
+          else if (typeof j.message === "string") detalhe = j.message;
         } catch {
           if (/^\s*(<!doctype|<html)/i.test(bruto) || resposta.status >= 502) {
             detalhe = `O servidor de ligação está fora do ar (erro ${resposta.status}).`;
