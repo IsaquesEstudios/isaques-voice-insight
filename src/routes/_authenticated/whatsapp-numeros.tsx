@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { CheckCircle2, Hash, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { CheckCircle2, Hash, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -14,6 +16,12 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  conectarWhatsapp,
+  listarNumerosWhatsapp,
+  obterConfigWhatsapp,
+  removerNumeroWhatsapp,
+} from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-numeros")({
   head: () => ({
@@ -36,15 +44,150 @@ export const Route = createFileRoute("/_authenticated/whatsapp-numeros")({
   component: WhatsappNumerosPage,
 });
 
-type NumeroWhatsapp = {
-  id: string;
-  numero: string;
-  nome: string;
-  status: "conectado" | "pendente";
-};
+declare global {
+  interface Window {
+    FB?: {
+      init: (options: Record<string, unknown>) => void;
+      login: (
+        cb: (response: { authResponse?: { code?: string } }) => void,
+        options: Record<string, unknown>
+      ) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
+
+function carregarSdkMeta(appId: string) {
+  return new Promise<void>((resolve, reject) => {
+    if (window.FB) {
+      resolve();
+      return;
+    }
+    const existente = document.getElementById("facebook-jssdk");
+    if (!existente) {
+      const script = document.createElement("script");
+      script.id = "facebook-jssdk";
+      script.src = "https://connect.facebook.net/en_US/sdk.js";
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.onerror = () => reject(new Error("Falha ao carregar o Meta."));
+      document.body.appendChild(script);
+    }
+    window.fbAsyncInit = () => {
+      window.FB?.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      resolve();
+    };
+    setTimeout(() => (window.FB ? resolve() : reject(new Error("Tempo esgotado."))), 15000);
+  });
+}
 
 function WhatsappNumerosPage() {
-  const [numeros] = useState<NumeroWhatsapp[]>([]);
+  const queryClient = useQueryClient();
+  const carregarConfig = useServerFn(obterConfigWhatsapp);
+  const carregarNumeros = useServerFn(listarNumerosWhatsapp);
+  const conectar = useServerFn(conectarWhatsapp);
+  const remover = useServerFn(removerNumeroWhatsapp);
+  const [abrindo, setAbrindo] = useState(false);
+  const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
+
+  const config = useQuery({
+    queryKey: ["whatsapp-config"],
+    queryFn: () => carregarConfig(),
+    staleTime: Infinity,
+  });
+
+  const numeros = useQuery({
+    queryKey: ["whatsapp-numeros"],
+    queryFn: () => carregarNumeros(),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (!event.origin.endsWith("facebook.com")) return;
+      try {
+        const dados = JSON.parse(event.data as string) as {
+          type?: string;
+          event?: string;
+          data?: { waba_id?: string; phone_number_id?: string };
+        };
+        if (dados.type === "WA_EMBEDDED_SIGNUP" && dados.data) {
+          sessaoRef.current = {
+            wabaId: dados.data.waba_id,
+            phoneNumberId: dados.data.phone_number_id,
+          };
+        }
+      } catch {
+        /* mensagens não relacionadas */
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  const conectarMutation = useMutation({
+    mutationFn: (input: {
+      code: string;
+      wabaId?: string | null;
+      phoneNumberId?: string | null;
+    }) => conectar({ data: input }),
+    onSuccess: () => {
+      toast.success("WhatsApp conectado com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const removerMutation = useMutation({
+    mutationFn: (id: string) => remover({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Número removido.");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  async function iniciarConexao() {
+    const dados = config.data;
+    if (!dados?.appId || !dados.configId || !dados.configurado) {
+      toast.error(
+        "A integração com a Meta ainda não está configurada. Verifique as credenciais do aplicativo."
+      );
+      return;
+    }
+    setAbrindo(true);
+    try {
+      await carregarSdkMeta(dados.appId);
+      sessaoRef.current = {};
+      window.FB?.login(
+        (response) => {
+          const code = response?.authResponse?.code;
+          if (!code) {
+            toast.info("Conexão cancelada.");
+            return;
+          }
+          conectarMutation.mutate({
+            code,
+            wabaId: sessaoRef.current.wabaId ?? null,
+            phoneNumberId: sessaoRef.current.phoneNumberId ?? null,
+          });
+        },
+        {
+          config_id: dados.configId,
+          response_type: "code",
+          override_default_response_type: true,
+          extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+        }
+      );
+    } catch {
+      toast.error("Não conseguimos abrir a janela do Meta. Tente novamente.");
+    } finally {
+      setAbrindo(false);
+    }
+  }
+
+  const lista = numeros.data ?? [];
+  const ocupado = abrindo || conectarMutation.isPending;
 
   return (
     <DashboardShell>
@@ -59,14 +202,12 @@ function WhatsappNumerosPage() {
               vão atender pelo painel.
             </p>
           </div>
-          <Button
-            onClick={() =>
-              toast.info(
-                "A conexão com o WhatsApp está sendo liberada. Avisaremos assim que estiver disponível."
-              )
-            }
-          >
-            <Plus className="mr-2 h-4 w-4" />
+          <Button onClick={iniciarConexao} disabled={ocupado}>
+            {ocupado ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
             Conectar WhatsApp
           </Button>
         </div>
@@ -79,7 +220,14 @@ function WhatsappNumerosPage() {
           </AlertDescription>
         </Alert>
 
-        {numeros.length === 0 ? (
+        {numeros.isLoading ? (
+          <Card className="border-border/60 bg-card/70">
+            <CardContent className="flex items-center justify-center gap-2 p-10 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando números...
+            </CardContent>
+          </Card>
+        ) : lista.length === 0 ? (
           <Card className="border-border/60 bg-card/70">
             <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
               <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -98,12 +246,16 @@ function WhatsappNumerosPage() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {numeros.map((n) => (
+            {lista.map((n) => (
               <Card key={n.id} className="border-border/60 bg-card/70">
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
-                    <CardTitle className="text-base">{n.numero}</CardTitle>
-                    <CardDescription>{n.nome}</CardDescription>
+                    <CardTitle className="text-base">
+                      {n.display_phone_number ?? n.phone_number_id}
+                    </CardTitle>
+                    <CardDescription>
+                      {n.verified_name ?? "Conta comercial"}
+                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={n.status === "conectado" ? "default" : "secondary"}>
@@ -112,7 +264,13 @@ function WhatsappNumerosPage() {
                       ) : null}
                       {n.status === "conectado" ? "Conectado" : "Pendente"}
                     </Badge>
-                    <Button variant="ghost" size="icon" aria-label="Remover número">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remover número"
+                      disabled={removerMutation.isPending}
+                      onClick={() => removerMutation.mutate(n.id)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
