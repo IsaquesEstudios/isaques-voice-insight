@@ -13,6 +13,8 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
+import { Route as AuthenticatedWhatsappNumerosRouteImport } from './routes/_authenticated/whatsapp-numeros'
+import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
 import { Route as AuthenticatedLigacaoRouteImport } from './routes/_authenticated/ligacao'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
@@ -42,6 +44,17 @@ const ReuniaoCodeRoute = ReuniaoCodeRouteImport.update({
   id: '/reuniao/$code',
   path: '/reuniao/$code',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedWhatsappNumerosRoute =
+  AuthenticatedWhatsappNumerosRouteImport.update({
+    id: '/whatsapp-numeros',
+    path: '/whatsapp-numeros',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedReunioesRoute = AuthenticatedReunioesRouteImport.update({
   id: '/reunioes',
@@ -109,6 +122,8 @@ export interface FileRoutesByFullPath {
   '/historico': typeof AuthenticatedHistoricoRoute
   '/ligacao': typeof AuthenticatedLigacaoRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
+  '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
@@ -124,6 +139,8 @@ export interface FileRoutesByTo {
   '/historico': typeof AuthenticatedHistoricoRoute
   '/ligacao': typeof AuthenticatedLigacaoRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
+  '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
@@ -141,6 +158,8 @@ export interface FileRoutesById {
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
   '/_authenticated/ligacao': typeof AuthenticatedLigacaoRoute
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
+  '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
 }
@@ -158,6 +177,8 @@ export interface FileRouteTypes {
     | '/historico'
     | '/ligacao'
     | '/reunioes'
+    | '/whatsapp'
+    | '/whatsapp-numeros'
     | '/reuniao/$code'
     | '/api/public/transcript'
   fileRoutesByTo: FileRoutesByTo
@@ -173,6 +194,8 @@ export interface FileRouteTypes {
     | '/historico'
     | '/ligacao'
     | '/reunioes'
+    | '/whatsapp'
+    | '/whatsapp-numeros'
     | '/reuniao/$code'
     | '/api/public/transcript'
   id:
@@ -189,6 +212,8 @@ export interface FileRouteTypes {
     | '/_authenticated/historico'
     | '/_authenticated/ligacao'
     | '/_authenticated/reunioes'
+    | '/_authenticated/whatsapp'
+    | '/_authenticated/whatsapp-numeros'
     | '/reuniao/$code'
     | '/api/public/transcript'
   fileRoutesById: FileRoutesById
@@ -230,6 +255,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/reuniao/$code'
       preLoaderRoute: typeof ReuniaoCodeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/whatsapp-numeros': {
+      id: '/_authenticated/whatsapp-numeros'
+      path: '/whatsapp-numeros'
+      fullPath: '/whatsapp-numeros'
+      preLoaderRoute: typeof AuthenticatedWhatsappNumerosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/whatsapp': {
+      id: '/_authenticated/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reunioes': {
       id: '/_authenticated/reunioes'
@@ -314,6 +353,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedLigacaoRoute: typeof AuthenticatedLigacaoRoute
   AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
+  AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
+  AuthenticatedWhatsappNumerosRoute: typeof AuthenticatedWhatsappNumerosRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -326,6 +367,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedLigacaoRoute: AuthenticatedLigacaoRoute,
   AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
+  AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
+  AuthenticatedWhatsappNumerosRoute: AuthenticatedWhatsappNumerosRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
