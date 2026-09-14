@@ -8,6 +8,8 @@ import {
   Megaphone,
   Video,
   Settings,
+  Hash,
+  MessageCircle,
 } from "lucide-react";
 
 import {
@@ -31,19 +33,46 @@ type NavItem = {
   activePaths?: string[];
 };
 
-const nav: NavItem[] = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const groups: NavGroup[] = [
   {
-    title: "Assistentes Virtuais",
-    url: "/assistentes",
-    icon: Bot,
-    activePaths: ["/assistentes"],
+    label: "Plataforma",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      {
+        title: "Assistentes Virtuais",
+        url: "/assistentes",
+        icon: Bot,
+        activePaths: ["/assistentes"],
+      },
+    ],
   },
-  { title: "Ligação", url: "/ligacao", icon: PhoneCall },
-  { title: "Atendente por IA", url: "/atendente-ia", icon: Headphones },
-  { title: "Campanhas", url: "/campanhas", icon: Megaphone },
-  { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
-  { title: "Configurações / API", url: "/configuracoes", icon: Settings },
+  {
+    label: "Ligação",
+    items: [
+      { title: "Ligação", url: "/ligacao", icon: PhoneCall },
+      { title: "Recepcionista", url: "/atendente-ia", icon: Headphones },
+      { title: "Campanhas", url: "/campanhas", icon: Megaphone },
+    ],
+  },
+  {
+    label: "WhatsApp",
+    items: [
+      { title: "Números de WhatsApp", url: "/whatsapp-numeros", icon: Hash },
+      { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
+    ],
+  },
+  {
+    label: "Outros",
+    items: [
+      { title: "Reunião em vídeo", url: "/reunioes", icon: Video },
+      { title: "Configurações / API", url: "/configuracoes", icon: Settings },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -62,33 +91,35 @@ export function AppSidebar() {
 
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {nav.map((item) => {
-                const active = (item.activePaths ?? [item.url]).some((path) =>
-                  pathname.startsWith(path)
-                );
-                return (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={item.title}
-                      className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-primary"
-                    >
-                      <Link to={item.url} className="flex items-center gap-3">
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const active = (item.activePaths ?? [item.url]).some((path) =>
+                    pathname.startsWith(path)
+                  );
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={item.title}
+                        className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-primary"
+                      >
+                        <Link to={item.url} className="flex items-center gap-3">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
     </Sidebar>
