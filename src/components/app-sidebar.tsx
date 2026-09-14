@@ -97,8 +97,8 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const active = (item.activePaths ?? [item.url]).some((path) =>
-                    pathname.startsWith(path)
+                  const active = (item.activePaths ?? [item.url]).some(
+                    (path) => pathname === path || pathname.startsWith(`${path}/`)
                   );
                   return (
                     <SidebarMenuItem key={item.url}>
