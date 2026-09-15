@@ -23,9 +23,7 @@ import {
 import { translateError } from "@/lib/error-messages";
 import { listarAtendentesIa, salvarAtendenteIa } from "@/lib/atendente-ia.functions";
 import { listLivekitAgents } from "@/lib/livekit.functions";
-import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 
-const BACKEND_URL = "https://krumswystdvenzlbllbe.supabase.co/functions/v1/smooth-task";
 
 export const Route = createFileRoute("/_authenticated/atendente-ia")({
   head: () => ({
@@ -147,71 +145,10 @@ function AtendenteIaPage() {
       });
       if (!res.ok) return res;
 
-      // Envia direto do navegador para o backend externo (sem intermediário).
-      const numeroCliente = atual.telefone?.trim();
-      if (!numeroCliente) {
+      if (!atual.telefone?.trim()) {
         throw new Error(
           "Este número não tem telefone cadastrado. Cadastre a linha novamente na página Ligação.",
         );
-      }
-
-      const payload = form.usar_ia
-        ? {
-            usar_ia: true,
-            numero_do_cliente: numeroCliente,
-            telefone: numeroCliente,
-            prompt: form.prompt,
-            saudacao: form.saudacao,
-            voz_id: form.voz_id || null,
-            sip_trunk_id: atual.sip_trunk_id,
-            numeros_transferencia,
-            numero_transferencia_padrao: form.padrao || null,
-          }
-        : {
-            usar_ia: false,
-            numero_do_cliente: numeroCliente,
-            telefone: numeroCliente,
-            sip_trunk_id: atual.sip_trunk_id,
-            numero_transferencia_padrao: form.padrao || null,
-          };
-
-      const { data: sessao } = await getSupabaseBrowser().auth.getSession();
-      const token = sessao.session?.access_token;
-
-      let resposta: Response;
-      try {
-        resposta = await fetch(BACKEND_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch {
-        return {
-          ok: false as const,
-          erro: "Configuração salva no painel, mas o servidor de ligação não respondeu.",
-        };
-      }
-
-      if (!resposta.ok) {
-        const bruto = await resposta.text().catch(() => "");
-        let detalhe = bruto.slice(0, 300);
-        try {
-          const j = JSON.parse(bruto) as Record<string, unknown>;
-          if (typeof j.error === "string") detalhe = j.error;
-          else if (typeof j.detail === "string") detalhe = j.detail;
-          else if (typeof j.message === "string") detalhe = j.message;
-        } catch {
-          if (/^\s*(<!doctype|<html)/i.test(bruto) || resposta.status >= 502) {
-            detalhe = `O servidor de ligação está fora do ar (erro ${resposta.status}).`;
-          }
-        }
-        return {
-          ok: false as const,
-          erro: `Configuração salva no painel, mas o backend recusou: ${detalhe}`,
-        };
       }
 
       return res;

@@ -114,6 +114,101 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
       return { ok: false as const, erro: `Não foi possível salvar: ${error.message}` };
     }
 
-    // O envio para o backend externo é feito direto do navegador (ver rota Atendente por IA).
+    // Configura o recebimento de chamadas no LiveKit (tronco de entrada + regra de roteamento).
+    const telefone = (data.telefone ?? "").trim();
+    if (telefone) {
+      try {
+        await configurarReceptivoLivekit({
+          telefone,
+          troncoSaida: data.sip_trunk_id,
+          metadata: {
+            usar_ia: data.usar_ia,
+            prompt: data.prompt,
+            saudacao: data.saudacao,
+            voz_id: data.voz_id ?? null,
+            numeros_transferencia: data.numeros_transferencia,
+            numero_transferencia_padrao: data.numero_transferencia_padrao ?? null,
+            numero_do_cliente: telefone,
+            sip_trunk_id: data.sip_trunk_id,
+          },
+        });
+      } catch (e) {
+        return {
+          ok: false as const,
+          erro: `Configuração salva, mas o recebimento de chamadas falhou: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        };
+      }
+    }
+
     return { ok: true as const, mensagem: "Atendente configurado com sucesso!" };
   });
+
+/** Garante o tronco de entrada do número e a regra que leva a chamada para a IA. */
+async function configurarReceptivoLivekit(opts: {
+  telefone: string;
+  troncoSaida: string;
+  metadata: Record<string, unknown>;
+}): Promise<void> {
+  const { getLivekitEnv, livekitHttpUrl, signLivekitJwt } = await import("@/lib/livekit.server");
+  const env = getLivekitEnv();
+  const base = livekitHttpUrl(env.url);
+
+  // O token de serviço precisa do grant SIP admin, que signLivekitJwt não emite.
+  const { SignJWT } = await import("jose");
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await new SignJWT({
+    video: { roomCreate: true, roomAdmin: true, roomList: true },
+    sip: { admin: true, call: true },
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer(env.apiKey)
+    .setSubject(env.apiKey)
+    .setIssuedAt(now)
+    .setExpirationTime(now + 300)
+    .sign(new TextEncoder().encode(env.apiSecret));
+  void signLivekitJwt;
+
+  const twirp = async (method: string, body: unknown): Promise<Record<string, unknown>> => {
+    const res = await fetch(`${base}/twirp/livekit.SIP/${method}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const texto = await res.text();
+    if (!res.ok) throw new Error(`${method} (${res.status}): ${texto.slice(0, 200)}`);
+    return texto ? (JSON.parse(texto) as Record<string, unknown>) : {};
+  };
+
+  type Trunk = { sip_trunk_id: string; numbers?: string[] };
+  const entradas = ((await twirp("ListSIPInboundTrunk", {})).items ?? []) as Trunk[];
+  let inboundId = entradas.find((t) => (t.numbers ?? []).includes(opts.telefone))?.sip_trunk_id;
+
+  if (!inboundId) {
+    const criado = await twirp("CreateSIPInboundTrunk", {
+      trunk: {
+        name: `omniasyn-inbound-${opts.telefone}`,
+        numbers: [opts.telefone],
+        krisp_enabled: true,
+      },
+    });
+    inboundId = String(criado.sip_trunk_id ?? "");
+  }
+  if (!inboundId) throw new Error("LiveKit não devolveu o tronco de entrada.");
+
+  type Regra = { sip_dispatch_rule_id: string; trunk_ids?: string[] };
+  const regras = ((await twirp("ListSIPDispatchRule", {})).items ?? []) as Regra[];
+  for (const r of regras) {
+    if ((r.trunk_ids ?? []).includes(inboundId)) {
+      await twirp("DeleteSIPDispatchRule", { sip_dispatch_rule_id: r.sip_dispatch_rule_id });
+    }
+  }
+
+  await twirp("CreateSIPDispatchRule", {
+    trunk_ids: [inboundId],
+    name: `atendente-${opts.telefone}`,
+    metadata: JSON.stringify(opts.metadata),
+    rule: { dispatch_rule_individual: { room_prefix: "call-" } },
+  });
+}
