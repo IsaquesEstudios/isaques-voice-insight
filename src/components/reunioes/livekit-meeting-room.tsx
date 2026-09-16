@@ -1376,20 +1376,79 @@ interface ShellProps {
 function MeetingShell(props: ShellProps) {
   const layoutContext = useCreateLayoutContext();
 
+  // Sala em tela cheia: as informações e os botões ficam em uma barra
+  // flutuante sobre o vídeo, que aparece quando o mouse se move e some
+  // após alguns segundos sem atividade (sempre por cima da câmera).
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const hideTimer = useRef<number | null>(null);
+  const overChrome = useRef(false);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimer.current !== null) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimer();
+    hideTimer.current = window.setTimeout(() => {
+      if (!overChrome.current) setChromeVisible(false);
+    }, 3000);
+  }, [clearHideTimer]);
+
+  useEffect(() => {
+    scheduleHide();
+    return () => clearHideTimer();
+  }, [scheduleHide, clearHideTimer]);
+
+  const handleActivity = useCallback(() => {
+    setChromeVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  // Com o mouse sobre a barra, ela nunca some (menus/popovers continuam
+  // utilizáveis enquanto abertos).
+  const keepChrome = useCallback(() => {
+    overChrome.current = true;
+    clearHideTimer();
+    setChromeVisible(true);
+  }, [clearHideTimer]);
+
+  const leaveChrome = useCallback(() => {
+    overChrome.current = false;
+    scheduleHide();
+  }, [scheduleHide]);
+
   return (
     <LayoutContextProvider
       value={layoutContext}
       onWidgetChange={(state) => props.onChatChange(!!state.showChat)}
     >
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background"
+        onMouseMove={handleActivity}
+        onMouseDown={handleActivity}
+        onTouchStart={handleActivity}
+      >
+        <div
+          onPointerEnter={keepChrome}
+          onPointerLeave={leaveChrome}
+          className={`absolute inset-x-0 top-0 z-30 flex justify-center px-3 pt-3 transition-all duration-300 ${
+            chromeVisible
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-3 opacity-0"
+          }`}
+        >
+          <div className="flex w-full max-w-5xl flex-col gap-2 rounded-2xl border border-border bg-background/80 px-4 py-2.5 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Código da reunião</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                Código da reunião
+              </p>
               <div className="flex items-center gap-2">
-                <CardTitle className="truncate font-mono text-base">
+                <p className="truncate font-mono text-sm font-semibold">
                   {props.session.roomName}
-                </CardTitle>
+                </p>
                 {props.session.transcribe && (
                   <Badge
                     variant="outline"
@@ -1429,19 +1488,14 @@ function MeetingShell(props: ShellProps) {
                 Sair
               </Button>
             </div>
-          </CardHeader>
-        </Card>
+          </div>
+        </div>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-          <Card className="min-w-0 flex-1 overflow-hidden">
-            <CardContent className="p-0">
-              <MeetingStage
-                session={props.session}
-                onAgentJoined={props.onAgentJoined}
-              />
-            </CardContent>
-          </Card>
-
+        <div className="relative min-h-0 flex-1">
+          <MeetingStage
+            session={props.session}
+            onAgentJoined={props.onAgentJoined}
+          />
           <MeetingChat
             open={props.showChat}
             onClose={() => props.onChatChange(false)}
