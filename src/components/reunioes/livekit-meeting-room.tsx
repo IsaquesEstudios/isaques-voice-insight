@@ -596,7 +596,7 @@ function MeetingChat({ open, onClose }: { open: boolean; onClose: () => void }) 
     <Card
       className={`${
         open ? "flex" : "hidden"
-      } h-[60vh] w-full flex-col overflow-hidden lg:h-auto lg:w-[360px] lg:shrink-0`}
+      } absolute bottom-24 right-4 top-20 z-20 w-[340px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden bg-background/95 shadow-xl backdrop-blur-md lg:w-[380px]`}
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
         <span className="text-sm font-medium">Chat da reunião</span>
@@ -880,7 +880,7 @@ function MeetingStage({
   const showStartPresent = !meta.presenter && canPresent;
 
   return (
-    <div className="flex h-[70vh] min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <AgentPresence onPresenceChange={onAgentJoined} />
       <div className="relative min-h-0 flex-1">
         {focus ? (
