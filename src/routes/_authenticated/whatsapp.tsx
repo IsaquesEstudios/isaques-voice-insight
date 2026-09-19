@@ -15,6 +15,7 @@ import {
   enviarMensagemWhatsapp,
   listarConversasWhatsapp,
   listarMensagensWhatsapp,
+  listarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
@@ -51,9 +52,17 @@ function WhatsappPage() {
   const carregarMensagens = useServerFn(listarMensagensWhatsapp);
   const enviar = useServerFn(enviarMensagemWhatsapp);
 
+  const carregarNumeros = useServerFn(listarNumerosWhatsapp);
+
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [numeroFiltro, setNumeroFiltro] = useState<string>("todos");
   const [busca, setBusca] = useState("");
   const [rascunho, setRascunho] = useState("");
+
+  const numeros = useQuery({
+    queryKey: ["whatsapp-numeros"],
+    queryFn: () => carregarNumeros(),
+  });
 
   const conversas = useQuery({
     queryKey: ["whatsapp-conversas"],
@@ -80,14 +89,21 @@ function WhatsappPage() {
   });
 
   const lista = conversas.data ?? [];
+  const listaNumeros = numeros.data ?? [];
+  const rotuloNumero = (phoneNumberId: string) => {
+    const n = listaNumeros.find((x) => x.phone_number_id === phoneNumberId);
+    return n?.display_phone_number ?? n?.verified_name ?? "Número";
+  };
   const filtradas = useMemo(
     () =>
-      lista.filter((c) =>
-        `${c.contato_nome ?? ""} ${c.contato_wa_id}`
-          .toLowerCase()
-          .includes(busca.toLowerCase())
-      ),
-    [lista, busca]
+      lista
+        .filter((c) => numeroFiltro === "todos" || c.phone_number_id === numeroFiltro)
+        .filter((c) =>
+          `${c.contato_nome ?? ""} ${c.contato_wa_id}`
+            .toLowerCase()
+            .includes(busca.toLowerCase())
+        ),
+    [lista, busca, numeroFiltro]
   );
 
   return (
@@ -112,6 +128,33 @@ function WhatsappPage() {
                   className="pl-9"
                 />
               </div>
+              {listaNumeros.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setNumeroFiltro("todos")}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                      numeroFiltro === "todos"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {listaNumeros.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => setNumeroFiltro(n.phone_number_id)}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                        numeroFiltro === n.phone_number_id
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/60 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                    >
+                      {n.display_phone_number ?? n.verified_name ?? "Número"}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <ScrollArea className="flex-1">
                 {conversas.isLoading ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
@@ -145,6 +188,9 @@ function WhatsappPage() {
                         </div>
                         <p className="truncate text-xs text-muted-foreground">
                           {c.ultima_mensagem ?? ""}
+                        </p>
+                        <p className="truncate text-[10px] text-muted-foreground/80">
+                          via {rotuloNumero(c.phone_number_id)}
                         </p>
                       </button>
                     ))}
