@@ -128,6 +128,33 @@ function WhatsappPage() {
                   className="pl-9"
                 />
               </div>
+              {listaNumeros.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setNumeroFiltro("todos")}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                      numeroFiltro === "todos"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/60 text-muted-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {listaNumeros.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => setNumeroFiltro(n.phone_number_id)}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                        numeroFiltro === n.phone_number_id
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/60 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                    >
+                      {n.display_phone_number ?? n.verified_name ?? "Número"}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <ScrollArea className="flex-1">
                 {conversas.isLoading ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
