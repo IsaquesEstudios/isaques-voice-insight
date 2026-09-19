@@ -89,14 +89,21 @@ function WhatsappPage() {
   });
 
   const lista = conversas.data ?? [];
+  const listaNumeros = numeros.data ?? [];
+  const rotuloNumero = (phoneNumberId: string) => {
+    const n = listaNumeros.find((x) => x.phone_number_id === phoneNumberId);
+    return n?.display_phone_number ?? n?.verified_name ?? "Número";
+  };
   const filtradas = useMemo(
     () =>
-      lista.filter((c) =>
-        `${c.contato_nome ?? ""} ${c.contato_wa_id}`
-          .toLowerCase()
-          .includes(busca.toLowerCase())
-      ),
-    [lista, busca]
+      lista
+        .filter((c) => numeroFiltro === "todos" || c.phone_number_id === numeroFiltro)
+        .filter((c) =>
+          `${c.contato_nome ?? ""} ${c.contato_wa_id}`
+            .toLowerCase()
+            .includes(busca.toLowerCase())
+        ),
+    [lista, busca, numeroFiltro]
   );
 
   return (
