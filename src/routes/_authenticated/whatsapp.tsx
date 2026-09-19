@@ -52,9 +52,17 @@ function WhatsappPage() {
   const carregarMensagens = useServerFn(listarMensagensWhatsapp);
   const enviar = useServerFn(enviarMensagemWhatsapp);
 
+  const carregarNumeros = useServerFn(listarNumerosWhatsapp);
+
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [numeroFiltro, setNumeroFiltro] = useState<string>("todos");
   const [busca, setBusca] = useState("");
   const [rascunho, setRascunho] = useState("");
+
+  const numeros = useQuery({
+    queryKey: ["whatsapp-numeros"],
+    queryFn: () => carregarNumeros(),
+  });
 
   const conversas = useQuery({
     queryKey: ["whatsapp-conversas"],
