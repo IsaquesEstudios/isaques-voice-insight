@@ -176,7 +176,7 @@ function WhatsappNumerosPage() {
           config_id: dados.configId,
           response_type: "code",
           override_default_response_type: true,
-          extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+          extras: {},
         }
       );
     } catch {
