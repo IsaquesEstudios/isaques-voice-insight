@@ -15,6 +15,7 @@ import {
   enviarMensagemWhatsapp,
   listarConversasWhatsapp,
   listarMensagensWhatsapp,
+  listarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
