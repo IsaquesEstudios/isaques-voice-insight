@@ -460,6 +460,89 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_conversas: {
+        Row: {
+          contato_nome: string | null
+          contato_wa_id: string
+          created_at: string
+          id: string
+          nao_lidas: number
+          phone_number_id: string
+          ultima_em: string
+          ultima_mensagem: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contato_nome?: string | null
+          contato_wa_id: string
+          created_at?: string
+          id?: string
+          nao_lidas?: number
+          phone_number_id: string
+          ultima_em?: string
+          ultima_mensagem?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contato_nome?: string | null
+          contato_wa_id?: string
+          created_at?: string
+          id?: string
+          nao_lidas?: number
+          phone_number_id?: string
+          ultima_em?: string
+          ultima_mensagem?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_mensagens: {
+        Row: {
+          conversa_id: string
+          criado_em: string
+          direcao: string
+          id: string
+          status: string | null
+          texto: string | null
+          tipo: string
+          user_id: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          conversa_id: string
+          criado_em?: string
+          direcao: string
+          id?: string
+          status?: string | null
+          texto?: string | null
+          tipo?: string
+          user_id: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          conversa_id?: string
+          criado_em?: string
+          direcao?: string
+          id?: string
+          status?: string | null
+          texto?: string | null
+          tipo?: string
+          user_id?: string
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_numeros: {
         Row: {
           created_at: string
