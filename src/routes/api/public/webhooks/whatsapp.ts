@@ -1,6 +1,105 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 
+type WhatsappChange = {
+  value?: {
+    metadata?: { phone_number_id?: string };
+    contacts?: { wa_id?: string; profile?: { name?: string } }[];
+    messages?: {
+      id?: string;
+      from?: string;
+      type?: string;
+      timestamp?: string;
+      text?: { body?: string };
+    }[];
+    statuses?: { id?: string; status?: string }[];
+  };
+};
+
+async function processarEvento(body: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const payload = JSON.parse(body) as {
+    entry?: { changes?: WhatsappChange[] }[];
+  };
+
+  for (const entry of payload.entry ?? []) {
+    for (const change of entry.changes ?? []) {
+      const value = change.value;
+      const phoneNumberId = value?.metadata?.phone_number_id;
+      if (!phoneNumberId) continue;
+
+      // Atualiza o status das mensagens que enviamos.
+      for (const status of value?.statuses ?? []) {
+        if (!status.id) continue;
+        await supabaseAdmin
+          .from("whatsapp_mensagens")
+          .update({ status: status.status ?? null })
+          .eq("wa_message_id", status.id);
+      }
+
+      const mensagens = value?.messages ?? [];
+      if (mensagens.length === 0) continue;
+
+      const { data: numero } = await supabaseAdmin
+        .from("whatsapp_numeros")
+        .select("user_id")
+        .eq("phone_number_id", phoneNumberId)
+        .maybeSingle();
+      if (!numero) continue;
+
+      for (const mensagem of mensagens) {
+        const waId = mensagem.from;
+        if (!waId) continue;
+
+        const contato = value?.contacts?.find((c) => c.wa_id === waId);
+        const texto =
+          mensagem.type === "text"
+            ? (mensagem.text?.body ?? "")
+            : `[${mensagem.type ?? "mídia"}]`;
+        const quando = mensagem.timestamp
+          ? new Date(Number(mensagem.timestamp) * 1000).toISOString()
+          : new Date().toISOString();
+
+        const { data: conversa } = await supabaseAdmin
+          .from("whatsapp_conversas")
+          .upsert(
+            {
+              user_id: numero.user_id,
+              phone_number_id: phoneNumberId,
+              contato_wa_id: waId,
+              contato_nome: contato?.profile?.name ?? null,
+              ultima_mensagem: texto,
+              ultima_em: quando,
+            },
+            { onConflict: "phone_number_id,contato_wa_id" }
+          )
+          .select("id, nao_lidas")
+          .maybeSingle();
+        if (!conversa) continue;
+
+        await supabaseAdmin.from("whatsapp_mensagens").upsert(
+          {
+            conversa_id: conversa.id,
+            user_id: numero.user_id,
+            wa_message_id: mensagem.id ?? null,
+            direcao: "entrada",
+            tipo: mensagem.type ?? "text",
+            texto,
+            status: "recebida",
+            criado_em: quando,
+          },
+          { onConflict: "wa_message_id" }
+        );
+
+        await supabaseAdmin
+          .from("whatsapp_conversas")
+          .update({ nao_lidas: (conversa.nao_lidas ?? 0) + 1 })
+          .eq("id", conversa.id);
+      }
+    }
+  }
+}
+
 export const Route = createFileRoute("/api/public/webhooks/whatsapp")({
   server: {
     handlers: {
@@ -23,9 +122,7 @@ export const Route = createFileRoute("/api/public/webhooks/whatsapp")({
         if (!appSecret || !signature?.startsWith("sha256=")) {
           return new Response("Invalid signature", { status: 401 });
         }
-        const expected = createHmac("sha256", appSecret)
-          .update(body)
-          .digest("hex");
+        const expected = createHmac("sha256", appSecret).update(body).digest("hex");
         const received = signature.slice("sha256=".length);
         if (
           received.length !== expected.length ||
@@ -34,8 +131,11 @@ export const Route = createFileRoute("/api/public/webhooks/whatsapp")({
           return new Response("Invalid signature", { status: 401 });
         }
 
-        // Evento válido da Meta. O processamento das mensagens é feito na página de conversas.
-        console.log("whatsapp webhook", body.slice(0, 2000));
+        try {
+          await processarEvento(body);
+        } catch (erro) {
+          console.error("whatsapp webhook", erro);
+        }
         return new Response("ok", { status: 200 });
       },
     },

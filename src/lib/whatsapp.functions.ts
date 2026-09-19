@@ -63,25 +63,21 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     const appId = process.env["META_APP_ID"];
     const appSecret = process.env["META_APP_SECRET"];
     if (!appId || !appSecret) {
-      throw new Error(
-        "A integração com a Meta ainda não está configurada nesta conta."
-      );
+      throw new Error("A integração com a Meta ainda não está configurada nesta conta.");
     }
 
-    const tokenUrl = `${GRAPH}/oauth/access_token?client_id=${encodeURIComponent(
-      appId
-    )}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(
-      data.code
-    )}`;
-    const tokenRes = await fetch(tokenUrl);
+    const tokenRes = await fetch(
+      `${GRAPH}/oauth/access_token?client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(
+        appSecret
+      )}&code=${encodeURIComponent(data.code)}`
+    );
     const tokenJson = (await tokenRes.json()) as {
       access_token?: string;
       error?: { message?: string };
     };
     if (!tokenRes.ok || !tokenJson.access_token) {
       throw new Error(
-        tokenJson.error?.message ??
-          "Não foi possível concluir a conexão com a Meta."
+        tokenJson.error?.message ?? "Não foi possível concluir a conexão com a Meta."
       );
     }
     const accessToken = tokenJson.access_token;
@@ -94,9 +90,7 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
         )}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
       );
       const dbgJson = (await dbg.json()) as {
-        data?: {
-          granular_scopes?: { scope: string; target_ids?: string[] }[];
-        };
+        data?: { granular_scopes?: { scope: string; target_ids?: string[] }[] };
       };
       wabaId =
         dbgJson.data?.granular_scopes?.find(
@@ -140,19 +134,13 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
       error?: { message?: string };
     };
     if (!numerosRes.ok) {
-      throw new Error(
-        numerosJson.error?.message ?? "Não foi possível listar os números."
-      );
+      throw new Error(numerosJson.error?.message ?? "Não foi possível listar os números.");
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error: contaError } = await supabaseAdmin.from("whatsapp_accounts").upsert(
-      {
-        user_id: context.userId,
-        waba_id: wabaId,
-        access_token: accessToken,
-      },
+      { user_id: context.userId, waba_id: wabaId, access_token: accessToken },
       { onConflict: "user_id,waba_id" }
     );
     if (contaError) throw new Error(contaError.message);
@@ -169,13 +157,135 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
           phone_number_id: n.id,
           display_phone_number: n.display_phone_number ?? null,
           verified_name: n.verified_name ?? null,
-          status:
-            n.code_verification_status === "VERIFIED" ? "conectado" : "pendente",
+          status: n.code_verification_status === "VERIFIED" ? "conectado" : "pendente",
         })),
-        { onConflict: "user_id,phone_number_id" }
+        { onConflict: "phone_number_id" }
       );
       if (error) throw new Error(error.message);
     }
 
     return { ok: true, total: lista.length };
+  });
+
+/* ------------------------------ Conversas ------------------------------ */
+
+export const listarConversasWhatsapp = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("whatsapp_conversas")
+      .select(
+        "id, phone_number_id, contato_wa_id, contato_nome, ultima_mensagem, ultima_em, nao_lidas"
+      )
+      .eq("user_id", context.userId)
+      .order("ultima_em", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { conversaId: string }) => {
+    if (!input?.conversaId) throw new Error("Conversa inválida.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: mensagens, error } = await supabaseAdmin
+      .from("whatsapp_mensagens")
+      .select("id, direcao, texto, tipo, status, criado_em")
+      .eq("conversa_id", data.conversaId)
+      .eq("user_id", context.userId)
+      .order("criado_em", { ascending: true })
+      .limit(300);
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin
+      .from("whatsapp_conversas")
+      .update({ nao_lidas: 0 })
+      .eq("id", data.conversaId)
+      .eq("user_id", context.userId);
+
+    return mensagens ?? [];
+  });
+
+export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { conversaId: string; texto: string }) => {
+    if (!input?.conversaId) throw new Error("Conversa inválida.");
+    if (!input?.texto?.trim()) throw new Error("Escreva uma mensagem antes de enviar.");
+    return { conversaId: input.conversaId, texto: input.texto.trim() };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: conversa, error: conversaError } = await supabaseAdmin
+      .from("whatsapp_conversas")
+      .select("id, phone_number_id, contato_wa_id")
+      .eq("id", data.conversaId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (conversaError) throw new Error(conversaError.message);
+    if (!conversa) throw new Error("Conversa não encontrada.");
+
+    const { data: numero } = await supabaseAdmin
+      .from("whatsapp_numeros")
+      .select("waba_id")
+      .eq("phone_number_id", conversa.phone_number_id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!numero) throw new Error("Número não está mais conectado.");
+
+    const { data: conta } = await supabaseAdmin
+      .from("whatsapp_accounts")
+      .select("access_token")
+      .eq("user_id", context.userId)
+      .eq("waba_id", numero.waba_id)
+      .maybeSingle();
+    if (!conta?.access_token) {
+      throw new Error("A autorização da Meta expirou. Conecte o WhatsApp novamente.");
+    }
+
+    const envioRes = await fetch(`${GRAPH}/${conversa.phone_number_id}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${conta.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: conversa.contato_wa_id,
+        type: "text",
+        text: { body: data.texto },
+      }),
+    });
+    const envioJson = (await envioRes.json()) as {
+      messages?: { id: string }[];
+      error?: { message?: string; code?: number };
+    };
+    if (!envioRes.ok) {
+      const codigo = envioJson.error?.code ? ` (código ${envioJson.error.code})` : "";
+      throw new Error(
+        `${envioJson.error?.message ?? "A Meta recusou o envio da mensagem."}${codigo}`
+      );
+    }
+
+    await supabaseAdmin.from("whatsapp_mensagens").insert({
+      conversa_id: conversa.id,
+      user_id: context.userId,
+      wa_message_id: envioJson.messages?.[0]?.id ?? null,
+      direcao: "saida",
+      tipo: "text",
+      texto: data.texto,
+      status: "enviada",
+    });
+
+    await supabaseAdmin
+      .from("whatsapp_conversas")
+      .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
+      .eq("id", conversa.id);
+
+    return { ok: true };
   });
