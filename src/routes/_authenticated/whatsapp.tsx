@@ -189,6 +189,9 @@ function WhatsappPage() {
                         <p className="truncate text-xs text-muted-foreground">
                           {c.ultima_mensagem ?? ""}
                         </p>
+                        <p className="truncate text-[10px] text-muted-foreground/80">
+                          via {rotuloNumero(c.phone_number_id)}
+                        </p>
                       </button>
                     ))}
                   </div>
