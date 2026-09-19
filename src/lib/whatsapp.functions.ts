@@ -110,10 +110,21 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     }
 
     // Assina o app para receber as mensagens dessa conta comercial.
-    await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
+    const assinaturaRes = await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    if (!assinaturaRes.ok) {
+      const assinaturaJson = (await assinaturaRes.json()) as {
+        error?: { message?: string; code?: number };
+      };
+      const codigo = assinaturaJson.error?.code
+        ? ` (código ${assinaturaJson.error.code})`
+        : "";
+      throw new Error(
+        `${assinaturaJson.error?.message ?? "A Meta não permitiu assinar as mensagens desta conta."}${codigo}`
+      );
+    }
 
     const numerosRes = await fetch(
       `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,code_verification_status`,
@@ -136,7 +147,7 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    await supabaseAdmin.from("whatsapp_accounts").upsert(
+    const { error: contaError } = await supabaseAdmin.from("whatsapp_accounts").upsert(
       {
         user_id: context.userId,
         waba_id: wabaId,
@@ -144,6 +155,7 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
       },
       { onConflict: "user_id,waba_id" }
     );
+    if (contaError) throw new Error(contaError.message);
 
     const lista = (numerosJson.data ?? []).filter(
       (n) => !data.phoneNumberId || n.id === data.phoneNumberId

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, Hash, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Hash, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -89,6 +89,7 @@ function WhatsappNumerosPage() {
   const remover = useServerFn(removerNumeroWhatsapp);
   const [abrindo, setAbrindo] = useState(false);
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
+  const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
   const config = useQuery({
     queryKey: ["whatsapp-config"],
@@ -104,18 +105,38 @@ function WhatsappNumerosPage() {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (!event.origin.endsWith("facebook.com")) return;
+      if (event.origin !== "https://www.facebook.com") return;
       try {
         const dados = JSON.parse(event.data as string) as {
           type?: string;
           event?: string;
-          data?: { waba_id?: string; phone_number_id?: string };
+          data?: {
+            waba_id?: string;
+            phone_number_id?: string;
+            current_step?: string;
+          };
         };
-        if (dados.type === "WA_EMBEDDED_SIGNUP" && dados.data) {
+        if (dados.type !== "WA_EMBEDDED_SIGNUP") return;
+
+        if (
+          (dados.event === "FINISH" || dados.event === "FINISH_ONLY_WABA") &&
+          dados.data
+        ) {
           sessaoRef.current = {
             wabaId: dados.data.waba_id,
             phoneNumberId: dados.data.phone_number_id,
           };
+          setDiagnostico(null);
+          return;
+        }
+
+        if (dados.event === "CANCEL") {
+          const etapa = dados.data?.current_step;
+          setDiagnostico(
+            etapa
+              ? `A Meta interrompeu a conexão na etapa ${etapa}.`
+              : "A Meta interrompeu a conexão antes de liberar os ativos."
+          );
         }
       } catch {
         /* mensagens não relacionadas */
@@ -156,6 +177,7 @@ function WhatsappNumerosPage() {
       return;
     }
     setAbrindo(true);
+    setDiagnostico(null);
     try {
       await carregarSdkMeta(dados.appId);
       sessaoRef.current = {};
@@ -163,7 +185,9 @@ function WhatsappNumerosPage() {
         (response) => {
           const code = response?.authResponse?.code;
           if (!code) {
-            toast.info("Conexão cancelada.");
+            toast.error(
+              "A Meta não autorizou a conexão. Confira o aviso exibido na janela de cadastro."
+            );
             return;
           }
           conectarMutation.mutate({
@@ -219,6 +243,13 @@ function WhatsappNumerosPage() {
             comercial, o número e o meio de pagamento continua com você.
           </AlertDescription>
         </Alert>
+
+        {diagnostico ? (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{diagnostico}</AlertDescription>
+          </Alert>
+        ) : null}
 
         {numeros.isLoading ? (
           <Card className="border-border/60 bg-card/70">
