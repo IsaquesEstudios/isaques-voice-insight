@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/external-auth-middleware";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH = "https://graph.facebook.com/v26.0";
 
 /** Dados públicos necessários para abrir o Cadastro Incorporado da Meta. */
 export const obterConfigWhatsapp = createServerFn({ method: "GET" })
