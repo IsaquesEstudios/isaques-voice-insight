@@ -74,7 +74,7 @@ function carregarSdkMeta(appId: string) {
       document.body.appendChild(script);
     }
     window.fbAsyncInit = () => {
-      window.FB?.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      window.FB?.init({ appId, cookie: true, xfbml: false, version: "v26.0" });
       resolve();
     };
     setTimeout(() => (window.FB ? resolve() : reject(new Error("Tempo esgotado."))), 15000);
