@@ -1,12 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { MessageCircle, Search, Send } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Loader2, MessageCircle, Search, Send } from "lucide-react";
+import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  enviarMensagemWhatsapp,
+  listarConversasWhatsapp,
+  listarMensagensWhatsapp,
+} from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   head: () => ({
@@ -29,30 +38,56 @@ export const Route = createFileRoute("/_authenticated/whatsapp")({
   component: WhatsappPage,
 });
 
-type Conversa = {
-  id: string;
-  nome: string;
-  numero: string;
-  ultimaMensagem: string;
-  horario: string;
-};
-
-type Mensagem = {
-  id: string;
-  autor: "cliente" | "empresa";
-  texto: string;
-  horario: string;
-};
+function hora(valor: string) {
+  return new Date(valor).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function WhatsappPage() {
-  const [conversas] = useState<Conversa[]>([]);
-  const [mensagens] = useState<Mensagem[]>([]);
+  const queryClient = useQueryClient();
+  const carregarConversas = useServerFn(listarConversasWhatsapp);
+  const carregarMensagens = useServerFn(listarMensagensWhatsapp);
+  const enviar = useServerFn(enviarMensagemWhatsapp);
+
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [rascunho, setRascunho] = useState("");
 
-  const filtradas = conversas.filter((c) =>
-    `${c.nome} ${c.numero}`.toLowerCase().includes(busca.toLowerCase())
+  const conversas = useQuery({
+    queryKey: ["whatsapp-conversas"],
+    queryFn: () => carregarConversas(),
+    refetchInterval: 5000,
+  });
+
+  const mensagens = useQuery({
+    queryKey: ["whatsapp-mensagens", selecionada],
+    queryFn: () => carregarMensagens({ data: { conversaId: selecionada! } }),
+    enabled: Boolean(selecionada),
+    refetchInterval: 5000,
+  });
+
+  const enviarMutation = useMutation({
+    mutationFn: (texto: string) =>
+      enviar({ data: { conversaId: selecionada!, texto } }),
+    onSuccess: () => {
+      setRascunho("");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens", selecionada] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const lista = conversas.data ?? [];
+  const filtradas = useMemo(
+    () =>
+      lista.filter((c) =>
+        `${c.contato_nome ?? ""} ${c.contato_wa_id}`
+          .toLowerCase()
+          .includes(busca.toLowerCase())
+      ),
+    [lista, busca]
   );
 
   return (
@@ -78,7 +113,11 @@ function WhatsappPage() {
                 />
               </div>
               <ScrollArea className="flex-1">
-                {filtradas.length === 0 ? (
+                {conversas.isLoading ? (
+                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    Carregando conversas...
+                  </p>
+                ) : filtradas.length === 0 ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                     Nenhuma conversa por aqui ainda.
                   </p>
@@ -94,11 +133,18 @@ function WhatsappPage() {
                             : "hover:bg-muted/60"
                         }`}
                       >
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {c.nome}
-                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {c.contato_nome ?? c.contato_wa_id}
+                          </p>
+                          {c.nao_lidas > 0 ? (
+                            <Badge className="h-5 min-w-5 justify-center px-1 text-[10px]">
+                              {c.nao_lidas}
+                            </Badge>
+                          ) : null}
+                        </div>
                         <p className="truncate text-xs text-muted-foreground">
-                          {c.ultimaMensagem}
+                          {c.ultima_mensagem ?? ""}
                         </p>
                       </button>
                     ))}
@@ -114,33 +160,48 @@ function WhatsappPage() {
                 <>
                   <ScrollArea className="flex-1 p-4">
                     <div className="flex flex-col gap-3">
-                      {mensagens.map((m) => (
+                      {(mensagens.data ?? []).map((m) => (
                         <div
                           key={m.id}
                           className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
-                            m.autor === "empresa"
+                            m.direcao === "saida"
                               ? "self-end bg-primary/15 text-foreground"
                               : "self-start bg-muted text-foreground"
                           }`}
                         >
                           {m.texto}
                           <span className="mt-1 block text-[10px] text-muted-foreground">
-                            {m.horario}
+                            {hora(m.criado_em)}
                           </span>
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
-                  <div className="flex items-center gap-2 border-t border-border/60 p-3">
+                  <form
+                    className="flex items-center gap-2 border-t border-border/60 p-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (rascunho.trim()) enviarMutation.mutate(rascunho);
+                    }}
+                  >
                     <Input
                       value={rascunho}
                       onChange={(e) => setRascunho(e.target.value)}
                       placeholder="Escreva uma mensagem"
                     />
-                    <Button size="icon" aria-label="Enviar mensagem">
-                      <Send className="h-4 w-4" />
+                    <Button
+                      type="submit"
+                      size="icon"
+                      aria-label="Enviar mensagem"
+                      disabled={enviarMutation.isPending || !rascunho.trim()}
+                    >
+                      {enviarMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
                     </Button>
-                  </div>
+                  </form>
                 </>
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center">
