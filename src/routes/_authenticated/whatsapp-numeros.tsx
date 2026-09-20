@@ -446,6 +446,142 @@ function WhatsappNumerosPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={cadastroAberto} onOpenChange={setCadastroAberto}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {etapa === "dados" ? "Cadastrar número" : "Confirmar código"}
+            </DialogTitle>
+            <DialogDescription>
+              {etapa === "dados"
+                ? "O número é cadastrado direto na sua conta comercial e a Meta envia um código de verificação."
+                : "Digite o código de 6 dígitos que a Meta enviou para o número informado."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {etapa === "dados" ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label>Conta comercial</Label>
+                <Select value={wabaId} onValueChange={setWabaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha a conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(contas.data ?? []).map((c) => (
+                      <SelectItem key={c.wabaId} value={c.wabaId}>
+                        {c.wabaId}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-[90px_1fr] gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="ddi">País</Label>
+                  <Input
+                    id="ddi"
+                    value={ddi}
+                    inputMode="numeric"
+                    maxLength={4}
+                    onChange={(e) => setDdi(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="numero">Número (com DDD)</Label>
+                  <Input
+                    id="numero"
+                    value={numero}
+                    inputMode="numeric"
+                    placeholder="11987654321"
+                    onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="nome">Nome de exibição</Label>
+                <Input
+                  id="nome"
+                  value={nomeExibicao}
+                  placeholder="Nome que aparece para os clientes"
+                  maxLength={60}
+                  onChange={(e) => setNomeExibicao(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Receber o código por</Label>
+                <Select
+                  value={metodo}
+                  onValueChange={(v) => setMetodo(v as "SMS" | "VOICE")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SMS">SMS</SelectItem>
+                    <SelectItem value="VOICE">Ligação</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="codigo">Código de verificação</Label>
+                <Input
+                  id="codigo"
+                  value={codigo}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              <Button
+                variant="ghost"
+                className="self-start px-0"
+                disabled={reenviarMutation.isPending}
+                onClick={() => reenviarMutation.mutate()}
+              >
+                Reenviar código
+              </Button>
+            </div>
+          )}
+
+          <DialogFooter>
+            {etapa === "dados" ? (
+              <Button
+                disabled={cadastrarMutation.isPending}
+                onClick={() =>
+                  cadastrarMutation.mutate({
+                    wabaId,
+                    ddi,
+                    numero,
+                    nomeExibicao,
+                    metodo,
+                  })
+                }
+              >
+                {cadastrarMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Enviar código
+              </Button>
+            ) : (
+              <Button
+                disabled={confirmarMutation.isPending}
+                onClick={() => confirmarMutation.mutate()}
+              >
+                {confirmarMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Confirmar e ativar
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
