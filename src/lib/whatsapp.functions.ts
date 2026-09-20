@@ -536,7 +536,10 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .order("criado_em", { ascending: true })
       .limit(300);
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (tabelaAusente(error)) return [];
+      throw new Error(error.message);
+    }
 
     await chatDb
       .from("whatsapp_conversas")
