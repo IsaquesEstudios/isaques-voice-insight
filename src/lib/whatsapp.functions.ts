@@ -494,6 +494,15 @@ export const confirmarCodigoWhatsapp = createServerFn({ method: "POST" })
 
 /* ------------------------------ Conversas ------------------------------ */
 
+// As tabelas de conversas vivem no banco externo; se ainda não existirem,
+// devolvemos listas vazias em vez de quebrar a tela.
+function tabelaAusente(error: { code?: string; message?: string }) {
+  return (
+    error?.code === "PGRST205" ||
+    /schema cache|does not exist/i.test(error?.message ?? "")
+  );
+}
+
 export const listarConversasWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -506,7 +515,10 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
       .eq("user_id", context.userId)
       .order("ultima_em", { ascending: false })
       .limit(200);
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (tabelaAusente(error)) return [];
+      throw new Error(error.message);
+    }
     return (data ?? []) as {
       id: string;
       phone_number_id: string;
@@ -533,7 +545,10 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .order("criado_em", { ascending: true })
       .limit(300);
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (tabelaAusente(error)) return [];
+      throw new Error(error.message);
+    }
 
     await chatDb
       .from("whatsapp_conversas")
