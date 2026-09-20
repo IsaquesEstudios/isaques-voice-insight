@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, CheckCircle2, Hash, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Hash, Loader2, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -21,6 +21,7 @@ import {
   listarNumerosWhatsapp,
   obterConfigWhatsapp,
   removerNumeroWhatsapp,
+  sincronizarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-numeros")({
@@ -87,6 +88,7 @@ function WhatsappNumerosPage() {
   const carregarNumeros = useServerFn(listarNumerosWhatsapp);
   const conectar = useServerFn(conectarWhatsapp);
   const remover = useServerFn(removerNumeroWhatsapp);
+  const sincronizar = useServerFn(sincronizarNumerosWhatsapp);
   const [abrindo, setAbrindo] = useState(false);
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [diagnostico, setDiagnostico] = useState<string | null>(null);
@@ -168,6 +170,15 @@ function WhatsappNumerosPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const sincronizarMutation = useMutation({
+    mutationFn: () => sincronizar({ data: {} as never }),
+    onSuccess: (r: { total: number }) => {
+      toast.success(`${r.total} número(s) atualizado(s).`);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   async function iniciarConexao() {
     const dados = config.data;
     if (!dados?.appId || !dados.configId || !dados.configurado) {
@@ -226,14 +237,28 @@ function WhatsappNumerosPage() {
               vão atender pelo painel.
             </p>
           </div>
-          <Button onClick={iniciarConexao} disabled={ocupado}>
-            {ocupado ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="mr-2 h-4 w-4" />
-            )}
-            Conectar WhatsApp
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => sincronizarMutation.mutate()}
+              disabled={sincronizarMutation.isPending}
+            >
+              {sincronizarMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Atualizar números
+            </Button>
+            <Button onClick={iniciarConexao} disabled={ocupado}>
+              {ocupado ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              Conectar WhatsApp
+            </Button>
+          </div>
         </div>
 
         <Alert>
