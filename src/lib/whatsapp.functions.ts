@@ -289,6 +289,209 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
 
   });
 
+/* ----------------- Cadastro de número pelo painel ----------------- */
+
+async function tokenDaConta(userId: string, wabaId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("whatsapp_accounts")
+    .select("access_token")
+    .eq("user_id", userId)
+    .eq("waba_id", wabaId)
+    .maybeSingle();
+  if (!data?.access_token) {
+    throw new Error("A autorização da Meta expirou. Conecte o WhatsApp novamente.");
+  }
+  return data.access_token;
+}
+
+async function erroMeta(res: Response, padrao: string) {
+  const json = (await res.json().catch(() => ({}))) as {
+    error?: { message?: string; error_user_msg?: string; code?: number };
+  };
+  const msg = json.error?.error_user_msg ?? json.error?.message ?? padrao;
+  const codigo = json.error?.code ? ` (código ${json.error.code})` : "";
+  return new Error(`${msg}${codigo}`);
+}
+
+/** Contas comerciais já autorizadas, para escolher onde cadastrar o número. */
+export const listarContasWhatsapp = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("whatsapp_accounts")
+      .select("waba_id")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((c) => ({ wabaId: c.waba_id }));
+  });
+
+/** Cadastra o número na conta comercial e pede o código de verificação. */
+export const cadastrarNumeroWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      wabaId: string;
+      ddi: string;
+      numero: string;
+      nomeExibicao: string;
+      metodo: "SMS" | "VOICE";
+    }) => {
+      const ddi = (input?.ddi ?? "").replace(/\D/g, "");
+      const numero = (input?.numero ?? "").replace(/\D/g, "");
+      const nomeExibicao = (input?.nomeExibicao ?? "").trim();
+      if (!input?.wabaId) throw new Error("Escolha a conta comercial.");
+      if (!ddi || ddi.length > 4) throw new Error("Informe um código de país válido.");
+      if (numero.length < 8 || numero.length > 15)
+        throw new Error("Informe um número de telefone válido.");
+      if (nomeExibicao.length < 2 || nomeExibicao.length > 60)
+        throw new Error("O nome de exibição deve ter entre 2 e 60 caracteres.");
+      return {
+        wabaId: input.wabaId,
+        ddi,
+        numero,
+        nomeExibicao,
+        metodo: input.metodo === "VOICE" ? ("VOICE" as const) : ("SMS" as const),
+      };
+    }
+  )
+  .handler(async ({ data, context }) => {
+    const token = await tokenDaConta(context.userId, data.wabaId);
+
+    const criarRes = await fetch(`${GRAPH}/${data.wabaId}/phone_numbers`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cc: data.ddi,
+        phone_number: data.numero,
+        verified_name: data.nomeExibicao,
+      }),
+    });
+    const criarJson = (await criarRes.clone().json().catch(() => ({}))) as { id?: string };
+    if (!criarRes.ok || !criarJson.id) {
+      throw await erroMeta(criarRes, "A Meta não aceitou o cadastro desse número.");
+    }
+    const phoneNumberId = criarJson.id;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("whatsapp_numeros").upsert(
+      {
+        user_id: context.userId,
+        waba_id: data.wabaId,
+        phone_number_id: phoneNumberId,
+        display_phone_number: `+${data.ddi} ${data.numero}`,
+        verified_name: data.nomeExibicao,
+        status: "pendente",
+      },
+      { onConflict: "phone_number_id" }
+    );
+
+    const codigoRes = await fetch(`${GRAPH}/${phoneNumberId}/request_code`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ code_method: data.metodo, language: "pt_BR" }),
+    });
+    if (!codigoRes.ok) {
+      throw await erroMeta(codigoRes, "A Meta não conseguiu enviar o código.");
+    }
+
+    return { ok: true, phoneNumberId };
+  });
+
+/** Reenvia o código de verificação de um número já cadastrado. */
+export const reenviarCodigoWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { phoneNumberId: string; metodo: "SMS" | "VOICE" }) => {
+    if (!input?.phoneNumberId) throw new Error("Número inválido.");
+    return {
+      phoneNumberId: input.phoneNumberId,
+      metodo: input.metodo === "VOICE" ? ("VOICE" as const) : ("SMS" as const),
+    };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: numero } = await supabaseAdmin
+      .from("whatsapp_numeros")
+      .select("waba_id")
+      .eq("phone_number_id", data.phoneNumberId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!numero) throw new Error("Número não encontrado.");
+    const token = await tokenDaConta(context.userId, numero.waba_id);
+
+    const res = await fetch(`${GRAPH}/${data.phoneNumberId}/request_code`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ code_method: data.metodo, language: "pt_BR" }),
+    });
+    if (!res.ok) throw await erroMeta(res, "A Meta não conseguiu enviar o código.");
+    return { ok: true };
+  });
+
+/** Confirma o código recebido e ativa o número para envio e recebimento. */
+export const confirmarCodigoWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { phoneNumberId: string; codigo: string }) => {
+    const codigo = (input?.codigo ?? "").replace(/\D/g, "");
+    if (!input?.phoneNumberId) throw new Error("Número inválido.");
+    if (codigo.length !== 6) throw new Error("O código tem 6 dígitos.");
+    return { phoneNumberId: input.phoneNumberId, codigo };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: numero } = await supabaseAdmin
+      .from("whatsapp_numeros")
+      .select("waba_id")
+      .eq("phone_number_id", data.phoneNumberId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!numero) throw new Error("Número não encontrado.");
+    const token = await tokenDaConta(context.userId, numero.waba_id);
+
+    const verificarRes = await fetch(`${GRAPH}/${data.phoneNumberId}/verify_code`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: data.codigo }),
+    });
+    if (!verificarRes.ok) {
+      throw await erroMeta(verificarRes, "Código incorreto ou expirado.");
+    }
+
+    // PIN de seis dígitos exigido pela Meta para ativar o número.
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    const registrarRes = await fetch(`${GRAPH}/${data.phoneNumberId}/register`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", pin }),
+    });
+    if (!registrarRes.ok) {
+      throw await erroMeta(registrarRes, "Não foi possível ativar o número na Meta.");
+    }
+
+    const detalheRes = await fetch(
+      `${GRAPH}/${data.phoneNumberId}?fields=display_phone_number,verified_name,code_verification_status`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const detalhe = (await detalheRes.json().catch(() => ({}))) as {
+      display_phone_number?: string;
+      verified_name?: string;
+    };
+
+    await supabaseAdmin
+      .from("whatsapp_numeros")
+      .update({
+        status: "conectado",
+        display_phone_number: detalhe.display_phone_number ?? null,
+        verified_name: detalhe.verified_name ?? null,
+      })
+      .eq("phone_number_id", data.phoneNumberId)
+      .eq("user_id", context.userId);
+
+    return { ok: true };
+  });
+
 /* ------------------------------ Conversas ------------------------------ */
 
 export const listarConversasWhatsapp = createServerFn({ method: "GET" })
