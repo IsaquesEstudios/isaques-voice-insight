@@ -95,6 +95,10 @@ async function processarEvento(body: string) {
           { onConflict: "wa_message_id" }
         );
 
+        if (mensagemError) {
+          console.error("whatsapp webhook mensagem", mensagemError.message);
+        }
+
         await chatDb
           .from("whatsapp_conversas")
           .update({ nao_lidas: (conversa.nao_lidas ?? 0) + 1 })
