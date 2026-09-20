@@ -248,6 +248,10 @@ function WhatsappNumerosPage() {
   const lista = numeros.data ?? [];
   const ocupado = abrindo || conectarMutation.isPending;
 
+  const verificacaoAtual = verificando
+    ? lista.find((n) => n.phone_number_id === verificando)
+    : null;
+
   return (
     <DashboardShell>
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
