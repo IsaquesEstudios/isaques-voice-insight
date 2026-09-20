@@ -263,9 +263,12 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     }
 
     if (lista.length === 0) {
-      throw new Error(
-        "A conexão foi autorizada, mas a Meta não retornou nenhum número nessa conta comercial. Verifique se o número já foi cadastrado e verificado no WhatsApp Manager."
-      );
+      return {
+        ok: true,
+        total: 0,
+        aviso:
+          "A conexão foi autorizada, mas essa conta comercial ainda não tem número cadastrado. Adicione e verifique o número no WhatsApp Manager e clique em Atualizar números.",
+      };
     }
 
     const { error } = await supabaseAdmin.from("whatsapp_numeros").upsert(
@@ -281,7 +284,8 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     );
     if (error) throw new Error(error.message);
 
-    return { ok: true, total: lista.length };
+    return { ok: true, total: lista.length, aviso: null };
+
 
   });
 
