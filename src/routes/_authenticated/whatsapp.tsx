@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MessageCircle, Search, Send } from "lucide-react";
@@ -11,12 +11,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   enviarMensagemWhatsapp,
   listarConversasWhatsapp,
   listarMensagensWhatsapp,
   listarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
+
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   head: () => ({
@@ -67,15 +69,38 @@ function WhatsappPage() {
   const conversas = useQuery({
     queryKey: ["whatsapp-conversas"],
     queryFn: () => carregarConversas(),
-    refetchInterval: 5000,
   });
 
   const mensagens = useQuery({
     queryKey: ["whatsapp-mensagens", selecionada],
     queryFn: () => carregarMensagens({ data: { conversaId: selecionada! } }),
     enabled: Boolean(selecionada),
-    refetchInterval: 5000,
   });
+
+  // Tempo real: o banco avisa assim que chega ou muda uma mensagem.
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    const canal = supabase
+      .channel("whatsapp-tempo-real")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_mensagens" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens"] });
+          queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_conversas" },
+        () => queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] })
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, [queryClient]);
 
   const enviarMutation = useMutation({
     mutationFn: (texto: string) =>
@@ -87,6 +112,7 @@ function WhatsappPage() {
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
+
 
   const lista = conversas.data ?? [];
   const listaNumeros = numeros.data ?? [];

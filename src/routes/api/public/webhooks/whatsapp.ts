@@ -18,6 +18,7 @@ type WhatsappChange = {
 
 async function processarEvento(body: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb } = await import("@/integrations/supabase/chat-db.server");
   const payload = JSON.parse(body) as {
     entry?: { changes?: WhatsappChange[] }[];
   };
@@ -31,7 +32,7 @@ async function processarEvento(body: string) {
       // Atualiza o status das mensagens que enviamos.
       for (const status of value?.statuses ?? []) {
         if (!status.id) continue;
-        await supabaseAdmin
+        await chatDb
           .from("whatsapp_mensagens")
           .update({ status: status.status ?? null })
           .eq("wa_message_id", status.id);
@@ -60,7 +61,7 @@ async function processarEvento(body: string) {
           ? new Date(Number(mensagem.timestamp) * 1000).toISOString()
           : new Date().toISOString();
 
-        const { data: conversa } = await supabaseAdmin
+        const { data: conversa } = await chatDb
           .from("whatsapp_conversas")
           .upsert(
             {
@@ -74,10 +75,10 @@ async function processarEvento(body: string) {
             { onConflict: "phone_number_id,contato_wa_id" }
           )
           .select("id, nao_lidas")
-          .maybeSingle();
+          .maybeSingle<{ id: string; nao_lidas: number | null }>();
         if (!conversa) continue;
 
-        await supabaseAdmin.from("whatsapp_mensagens").upsert(
+        await chatDb.from("whatsapp_mensagens").upsert(
           {
             conversa_id: conversa.id,
             user_id: numero.user_id,
@@ -91,7 +92,7 @@ async function processarEvento(body: string) {
           { onConflict: "wa_message_id" }
         );
 
-        await supabaseAdmin
+        await chatDb
           .from("whatsapp_conversas")
           .update({ nao_lidas: (conversa.nao_lidas ?? 0) + 1 })
           .eq("id", conversa.id);
