@@ -145,26 +145,54 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     );
     if (contaError) throw new Error(contaError.message);
 
-    const lista = (numerosJson.data ?? []).filter(
-      (n) => !data.phoneNumberId || n.id === data.phoneNumberId
-    );
+    type NumeroMeta = {
+      id: string;
+      display_phone_number?: string;
+      verified_name?: string;
+      code_verification_status?: string;
+    };
 
-    if (lista.length > 0) {
-      const { error } = await supabaseAdmin.from("whatsapp_numeros").upsert(
-        lista.map((n) => ({
-          user_id: context.userId,
-          waba_id: wabaId!,
-          phone_number_id: n.id,
-          display_phone_number: n.display_phone_number ?? null,
-          verified_name: n.verified_name ?? null,
-          status: n.code_verification_status === "VERIFIED" ? "conectado" : "pendente",
-        })),
-        { onConflict: "phone_number_id" }
+    const todos: NumeroMeta[] = numerosJson.data ?? [];
+    let lista = data.phoneNumberId
+      ? todos.filter((n) => n.id === data.phoneNumberId)
+      : todos;
+
+    // Se o filtro não bateu, mantemos todos os números da conta comercial.
+    if (lista.length === 0 && todos.length > 0) lista = todos;
+
+    // Último recurso: buscar o número escolhido diretamente pelo ID.
+    if (lista.length === 0 && data.phoneNumberId) {
+      const unicoRes = await fetch(
+        `${GRAPH}/${data.phoneNumberId}?fields=id,display_phone_number,verified_name,code_verification_status`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      if (error) throw new Error(error.message);
+      const unicoJson = (await unicoRes.json()) as NumeroMeta & {
+        error?: { message?: string };
+      };
+      if (unicoRes.ok && unicoJson.id) lista = [unicoJson];
     }
 
+    if (lista.length === 0) {
+      throw new Error(
+        "A conexão foi autorizada, mas a Meta não retornou nenhum número nessa conta comercial. Verifique se o número já foi cadastrado e verificado no WhatsApp Manager."
+      );
+    }
+
+    const { error } = await supabaseAdmin.from("whatsapp_numeros").upsert(
+      lista.map((n) => ({
+        user_id: context.userId,
+        waba_id: wabaId!,
+        phone_number_id: n.id,
+        display_phone_number: n.display_phone_number ?? null,
+        verified_name: n.verified_name ?? null,
+        status: n.code_verification_status === "VERIFIED" ? "conectado" : "pendente",
+      })),
+      { onConflict: "phone_number_id" }
+    );
+    if (error) throw new Error(error.message);
+
     return { ok: true, total: lista.length };
+
   });
 
 /* ------------------------------ Conversas ------------------------------ */
