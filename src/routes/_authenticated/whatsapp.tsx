@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MessageCircle, Search, Send } from "lucide-react";
@@ -11,12 +11,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   enviarMensagemWhatsapp,
   listarConversasWhatsapp,
   listarMensagensWhatsapp,
   listarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
+
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   head: () => ({
