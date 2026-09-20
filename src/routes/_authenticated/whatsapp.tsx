@@ -69,15 +69,38 @@ function WhatsappPage() {
   const conversas = useQuery({
     queryKey: ["whatsapp-conversas"],
     queryFn: () => carregarConversas(),
-    refetchInterval: 5000,
   });
 
   const mensagens = useQuery({
     queryKey: ["whatsapp-mensagens", selecionada],
     queryFn: () => carregarMensagens({ data: { conversaId: selecionada! } }),
     enabled: Boolean(selecionada),
-    refetchInterval: 5000,
   });
+
+  // Tempo real: o banco avisa assim que chega ou muda uma mensagem.
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    const canal = supabase
+      .channel("whatsapp-tempo-real")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_mensagens" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens"] });
+          queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_conversas" },
+        () => queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] })
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, [queryClient]);
 
   const enviarMutation = useMutation({
     mutationFn: (texto: string) =>
@@ -89,6 +112,7 @@ function WhatsappPage() {
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
+
 
   const lista = conversas.data ?? [];
   const listaNumeros = numeros.data ?? [];
