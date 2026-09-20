@@ -211,6 +211,46 @@ function WhatsappNumerosPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const cadastrarMutation = useMutation({
+    mutationFn: (input: {
+      wabaId: string;
+      ddi: string;
+      numero: string;
+      nomeExibicao: string;
+      metodo: "SMS" | "VOICE";
+    }) => cadastrarNumero({ data: input }),
+    onSuccess: (r: { phoneNumberId: string }) => {
+      setPhoneNumberId(r.phoneNumberId);
+      setEtapa("codigo");
+      toast.success("Código enviado pela Meta. Confira o telefone informado.");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const reenviarMutation = useMutation({
+    mutationFn: () =>
+      reenviarCodigo({ data: { phoneNumberId: phoneNumberId!, metodo } }),
+    onSuccess: () => toast.success("Novo código enviado."),
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const confirmarMutation = useMutation({
+    mutationFn: () =>
+      confirmarCodigo({ data: { phoneNumberId: phoneNumberId!, codigo } }),
+    onSuccess: () => {
+      toast.success("Número verificado e pronto para uso.");
+      setCadastroAberto(false);
+      setEtapa("dados");
+      setCodigo("");
+      setNumero("");
+      setNomeExibicao("");
+      setPhoneNumberId(null);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   async function iniciarConexao() {
     const dados = config.data;
     if (!dados?.appId || !dados.configId || !dados.configurado) {
