@@ -378,6 +378,18 @@ function WhatsappNumerosPage() {
                       ) : null}
                       {n.status === "conectado" ? "Conectado" : "Pendente"}
                     </Badge>
+                    {n.status !== "conectado" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setVerificando(n.phone_number_id);
+                          setCodigo("");
+                        }}
+                      >
+                        Verificar
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
