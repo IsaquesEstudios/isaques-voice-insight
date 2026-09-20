@@ -406,6 +406,84 @@ function WhatsappNumerosPage() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={Boolean(verificando)}
+        onOpenChange={(aberto) => {
+          if (!aberto) {
+            setVerificando(null);
+            setCodigo("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verificar número</DialogTitle>
+            <DialogDescription>
+              Receba o código da Meta em{" "}
+              {verificacaoAtual?.display_phone_number ?? "seu número"} e confirme aqui
+              para ativar o envio e o recebimento de mensagens.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={enviarCodigoMutation.isPending}
+                onClick={() =>
+                  verificando &&
+                  enviarCodigoMutation.mutate({ phoneNumberId: verificando, metodo: "SMS" })
+                }
+              >
+                Enviar por SMS
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={enviarCodigoMutation.isPending}
+                onClick={() =>
+                  verificando &&
+                  enviarCodigoMutation.mutate({
+                    phoneNumberId: verificando,
+                    metodo: "VOICE",
+                  })
+                }
+              >
+                Receber ligação
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="codigo-whatsapp">Código de 6 dígitos</Label>
+              <Input
+                id="codigo-whatsapp"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              disabled={codigo.length !== 6 || confirmarCodigoMutation.isPending}
+              onClick={() =>
+                verificando &&
+                confirmarCodigoMutation.mutate({ phoneNumberId: verificando, codigo })
+              }
+            >
+              {confirmarCodigoMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Confirmar código
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
