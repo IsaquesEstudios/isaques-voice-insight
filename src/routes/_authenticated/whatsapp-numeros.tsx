@@ -170,6 +170,15 @@ function WhatsappNumerosPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const sincronizarMutation = useMutation({
+    mutationFn: () => sincronizar({ data: {} as never }),
+    onSuccess: (r: { total: number }) => {
+      toast.success(`${r.total} número(s) atualizado(s).`);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   async function iniciarConexao() {
     const dados = config.data;
     if (!dados?.appId || !dados.configId || !dados.configurado) {
