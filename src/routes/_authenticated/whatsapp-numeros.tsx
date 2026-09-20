@@ -21,6 +21,7 @@ import {
   listarNumerosWhatsapp,
   obterConfigWhatsapp,
   removerNumeroWhatsapp,
+  sincronizarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-numeros")({
