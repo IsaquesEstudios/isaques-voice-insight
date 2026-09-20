@@ -114,6 +114,21 @@ function WhatsappNumerosPage() {
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
+  const carregarContas = useServerFn(listarContasWhatsapp);
+  const cadastrarNumero = useServerFn(cadastrarNumeroWhatsapp);
+  const reenviarCodigo = useServerFn(reenviarCodigoWhatsapp);
+  const confirmarCodigo = useServerFn(confirmarCodigoWhatsapp);
+
+  const [cadastroAberto, setCadastroAberto] = useState(false);
+  const [etapa, setEtapa] = useState<"dados" | "codigo">("dados");
+  const [wabaId, setWabaId] = useState("");
+  const [ddi, setDdi] = useState("55");
+  const [numero, setNumero] = useState("");
+  const [nomeExibicao, setNomeExibicao] = useState("");
+  const [metodo, setMetodo] = useState<"SMS" | "VOICE">("SMS");
+  const [codigo, setCodigo] = useState("");
+  const [phoneNumberId, setPhoneNumberId] = useState<string | null>(null);
+
   const config = useQuery({
     queryKey: ["whatsapp-config"],
     queryFn: () => carregarConfig(),
@@ -124,6 +139,12 @@ function WhatsappNumerosPage() {
     queryKey: ["whatsapp-numeros"],
     queryFn: () => carregarNumeros(),
     staleTime: 30_000,
+  });
+
+  const contas = useQuery({
+    queryKey: ["whatsapp-contas"],
+    queryFn: () => carregarContas(),
+    staleTime: 60_000,
   });
 
   useEffect(() => {
