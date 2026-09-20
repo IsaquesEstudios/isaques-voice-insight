@@ -17,30 +17,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  cadastrarNumeroWhatsapp,
   conectarWhatsapp,
-  confirmarCodigoWhatsapp,
-  listarContasWhatsapp,
   listarNumerosWhatsapp,
   obterConfigWhatsapp,
-  reenviarCodigoWhatsapp,
   removerNumeroWhatsapp,
   sincronizarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
@@ -114,21 +93,6 @@ function WhatsappNumerosPage() {
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
-  const carregarContas = useServerFn(listarContasWhatsapp);
-  const cadastrarNumero = useServerFn(cadastrarNumeroWhatsapp);
-  const reenviarCodigo = useServerFn(reenviarCodigoWhatsapp);
-  const confirmarCodigo = useServerFn(confirmarCodigoWhatsapp);
-
-  const [cadastroAberto, setCadastroAberto] = useState(false);
-  const [etapa, setEtapa] = useState<"dados" | "codigo">("dados");
-  const [wabaId, setWabaId] = useState("");
-  const [ddi, setDdi] = useState("55");
-  const [numero, setNumero] = useState("");
-  const [nomeExibicao, setNomeExibicao] = useState("");
-  const [metodo, setMetodo] = useState<"SMS" | "VOICE">("SMS");
-  const [codigo, setCodigo] = useState("");
-  const [phoneNumberId, setPhoneNumberId] = useState<string | null>(null);
-
   const config = useQuery({
     queryKey: ["whatsapp-config"],
     queryFn: () => carregarConfig(),
@@ -140,17 +104,6 @@ function WhatsappNumerosPage() {
     queryFn: () => carregarNumeros(),
     staleTime: 30_000,
   });
-
-  const contas = useQuery({
-    queryKey: ["whatsapp-contas"],
-    queryFn: () => carregarContas(),
-    staleTime: 60_000,
-  });
-
-  useEffect(() => {
-    const primeira = contas.data?.[0]?.wabaId;
-    if (primeira && !wabaId) setWabaId(primeira);
-  }, [contas.data, wabaId]);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -206,6 +159,7 @@ function WhatsappNumerosPage() {
         setDiagnostico(r.aviso);
         toast.warning(r.aviso);
       } else {
+        setDiagnostico(null);
         toast.success("WhatsApp conectado com sucesso.");
       }
       queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
@@ -232,46 +186,6 @@ function WhatsappNumerosPage() {
         setDiagnostico(null);
         toast.success(`${r.total} número(s) atualizado(s).`);
       }
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
-    },
-    onError: (erro: Error) => toast.error(erro.message),
-  });
-
-  const cadastrarMutation = useMutation({
-    mutationFn: (input: {
-      wabaId: string;
-      ddi: string;
-      numero: string;
-      nomeExibicao: string;
-      metodo: "SMS" | "VOICE";
-    }) => cadastrarNumero({ data: input }),
-    onSuccess: (r: { phoneNumberId: string }) => {
-      setPhoneNumberId(r.phoneNumberId);
-      setEtapa("codigo");
-      toast.success("Código enviado pela Meta. Confira o telefone informado.");
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
-    },
-    onError: (erro: Error) => toast.error(erro.message),
-  });
-
-  const reenviarMutation = useMutation({
-    mutationFn: () =>
-      reenviarCodigo({ data: { phoneNumberId: phoneNumberId!, metodo } }),
-    onSuccess: () => toast.success("Novo código enviado."),
-    onError: (erro: Error) => toast.error(erro.message),
-  });
-
-  const confirmarMutation = useMutation({
-    mutationFn: () =>
-      confirmarCodigo({ data: { phoneNumberId: phoneNumberId!, codigo } }),
-    onSuccess: () => {
-      toast.success("Número verificado e pronto para uso.");
-      setCadastroAberto(false);
-      setEtapa("dados");
-      setCodigo("");
-      setNumero("");
-      setNomeExibicao("");
-      setPhoneNumberId(null);
       queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
@@ -331,8 +245,8 @@ function WhatsappNumerosPage() {
               Números de WhatsApp
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Conecte a conta WhatsApp Business da sua empresa e escolha quais números
-              vão atender pelo painel.
+              Em um único passo você conecta a conta comercial, cadastra e verifica o
+              número — tudo pela janela oficial da Meta.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -356,26 +270,15 @@ function WhatsappNumerosPage() {
               )}
               Conectar WhatsApp
             </Button>
-            <Button
-              variant="secondary"
-              disabled={(contas.data?.length ?? 0) === 0}
-              onClick={() => {
-                setEtapa("dados");
-                setCodigo("");
-                setCadastroAberto(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Cadastrar número
-            </Button>
           </div>
         </div>
 
         <Alert>
           <ShieldCheck className="h-4 w-4" />
           <AlertDescription>
-            A conexão é feita com a sua própria conta do Meta: você escolhe a conta
-            comercial, o número e o meio de pagamento continua com você.
+            Ao clicar em “Conectar WhatsApp”, a janela da Meta guia você pela conexão da
+            conta comercial e pelo cadastro do número com verificação por SMS ou ligação.
+            O faturamento continua direto com a Meta, na sua conta.
           </AlertDescription>
         </Alert>
 
@@ -404,8 +307,8 @@ function WhatsappNumerosPage() {
                   Nenhum número conectado ainda
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Clique em “Conectar WhatsApp” para vincular o primeiro número da sua
-                  empresa.
+                  Clique em “Conectar WhatsApp” para conectar a conta e cadastrar o
+                  primeiro número da sua empresa em um único passo.
                 </p>
               </div>
             </CardContent>
@@ -446,142 +349,6 @@ function WhatsappNumerosPage() {
           </div>
         )}
       </div>
-
-      <Dialog open={cadastroAberto} onOpenChange={setCadastroAberto}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {etapa === "dados" ? "Cadastrar número" : "Confirmar código"}
-            </DialogTitle>
-            <DialogDescription>
-              {etapa === "dados"
-                ? "O número é cadastrado direto na sua conta comercial e a Meta envia um código de verificação."
-                : "Digite o código de 6 dígitos que a Meta enviou para o número informado."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {etapa === "dados" ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label>Conta comercial</Label>
-                <Select value={wabaId} onValueChange={setWabaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Escolha a conta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(contas.data ?? []).map((c) => (
-                      <SelectItem key={c.wabaId} value={c.wabaId}>
-                        {c.wabaId}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-[90px_1fr] gap-3">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="ddi">País</Label>
-                  <Input
-                    id="ddi"
-                    value={ddi}
-                    inputMode="numeric"
-                    maxLength={4}
-                    onChange={(e) => setDdi(e.target.value.replace(/\D/g, ""))}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="numero">Número (com DDD)</Label>
-                  <Input
-                    id="numero"
-                    value={numero}
-                    inputMode="numeric"
-                    placeholder="11987654321"
-                    onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="nome">Nome de exibição</Label>
-                <Input
-                  id="nome"
-                  value={nomeExibicao}
-                  placeholder="Nome que aparece para os clientes"
-                  maxLength={60}
-                  onChange={(e) => setNomeExibicao(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label>Receber o código por</Label>
-                <Select
-                  value={metodo}
-                  onValueChange={(v) => setMetodo(v as "SMS" | "VOICE")}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SMS">SMS</SelectItem>
-                    <SelectItem value="VOICE">Ligação</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="codigo">Código de verificação</Label>
-                <Input
-                  id="codigo"
-                  value={codigo}
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="000000"
-                  onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
-                />
-              </div>
-              <Button
-                variant="ghost"
-                className="self-start px-0"
-                disabled={reenviarMutation.isPending}
-                onClick={() => reenviarMutation.mutate()}
-              >
-                Reenviar código
-              </Button>
-            </div>
-          )}
-
-          <DialogFooter>
-            {etapa === "dados" ? (
-              <Button
-                disabled={cadastrarMutation.isPending}
-                onClick={() =>
-                  cadastrarMutation.mutate({
-                    wabaId,
-                    ddi,
-                    numero,
-                    nomeExibicao,
-                    metodo,
-                  })
-                }
-              >
-                {cadastrarMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Enviar código
-              </Button>
-            ) : (
-              <Button
-                disabled={confirmarMutation.isPending}
-                onClick={() => confirmarMutation.mutate()}
-              >
-                {confirmarMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Confirmar e ativar
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DashboardShell>
   );
 }
