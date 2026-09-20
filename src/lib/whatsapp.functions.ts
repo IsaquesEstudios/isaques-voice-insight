@@ -561,15 +561,17 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
 
-    const { data: conversa, error: conversaError } = await supabaseAdmin
+    const { data: conversa, error: conversaError } = await chatDb
       .from("whatsapp_conversas")
       .select("id, phone_number_id, contato_wa_id")
       .eq("id", data.conversaId)
       .eq("user_id", context.userId)
-      .maybeSingle();
+      .maybeSingle<{ id: string; phone_number_id: string; contato_wa_id: string }>();
     if (conversaError) throw new Error(conversaError.message);
     if (!conversa) throw new Error("Conversa não encontrada.");
+
 
     const { data: numero } = await supabaseAdmin
       .from("whatsapp_numeros")
