@@ -16,11 +16,23 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   conectarWhatsapp,
+  confirmarCodigoWhatsapp,
   listarNumerosWhatsapp,
   obterConfigWhatsapp,
   removerNumeroWhatsapp,
+  reenviarCodigoWhatsapp,
   sincronizarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
 
@@ -89,7 +101,11 @@ function WhatsappNumerosPage() {
   const conectar = useServerFn(conectarWhatsapp);
   const remover = useServerFn(removerNumeroWhatsapp);
   const sincronizar = useServerFn(sincronizarNumerosWhatsapp);
+  const enviarCodigo = useServerFn(reenviarCodigoWhatsapp);
+  const confirmarCodigo = useServerFn(confirmarCodigoWhatsapp);
   const [abrindo, setAbrindo] = useState(false);
+  const [verificando, setVerificando] = useState<string | null>(null);
+  const [codigo, setCodigo] = useState("");
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
@@ -176,6 +192,31 @@ function WhatsappNumerosPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const enviarCodigoMutation = useMutation({
+    mutationFn: (input: { phoneNumberId: string; metodo: "SMS" | "VOICE" }) =>
+      enviarCodigo({ data: input }),
+    onSuccess: (_r, input) => {
+      toast.success(
+        input.metodo === "SMS"
+          ? "Código enviado por SMS."
+          : "Você vai receber uma ligação com o código."
+      );
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const confirmarCodigoMutation = useMutation({
+    mutationFn: (input: { phoneNumberId: string; codigo: string }) =>
+      confirmarCodigo({ data: input }),
+    onSuccess: () => {
+      toast.success("Número verificado e pronto para uso.");
+      setVerificando(null);
+      setCodigo("");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const sincronizarMutation = useMutation({
     mutationFn: () => sincronizar({ data: {} as never }),
     onSuccess: (r: { total: number; aviso: string | null }) => {
@@ -235,6 +276,10 @@ function WhatsappNumerosPage() {
 
   const lista = numeros.data ?? [];
   const ocupado = abrindo || conectarMutation.isPending;
+
+  const verificacaoAtual = verificando
+    ? lista.find((n) => n.phone_number_id === verificando)
+    : null;
 
   return (
     <DashboardShell>
@@ -333,6 +378,18 @@ function WhatsappNumerosPage() {
                       ) : null}
                       {n.status === "conectado" ? "Conectado" : "Pendente"}
                     </Badge>
+                    {n.status !== "conectado" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setVerificando(n.phone_number_id);
+                          setCodigo("");
+                        }}
+                      >
+                        Verificar
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -349,6 +406,84 @@ function WhatsappNumerosPage() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={Boolean(verificando)}
+        onOpenChange={(aberto) => {
+          if (!aberto) {
+            setVerificando(null);
+            setCodigo("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verificar número</DialogTitle>
+            <DialogDescription>
+              Receba o código da Meta em{" "}
+              {verificacaoAtual?.display_phone_number ?? "seu número"} e confirme aqui
+              para ativar o envio e o recebimento de mensagens.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={enviarCodigoMutation.isPending}
+                onClick={() =>
+                  verificando &&
+                  enviarCodigoMutation.mutate({ phoneNumberId: verificando, metodo: "SMS" })
+                }
+              >
+                Enviar por SMS
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={enviarCodigoMutation.isPending}
+                onClick={() =>
+                  verificando &&
+                  enviarCodigoMutation.mutate({
+                    phoneNumberId: verificando,
+                    metodo: "VOICE",
+                  })
+                }
+              >
+                Receber ligação
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="codigo-whatsapp">Código de 6 dígitos</Label>
+              <Input
+                id="codigo-whatsapp"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              disabled={codigo.length !== 6 || confirmarCodigoMutation.isPending}
+              onClick={() =>
+                verificando &&
+                confirmarCodigoMutation.mutate({ phoneNumberId: verificando, codigo })
+              }
+            >
+              {confirmarCodigoMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Confirmar código
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
