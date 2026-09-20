@@ -148,6 +148,11 @@ function WhatsappNumerosPage() {
   });
 
   useEffect(() => {
+    const primeira = contas.data?.[0]?.wabaId;
+    if (primeira && !wabaId) setWabaId(primeira);
+  }, [contas.data, wabaId]);
+
+  useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.origin !== "https://www.facebook.com") return;
       try {
