@@ -101,8 +101,6 @@ async function processarEvento(body: string) {
   }
 }
 
-}
-
 export const Route = createFileRoute("/api/public/webhooks/whatsapp")({
   server: {
     handlers: {
