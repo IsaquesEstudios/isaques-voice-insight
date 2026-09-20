@@ -61,7 +61,7 @@ async function processarEvento(body: string) {
           ? new Date(Number(mensagem.timestamp) * 1000).toISOString()
           : new Date().toISOString();
 
-        const { data: conversa } = await chatDb
+        const { data: conversa, error: conversaError } = await chatDb
           .from("whatsapp_conversas")
           .upsert(
             {
@@ -76,9 +76,12 @@ async function processarEvento(body: string) {
           )
           .select("id, nao_lidas")
           .maybeSingle<{ id: string; nao_lidas: number | null }>();
+        if (conversaError) {
+          console.error("whatsapp webhook conversa", conversaError.message);
+        }
         if (!conversa) continue;
 
-        await chatDb.from("whatsapp_mensagens").upsert(
+        const { error: mensagemError } = await chatDb.from("whatsapp_mensagens").upsert(
           {
             conversa_id: conversa.id,
             user_id: numero.user_id,
@@ -91,6 +94,10 @@ async function processarEvento(body: string) {
           },
           { onConflict: "wa_message_id" }
         );
+
+        if (mensagemError) {
+          console.error("whatsapp webhook mensagem", mensagemError.message);
+        }
 
         await chatDb
           .from("whatsapp_conversas")
