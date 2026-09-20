@@ -615,7 +615,7 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       );
     }
 
-    await supabaseAdmin.from("whatsapp_mensagens").insert({
+    await chatDb.from("whatsapp_mensagens").insert({
       conversa_id: conversa.id,
       user_id: context.userId,
       wa_message_id: envioJson.messages?.[0]?.id ?? null,
@@ -625,10 +625,12 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       status: "enviada",
     });
 
-    await supabaseAdmin
+    await chatDb
       .from("whatsapp_conversas")
       .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
       .eq("id", conversa.id);
+
+
 
     return { ok: true };
   });
