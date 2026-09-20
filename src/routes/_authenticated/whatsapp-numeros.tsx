@@ -88,6 +88,7 @@ function WhatsappNumerosPage() {
   const carregarNumeros = useServerFn(listarNumerosWhatsapp);
   const conectar = useServerFn(conectarWhatsapp);
   const remover = useServerFn(removerNumeroWhatsapp);
+  const sincronizar = useServerFn(sincronizarNumerosWhatsapp);
   const [abrindo, setAbrindo] = useState(false);
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [diagnostico, setDiagnostico] = useState<string | null>(null);
