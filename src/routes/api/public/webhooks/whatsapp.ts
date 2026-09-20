@@ -61,7 +61,7 @@ async function processarEvento(body: string) {
           ? new Date(Number(mensagem.timestamp) * 1000).toISOString()
           : new Date().toISOString();
 
-        const { data: conversa } = await chatDb
+        const { data: conversa, error: conversaError } = await chatDb
           .from("whatsapp_conversas")
           .upsert(
             {
