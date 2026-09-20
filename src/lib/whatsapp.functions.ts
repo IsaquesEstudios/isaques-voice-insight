@@ -29,6 +29,68 @@ export const listarNumerosWhatsapp = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+/** Rebusca na Meta os números das contas já autorizadas pelo usuário. */
+export const sincronizarNumerosWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: contas, error: contasError } = await supabaseAdmin
+      .from("whatsapp_accounts")
+      .select("waba_id, access_token")
+      .eq("user_id", context.userId);
+    if (contasError) throw new Error(contasError.message);
+    if (!contas || contas.length === 0) {
+      throw new Error("Nenhuma conta do WhatsApp conectada ainda.");
+    }
+
+    let total = 0;
+    for (const conta of contas) {
+      if (!conta.access_token) continue;
+      const res = await fetch(
+        `${GRAPH}/${conta.waba_id}/phone_numbers?fields=id,display_phone_number,verified_name,code_verification_status`,
+        { headers: { Authorization: `Bearer ${conta.access_token}` } }
+      );
+      const json = (await res.json()) as {
+        data?: {
+          id: string;
+          display_phone_number?: string;
+          verified_name?: string;
+          code_verification_status?: string;
+        }[];
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        throw new Error(
+          json.error?.message ?? "A Meta não permitiu listar os números desta conta."
+        );
+      }
+      const lista = json.data ?? [];
+      if (lista.length === 0) continue;
+
+      const { error } = await supabaseAdmin.from("whatsapp_numeros").upsert(
+        lista.map((n) => ({
+          user_id: context.userId,
+          waba_id: conta.waba_id,
+          phone_number_id: n.id,
+          display_phone_number: n.display_phone_number ?? null,
+          verified_name: n.verified_name ?? null,
+          status: n.code_verification_status === "VERIFIED" ? "conectado" : "pendente",
+        })),
+        { onConflict: "phone_number_id" }
+      );
+      if (error) throw new Error(error.message);
+      total += lista.length;
+    }
+
+    if (total === 0) {
+      throw new Error(
+        "A conta está conectada, mas a Meta não retornou nenhum número. Cadastre e verifique o número no WhatsApp Manager."
+      );
+    }
+    return { ok: true, total };
+  });
+
+
 export const removerNumeroWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => {
