@@ -237,14 +237,28 @@ function WhatsappNumerosPage() {
               vão atender pelo painel.
             </p>
           </div>
-          <Button onClick={iniciarConexao} disabled={ocupado}>
-            {ocupado ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="mr-2 h-4 w-4" />
-            )}
-            Conectar WhatsApp
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => sincronizarMutation.mutate()}
+              disabled={sincronizarMutation.isPending}
+            >
+              {sincronizarMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Atualizar números
+            </Button>
+            <Button onClick={iniciarConexao} disabled={ocupado}>
+              {ocupado ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              Conectar WhatsApp
+            </Button>
+          </div>
         </div>
 
         <Alert>
