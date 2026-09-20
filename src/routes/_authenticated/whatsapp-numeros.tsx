@@ -356,6 +356,18 @@ function WhatsappNumerosPage() {
               )}
               Conectar WhatsApp
             </Button>
+            <Button
+              variant="secondary"
+              disabled={(contas.data?.length ?? 0) === 0}
+              onClick={() => {
+                setEtapa("dados");
+                setCodigo("");
+                setCadastroAberto(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Cadastrar número
+            </Button>
           </div>
         </div>
 
