@@ -497,8 +497,8 @@ export const confirmarCodigoWhatsapp = createServerFn({ method: "POST" })
 export const listarConversasWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { data, error } = await chatDb
       .from("whatsapp_conversas")
       .select(
         "id, phone_number_id, contato_wa_id, contato_nome, ultima_mensagem, ultima_em, nao_lidas"
@@ -507,7 +507,15 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
       .order("ultima_em", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []) as {
+      id: string;
+      phone_number_id: string;
+      contato_wa_id: string;
+      contato_nome: string | null;
+      ultima_mensagem: string | null;
+      ultima_em: string;
+      nao_lidas: number;
+    }[];
   });
 
 export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
@@ -517,8 +525,8 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: mensagens, error } = await supabaseAdmin
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { data: mensagens, error } = await chatDb
       .from("whatsapp_mensagens")
       .select("id, direcao, texto, tipo, status, criado_em")
       .eq("conversa_id", data.conversaId)
@@ -527,14 +535,22 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
       .limit(300);
     if (error) throw new Error(error.message);
 
-    await supabaseAdmin
+    await chatDb
       .from("whatsapp_conversas")
       .update({ nao_lidas: 0 })
       .eq("id", data.conversaId)
       .eq("user_id", context.userId);
 
-    return mensagens ?? [];
+    return (mensagens ?? []) as {
+      id: string;
+      direcao: string;
+      texto: string | null;
+      tipo: string;
+      status: string | null;
+      criado_em: string;
+    }[];
   });
+
 
 export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
