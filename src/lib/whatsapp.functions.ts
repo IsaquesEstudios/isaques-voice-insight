@@ -43,12 +43,36 @@ export const sincronizarNumerosWhatsapp = createServerFn({ method: "POST" })
       throw new Error("Nenhuma conta do WhatsApp conectada ainda.");
     }
 
-    let total = 0;
+    const appId = process.env["META_APP_ID"];
+    const appSecret = process.env["META_APP_SECRET"];
+
+    // Um mesmo login pode autorizar mais de uma conta comercial; descobre todas.
+    const pares = new Map<string, string>();
     for (const conta of contas) {
       if (!conta.access_token) continue;
+      pares.set(conta.waba_id, conta.access_token);
+      if (!appId || !appSecret) continue;
+      const dbg = await fetch(
+        `${GRAPH}/debug_token?input_token=${encodeURIComponent(
+          conta.access_token
+        )}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
+      );
+      const dbgJson = (await dbg.json()) as {
+        data?: { granular_scopes?: { scope: string; target_ids?: string[] }[] };
+      };
+      for (const escopo of dbgJson.data?.granular_scopes ?? []) {
+        if (escopo.scope !== "whatsapp_business_management") continue;
+        for (const alvo of escopo.target_ids ?? []) {
+          if (!pares.has(alvo)) pares.set(alvo, conta.access_token);
+        }
+      }
+    }
+
+    let total = 0;
+    for (const [wabaId, token] of pares) {
       const res = await fetch(
-        `${GRAPH}/${conta.waba_id}/phone_numbers?fields=id,display_phone_number,verified_name,code_verification_status`,
-        { headers: { Authorization: `Bearer ${conta.access_token}` } }
+        `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,code_verification_status`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       const json = (await res.json()) as {
         data?: {
@@ -59,18 +83,19 @@ export const sincronizarNumerosWhatsapp = createServerFn({ method: "POST" })
         }[];
         error?: { message?: string };
       };
-      if (!res.ok) {
-        throw new Error(
-          json.error?.message ?? "A Meta não permitiu listar os números desta conta."
-        );
-      }
+      if (!res.ok) continue;
       const lista = json.data ?? [];
       if (lista.length === 0) continue;
+
+      await supabaseAdmin.from("whatsapp_accounts").upsert(
+        { user_id: context.userId, waba_id: wabaId, access_token: token },
+        { onConflict: "user_id,waba_id" }
+      );
 
       const { error } = await supabaseAdmin.from("whatsapp_numeros").upsert(
         lista.map((n) => ({
           user_id: context.userId,
-          waba_id: conta.waba_id,
+          waba_id: wabaId,
           phone_number_id: n.id,
           display_phone_number: n.display_phone_number ?? null,
           verified_name: n.verified_name ?? null,
@@ -82,12 +107,15 @@ export const sincronizarNumerosWhatsapp = createServerFn({ method: "POST" })
       total += lista.length;
     }
 
-    if (total === 0) {
-      throw new Error(
-        "A conta está conectada, mas a Meta não retornou nenhum número. Cadastre e verifique o número no WhatsApp Manager."
-      );
-    }
-    return { ok: true, total };
+    return {
+      ok: true,
+      total,
+      aviso:
+        total === 0
+          ? `A Meta autorizou ${pares.size} conta(s) comercial(is), mas nenhuma delas tem número cadastrado. Adicione e verifique o número no WhatsApp Manager e clique em Atualizar números.`
+          : null,
+    };
+
   });
 
 
@@ -235,9 +263,12 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     }
 
     if (lista.length === 0) {
-      throw new Error(
-        "A conexão foi autorizada, mas a Meta não retornou nenhum número nessa conta comercial. Verifique se o número já foi cadastrado e verificado no WhatsApp Manager."
-      );
+      return {
+        ok: true,
+        total: 0,
+        aviso:
+          "A conexão foi autorizada, mas essa conta comercial ainda não tem número cadastrado. Adicione e verifique o número no WhatsApp Manager e clique em Atualizar números.",
+      };
     }
 
     const { error } = await supabaseAdmin.from("whatsapp_numeros").upsert(
@@ -253,7 +284,8 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
     );
     if (error) throw new Error(error.message);
 
-    return { ok: true, total: lista.length };
+    return { ok: true, total: lista.length, aviso: null };
+
 
   });
 

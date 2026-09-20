@@ -154,8 +154,13 @@ function WhatsappNumerosPage() {
       wabaId?: string | null;
       phoneNumberId?: string | null;
     }) => conectar({ data: input }),
-    onSuccess: () => {
-      toast.success("WhatsApp conectado com sucesso.");
+    onSuccess: (r: { total: number; aviso: string | null }) => {
+      if (r.aviso) {
+        setDiagnostico(r.aviso);
+        toast.warning(r.aviso);
+      } else {
+        toast.success("WhatsApp conectado com sucesso.");
+      }
       queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
@@ -172,8 +177,14 @@ function WhatsappNumerosPage() {
 
   const sincronizarMutation = useMutation({
     mutationFn: () => sincronizar({ data: {} as never }),
-    onSuccess: (r: { total: number }) => {
-      toast.success(`${r.total} número(s) atualizado(s).`);
+    onSuccess: (r: { total: number; aviso: string | null }) => {
+      if (r.aviso) {
+        setDiagnostico(r.aviso);
+        toast.warning(r.aviso);
+      } else {
+        setDiagnostico(null);
+        toast.success(`${r.total} número(s) atualizado(s).`);
+      }
       queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
