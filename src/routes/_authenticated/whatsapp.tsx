@@ -256,15 +256,21 @@ function WhatsappPage() {
                   </div>
                   <div>
                     <p className="text-base font-semibold text-foreground">
-                      Nenhuma conversa selecionada
+                      {listaNumeros.length === 0
+                        ? "Nenhum número conectado"
+                        : "Nenhuma conversa selecionada"}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Conecte um número de WhatsApp para começar a receber mensagens.
+                      {listaNumeros.length === 0
+                        ? "Conecte um número de WhatsApp para começar a receber mensagens."
+                        : "Escolha uma conversa na lista ao lado para ver as mensagens."}
                     </p>
                   </div>
-                  <Button asChild variant="outline">
-                    <Link to="/whatsapp-numeros">Conectar um número</Link>
-                  </Button>
+                  {listaNumeros.length === 0 ? (
+                    <Button asChild variant="outline">
+                      <Link to="/whatsapp-numeros">Conectar um número</Link>
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </CardContent>
