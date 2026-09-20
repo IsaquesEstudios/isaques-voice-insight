@@ -494,6 +494,15 @@ export const confirmarCodigoWhatsapp = createServerFn({ method: "POST" })
 
 /* ------------------------------ Conversas ------------------------------ */
 
+// As tabelas de conversas vivem no banco externo; se ainda não existirem,
+// devolvemos listas vazias em vez de quebrar a tela.
+function tabelaAusente(error: { code?: string; message?: string }) {
+  return (
+    error?.code === "PGRST205" ||
+    /schema cache|does not exist/i.test(error?.message ?? "")
+  );
+}
+
 export const listarConversasWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
