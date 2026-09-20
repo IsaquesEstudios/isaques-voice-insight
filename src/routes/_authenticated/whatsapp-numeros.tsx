@@ -188,6 +188,31 @@ function WhatsappNumerosPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const enviarCodigoMutation = useMutation({
+    mutationFn: (input: { phoneNumberId: string; metodo: "SMS" | "VOICE" }) =>
+      enviarCodigo({ data: input }),
+    onSuccess: (_r, input) => {
+      toast.success(
+        input.metodo === "SMS"
+          ? "Código enviado por SMS."
+          : "Você vai receber uma ligação com o código."
+      );
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const confirmarCodigoMutation = useMutation({
+    mutationFn: (input: { phoneNumberId: string; codigo: string }) =>
+      confirmarCodigo({ data: input }),
+    onSuccess: () => {
+      toast.success("Número verificado e pronto para uso.");
+      setVerificando(null);
+      setCodigo("");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const sincronizarMutation = useMutation({
     mutationFn: () => sincronizar({ data: {} as never }),
     onSuccess: (r: { total: number; aviso: string | null }) => {
