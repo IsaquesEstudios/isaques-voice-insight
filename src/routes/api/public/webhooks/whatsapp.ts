@@ -76,9 +76,12 @@ async function processarEvento(body: string) {
           )
           .select("id, nao_lidas")
           .maybeSingle<{ id: string; nao_lidas: number | null }>();
+        if (conversaError) {
+          console.error("whatsapp webhook conversa", conversaError.message);
+        }
         if (!conversa) continue;
 
-        await chatDb.from("whatsapp_mensagens").upsert(
+        const { error: mensagemError } = await chatDb.from("whatsapp_mensagens").upsert(
           {
             conversa_id: conversa.id,
             user_id: numero.user_id,
