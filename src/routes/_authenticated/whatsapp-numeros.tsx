@@ -101,7 +101,11 @@ function WhatsappNumerosPage() {
   const conectar = useServerFn(conectarWhatsapp);
   const remover = useServerFn(removerNumeroWhatsapp);
   const sincronizar = useServerFn(sincronizarNumerosWhatsapp);
+  const enviarCodigo = useServerFn(reenviarCodigoWhatsapp);
+  const confirmarCodigo = useServerFn(confirmarCodigoWhatsapp);
   const [abrindo, setAbrindo] = useState(false);
+  const [verificando, setVerificando] = useState<string | null>(null);
+  const [codigo, setCodigo] = useState("");
   const sessaoRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
