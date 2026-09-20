@@ -506,7 +506,10 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
       .eq("user_id", context.userId)
       .order("ultima_em", { ascending: false })
       .limit(200);
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (tabelaAusente(error)) return [];
+      throw new Error(error.message);
+    }
     return (data ?? []) as {
       id: string;
       phone_number_id: string;
