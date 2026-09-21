@@ -33,6 +33,7 @@ export const listWhatsappAiAgents = createServerFn({ method: "GET" })
       .select("id, name, provider, area, mission, tone, emoji_usage, language, response_length, restrictions, knowledge, created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
+    if (tabelaAusente(error)) return [];
     if (error) throw new Error(`Não foi possível carregar os assistentes: ${error.message}`);
     return data ?? [];
   });
