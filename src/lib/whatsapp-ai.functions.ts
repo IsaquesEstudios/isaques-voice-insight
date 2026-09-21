@@ -60,6 +60,7 @@ export const saveWhatsappAiAgent = createServerFn({ method: "POST" })
       ? chatDb.from("whatsapp_ai_agents").update(record).eq("id", data.id).eq("user_id", context.userId)
       : chatDb.from("whatsapp_ai_agents").insert(record);
     const { error } = await query;
+    if (tabelaAusente(error)) throw new Error(AVISO_TABELAS);
     if (error) throw new Error(`Não foi possível salvar o assistente: ${error.message}`);
     return { ok: true as const };
   });
