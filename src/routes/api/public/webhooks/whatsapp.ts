@@ -31,7 +31,7 @@ async function responderComIa(input: {
   inboundMessageId: string;
   agentId: string;
 }) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { chatDb } = await import("@/integrations/supabase/chat-db.server");
 
   const { error: claimError } = await chatDb.from("whatsapp_ai_runs").insert({
@@ -153,7 +153,7 @@ async function responderComIa(input: {
 }
 
 async function processarEvento(body: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { chatDb } = await import("@/integrations/supabase/chat-db.server");
   const payload = JSON.parse(body) as {
     entry?: { changes?: WhatsappChange[] }[];

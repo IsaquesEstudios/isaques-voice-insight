@@ -42,7 +42,7 @@ const templateSchema = z.object({
 export type TemplateInput = z.infer<typeof templateSchema>;
 
 async function tokenDaConta(userId: string, wabaId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { data } = await supabaseAdmin
     .from("whatsapp_accounts")
     .select("access_token")
@@ -69,7 +69,7 @@ export type ComponenteTemplate = {
 export const listarTemplatesWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { data: contas } = await supabaseAdmin
       .from("whatsapp_accounts")
       .select("waba_id, access_token")

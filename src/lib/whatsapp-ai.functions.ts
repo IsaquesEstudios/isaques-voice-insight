@@ -136,7 +136,7 @@ export const bindWhatsappNumberAgent = createServerFn({ method: "POST" })
     z.object({ numberId: z.string().uuid(), agentId: z.string().uuid().nullable() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
     if (data.agentId) {
       const { data: agent } = await chatDb
