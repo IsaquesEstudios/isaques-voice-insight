@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, MessageCircle, Search, Send } from "lucide-react";
+import { Bot, Loader2, MessageCircle, Search, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -11,6 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import { PromptInput, PromptInputBody, PromptInputFooter, PromptInputSubmit } from "@/components/ai-elements/prompt-input";
+import { Textarea } from "@/components/ui/textarea";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   enviarMensagemWhatsapp,
@@ -18,6 +22,7 @@ import {
   listarMensagensWhatsapp,
   listarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
+import { setWhatsappConversationTakeover } from "@/lib/whatsapp-ai.functions";
 
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
@@ -53,6 +58,7 @@ function WhatsappPage() {
   const carregarConversas = useServerFn(listarConversasWhatsapp);
   const carregarMensagens = useServerFn(listarMensagensWhatsapp);
   const enviar = useServerFn(enviarMensagemWhatsapp);
+  const alterarAtendimento = useServerFn(setWhatsappConversationTakeover);
 
   const carregarNumeros = useServerFn(listarNumerosWhatsapp);
 
@@ -69,12 +75,14 @@ function WhatsappPage() {
   const conversas = useQuery({
     queryKey: ["whatsapp-conversas"],
     queryFn: () => carregarConversas(),
+    refetchInterval: 3_000,
   });
 
   const mensagens = useQuery({
     queryKey: ["whatsapp-mensagens", selecionada],
     queryFn: () => carregarMensagens({ data: { conversaId: selecionada! } }),
     enabled: Boolean(selecionada),
+    refetchInterval: selecionada ? 3_000 : false,
   });
 
   // Tempo real: o banco avisa assim que chega ou muda uma mensagem.
@@ -113,9 +121,24 @@ function WhatsappPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const atendimentoMutation = useMutation({
+    mutationFn: (manual: boolean) =>
+      alterarAtendimento({ data: { conversationId: selecionada!, manual } }),
+    onSuccess: (_data, manual) => {
+      toast.success(manual ? "Atendimento assumido por você." : "Assistente de IA reativado.");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
 
   const lista = conversas.data ?? [];
   const listaNumeros = numeros.data ?? [];
+  const conversaSelecionada = lista.find((conversa) => conversa.id === selecionada);
+  const numeroSelecionado = listaNumeros.find(
+    (numero) => numero.phone_number_id === conversaSelecionada?.phone_number_id,
+  );
+  const possuiIa = Boolean(numeroSelecionado?.whatsapp_ai_agent_id);
   const rotuloNumero = (phoneNumberId: string) => {
     const n = listaNumeros.find((x) => x.phone_number_id === phoneNumberId);
     return n?.display_phone_number ?? n?.verified_name ?? "Número";
@@ -134,17 +157,10 @@ function WhatsappPage() {
 
   return (
     <DashboardShell>
-      <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">WhatsApp</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Todas as conversas dos seus números de WhatsApp em um só lugar.
-          </p>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="flex min-h-[calc(100dvh-7rem)] flex-col">
+        <div className="grid flex-1 gap-4 lg:grid-cols-[320px_1fr]">
           <Card className="border-border/60 bg-card/70">
-            <CardContent className="flex h-[540px] flex-col gap-3 p-3">
+            <CardContent className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3 p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -227,53 +243,68 @@ function WhatsappPage() {
           </Card>
 
           <Card className="border-border/60 bg-card/70">
-            <CardContent className="flex h-[540px] flex-col p-0">
+            <CardContent className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col p-0">
               {selecionada ? (
                 <>
-                  <ScrollArea className="flex-1 p-4">
-                    <div className="flex flex-col gap-3">
+                  <div className="flex min-h-16 items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{conversaSelecionada?.contato_nome ?? conversaSelecionada?.contato_wa_id}</p>
+                      <p className="truncate text-xs text-muted-foreground">via {conversaSelecionada ? rotuloNumero(conversaSelecionada.phone_number_id) : "WhatsApp"}</p>
+                    </div>
+                    {possuiIa ? (
+                      <Button
+                        variant={conversaSelecionada?.manual_takeover ? "secondary" : "outline"}
+                        size="sm"
+                        disabled={atendimentoMutation.isPending}
+                        onClick={() => atendimentoMutation.mutate(!conversaSelecionada?.manual_takeover)}
+                      >
+                        {atendimentoMutation.isPending ? <Loader2 className="animate-spin" /> : conversaSelecionada?.manual_takeover ? <Bot /> : <UserRound />}
+                        {conversaSelecionada?.manual_takeover ? "Reativar IA" : "Assumir conversa"}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <Conversation>
+                    <ConversationContent className="gap-3 p-4">
                       {(mensagens.data ?? []).map((m) => (
-                        <div
-                          key={m.id}
-                          className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
-                            m.direcao === "saida"
-                              ? "self-end bg-primary/15 text-foreground"
-                              : "self-start bg-muted text-foreground"
-                          }`}
-                        >
-                          {m.texto}
+                        <Message key={m.id} from={m.direcao === "saida" ? "user" : "assistant"}>
+                          <MessageContent className={m.direcao === "entrada" ? "rounded-lg bg-muted px-4 py-3" : ""}>
+                            <span>{m.texto}</span>
                           <span className="mt-1 block text-[10px] text-muted-foreground">
                             {hora(m.criado_em)}
                           </span>
-                        </div>
+                          </MessageContent>
+                        </Message>
                       ))}
-                    </div>
-                  </ScrollArea>
-                  <form
-                    className="flex items-center gap-2 border-t border-border/60 p-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (rascunho.trim()) enviarMutation.mutate(rascunho);
-                    }}
-                  >
-                    <Input
-                      value={rascunho}
-                      onChange={(e) => setRascunho(e.target.value)}
-                      placeholder="Escreva uma mensagem"
-                    />
-                    <Button
-                      type="submit"
-                      size="icon"
-                      aria-label="Enviar mensagem"
-                      disabled={enviarMutation.isPending || !rascunho.trim()}
+                    </ConversationContent>
+                    <ConversationScrollButton />
+                  </Conversation>
+                  <div className="border-t border-border/60 p-3">
+                    <PromptInput
+                      onSubmit={({ text }) => {
+                        const value = (text || rascunho).trim();
+                        if (value) enviarMutation.mutate(value);
+                      }}
                     >
-                      {enviarMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </form>
+                      <PromptInputBody>
+                        <Textarea
+                          value={rascunho}
+                          onChange={(event) => setRascunho(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" && !event.shiftKey) {
+                              event.preventDefault();
+                              if (rascunho.trim() && !enviarMutation.isPending) enviarMutation.mutate(rascunho);
+                            }
+                          }}
+                          placeholder="Escreva uma mensagem"
+                          className="min-h-12 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+                        />
+                      </PromptInputBody>
+                      <PromptInputFooter>
+                        <span className="text-xs text-muted-foreground">Enter para enviar · Shift + Enter para quebrar linha</span>
+                        <PromptInputSubmit disabled={enviarMutation.isPending || !rascunho.trim()} status={enviarMutation.isPending ? "submitted" : "ready"} />
+                      </PromptInputFooter>
+                    </PromptInput>
+                  </div>
                 </>
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center">
