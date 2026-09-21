@@ -86,6 +86,44 @@ function arquivoParaBase64(arquivo: Blob) {
   });
 }
 
+function canalParaPcm(canal: Float32Array, inicio: number, tamanho: number) {
+  const pcm = new Int16Array(tamanho);
+  for (let i = 0; i < tamanho; i += 1) {
+    const amostra = Math.max(-1, Math.min(1, canal[inicio + i] ?? 0));
+    pcm[i] = amostra < 0 ? amostra * 0x8000 : amostra * 0x7fff;
+  }
+  return pcm;
+}
+
+async function converterAudioParaMp3(gravacao: Blob) {
+  const AudioContextClass = window.AudioContext;
+  const audioContext = new AudioContextClass();
+  try {
+    const audioBuffer = await audioContext.decodeAudioData(await gravacao.arrayBuffer());
+    const { Mp3Encoder } = await import("@breezystack/lamejs");
+    const canais = Math.min(audioBuffer.numberOfChannels, 2);
+    const esquerdo = audioBuffer.getChannelData(0);
+    const direito = canais === 2 ? audioBuffer.getChannelData(1) : undefined;
+    const encoder = new Mp3Encoder(canais, audioBuffer.sampleRate, 96);
+    const partes: BlobPart[] = [];
+
+    for (let inicio = 0; inicio < audioBuffer.length; inicio += 1152) {
+      const tamanho = Math.min(1152, audioBuffer.length - inicio);
+      const pcmEsquerdo = canalParaPcm(esquerdo, inicio, tamanho);
+      const pcmDireito = direito ? canalParaPcm(direito, inicio, tamanho) : undefined;
+      const codificado = encoder.encodeBuffer(pcmEsquerdo, pcmDireito);
+      if (codificado.length > 0) partes.push(new Uint8Array(codificado));
+    }
+
+    const final = encoder.flush();
+    if (final.length > 0) partes.push(new Uint8Array(final));
+    if (partes.length === 0) throw new Error("A gravação ficou vazia.");
+    return new Blob(partes, { type: "audio/mpeg" });
+  } finally {
+    await audioContext.close();
+  }
+}
+
 function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   const baixar = useServerFn(obterMidiaWhatsapp);
   const automatico = mensagem.tipo === "image" || mensagem.tipo === "audio";
@@ -253,32 +291,29 @@ function WhatsappPage() {
   const iniciarGravacao = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const formatos = ["audio/mp4", "audio/ogg;codecs=opus", "audio/aac", "audio/webm;codecs=opus", "audio/webm"];
+      const formatos = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4", "audio/webm"];
       const formato = formatos.find((f) => MediaRecorder.isTypeSupported(f)) ?? "";
       const gravador = new MediaRecorder(stream, formato ? { mimeType: formato } : undefined);
       const partes: Blob[] = [];
       gravador.ondataavailable = (evento) => {
         if (evento.data.size > 0) partes.push(evento.data);
       };
-      gravador.onstop = () => {
+      gravador.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         setGravando(false);
-        const gravado = (gravador.mimeType || "audio/mp4").split(";")[0] ?? "audio/mp4";
-        // O WhatsApp não aceita webm: nesse caso enviamos como arquivo para não perder o áudio.
-        const suportado = gravado === "audio/mp4" || gravado === "audio/ogg" || gravado === "audio/aac" || gravado === "audio/mpeg";
-        const mime = gravado;
-        const extensao = mime.includes("mp4") || mime.includes("aac") ? "m4a" : mime.includes("mpeg") ? "mp3" : mime.includes("webm") ? "webm" : "ogg";
-        const audio = new Blob(partes, { type: mime });
-        if (audio.size === 0) return;
-        if (!suportado) {
-          toast.info("Seu navegador gravou em um formato que o WhatsApp não aceita; enviamos como arquivo.");
+        const gravado = new Blob(partes, { type: gravador.mimeType || "audio/webm" });
+        if (gravado.size === 0) return;
+        try {
+          const audioMp3 = await converterAudioParaMp3(gravado);
+          midiaMutation.mutate({
+            arquivo: audioMp3,
+            nome: `audio-${Date.now()}.mp3`,
+            tipo: "audio",
+            mime: "audio/mpeg",
+          });
+        } catch {
+          toast.error("Não foi possível preparar o áudio. Grave novamente e tente enviar.");
         }
-        midiaMutation.mutate({
-          arquivo: audio,
-          nome: `audio-${Date.now()}.${extensao}`,
-          tipo: suportado ? "audio" : "document",
-          mime,
-        });
       };
       gravadorRef.current = gravador;
       gravador.start();
