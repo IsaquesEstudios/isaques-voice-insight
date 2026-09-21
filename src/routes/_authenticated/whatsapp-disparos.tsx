@@ -34,6 +34,7 @@ import {
   excluirLembreteWhatsapp,
   listarCampanhasWhatsapp,
   listarLembretesWhatsapp,
+  obterAgendamentoCron,
   processarCampanhaAgora,
   salvarLembreteWhatsapp,
 } from "@/lib/whatsapp-disparos.functions";
@@ -261,6 +262,11 @@ function DisparosPage() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const cron = useQuery({ queryKey: ["whatsapp-cron"], queryFn: () => obterAgendamentoCron() });
+  const sqlAgendamento = cron.data
+    ? `select cron.schedule(\n  'omniasyn-disparos',\n  '* * * * *',\n  $$ select net.http_post(url := '${cron.data.url}') $$\n);`
+    : "";
+
   const listaNumeros = numeros.data ?? [];
 
   return (
@@ -413,6 +419,30 @@ function DisparosPage() {
             )}
           </TabsContent>
         </Tabs>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Agendamento automático</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Rode este comando uma única vez no SQL Editor do seu banco externo para que campanhas
+              agendadas e lembretes saiam sozinhos no horário marcado.
+            </p>
+            <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{sqlAgendamento}</pre>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                void navigator.clipboard.writeText(sqlAgendamento);
+                toast.success("Comando copiado.");
+              }}
+              disabled={!sqlAgendamento}
+            >
+              Copiar comando
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Nova campanha */}
