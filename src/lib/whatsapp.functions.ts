@@ -503,6 +503,15 @@ function tabelaAusente(error: { code?: string; message?: string }) {
   );
 }
 
+// Colunas de mídia são opcionais: o painel continua funcionando sem elas.
+function colunaAusente(error: { code?: string; message?: string }) {
+  return (
+    error?.code === "42703" ||
+    error?.code === "PGRST204" ||
+    /column .* does not exist|media_id/i.test(error?.message ?? "")
+  );
+}
+
 export const listarConversasWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
