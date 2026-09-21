@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   conectarWhatsapp,
   confirmarCodigoWhatsapp,
@@ -35,6 +36,7 @@ import {
   reenviarCodigoWhatsapp,
   sincronizarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
+import { bindWhatsappNumberAgent, listWhatsappAiAgents } from "@/lib/whatsapp-ai.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-numeros")({
   head: () => ({
@@ -103,6 +105,8 @@ function WhatsappNumerosPage() {
   const sincronizar = useServerFn(sincronizarNumerosWhatsapp);
   const enviarCodigo = useServerFn(reenviarCodigoWhatsapp);
   const confirmarCodigo = useServerFn(confirmarCodigoWhatsapp);
+  const carregarAssistentes = useServerFn(listWhatsappAiAgents);
+  const vincularAssistente = useServerFn(bindWhatsappNumberAgent);
   const [abrindo, setAbrindo] = useState(false);
   const [verificando, setVerificando] = useState<string | null>(null);
   const [codigo, setCodigo] = useState("");
@@ -119,6 +123,11 @@ function WhatsappNumerosPage() {
     queryKey: ["whatsapp-numeros"],
     queryFn: () => carregarNumeros(),
     staleTime: 30_000,
+  });
+
+  const assistentes = useQuery({
+    queryKey: ["whatsapp-ai-agents"],
+    queryFn: () => carregarAssistentes(),
   });
 
   useEffect(() => {
@@ -227,6 +236,16 @@ function WhatsappNumerosPage() {
         setDiagnostico(null);
         toast.success(`${r.total} número(s) atualizado(s).`);
       }
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const vincularMutation = useMutation({
+    mutationFn: (input: { numberId: string; agentId: string | null }) =>
+      vincularAssistente({ data: input }),
+    onSuccess: () => {
+      toast.success("Atendimento por IA atualizado.");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-numeros"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
@@ -401,6 +420,32 @@ function WhatsappNumerosPage() {
                     </Button>
                   </div>
                 </CardHeader>
+                <CardContent className="border-t border-border/60 pt-4">
+                  <div className="space-y-1.5">
+                    <Label>Assistente de IA</Label>
+                    <Select
+                      value={n.whatsapp_ai_agent_id ?? "sem-ia"}
+                      onValueChange={(value) =>
+                        vincularMutation.mutate({
+                          numberId: n.id,
+                          agentId: value === "sem-ia" ? null : value,
+                        })
+                      }
+                      disabled={vincularMutation.isPending}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecionar assistente" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sem-ia">Sem atendimento por IA</SelectItem>
+                        {(assistentes.data ?? []).map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(assistentes.data ?? []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Crie um assistente na página Assistente de IA para ativar respostas automáticas.</p>
+                    ) : null}
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>
