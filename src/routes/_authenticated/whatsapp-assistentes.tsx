@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteWhatsappAiAgent, listWhatsappAiAgents, saveWhatsappAiAgent } from "@/lib/whatsapp-ai.functions";
+import { deleteWhatsappAiAgent, getGeminiCredentialStatus, listWhatsappAiAgents, saveWhatsappAiAgent } from "@/lib/whatsapp-ai.functions";
 import { listarNumerosWhatsapp } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-assistentes")({
@@ -76,9 +76,11 @@ function WhatsappAssistentesPage() {
   const listNumbers = useServerFn(listarNumerosWhatsapp);
   const saveAgent = useServerFn(saveWhatsappAiAgent);
   const removeAgent = useServerFn(deleteWhatsappAiAgent);
+  const getCredentialStatus = useServerFn(getGeminiCredentialStatus);
   const [form, setForm] = useState<FormState | null>(null);
 
   const agents = useQuery({ queryKey: ["whatsapp-ai-agents"], queryFn: () => listAgents() });
+  const geminiStatus = useQuery({ queryKey: ["gemini-credential-status"], queryFn: () => getCredentialStatus() });
   const numbers = useQuery({ queryKey: ["whatsapp-numeros"], queryFn: () => listNumbers() });
   const save = useMutation({
     mutationFn: (value: FormState) => saveAgent({ data: value }),
