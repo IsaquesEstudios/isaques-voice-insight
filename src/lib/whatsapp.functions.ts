@@ -552,13 +552,23 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
-    const { data: mensagens, error } = await chatDb
-      .from("whatsapp_mensagens")
-      .select("id, direcao, texto, tipo, status, criado_em")
-      .eq("conversa_id", data.conversaId)
-      .eq("user_id", context.userId)
-      .order("criado_em", { ascending: true })
-      .limit(300);
+    const consulta = (campos: string) =>
+      chatDb
+        .from("whatsapp_mensagens")
+        .select(campos)
+        .eq("conversa_id", data.conversaId)
+        .eq("user_id", context.userId)
+        .order("criado_em", { ascending: true })
+        .limit(300);
+
+    let { data: mensagens, error } = await consulta(
+      "id, direcao, texto, tipo, status, criado_em, media_id, media_mime, media_nome",
+    );
+    if (error && colunaAusente(error)) {
+      ({ data: mensagens, error } = await consulta(
+        "id, direcao, texto, tipo, status, criado_em",
+      ));
+    }
     if (error) {
       if (tabelaAusente(error)) return [];
       throw new Error(error.message);
@@ -570,13 +580,16 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("user_id", context.userId);
 
-    return (mensagens ?? []) as {
+    return (mensagens ?? []) as unknown as {
       id: string;
       direcao: string;
       texto: string | null;
       tipo: string;
       status: string | null;
       criado_em: string;
+      media_id?: string | null;
+      media_mime?: string | null;
+      media_nome?: string | null;
     }[];
   });
 
