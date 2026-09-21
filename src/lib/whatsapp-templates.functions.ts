@@ -59,6 +59,13 @@ function contarVariaveis(texto: string) {
   return (texto.match(/\{\{\s*\d+\s*\}\}/g) ?? []).length;
 }
 
+export type ComponenteTemplate = {
+  type: string;
+  format?: string;
+  text?: string;
+  buttons?: { type: string; text?: string; url?: string; phone_number?: string }[];
+};
+
 export const listarTemplatesWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -76,7 +83,7 @@ export const listarTemplatesWhatsapp = createServerFn({ method: "GET" })
       category: string;
       status: string;
       motivo: string | null;
-      components: unknown[];
+      components: ComponenteTemplate[];
     }[] = [];
 
     for (const conta of contas ?? []) {
@@ -93,7 +100,7 @@ export const listarTemplatesWhatsapp = createServerFn({ method: "GET" })
           category: string;
           status: string;
           rejected_reason?: string;
-          components?: unknown[];
+          components?: ComponenteTemplate[];
         }[];
       };
       if (!res.ok) continue;

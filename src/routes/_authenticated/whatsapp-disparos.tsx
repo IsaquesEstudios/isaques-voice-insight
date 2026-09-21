@@ -37,7 +37,10 @@ import {
   processarCampanhaAgora,
   salvarLembreteWhatsapp,
 } from "@/lib/whatsapp-disparos.functions";
-import { listarTemplatesWhatsapp } from "@/lib/whatsapp-templates.functions";
+import {
+  listarTemplatesWhatsapp,
+  type ComponenteTemplate,
+} from "@/lib/whatsapp-templates.functions";
 import { listarNumerosWhatsapp } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-disparos")({
@@ -72,15 +75,13 @@ function contarVariaveis(texto: string) {
   return (texto.match(/\{\{\s*\d+\s*\}\}/g) ?? []).length;
 }
 
-function corpoDoTemplate(components: unknown[]) {
-  const corpo = (components as { type?: string; text?: string }[]).find((c) => c.type === "BODY");
+function corpoDoTemplate(components: ComponenteTemplate[]) {
+  const corpo = components.find((c) => c.type === "BODY");
   return corpo?.text ?? "";
 }
 
-function formatoDoHeader(components: unknown[]) {
-  const header = (components as { type?: string; format?: string }[]).find(
-    (c) => c.type === "HEADER",
-  );
+function formatoDoHeader(components: ComponenteTemplate[]) {
+  const header = components.find((c) => c.type === "HEADER");
   const formato = header?.format ?? "";
   return ["IMAGE", "VIDEO", "DOCUMENT"].includes(formato)
     ? (formato.toLowerCase() as "image" | "video" | "document")

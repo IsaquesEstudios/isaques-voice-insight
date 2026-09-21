@@ -252,9 +252,7 @@ function TemplatesPage() {
                 texto: template.status,
                 cor: "bg-muted text-muted-foreground",
               };
-              const corpo = (template.components as { type?: string; text?: string }[]).find(
-                (c) => c.type === "BODY",
-              );
+              const corpo = template.components.find((c) => c.type === "BODY");
               return (
                 <Card key={`${template.wabaId}-${template.id}`}>
                   <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
