@@ -176,7 +176,7 @@ function WhatsappAssistentesPage() {
             <Field label="Não deve"><Textarea rows={3} value={form.restrictions} placeholder="Prometer descontos, pedir dados sensíveis..." onChange={(e) => setForm({ ...form, restrictions: e.target.value })} /></Field>
             <Field label="Inteligência"><Textarea rows={8} value={form.knowledge} placeholder="Produtos, políticas, respostas frequentes e tudo que a IA precisa saber." onChange={(e) => setForm({ ...form, knowledge: e.target.value })} /></Field>
           </div> : null}
-          <DialogFooter><Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button><Button disabled={!form || save.isPending} onClick={() => form && save.mutate(form)}>{save.isPending ? <Loader2 className="animate-spin" /> : null}Salvar assistente</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button><Button disabled={!form || save.isPending || (geminiStatus.data ? !geminiStatus.data.configured : false)} onClick={() => form && save.mutate(form)}>{save.isPending ? <Loader2 className="animate-spin" /> : null}Salvar assistente</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardShell>
