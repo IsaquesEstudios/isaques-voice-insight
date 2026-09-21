@@ -11,6 +11,11 @@ type WhatsappChange = {
       type?: string;
       timestamp?: string;
       text?: { body?: string };
+      image?: { id?: string; mime_type?: string; caption?: string };
+      audio?: { id?: string; mime_type?: string };
+      video?: { id?: string; mime_type?: string; caption?: string };
+      document?: { id?: string; mime_type?: string; caption?: string; filename?: string };
+      sticker?: { id?: string; mime_type?: string };
     }[];
     statuses?: { id?: string; status?: string }[];
   };
@@ -184,10 +189,25 @@ async function processarEvento(body: string) {
         if (!waId) continue;
 
         const contato = value?.contacts?.find((c) => c.wa_id === waId);
+        const midia =
+          mensagem.image ?? mensagem.audio ?? mensagem.video ?? mensagem.document ?? mensagem.sticker;
+        const rotuloMidia =
+          mensagem.type === "image"
+            ? "📷 Foto"
+            : mensagem.type === "audio"
+              ? "🎤 Áudio"
+              : mensagem.type === "video"
+                ? "🎬 Vídeo"
+                : mensagem.type === "document"
+                  ? `📎 ${mensagem.document?.filename ?? "Documento"}`
+                  : `[${mensagem.type ?? "mídia"}]`;
         const texto =
           mensagem.type === "text"
             ? (mensagem.text?.body ?? "")
-            : `[${mensagem.type ?? "mídia"}]`;
+            : (mensagem.image?.caption ??
+               mensagem.video?.caption ??
+               mensagem.document?.caption ??
+               rotuloMidia);
         const quando = mensagem.timestamp
           ? new Date(Number(mensagem.timestamp) * 1000).toISOString()
           : new Date().toISOString();
@@ -212,18 +232,30 @@ async function processarEvento(body: string) {
         }
         if (!conversa) continue;
 
-        const { error: mensagemError } = await chatDb.from("whatsapp_mensagens").insert(
-          {
-            conversa_id: conversa.id,
-            user_id: numero.user_id,
-            wa_message_id: mensagem.id ?? null,
-            direcao: "entrada",
-            tipo: mensagem.type ?? "text",
-            texto,
-            status: "recebida",
-            criado_em: quando,
-          }
-        );
+        const baseMensagem = {
+          conversa_id: conversa.id,
+          user_id: numero.user_id,
+          wa_message_id: mensagem.id ?? null,
+          direcao: "entrada",
+          tipo: mensagem.type ?? "text",
+          texto,
+          status: "recebida",
+          criado_em: quando,
+        };
+        let { error: mensagemError } = await chatDb.from("whatsapp_mensagens").insert({
+          ...baseMensagem,
+          media_id: midia?.id ?? null,
+          media_mime: midia?.mime_type ?? null,
+          media_nome: mensagem.document?.filename ?? null,
+        });
+        if (
+          mensagemError &&
+          (mensagemError.code === "42703" ||
+            mensagemError.code === "PGRST204" ||
+            /column .* does not exist|media_id/i.test(mensagemError.message ?? ""))
+        ) {
+          ({ error: mensagemError } = await chatDb.from("whatsapp_mensagens").insert(baseMensagem));
+        }
 
         if (mensagemError) {
           if (mensagemError.code === "23505") continue;

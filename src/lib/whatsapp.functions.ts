@@ -503,6 +503,15 @@ function tabelaAusente(error: { code?: string; message?: string }) {
   );
 }
 
+// Colunas de mídia são opcionais: o painel continua funcionando sem elas.
+function colunaAusente(error: { code?: string; message?: string }) {
+  return (
+    error?.code === "42703" ||
+    error?.code === "PGRST204" ||
+    /column .* does not exist|media_id/i.test(error?.message ?? "")
+  );
+}
+
 export const listarConversasWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -552,13 +561,23 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
-    const { data: mensagens, error } = await chatDb
-      .from("whatsapp_mensagens")
-      .select("id, direcao, texto, tipo, status, criado_em")
-      .eq("conversa_id", data.conversaId)
-      .eq("user_id", context.userId)
-      .order("criado_em", { ascending: true })
-      .limit(300);
+    const consulta = (campos: string) =>
+      chatDb
+        .from("whatsapp_mensagens")
+        .select(campos)
+        .eq("conversa_id", data.conversaId)
+        .eq("user_id", context.userId)
+        .order("criado_em", { ascending: true })
+        .limit(300);
+
+    let { data: mensagens, error } = await consulta(
+      "id, direcao, texto, tipo, status, criado_em, media_id, media_mime, media_nome",
+    );
+    if (error && colunaAusente(error)) {
+      ({ data: mensagens, error } = await consulta(
+        "id, direcao, texto, tipo, status, criado_em",
+      ));
+    }
     if (error) {
       if (tabelaAusente(error)) return [];
       throw new Error(error.message);
@@ -570,13 +589,16 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("user_id", context.userId);
 
-    return (mensagens ?? []) as {
+    return (mensagens ?? []) as unknown as {
       id: string;
       direcao: string;
       texto: string | null;
       tipo: string;
       status: string | null;
       criado_em: string;
+      media_id?: string | null;
+      media_mime?: string | null;
+      media_nome?: string | null;
     }[];
   });
 
@@ -668,4 +690,212 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
 
 
     return { ok: true };
+  });
+
+/* -------------------------------- Mídia -------------------------------- */
+
+type MidiaInput = {
+  conversaId: string;
+  tipo: "image" | "audio" | "document";
+  mimeType: string;
+  nomeArquivo: string;
+  dadosBase64: string;
+  legenda?: string | null;
+};
+
+function base64ParaBytes(base64: string) {
+  const limpo = base64.includes(",") ? base64.slice(base64.indexOf(",") + 1) : base64;
+  const binario = atob(limpo);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i += 1) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
+
+async function dadosDaConversa(conversaId: string, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+
+  const { data: conversa, error } = await chatDb
+    .from("whatsapp_conversas")
+    .select("id, phone_number_id, contato_wa_id")
+    .eq("id", conversaId)
+    .eq("user_id", userId)
+    .maybeSingle<{ id: string; phone_number_id: string; contato_wa_id: string }>();
+  if (error) throw new Error(error.message);
+  if (!conversa) throw new Error("Conversa não encontrada.");
+
+  const { data: numero } = await supabaseAdmin
+    .from("whatsapp_numeros")
+    .select("waba_id")
+    .eq("phone_number_id", conversa.phone_number_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!numero) throw new Error("Número não está mais conectado.");
+
+  const { data: conta } = await supabaseAdmin
+    .from("whatsapp_accounts")
+    .select("access_token")
+    .eq("user_id", userId)
+    .eq("waba_id", numero.waba_id)
+    .maybeSingle();
+  if (!conta?.access_token) {
+    throw new Error("A autorização da Meta expirou. Conecte o WhatsApp novamente.");
+  }
+
+  return { conversa, token: conta.access_token, chatDb };
+}
+
+/** Envia áudio gravado, foto ou documento pela API oficial da Meta. */
+export const enviarMidiaWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: MidiaInput) => {
+    if (!input?.conversaId) throw new Error("Conversa inválida.");
+    if (!input?.dadosBase64) throw new Error("Arquivo inválido.");
+    if (!["image", "audio", "document"].includes(input.tipo)) {
+      throw new Error("Tipo de arquivo não suportado.");
+    }
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { conversa, token, chatDb } = await dadosDaConversa(data.conversaId, context.userId);
+    const bytes = base64ParaBytes(data.dadosBase64);
+    if (bytes.byteLength > 16 * 1024 * 1024) {
+      throw new Error("O arquivo passa do limite de 16 MB do WhatsApp.");
+    }
+
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", data.mimeType);
+    form.append(
+      "file",
+      new Blob([bytes as unknown as BlobPart], { type: data.mimeType }),
+      data.nomeArquivo,
+    );
+
+    const uploadRes = await fetch(`${GRAPH}/${conversa.phone_number_id}/media`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const uploadJson = (await uploadRes.json().catch(() => ({}))) as {
+      id?: string;
+      error?: { message?: string; code?: number };
+    };
+    if (!uploadRes.ok || !uploadJson.id) {
+      throw new Error(uploadJson.error?.message ?? "A Meta recusou o envio do arquivo.");
+    }
+
+    const legenda = data.legenda?.trim() || null;
+    const corpo: Record<string, unknown> = { id: uploadJson.id };
+    if (data.tipo === "document") corpo["filename"] = data.nomeArquivo;
+    if (legenda && data.tipo !== "audio") corpo["caption"] = legenda;
+
+    const envioRes = await fetch(`${GRAPH}/${conversa.phone_number_id}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: conversa.contato_wa_id,
+        type: data.tipo,
+        [data.tipo]: corpo,
+      }),
+    });
+    const envioJson = (await envioRes.json().catch(() => ({}))) as {
+      messages?: { id?: string }[];
+      error?: { message?: string; code?: number };
+    };
+    if (!envioRes.ok) {
+      const codigo = envioJson.error?.code ? ` (código ${envioJson.error.code})` : "";
+      throw new Error(`${envioJson.error?.message ?? "A Meta recusou o envio."}${codigo}`);
+    }
+
+    const resumo =
+      legenda ??
+      (data.tipo === "image" ? "📷 Foto" : data.tipo === "audio" ? "🎤 Áudio" : `📎 ${data.nomeArquivo}`);
+    const agora = new Date().toISOString();
+    const base = {
+      conversa_id: conversa.id,
+      user_id: context.userId,
+      wa_message_id: envioJson.messages?.[0]?.id ?? null,
+      direcao: "saida",
+      tipo: data.tipo,
+      texto: resumo,
+      status: "enviada",
+      criado_em: agora,
+    };
+
+    const { error: insertError } = await chatDb.from("whatsapp_mensagens").insert({
+      ...base,
+      media_id: uploadJson.id,
+      media_mime: data.mimeType,
+      media_nome: data.nomeArquivo,
+    });
+    if (insertError && colunaAusente(insertError)) {
+      await chatDb.from("whatsapp_mensagens").insert(base);
+    } else if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    await chatDb
+      .from("whatsapp_conversas")
+      .update({ ultima_mensagem: resumo, ultima_em: agora })
+      .eq("id", conversa.id);
+
+    await chatDb.from("whatsapp_ai_conversation_controls").upsert({
+      user_id: context.userId,
+      conversation_id: conversa.id,
+      manual_takeover: true,
+    });
+
+    return { ok: true };
+  });
+
+/** Baixa da Meta o arquivo de uma mensagem e devolve pronto para exibir. */
+export const obterMidiaWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { mensagemId: string }) => {
+    if (!input?.mensagemId) throw new Error("Mensagem inválida.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { data: mensagem, error } = await chatDb
+      .from("whatsapp_mensagens")
+      .select("conversa_id, media_id, media_mime, media_nome")
+      .eq("id", data.mensagemId)
+      .eq("user_id", context.userId)
+      .maybeSingle<{
+        conversa_id: string;
+        media_id: string | null;
+        media_mime: string | null;
+        media_nome: string | null;
+      }>();
+    if (error) throw new Error(error.message);
+    if (!mensagem?.media_id) throw new Error("Esta mensagem não tem arquivo salvo.");
+
+    const { token } = await dadosDaConversa(mensagem.conversa_id, context.userId);
+    const infoRes = await fetch(`${GRAPH}/${mensagem.media_id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const info = (await infoRes.json().catch(() => ({}))) as {
+      url?: string;
+      mime_type?: string;
+      error?: { message?: string };
+    };
+    if (!infoRes.ok || !info.url) {
+      throw new Error(info.error?.message ?? "Não foi possível abrir o arquivo na Meta.");
+    }
+
+    const arquivoRes = await fetch(info.url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!arquivoRes.ok) throw new Error("Não foi possível baixar o arquivo.");
+    const buffer = new Uint8Array(await arquivoRes.arrayBuffer());
+    let binario = "";
+    for (const byte of buffer) binario += String.fromCharCode(byte);
+    const mime = mensagem.media_mime ?? info.mime_type ?? "application/octet-stream";
+
+    return {
+      dataUrl: `data:${mime};base64,${btoa(binario)}`,
+      mime,
+      nome: mensagem.media_nome ?? "arquivo",
+    };
   });
