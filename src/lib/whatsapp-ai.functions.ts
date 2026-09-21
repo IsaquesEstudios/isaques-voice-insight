@@ -18,7 +18,8 @@ const agentSchema = z.object({
 export const listWhatsappAiAgents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("whatsapp_ai_agents")
       .select("id, name, provider, area, mission, tone, emoji_usage, language, response_length, restrictions, knowledge, created_at")
       .eq("user_id", context.userId)
@@ -31,6 +32,7 @@ export const saveWhatsappAiAgent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => agentSchema.parse(input))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const record = {
       user_id: context.userId,
       name: data.name,
@@ -45,8 +47,8 @@ export const saveWhatsappAiAgent = createServerFn({ method: "POST" })
       knowledge: data.knowledge,
     };
     const query = data.id
-      ? context.supabase.from("whatsapp_ai_agents").update(record).eq("id", data.id).eq("user_id", context.userId)
-      : context.supabase.from("whatsapp_ai_agents").insert(record);
+      ? supabaseAdmin.from("whatsapp_ai_agents").update(record).eq("id", data.id).eq("user_id", context.userId)
+      : supabaseAdmin.from("whatsapp_ai_agents").insert(record);
     const { error } = await query;
     if (error) throw new Error(`Não foi possível salvar o assistente: ${error.message}`);
     return { ok: true as const };
@@ -56,7 +58,8 @@ export const deleteWhatsappAiAgent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("whatsapp_ai_agents")
       .delete()
       .eq("id", data.id)
@@ -121,8 +124,9 @@ export const bindWhatsappNumberAgent = createServerFn({ method: "POST" })
     z.object({ numberId: z.string().uuid(), agentId: z.string().uuid().nullable() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.agentId) {
-      const { data: agent } = await context.supabase
+      const { data: agent } = await supabaseAdmin
         .from("whatsapp_ai_agents")
         .select("id")
         .eq("id", data.agentId)
@@ -130,7 +134,7 @@ export const bindWhatsappNumberAgent = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!agent) throw new Error("Assistente não encontrado.");
     }
-    const { error } = await context.supabase
+    const { error } = await supabaseAdmin
       .from("whatsapp_numeros")
       .update({ whatsapp_ai_agent_id: data.agentId })
       .eq("id", data.numberId)
