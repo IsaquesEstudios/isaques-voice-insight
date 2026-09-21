@@ -219,6 +219,7 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   const baixar = useServerFn(obterMidiaWhatsapp);
   const automatico = mensagem.tipo === "image" || mensagem.tipo === "audio";
   const [abrir, setAbrir] = useState(automatico);
+  const [expandida, setExpandida] = useState(false);
 
   const arquivo = useQuery({
     queryKey: ["whatsapp-midia", mensagem.id],
