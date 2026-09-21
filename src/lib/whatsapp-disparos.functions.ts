@@ -216,7 +216,7 @@ export const processarCampanhaAgora = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", context.userId)
       .maybeSingle<{ id: string }>();
-    if (!campanha) throw new Error("Campanha не encontrada.".replace("не", "não"));
+    if (!campanha) throw new Error("Campanha não encontrada.");
     const { processarCampanha } = await import("@/lib/whatsapp-disparos.server");
     return processarCampanha(campanha.id);
   });
