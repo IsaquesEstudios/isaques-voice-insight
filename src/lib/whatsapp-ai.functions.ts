@@ -88,7 +88,7 @@ export const getGeminiCredentialStatus = createServerFn({ method: "GET" })
       .select("gemini_api_key_last_four, updated_at")
       .eq("user_id", context.userId)
       .maybeSingle();
-    if (error) throw new Error(`Não foi possível consultar a chave: ${error.message}`);
+    if (error && !tabelaAusente(error)) throw new Error(`Não foi possível consultar a chave: ${error.message}`);
     return {
       configured: Boolean(data),
       lastFour: data?.gemini_api_key_last_four ?? null,
