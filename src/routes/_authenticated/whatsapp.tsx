@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, UserRound } from "lucide-react";
+import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -219,6 +219,7 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   const baixar = useServerFn(obterMidiaWhatsapp);
   const automatico = mensagem.tipo === "image" || mensagem.tipo === "audio";
   const [abrir, setAbrir] = useState(automatico);
+  const [expandida, setExpandida] = useState(false);
 
   const arquivo = useQuery({
     queryKey: ["whatsapp-midia", mensagem.id],
@@ -246,11 +247,61 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   }
   if (mensagem.tipo === "image" || arquivo.data.mime.startsWith("image/")) {
     return (
-      <img
-        src={arquivo.data.dataUrl}
-        alt={arquivo.data.nome}
-        className="max-h-64 w-full rounded-lg object-cover"
-      />
+      <>
+        <button
+          type="button"
+          onClick={() => setExpandida(true)}
+          className="block w-full cursor-zoom-in overflow-hidden rounded-lg"
+          aria-label="Ampliar imagem"
+        >
+          <img
+            src={arquivo.data.dataUrl}
+            alt={arquivo.data.nome}
+            className="max-h-64 w-full rounded-lg object-cover transition hover:opacity-90"
+          />
+        </button>
+        {expandida && (
+          <div
+            className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setExpandida(false)}
+          >
+            <div className="flex items-center justify-between gap-2 p-4" onClick={(e) => e.stopPropagation()}>
+              <span className="truncate text-sm font-medium text-white">{arquivo.data.nome}</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  asChild
+                >
+                  <a href={arquivo.data.dataUrl} download={arquivo.data.nome}>
+                    <Download /> Baixar
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => setExpandida(false)}
+                  aria-label="Fechar"
+                >
+                  <X />
+                </Button>
+              </div>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+              <img
+                src={arquivo.data.dataUrl}
+                alt={arquivo.data.nome}
+                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        )}
+      </>
     );
   }
   if (mensagem.tipo === "audio" || arquivo.data.mime.startsWith("audio/")) {
