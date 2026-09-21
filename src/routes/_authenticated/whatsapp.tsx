@@ -85,8 +85,10 @@ function formatarDuracao(segundos: number) {
 }
 
 const barrasAudio = [
-  26, 42, 68, 38, 78, 54, 34, 62, 88, 48, 72, 36, 58, 82, 44, 66, 30, 74,
-  52, 86, 40, 64, 32, 76, 56, 90, 46, 70, 38, 60, 80, 50,
+  "h-2", "h-3", "h-5", "h-3", "h-6", "h-4", "h-2.5", "h-5", "h-7", "h-3.5",
+  "h-5", "h-2.5", "h-4", "h-6", "h-3", "h-5", "h-2", "h-5.5", "h-4", "h-7",
+  "h-3", "h-5", "h-2.5", "h-6", "h-4", "h-7", "h-3.5", "h-5", "h-3", "h-4.5",
+  "h-6", "h-3.5",
 ];
 
 function PlayerAudio({ src }: { src: string }) {
@@ -133,9 +135,10 @@ function PlayerAudio({ src }: { src: string }) {
         {tocando ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
       </Button>
       <div className="min-w-0 flex-1">
-        <button
+        <Button
           type="button"
-          className="flex h-8 w-full items-center gap-0.5"
+          variant="ghost"
+          className="flex h-8 w-full items-center gap-0.5 rounded-none p-0 hover:bg-transparent"
           aria-label={`Áudio em ${formatarDuracao(atual)} de ${formatarDuracao(duracao)}`}
           onClick={(event) => {
             const audio = audioRef.current;
@@ -149,14 +152,13 @@ function PlayerAudio({ src }: { src: string }) {
             return (
               <span
                 key={`${altura}-${indice}`}
-                className={`w-1 flex-1 rounded-full transition-colors ${
+                className={`w-1 flex-1 rounded-full transition-colors ${altura} ${
                   preenchida ? "bg-primary" : "bg-muted-foreground/35"
                 }`}
-                style={{ height: `${altura}%` }}
               />
             );
           })}
-        </button>
+        </Button>
         <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
           <span>{formatarDuracao(atual)}</span>
           <span>{formatarDuracao(duracao)}</span>
