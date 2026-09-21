@@ -11,6 +11,8 @@ import {
   Hash,
   MessageCircle,
   BrainCircuit,
+  FileText,
+  Send,
 } from "lucide-react";
 
 import {
@@ -65,6 +67,8 @@ const groups: NavGroup[] = [
     items: [
       { title: "Números de WhatsApp", url: "/whatsapp-numeros", icon: Hash },
       { title: "Assistente de IA", url: "/whatsapp-assistentes", icon: BrainCircuit },
+      { title: "Modelos", url: "/whatsapp-templates", icon: FileText },
+      { title: "Disparos", url: "/whatsapp-disparos", icon: Send },
       { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
     ],
   },
