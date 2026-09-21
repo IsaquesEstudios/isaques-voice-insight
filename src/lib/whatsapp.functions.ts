@@ -873,10 +873,15 @@ export const obterMidiaWhatsapp = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!mensagem?.media_id) throw new Error("Esta mensagem não tem arquivo salvo.");
 
-    const { token } = await dadosDaConversa(mensagem.conversa_id, context.userId);
-    const infoRes = await fetch(`${GRAPH}/${mensagem.media_id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { token, phoneNumberId } = await dadosDaConversa(mensagem.conversa_id, context.userId);
+    // Meta exige 2 passos para mídia recebida: consultar o id (devolve uma URL
+    // temporária) e depois baixar essa URL com o mesmo token e um User-Agent.
+    const infoRes = await fetch(
+      `${GRAPH}/${mensagem.media_id}?phone_number_id=${encodeURIComponent(phoneNumberId)}`,
+      {
+        headers: { Authorization: `Bearer ${token}`, "User-Agent": "Omniasyn/1.0" },
+      },
+    );
     const info = (await infoRes.json().catch(() => ({}))) as {
       url?: string;
       mime_type?: string;
@@ -886,7 +891,9 @@ export const obterMidiaWhatsapp = createServerFn({ method: "POST" })
       throw new Error(info.error?.message ?? "Não foi possível abrir o arquivo na Meta.");
     }
 
-    const arquivoRes = await fetch(info.url, { headers: { Authorization: `Bearer ${token}` } });
+    const arquivoRes = await fetch(info.url, {
+      headers: { Authorization: `Bearer ${token}`, "User-Agent": "Omniasyn/1.0" },
+    });
     if (!arquivoRes.ok) throw new Error("Não foi possível baixar o arquivo.");
     const buffer = new Uint8Array(await arquivoRes.arrayBuffer());
     let binario = "";
