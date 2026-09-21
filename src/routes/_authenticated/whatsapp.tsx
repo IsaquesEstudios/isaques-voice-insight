@@ -253,7 +253,7 @@ function WhatsappPage() {
   const iniciarGravacao = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const formatos = ["audio/ogg;codecs=opus", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
+      const formatos = ["audio/mp4", "audio/ogg;codecs=opus", "audio/aac", "audio/webm;codecs=opus", "audio/webm"];
       const formato = formatos.find((f) => MediaRecorder.isTypeSupported(f)) ?? "";
       const gravador = new MediaRecorder(stream, formato ? { mimeType: formato } : undefined);
       const partes: Blob[] = [];
@@ -263,14 +263,20 @@ function WhatsappPage() {
       gravador.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
         setGravando(false);
-        const mime = (gravador.mimeType || "audio/ogg").split(";")[0] ?? "audio/ogg";
-        const extensao = mime.includes("mp4") ? "m4a" : mime.includes("webm") ? "webm" : "ogg";
+        const gravado = (gravador.mimeType || "audio/mp4").split(";")[0] ?? "audio/mp4";
+        // O WhatsApp não aceita webm: nesse caso enviamos como arquivo para não perder o áudio.
+        const suportado = gravado === "audio/mp4" || gravado === "audio/ogg" || gravado === "audio/aac" || gravado === "audio/mpeg";
+        const mime = gravado;
+        const extensao = mime.includes("mp4") || mime.includes("aac") ? "m4a" : mime.includes("mpeg") ? "mp3" : mime.includes("webm") ? "webm" : "ogg";
         const audio = new Blob(partes, { type: mime });
         if (audio.size === 0) return;
+        if (!suportado) {
+          toast.info("Seu navegador gravou em um formato que o WhatsApp não aceita; enviamos como arquivo.");
+        }
         midiaMutation.mutate({
           arquivo: audio,
           nome: `audio-${Date.now()}.${extensao}`,
-          tipo: "audio",
+          tipo: suportado ? "audio" : "document",
           mime,
         });
       };
