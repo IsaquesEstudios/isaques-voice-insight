@@ -15,6 +15,15 @@ const agentSchema = z.object({
   knowledge: z.string().trim().max(30000),
 });
 
+const tabelaAusente = (error: { code?: string | null; message?: string | null } | null) => {
+  if (!error) return false;
+  const msg = (error.message ?? "").toLowerCase();
+  return error.code === "PGRST205" || msg.includes("schema cache") || msg.includes("does not exist");
+};
+
+const AVISO_TABELAS =
+  "As tabelas de IA ainda não existem no banco externo. Rode o SQL enviado no SQL Editor do seu Supabase externo.";
+
 export const listWhatsappAiAgents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
