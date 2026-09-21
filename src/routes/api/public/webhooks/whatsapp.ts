@@ -16,6 +16,137 @@ type WhatsappChange = {
   };
 };
 
+const GRAPH = "https://graph.facebook.com/v26.0";
+
+async function responderComIa(input: {
+  userId: string;
+  conversationId: string;
+  phoneNumberId: string;
+  contactWaId: string;
+  inboundMessageId: string;
+  agentId: string;
+}) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+
+  const { error: claimError } = await supabaseAdmin.from("whatsapp_ai_runs").insert({
+    inbound_message_id: input.inboundMessageId,
+    user_id: input.userId,
+    conversation_id: input.conversationId,
+    agent_id: input.agentId,
+    status: "processing",
+  });
+  if (claimError?.code === "23505") return;
+  if (claimError) throw new Error(claimError.message);
+
+  try {
+    const [{ data: control }, { data: agent }, { data: credential }, { data: number }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("whatsapp_ai_conversation_controls")
+          .select("manual_takeover")
+          .eq("user_id", input.userId)
+          .eq("conversation_id", input.conversationId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("whatsapp_ai_agents")
+          .select("name, area, mission, tone, emoji_usage, response_length, restrictions, knowledge")
+          .eq("id", input.agentId)
+          .eq("user_id", input.userId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("whatsapp_ai_credentials")
+          .select("gemini_api_key_ciphertext")
+          .eq("user_id", input.userId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("whatsapp_numeros")
+          .select("waba_id")
+          .eq("phone_number_id", input.phoneNumberId)
+          .eq("user_id", input.userId)
+          .maybeSingle(),
+      ]);
+    if (control?.manual_takeover || !agent || !credential || !number) {
+      await supabaseAdmin
+        .from("whatsapp_ai_runs")
+        .update({ status: "skipped" })
+        .eq("inbound_message_id", input.inboundMessageId);
+      return;
+    }
+
+    const { data: account } = await supabaseAdmin
+      .from("whatsapp_accounts")
+      .select("access_token")
+      .eq("user_id", input.userId)
+      .eq("waba_id", number.waba_id)
+      .maybeSingle();
+    if (!account?.access_token) throw new Error("Autorização da Meta indisponível.");
+
+    const { data: history, error: historyError } = await chatDb
+      .from("whatsapp_mensagens")
+      .select("direcao, texto")
+      .eq("conversa_id", input.conversationId)
+      .eq("user_id", input.userId)
+      .order("criado_em", { ascending: false })
+      .limit(20);
+    if (historyError) throw new Error(historyError.message);
+
+    const { decryptApiKey, generateGeminiReply } = await import("@/lib/whatsapp-ai.server");
+    const reply = await generateGeminiReply({
+      apiKey: await decryptApiKey(credential.gemini_api_key_ciphertext),
+      agent,
+      history: [...(history ?? [])].reverse(),
+    });
+
+    const sendResponse = await fetch(`${GRAPH}/${input.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: input.contactWaId,
+        type: "text",
+        text: { body: reply },
+      }),
+    });
+    const sendPayload = (await sendResponse.json().catch(() => ({}))) as {
+      messages?: { id?: string }[];
+      error?: { message?: string };
+    };
+    if (!sendResponse.ok) throw new Error(sendPayload.error?.message ?? "A Meta recusou a resposta.");
+
+    const now = new Date().toISOString();
+    const { error: saveError } = await chatDb.from("whatsapp_mensagens").insert({
+      conversa_id: input.conversationId,
+      user_id: input.userId,
+      wa_message_id: sendPayload.messages?.[0]?.id ?? null,
+      direcao: "saida",
+      tipo: "text",
+      texto: reply,
+      status: "enviada",
+      criado_em: now,
+    });
+    if (saveError) throw new Error(saveError.message);
+    await chatDb
+      .from("whatsapp_conversas")
+      .update({ ultima_mensagem: reply, ultima_em: now })
+      .eq("id", input.conversationId);
+    await supabaseAdmin
+      .from("whatsapp_ai_runs")
+      .update({ status: "completed", error_message: null })
+      .eq("inbound_message_id", input.inboundMessageId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 500) : "Falha inesperada.";
+    await supabaseAdmin
+      .from("whatsapp_ai_runs")
+      .update({ status: "failed", error_message: message })
+      .eq("inbound_message_id", input.inboundMessageId);
+    console.error("whatsapp ai reply", message);
+  }
+}
+
 async function processarEvento(body: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { chatDb } = await import("@/integrations/supabase/chat-db.server");
@@ -43,7 +174,7 @@ async function processarEvento(body: string) {
 
       const { data: numero } = await supabaseAdmin
         .from("whatsapp_numeros")
-        .select("user_id")
+        .select("user_id, whatsapp_ai_agent_id")
         .eq("phone_number_id", phoneNumberId)
         .maybeSingle();
       if (!numero) continue;
@@ -81,7 +212,7 @@ async function processarEvento(body: string) {
         }
         if (!conversa) continue;
 
-        const { error: mensagemError } = await chatDb.from("whatsapp_mensagens").upsert(
+        const { error: mensagemError } = await chatDb.from("whatsapp_mensagens").insert(
           {
             conversa_id: conversa.id,
             user_id: numero.user_id,
@@ -91,18 +222,34 @@ async function processarEvento(body: string) {
             texto,
             status: "recebida",
             criado_em: quando,
-          },
-          { onConflict: "wa_message_id" }
+          }
         );
 
         if (mensagemError) {
+          if (mensagemError.code === "23505") continue;
           console.error("whatsapp webhook mensagem", mensagemError.message);
+          continue;
         }
 
         await chatDb
           .from("whatsapp_conversas")
           .update({ nao_lidas: (conversa.nao_lidas ?? 0) + 1 })
           .eq("id", conversa.id);
+
+        if (
+          mensagem.type === "text" &&
+          mensagem.id &&
+          numero.whatsapp_ai_agent_id
+        ) {
+          await responderComIa({
+            userId: numero.user_id,
+            conversationId: conversa.id,
+            phoneNumberId,
+            contactWaId: waId,
+            inboundMessageId: mensagem.id,
+            agentId: numero.whatsapp_ai_agent_id,
+          });
+        }
       }
     }
   }
