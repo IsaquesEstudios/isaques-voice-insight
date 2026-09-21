@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, Loader2, MessageCircle, Search, Smartphone, UserRound } from "lucide-react";
+import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Search, Smartphone, Square, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { getSupabaseBrowser } from "@/integrations/supabase/browser";
 import {
   enviarMensagemWhatsapp,
+  enviarMidiaWhatsapp,
+  obterMidiaWhatsapp,
   listarConversasWhatsapp,
   listarMensagensWhatsapp,
   listarNumerosWhatsapp,
@@ -67,11 +69,81 @@ function formatarTelefone(valor: string) {
   return valor.startsWith("+") ? valor : `+${valor}`;
 }
 
+type MensagemMidia = {
+  id: string;
+  tipo: string;
+  media_id?: string | null;
+  media_mime?: string | null;
+  media_nome?: string | null;
+};
+
+function arquivoParaBase64(arquivo: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result).split(",")[1] ?? "");
+    leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
+  const baixar = useServerFn(obterMidiaWhatsapp);
+  const automatico = mensagem.tipo === "image" || mensagem.tipo === "audio";
+  const [abrir, setAbrir] = useState(automatico);
+
+  const arquivo = useQuery({
+    queryKey: ["whatsapp-midia", mensagem.id],
+    queryFn: () => baixar({ data: { mensagemId: mensagem.id } }),
+    enabled: abrir,
+    staleTime: 10 * 60_000,
+  });
+
+  if (!abrir) {
+    return (
+      <Button type="button" variant="outline" size="sm" onClick={() => setAbrir(true)}>
+        <Download /> Abrir arquivo
+      </Button>
+    );
+  }
+  if (arquivo.isLoading) {
+    return (
+      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> Carregando arquivo...
+      </span>
+    );
+  }
+  if (arquivo.isError || !arquivo.data) {
+    return <span className="text-xs text-destructive">Não foi possível abrir o arquivo.</span>;
+  }
+  if (mensagem.tipo === "image" || arquivo.data.mime.startsWith("image/")) {
+    return (
+      <img
+        src={arquivo.data.dataUrl}
+        alt={arquivo.data.nome}
+        className="max-h-64 w-full rounded-lg object-cover"
+      />
+    );
+  }
+  if (mensagem.tipo === "audio" || arquivo.data.mime.startsWith("audio/")) {
+    return <audio controls src={arquivo.data.dataUrl} className="w-56" />;
+  }
+  return (
+    <a
+      href={arquivo.data.dataUrl}
+      download={arquivo.data.nome}
+      className="flex items-center gap-2 text-xs underline"
+    >
+      <FileText className="h-4 w-4" /> {arquivo.data.nome}
+    </a>
+  );
+}
+
 function WhatsappPage() {
   const queryClient = useQueryClient();
   const carregarConversas = useServerFn(listarConversasWhatsapp);
   const carregarMensagens = useServerFn(listarMensagensWhatsapp);
   const enviar = useServerFn(enviarMensagemWhatsapp);
+  const enviarMidia = useServerFn(enviarMidiaWhatsapp);
   const alterarAtendimento = useServerFn(setWhatsappConversationTakeover);
 
   const carregarNumeros = useServerFn(listarNumerosWhatsapp);
@@ -144,6 +216,73 @@ function WhatsappPage() {
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
+
+  const inputImagemRef = useRef<HTMLInputElement>(null);
+  const inputDocumentoRef = useRef<HTMLInputElement>(null);
+  const gravadorRef = useRef<MediaRecorder | null>(null);
+  const [gravando, setGravando] = useState(false);
+
+  const midiaMutation = useMutation({
+    mutationFn: async (entrada: {
+      arquivo: Blob;
+      nome: string;
+      tipo: "image" | "audio" | "document";
+      mime: string;
+    }) => {
+      if (!selecionada) throw new Error("Selecione uma conversa para enviar o arquivo.");
+      const dadosBase64 = await arquivoParaBase64(entrada.arquivo);
+      return enviarMidia({
+        data: {
+          conversaId: selecionada,
+          tipo: entrada.tipo,
+          mimeType: entrada.mime,
+          nomeArquivo: entrada.nome,
+          dadosBase64,
+          legenda: rascunho.trim() || null,
+        },
+      });
+    },
+    onSuccess: () => {
+      setRascunho("");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens", selecionada] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const iniciarGravacao = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const formatos = ["audio/ogg;codecs=opus", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
+      const formato = formatos.find((f) => MediaRecorder.isTypeSupported(f)) ?? "";
+      const gravador = new MediaRecorder(stream, formato ? { mimeType: formato } : undefined);
+      const partes: Blob[] = [];
+      gravador.ondataavailable = (evento) => {
+        if (evento.data.size > 0) partes.push(evento.data);
+      };
+      gravador.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setGravando(false);
+        const mime = (gravador.mimeType || "audio/ogg").split(";")[0] ?? "audio/ogg";
+        const extensao = mime.includes("mp4") ? "m4a" : mime.includes("webm") ? "webm" : "ogg";
+        const audio = new Blob(partes, { type: mime });
+        if (audio.size === 0) return;
+        midiaMutation.mutate({
+          arquivo: audio,
+          nome: `audio-${Date.now()}.${extensao}`,
+          tipo: "audio",
+          mime,
+        });
+      };
+      gravadorRef.current = gravador;
+      gravador.start();
+      setGravando(true);
+    } catch {
+      toast.error("Não conseguimos acessar o microfone. Libere a permissão no navegador.");
+    }
+  };
+
+  const pararGravacao = () => gravadorRef.current?.stop();
 
   const atendimentoMutation = useMutation({
     mutationFn: (manual: boolean) => {
@@ -296,6 +435,11 @@ function WhatsappPage() {
                       {(mensagens.data ?? []).map((m) => (
                         <Message key={m.id} from={m.direcao === "saida" ? "user" : "assistant"}>
                           <MessageContent className={m.direcao === "entrada" ? "rounded-lg bg-muted px-4 py-3" : ""}>
+                            {m.media_id ? (
+                              <div className="mb-1">
+                                <MidiaMensagem mensagem={m} />
+                              </div>
+                            ) : null}
                             <span className="whitespace-pre-wrap break-words">{m.texto}</span>
                             <span className="mt-1 block text-[10px] text-muted-foreground">
                               {hora(m.criado_em)}
@@ -328,7 +472,74 @@ function WhatsappPage() {
                         />
                       </PromptInputBody>
                       <PromptInputFooter>
-                        <span className="text-xs text-muted-foreground">Enter para enviar · Shift + Enter para quebrar linha</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            ref={inputImagemRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => {
+                              const arquivo = event.target.files?.[0];
+                              event.target.value = "";
+                              if (arquivo)
+                                midiaMutation.mutate({
+                                  arquivo,
+                                  nome: arquivo.name,
+                                  tipo: "image",
+                                  mime: arquivo.type || "image/jpeg",
+                                });
+                            }}
+                          />
+                          <input
+                            ref={inputDocumentoRef}
+                            type="file"
+                            className="hidden"
+                            onChange={(event) => {
+                              const arquivo = event.target.files?.[0];
+                              event.target.value = "";
+                              if (arquivo)
+                                midiaMutation.mutate({
+                                  arquivo,
+                                  nome: arquivo.name,
+                                  tipo: "document",
+                                  mime: arquivo.type || "application/octet-stream",
+                                });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            title="Enviar foto"
+                            disabled={midiaMutation.isPending}
+                            onClick={() => inputImagemRef.current?.click()}
+                          >
+                            <ImageIcon />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            title="Enviar documento"
+                            disabled={midiaMutation.isPending}
+                            onClick={() => inputDocumentoRef.current?.click()}
+                          >
+                            <Paperclip />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant={gravando ? "destructive" : "ghost"}
+                            title={gravando ? "Parar e enviar áudio" : "Gravar áudio"}
+                            disabled={midiaMutation.isPending}
+                            onClick={() => (gravando ? pararGravacao() : iniciarGravacao())}
+                          >
+                            {midiaMutation.isPending ? <Loader2 className="animate-spin" /> : gravando ? <Square /> : <Mic />}
+                          </Button>
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            {gravando ? "Gravando... toque no quadrado para enviar" : "Enter para enviar · Shift + Enter para quebrar linha"}
+                          </span>
+                        </div>
                         <PromptInputSubmit disabled={enviarMutation.isPending || !rascunho.trim()} status={enviarMutation.isPending ? "submitted" : "ready"} />
                       </PromptInputFooter>
                     </PromptInput>
