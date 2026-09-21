@@ -113,6 +113,7 @@ export const saveGeminiCredential = createServerFn({ method: "POST" })
       gemini_api_key_ciphertext: await encryptApiKey(data.apiKey),
       gemini_api_key_last_four: data.apiKey.slice(-4),
     });
+    if (tabelaAusente(error)) throw new Error(AVISO_TABELAS);
     if (error) throw new Error(`Não foi possível guardar a chave: ${error.message}`);
     return { ok: true as const };
   });
