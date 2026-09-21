@@ -42,7 +42,7 @@ export const listarAtendentesIa = createServerFn({ method: "GET" })
       return { ok: false as const, erro: error.message, itens: [] as AtendenteIaConfig[] };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     const { data: configs } = await supabaseAdmin
       .from("atendentes_ia")
       .select("*")
@@ -94,7 +94,7 @@ export const salvarAtendenteIa = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     const { error } = await supabaseAdmin.from("atendentes_ia").upsert(
       {
         user_id: context.userId,
