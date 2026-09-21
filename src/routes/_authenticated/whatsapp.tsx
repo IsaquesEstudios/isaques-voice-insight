@@ -246,11 +246,61 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   }
   if (mensagem.tipo === "image" || arquivo.data.mime.startsWith("image/")) {
     return (
-      <img
-        src={arquivo.data.dataUrl}
-        alt={arquivo.data.nome}
-        className="max-h-64 w-full rounded-lg object-cover"
-      />
+      <>
+        <button
+          type="button"
+          onClick={() => setExpandida(true)}
+          className="block w-full cursor-zoom-in overflow-hidden rounded-lg"
+          aria-label="Ampliar imagem"
+        >
+          <img
+            src={arquivo.data.dataUrl}
+            alt={arquivo.data.nome}
+            className="max-h-64 w-full rounded-lg object-cover transition hover:opacity-90"
+          />
+        </button>
+        {expandida && (
+          <div
+            className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setExpandida(false)}
+          >
+            <div className="flex items-center justify-between gap-2 p-4" onClick={(e) => e.stopPropagation()}>
+              <span className="truncate text-sm font-medium text-white">{arquivo.data.nome}</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  asChild
+                >
+                  <a href={arquivo.data.dataUrl} download={arquivo.data.nome}>
+                    <Download /> Baixar
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => setExpandida(false)}
+                  aria-label="Fechar"
+                >
+                  <X />
+                </Button>
+              </div>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+              <img
+                src={arquivo.data.dataUrl}
+                alt={arquivo.data.nome}
+                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        )}
+      </>
     );
   }
   if (mensagem.tipo === "audio" || arquivo.data.mime.startsWith("audio/")) {
