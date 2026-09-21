@@ -15,6 +15,13 @@
       "when": 1789953748568,
       "tag": "0001_whatsapp_ai_assistants_and_controls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789955624984,
+      "tag": "0002_drop_whatsapp_numeros_agent_fk",
+      "breakpoints": true
     }
   ]
 }

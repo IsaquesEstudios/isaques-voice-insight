@@ -717,15 +717,7 @@ export type Database = {
           waba_id?: string
           whatsapp_ai_agent_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_numeros_whatsapp_ai_agent_id_fkey"
-            columns: ["whatsapp_ai_agent_id"]
-            isOneToOne: false
-            referencedRelation: "whatsapp_ai_agents"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
