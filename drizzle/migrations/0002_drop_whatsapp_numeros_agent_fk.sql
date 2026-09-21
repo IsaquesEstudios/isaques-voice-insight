@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_numeros DROP CONSTRAINT IF EXISTS whatsapp_numeros_whatsapp_ai_agent_id_fkey;
