@@ -13,7 +13,9 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
+import { Route as AuthenticatedWhatsappTemplatesRouteImport } from './routes/_authenticated/whatsapp-templates'
 import { Route as AuthenticatedWhatsappNumerosRouteImport } from './routes/_authenticated/whatsapp-numeros'
+import { Route as AuthenticatedWhatsappDisparosRouteImport } from './routes/_authenticated/whatsapp-disparos'
 import { Route as AuthenticatedWhatsappAssistentesRouteImport } from './routes/_authenticated/whatsapp-assistentes'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
@@ -27,6 +29,7 @@ import { Route as AuthenticatedAtendenteIaRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAssistentesRouteImport } from './routes/_authenticated/assistentes'
 import { Route as ApiPublicTranscriptRouteImport } from './routes/api/public/transcript'
 import { Route as ApiPublicWebhooksWhatsappRouteImport } from './routes/api/public/webhooks/whatsapp'
+import { Route as ApiPublicCronWhatsappDisparosRouteImport } from './routes/api/public/cron/whatsapp-disparos'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -47,10 +50,22 @@ const ReuniaoCodeRoute = ReuniaoCodeRouteImport.update({
   path: '/reuniao/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedWhatsappTemplatesRoute =
+  AuthenticatedWhatsappTemplatesRouteImport.update({
+    id: '/whatsapp-templates',
+    path: '/whatsapp-templates',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedWhatsappNumerosRoute =
   AuthenticatedWhatsappNumerosRouteImport.update({
     id: '/whatsapp-numeros',
     path: '/whatsapp-numeros',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWhatsappDisparosRoute =
+  AuthenticatedWhatsappDisparosRouteImport.update({
+    id: '/whatsapp-disparos',
+    path: '/whatsapp-disparos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedWhatsappAssistentesRoute =
@@ -123,6 +138,12 @@ const ApiPublicWebhooksWhatsappRoute =
     path: '/api/public/webhooks/whatsapp',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronWhatsappDisparosRoute =
+  ApiPublicCronWhatsappDisparosRouteImport.update({
+    id: '/api/public/cron/whatsapp-disparos',
+    path: '/api/public/cron/whatsapp-disparos',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -138,9 +159,12 @@ export interface FileRoutesByFullPath {
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/whatsapp-assistentes': typeof AuthenticatedWhatsappAssistentesRoute
+  '/whatsapp-disparos': typeof AuthenticatedWhatsappDisparosRoute
   '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
+  '/whatsapp-templates': typeof AuthenticatedWhatsappTemplatesRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
+  '/api/public/cron/whatsapp-disparos': typeof ApiPublicCronWhatsappDisparosRoute
   '/api/public/webhooks/whatsapp': typeof ApiPublicWebhooksWhatsappRoute
 }
 export interface FileRoutesByTo {
@@ -157,9 +181,12 @@ export interface FileRoutesByTo {
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/whatsapp-assistentes': typeof AuthenticatedWhatsappAssistentesRoute
+  '/whatsapp-disparos': typeof AuthenticatedWhatsappDisparosRoute
   '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
+  '/whatsapp-templates': typeof AuthenticatedWhatsappTemplatesRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
+  '/api/public/cron/whatsapp-disparos': typeof ApiPublicCronWhatsappDisparosRoute
   '/api/public/webhooks/whatsapp': typeof ApiPublicWebhooksWhatsappRoute
 }
 export interface FileRoutesById {
@@ -178,9 +205,12 @@ export interface FileRoutesById {
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/_authenticated/whatsapp-assistentes': typeof AuthenticatedWhatsappAssistentesRoute
+  '/_authenticated/whatsapp-disparos': typeof AuthenticatedWhatsappDisparosRoute
   '/_authenticated/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
+  '/_authenticated/whatsapp-templates': typeof AuthenticatedWhatsappTemplatesRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
+  '/api/public/cron/whatsapp-disparos': typeof ApiPublicCronWhatsappDisparosRoute
   '/api/public/webhooks/whatsapp': typeof ApiPublicWebhooksWhatsappRoute
 }
 export interface FileRouteTypes {
@@ -199,9 +229,12 @@ export interface FileRouteTypes {
     | '/reunioes'
     | '/whatsapp'
     | '/whatsapp-assistentes'
+    | '/whatsapp-disparos'
     | '/whatsapp-numeros'
+    | '/whatsapp-templates'
     | '/reuniao/$code'
     | '/api/public/transcript'
+    | '/api/public/cron/whatsapp-disparos'
     | '/api/public/webhooks/whatsapp'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -218,9 +251,12 @@ export interface FileRouteTypes {
     | '/reunioes'
     | '/whatsapp'
     | '/whatsapp-assistentes'
+    | '/whatsapp-disparos'
     | '/whatsapp-numeros'
+    | '/whatsapp-templates'
     | '/reuniao/$code'
     | '/api/public/transcript'
+    | '/api/public/cron/whatsapp-disparos'
     | '/api/public/webhooks/whatsapp'
   id:
     | '__root__'
@@ -238,9 +274,12 @@ export interface FileRouteTypes {
     | '/_authenticated/reunioes'
     | '/_authenticated/whatsapp'
     | '/_authenticated/whatsapp-assistentes'
+    | '/_authenticated/whatsapp-disparos'
     | '/_authenticated/whatsapp-numeros'
+    | '/_authenticated/whatsapp-templates'
     | '/reuniao/$code'
     | '/api/public/transcript'
+    | '/api/public/cron/whatsapp-disparos'
     | '/api/public/webhooks/whatsapp'
   fileRoutesById: FileRoutesById
 }
@@ -250,6 +289,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReuniaoCodeRoute: typeof ReuniaoCodeRoute
   ApiPublicTranscriptRoute: typeof ApiPublicTranscriptRoute
+  ApiPublicCronWhatsappDisparosRoute: typeof ApiPublicCronWhatsappDisparosRoute
   ApiPublicWebhooksWhatsappRoute: typeof ApiPublicWebhooksWhatsappRoute
 }
 
@@ -283,11 +323,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReuniaoCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/whatsapp-templates': {
+      id: '/_authenticated/whatsapp-templates'
+      path: '/whatsapp-templates'
+      fullPath: '/whatsapp-templates'
+      preLoaderRoute: typeof AuthenticatedWhatsappTemplatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/whatsapp-numeros': {
       id: '/_authenticated/whatsapp-numeros'
       path: '/whatsapp-numeros'
       fullPath: '/whatsapp-numeros'
       preLoaderRoute: typeof AuthenticatedWhatsappNumerosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/whatsapp-disparos': {
+      id: '/_authenticated/whatsapp-disparos'
+      path: '/whatsapp-disparos'
+      fullPath: '/whatsapp-disparos'
+      preLoaderRoute: typeof AuthenticatedWhatsappDisparosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/whatsapp-assistentes': {
@@ -381,6 +435,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/whatsapp-disparos': {
+      id: '/api/public/cron/whatsapp-disparos'
+      path: '/api/public/cron/whatsapp-disparos'
+      fullPath: '/api/public/cron/whatsapp-disparos'
+      preLoaderRoute: typeof ApiPublicCronWhatsappDisparosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -396,7 +457,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
   AuthenticatedWhatsappAssistentesRoute: typeof AuthenticatedWhatsappAssistentesRoute
+  AuthenticatedWhatsappDisparosRoute: typeof AuthenticatedWhatsappDisparosRoute
   AuthenticatedWhatsappNumerosRoute: typeof AuthenticatedWhatsappNumerosRoute
+  AuthenticatedWhatsappTemplatesRoute: typeof AuthenticatedWhatsappTemplatesRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -411,7 +474,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
   AuthenticatedWhatsappAssistentesRoute: AuthenticatedWhatsappAssistentesRoute,
+  AuthenticatedWhatsappDisparosRoute: AuthenticatedWhatsappDisparosRoute,
   AuthenticatedWhatsappNumerosRoute: AuthenticatedWhatsappNumerosRoute,
+  AuthenticatedWhatsappTemplatesRoute: AuthenticatedWhatsappTemplatesRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -423,6 +488,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ReuniaoCodeRoute: ReuniaoCodeRoute,
   ApiPublicTranscriptRoute: ApiPublicTranscriptRoute,
+  ApiPublicCronWhatsappDisparosRoute: ApiPublicCronWhatsappDisparosRoute,
   ApiPublicWebhooksWhatsappRoute: ApiPublicWebhooksWhatsappRoute,
 }
 export const routeTree = rootRouteImport
