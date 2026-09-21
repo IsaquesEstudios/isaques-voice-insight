@@ -220,3 +220,12 @@ export const processarCampanhaAgora = createServerFn({ method: "POST" })
     const { processarCampanha } = await import("@/lib/whatsapp-disparos.server");
     return processarCampanha(campanha.id);
   });
+
+/** Devolve o endereço (com chave) que o agendamento do banco externo deve chamar. */
+export const obterAgendamentoCron = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const segredo = process.env["DISPAROS_CRON_SECRET"] ?? "";
+    const base = process.env["PUBLIC_APP_URL"] ?? "https://app.omniasyn.com";
+    return { url: `${base}/api/public/cron/whatsapp-disparos?secret=${segredo}` };
+  });
