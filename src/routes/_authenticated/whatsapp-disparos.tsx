@@ -34,7 +34,6 @@ import {
   excluirLembreteWhatsapp,
   listarCampanhasWhatsapp,
   listarLembretesWhatsapp,
-  obterAgendamentoCron,
   processarCampanhaAgora,
   salvarLembreteWhatsapp,
 } from "@/lib/whatsapp-disparos.functions";
