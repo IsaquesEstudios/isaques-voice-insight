@@ -873,7 +873,8 @@ export const obterMidiaWhatsapp = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!mensagem?.media_id) throw new Error("Esta mensagem não tem arquivo salvo.");
 
-    const { token, phoneNumberId } = await dadosDaConversa(mensagem.conversa_id, context.userId);
+    const { token, conversa } = await dadosDaConversa(mensagem.conversa_id, context.userId);
+    const phoneNumberId = conversa.phone_number_id;
     // Meta exige 2 passos para mídia recebida: consultar o id (devolve uma URL
     // temporária) e depois baixar essa URL com o mesmo token e um User-Agent.
     const infoRes = await fetch(
