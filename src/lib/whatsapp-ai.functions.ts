@@ -15,6 +15,15 @@ const agentSchema = z.object({
   knowledge: z.string().trim().max(30000),
 });
 
+const tabelaAusente = (error: { code?: string | null; message?: string | null } | null) => {
+  if (!error) return false;
+  const msg = (error.message ?? "").toLowerCase();
+  return error.code === "PGRST205" || msg.includes("schema cache") || msg.includes("does not exist");
+};
+
+const AVISO_TABELAS =
+  "As tabelas de IA ainda não existem no banco externo. Rode o SQL enviado no SQL Editor do seu Supabase externo.";
+
 export const listWhatsappAiAgents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -24,6 +33,7 @@ export const listWhatsappAiAgents = createServerFn({ method: "GET" })
       .select("id, name, provider, area, mission, tone, emoji_usage, language, response_length, restrictions, knowledge, created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
+    if (tabelaAusente(error)) return [];
     if (error) throw new Error(`Não foi possível carregar os assistentes: ${error.message}`);
     return data ?? [];
   });
@@ -50,6 +60,7 @@ export const saveWhatsappAiAgent = createServerFn({ method: "POST" })
       ? chatDb.from("whatsapp_ai_agents").update(record).eq("id", data.id).eq("user_id", context.userId)
       : chatDb.from("whatsapp_ai_agents").insert(record);
     const { error } = await query;
+    if (tabelaAusente(error)) throw new Error(AVISO_TABELAS);
     if (error) throw new Error(`Não foi possível salvar o assistente: ${error.message}`);
     return { ok: true as const };
   });
@@ -77,7 +88,7 @@ export const getGeminiCredentialStatus = createServerFn({ method: "GET" })
       .select("gemini_api_key_last_four, updated_at")
       .eq("user_id", context.userId)
       .maybeSingle();
-    if (error) throw new Error(`Não foi possível consultar a chave: ${error.message}`);
+    if (error && !tabelaAusente(error)) throw new Error(`Não foi possível consultar a chave: ${error.message}`);
     return {
       configured: Boolean(data),
       lastFour: data?.gemini_api_key_last_four ?? null,
@@ -102,6 +113,7 @@ export const saveGeminiCredential = createServerFn({ method: "POST" })
       gemini_api_key_ciphertext: await encryptApiKey(data.apiKey),
       gemini_api_key_last_four: data.apiKey.slice(-4),
     });
+    if (tabelaAusente(error)) throw new Error(AVISO_TABELAS);
     if (error) throw new Error(`Não foi possível guardar a chave: ${error.message}`);
     return { ok: true as const };
   });
