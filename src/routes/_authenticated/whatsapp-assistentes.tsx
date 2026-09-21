@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteWhatsappAiAgent, listWhatsappAiAgents, saveWhatsappAiAgent } from "@/lib/whatsapp-ai.functions";
+import { deleteWhatsappAiAgent, getGeminiCredentialStatus, listWhatsappAiAgents, saveWhatsappAiAgent } from "@/lib/whatsapp-ai.functions";
 import { listarNumerosWhatsapp } from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-assistentes")({
@@ -76,9 +76,11 @@ function WhatsappAssistentesPage() {
   const listNumbers = useServerFn(listarNumerosWhatsapp);
   const saveAgent = useServerFn(saveWhatsappAiAgent);
   const removeAgent = useServerFn(deleteWhatsappAiAgent);
+  const getCredentialStatus = useServerFn(getGeminiCredentialStatus);
   const [form, setForm] = useState<FormState | null>(null);
 
   const agents = useQuery({ queryKey: ["whatsapp-ai-agents"], queryFn: () => listAgents() });
+  const geminiStatus = useQuery({ queryKey: ["gemini-credential-status"], queryFn: () => getCredentialStatus() });
   const numbers = useQuery({ queryKey: ["whatsapp-numeros"], queryFn: () => listNumbers() });
   const save = useMutation({
     mutationFn: (value: FormState) => saveAgent({ data: value }),
@@ -157,7 +159,14 @@ function WhatsappAssistentesPage() {
           {form ? <div className="grid gap-4 py-2">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nome"><Input value={form.name} placeholder="Luna" onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="IA utilizada"><Input value="Gemini" disabled /></Field>
+              <Field label="IA utilizada">
+                <Input value="Gemini" disabled />
+                {geminiStatus.data && !geminiStatus.data.configured ? (
+                  <p className="text-sm font-medium text-destructive">
+                    A chave da API do Gemini não está configurada. Preencha em Configurações → API e chaves antes de salvar o assistente.
+                  </p>
+                ) : null}
+              </Field>
               <Field label="Área"><AgentSelect value={form.area} onValueChange={(area) => setForm({ ...form, area: area as FormState["area"] })} options={[['suporte','Suporte'],['vendas','Vendas'],['educacao','Educação']]} /></Field>
               <Field label="Tom"><AgentSelect value={form.tone} onValueChange={(tone) => setForm({ ...form, tone: tone as FormState["tone"] })} options={[['acolhedor','Acolhedor'],['formal','Formal'],['descontraido','Descontraído'],['tecnico','Técnico']]} /></Field>
               <Field label="Emojis"><AgentSelect value={form.emojiUsage} onValueChange={(emojiUsage) => setForm({ ...form, emojiUsage: emojiUsage as FormState["emojiUsage"] })} options={[['nunca','Nunca'],['raramente','Raramente'],['frequente','Com frequência']]} /></Field>
@@ -167,7 +176,7 @@ function WhatsappAssistentesPage() {
             <Field label="Não deve"><Textarea rows={3} value={form.restrictions} placeholder="Prometer descontos, pedir dados sensíveis..." onChange={(e) => setForm({ ...form, restrictions: e.target.value })} /></Field>
             <Field label="Inteligência"><Textarea rows={8} value={form.knowledge} placeholder="Produtos, políticas, respostas frequentes e tudo que a IA precisa saber." onChange={(e) => setForm({ ...form, knowledge: e.target.value })} /></Field>
           </div> : null}
-          <DialogFooter><Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button><Button disabled={!form || save.isPending} onClick={() => form && save.mutate(form)}>{save.isPending ? <Loader2 className="animate-spin" /> : null}Salvar assistente</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setForm(null)}>Cancelar</Button><Button disabled={!form || save.isPending || (geminiStatus.data ? !geminiStatus.data.configured : false)} onClick={() => form && save.mutate(form)}>{save.isPending ? <Loader2 className="animate-spin" /> : null}Salvar assistente</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardShell>

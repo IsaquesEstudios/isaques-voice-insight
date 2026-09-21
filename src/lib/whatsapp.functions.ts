@@ -530,8 +530,7 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
     }[];
     const ids = conversations.map((conversation) => conversation.id);
     if (ids.length === 0) return [];
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: controls } = await supabaseAdmin
+    const { data: controls } = await chatDb
       .from("whatsapp_ai_conversation_controls")
       .select("conversation_id, manual_takeover")
       .eq("user_id", context.userId)
@@ -660,7 +659,7 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
       .eq("id", conversa.id);
 
-    await supabaseAdmin.from("whatsapp_ai_conversation_controls").upsert({
+    await chatDb.from("whatsapp_ai_conversation_controls").upsert({
       user_id: context.userId,
       conversation_id: conversa.id,
       manual_takeover: true,

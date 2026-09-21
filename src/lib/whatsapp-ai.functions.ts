@@ -18,8 +18,8 @@ const agentSchema = z.object({
 export const listWhatsappAiAgents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { data, error } = await chatDb
       .from("whatsapp_ai_agents")
       .select("id, name, provider, area, mission, tone, emoji_usage, language, response_length, restrictions, knowledge, created_at")
       .eq("user_id", context.userId)
@@ -32,7 +32,7 @@ export const saveWhatsappAiAgent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => agentSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
     const record = {
       user_id: context.userId,
       name: data.name,
@@ -47,8 +47,8 @@ export const saveWhatsappAiAgent = createServerFn({ method: "POST" })
       knowledge: data.knowledge,
     };
     const query = data.id
-      ? supabaseAdmin.from("whatsapp_ai_agents").update(record).eq("id", data.id).eq("user_id", context.userId)
-      : supabaseAdmin.from("whatsapp_ai_agents").insert(record);
+      ? chatDb.from("whatsapp_ai_agents").update(record).eq("id", data.id).eq("user_id", context.userId)
+      : chatDb.from("whatsapp_ai_agents").insert(record);
     const { error } = await query;
     if (error) throw new Error(`Não foi possível salvar o assistente: ${error.message}`);
     return { ok: true as const };
@@ -58,8 +58,8 @@ export const deleteWhatsappAiAgent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { error } = await chatDb
       .from("whatsapp_ai_agents")
       .delete()
       .eq("id", data.id)
@@ -71,8 +71,8 @@ export const deleteWhatsappAiAgent = createServerFn({ method: "POST" })
 export const getGeminiCredentialStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { data, error } = await chatDb
       .from("whatsapp_ai_credentials")
       .select("gemini_api_key_last_four, updated_at")
       .eq("user_id", context.userId)
@@ -96,8 +96,8 @@ export const saveGeminiCredential = createServerFn({ method: "POST" })
     });
     if (!test.ok) throw new Error("A chave Gemini não foi aceita. Confira a chave e tente novamente.");
     const { encryptApiKey } = await import("@/lib/whatsapp-ai.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("whatsapp_ai_credentials").upsert({
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { error } = await chatDb.from("whatsapp_ai_credentials").upsert({
       user_id: context.userId,
       gemini_api_key_ciphertext: await encryptApiKey(data.apiKey),
       gemini_api_key_last_four: data.apiKey.slice(-4),
@@ -109,8 +109,8 @@ export const saveGeminiCredential = createServerFn({ method: "POST" })
 export const deleteGeminiCredential = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { error } = await chatDb
       .from("whatsapp_ai_credentials")
       .delete()
       .eq("user_id", context.userId);
@@ -125,8 +125,9 @@ export const bindWhatsappNumberAgent = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
     if (data.agentId) {
-      const { data: agent } = await supabaseAdmin
+      const { data: agent } = await chatDb
         .from("whatsapp_ai_agents")
         .select("id")
         .eq("id", data.agentId)
@@ -157,8 +158,7 @@ export const setWhatsappConversationTakeover = createServerFn({ method: "POST" }
       .eq("user_id", context.userId)
       .maybeSingle();
     if (!conversation) throw new Error("Conversa não encontrada.");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("whatsapp_ai_conversation_controls").upsert({
+    const { error } = await chatDb.from("whatsapp_ai_conversation_controls").upsert({
       user_id: context.userId,
       conversation_id: data.conversationId,
       manual_takeover: data.manual,

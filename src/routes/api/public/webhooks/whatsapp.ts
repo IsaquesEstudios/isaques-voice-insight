@@ -29,7 +29,7 @@ async function responderComIa(input: {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { chatDb } = await import("@/integrations/supabase/chat-db.server");
 
-  const { error: claimError } = await supabaseAdmin.from("whatsapp_ai_runs").insert({
+  const { error: claimError } = await chatDb.from("whatsapp_ai_runs").insert({
     inbound_message_id: input.inboundMessageId,
     user_id: input.userId,
     conversation_id: input.conversationId,
@@ -42,19 +42,19 @@ async function responderComIa(input: {
   try {
     const [{ data: control }, { data: agent }, { data: credential }, { data: number }] =
       await Promise.all([
-        supabaseAdmin
+        chatDb
           .from("whatsapp_ai_conversation_controls")
           .select("manual_takeover")
           .eq("user_id", input.userId)
           .eq("conversation_id", input.conversationId)
           .maybeSingle(),
-        supabaseAdmin
+        chatDb
           .from("whatsapp_ai_agents")
           .select("name, area, mission, tone, emoji_usage, response_length, restrictions, knowledge")
           .eq("id", input.agentId)
           .eq("user_id", input.userId)
           .maybeSingle(),
-        supabaseAdmin
+        chatDb
           .from("whatsapp_ai_credentials")
           .select("gemini_api_key_ciphertext")
           .eq("user_id", input.userId)
@@ -67,7 +67,7 @@ async function responderComIa(input: {
           .maybeSingle(),
       ]);
     if (control?.manual_takeover || !agent || !credential || !number) {
-      await supabaseAdmin
+      await chatDb
         .from("whatsapp_ai_runs")
         .update({ status: "skipped" })
         .eq("inbound_message_id", input.inboundMessageId);
@@ -133,13 +133,13 @@ async function responderComIa(input: {
       .from("whatsapp_conversas")
       .update({ ultima_mensagem: reply, ultima_em: now })
       .eq("id", input.conversationId);
-    await supabaseAdmin
+    await chatDb
       .from("whatsapp_ai_runs")
       .update({ status: "completed", error_message: null })
       .eq("inbound_message_id", input.inboundMessageId);
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Falha inesperada.";
-    await supabaseAdmin
+    await chatDb
       .from("whatsapp_ai_runs")
       .update({ status: "failed", error_message: message })
       .eq("inbound_message_id", input.inboundMessageId);
