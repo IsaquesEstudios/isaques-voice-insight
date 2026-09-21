@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { translateError } from "@/lib/error-messages";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Key, Bell, CreditCard, Building2, Webhook, User, Check, Loader2 } from "lucide-react";
+import { Key, Bell, CreditCard, Building2, Webhook, User, Check, Loader2, Eye, EyeOff, Trash2 } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
@@ -13,11 +14,19 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
+import { deleteGeminiCredential, getGeminiCredentialStatus, saveGeminiCredential } from "@/lib/whatsapp-ai.functions";
 
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
-    meta: [{ title: "Configurações / API — Omniasyn" }],
+    meta: [
+      { title: "Configurações / API — Omniasyn" },
+      { name: "description", content: "Gerencie seu perfil, integrações e chaves de API na Omniasyn." },
+      { property: "og:title", content: "Configurações / API — Omniasyn" },
+      { property: "og:description", content: "Gerencie seu perfil, integrações e chaves de API." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
   }),
   component: ConfiguracoesPage,
 });
@@ -71,9 +80,7 @@ function ConfiguracoesPage() {
 
           <div className="space-y-6">
             {active === "perfil" && <PerfilSection />}
-            {active === "api" && (
-              <PlaceholderSection title="API & Chaves" desc="Nenhuma integração conectada." />
-            )}
+            {active === "api" && <ApiKeysSection />}
             {active === "notificacoes" && <NotificacoesSection />}
             {active === "faturamento" && (
               <PlaceholderSection title="Faturamento" desc="Em breve." />
@@ -84,6 +91,64 @@ function ConfiguracoesPage() {
         </div>
       </div>
     </DashboardShell>
+  );
+}
+
+function ApiKeysSection() {
+  const queryClient = useQueryClient();
+  const getStatus = useServerFn(getGeminiCredentialStatus);
+  const saveCredential = useServerFn(saveGeminiCredential);
+  const removeCredential = useServerFn(deleteGeminiCredential);
+  const [apiKey, setApiKey] = useState("");
+  const [show, setShow] = useState(false);
+  const status = useQuery({ queryKey: ["gemini-credential"], queryFn: () => getStatus() });
+  const save = useMutation({
+    mutationFn: () => saveCredential({ data: { apiKey } }),
+    onSuccess: () => {
+      setApiKey("");
+      toast.success("Chave Gemini salva com segurança.");
+      queryClient.invalidateQueries({ queryKey: ["gemini-credential"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const remove = useMutation({
+    mutationFn: () => removeCredential(),
+    onSuccess: () => {
+      toast.success("Chave Gemini removida.");
+      queryClient.invalidateQueries({ queryKey: ["gemini-credential"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <Card className="border-border bg-card/20 backdrop-blur-2xl">
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">API & Chaves</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background/40 p-4">
+          <div>
+            <p className="text-sm font-medium">Google Gemini</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {status.data?.configured ? `Configurada · final ${status.data.lastFour}` : "Nenhuma chave configurada"}
+            </p>
+          </div>
+          {status.data?.configured ? <Check className="text-success" /> : <Key className="text-muted-foreground" />}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="gemini-key">{status.data?.configured ? "Substituir chave" : "Chave da API Gemini"}</Label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input id="gemini-key" type={show ? "text" : "password"} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="Cole sua chave do Google AI Studio" className="pr-10" autoComplete="off" />
+              <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0" aria-label={show ? "Ocultar chave" : "Mostrar chave"} onClick={() => setShow((value) => !value)}>{show ? <EyeOff /> : <Eye />}</Button>
+            </div>
+            <Button disabled={!apiKey.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Loader2 className="animate-spin" /> : <Check />}Salvar</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">A chave é validada e armazenada criptografada. Ela nunca volta a aparecer por inteiro.</p>
+        </div>
+        {status.data?.configured ? <div className="flex justify-end"><Button variant="outline" disabled={remove.isPending} onClick={() => remove.mutate()}><Trash2 />Remover chave</Button></div> : null}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -22,7 +22,7 @@ export const listarNumerosWhatsapp = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("whatsapp_numeros")
-      .select("id, waba_id, phone_number_id, display_phone_number, verified_name, status")
+      .select("id, waba_id, phone_number_id, display_phone_number, verified_name, status, whatsapp_ai_agent_id")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
@@ -519,7 +519,7 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
       if (tabelaAusente(error)) return [];
       throw new Error(error.message);
     }
-    return (data ?? []) as {
+    const conversations = (data ?? []) as {
       id: string;
       phone_number_id: string;
       contato_wa_id: string;
@@ -528,6 +528,21 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
       ultima_em: string;
       nao_lidas: number;
     }[];
+    const ids = conversations.map((conversation) => conversation.id);
+    if (ids.length === 0) return [];
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: controls } = await supabaseAdmin
+      .from("whatsapp_ai_conversation_controls")
+      .select("conversation_id, manual_takeover")
+      .eq("user_id", context.userId)
+      .in("conversation_id", ids);
+    const manualById = new Map(
+      (controls ?? []).map((control) => [control.conversation_id, control.manual_takeover]),
+    );
+    return conversations.map((conversation) => ({
+      ...conversation,
+      manual_takeover: manualById.get(conversation.id) ?? false,
+    }));
   });
 
 export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
@@ -644,6 +659,12 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       .from("whatsapp_conversas")
       .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
       .eq("id", conversa.id);
+
+    await supabaseAdmin.from("whatsapp_ai_conversation_controls").upsert({
+      user_id: context.userId,
+      conversation_id: conversa.id,
+      manual_takeover: true,
+    });
 
 
 

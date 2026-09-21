@@ -460,6 +460,143 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_ai_agents: {
+        Row: {
+          area: string
+          created_at: string
+          emoji_usage: string
+          id: string
+          knowledge: string
+          language: string
+          mission: string
+          name: string
+          provider: string
+          response_length: string
+          restrictions: string
+          tone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          emoji_usage: string
+          id?: string
+          knowledge?: string
+          language?: string
+          mission: string
+          name: string
+          provider?: string
+          response_length: string
+          restrictions?: string
+          tone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          emoji_usage?: string
+          id?: string
+          knowledge?: string
+          language?: string
+          mission?: string
+          name?: string
+          provider?: string
+          response_length?: string
+          restrictions?: string
+          tone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_ai_conversation_controls: {
+        Row: {
+          conversation_id: string
+          manual_takeover: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          manual_takeover?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          manual_takeover?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_ai_credentials: {
+        Row: {
+          created_at: string
+          gemini_api_key_ciphertext: string
+          gemini_api_key_last_four: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gemini_api_key_ciphertext: string
+          gemini_api_key_last_four: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gemini_api_key_ciphertext?: string
+          gemini_api_key_last_four?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_ai_runs: {
+        Row: {
+          agent_id: string | null
+          conversation_id: string
+          created_at: string
+          error_message: string | null
+          inbound_message_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          conversation_id: string
+          created_at?: string
+          error_message?: string | null
+          inbound_message_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          error_message?: string | null
+          inbound_message_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_ai_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_conversas: {
         Row: {
           contato_nome: string | null
@@ -554,6 +691,7 @@ export type Database = {
           user_id: string
           verified_name: string | null
           waba_id: string
+          whatsapp_ai_agent_id: string | null
         }
         Insert: {
           created_at?: string
@@ -565,6 +703,7 @@ export type Database = {
           user_id: string
           verified_name?: string | null
           waba_id: string
+          whatsapp_ai_agent_id?: string | null
         }
         Update: {
           created_at?: string
@@ -576,8 +715,17 @@ export type Database = {
           user_id?: string
           verified_name?: string | null
           waba_id?: string
+          whatsapp_ai_agent_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_numeros_whatsapp_ai_agent_id_fkey"
+            columns: ["whatsapp_ai_agent_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
