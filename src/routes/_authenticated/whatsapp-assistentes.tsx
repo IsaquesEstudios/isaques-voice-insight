@@ -159,7 +159,14 @@ function WhatsappAssistentesPage() {
           {form ? <div className="grid gap-4 py-2">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nome"><Input value={form.name} placeholder="Luna" onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="IA utilizada"><Input value="Gemini" disabled /></Field>
+              <Field label="IA utilizada">
+                <Input value="Gemini" disabled />
+                {geminiStatus.data && !geminiStatus.data.configured ? (
+                  <p className="text-sm font-medium text-destructive">
+                    A chave da API do Gemini não está configurada. Preencha em Configurações → API e chaves antes de salvar o assistente.
+                  </p>
+                ) : null}
+              </Field>
               <Field label="Área"><AgentSelect value={form.area} onValueChange={(area) => setForm({ ...form, area: area as FormState["area"] })} options={[['suporte','Suporte'],['vendas','Vendas'],['educacao','Educação']]} /></Field>
               <Field label="Tom"><AgentSelect value={form.tone} onValueChange={(tone) => setForm({ ...form, tone: tone as FormState["tone"] })} options={[['acolhedor','Acolhedor'],['formal','Formal'],['descontraido','Descontraído'],['tecnico','Técnico']]} /></Field>
               <Field label="Emojis"><AgentSelect value={form.emojiUsage} onValueChange={(emojiUsage) => setForm({ ...form, emojiUsage: emojiUsage as FormState["emojiUsage"] })} options={[['nunca','Nunca'],['raramente','Raramente'],['frequente','Com frequência']]} /></Field>
