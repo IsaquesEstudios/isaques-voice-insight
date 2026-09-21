@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, Loader2, MessageCircle, Search, UserRound } from "lucide-react";
+import { Bot, Loader2, MessageCircle, Search, Smartphone, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -53,6 +53,20 @@ function hora(valor: string) {
   });
 }
 
+function formatarTelefone(valor: string) {
+  const digitos = valor.replace(/\D/g, "");
+
+  if (digitos.length === 13 && digitos.startsWith("55")) {
+    return `+${digitos.slice(0, 2)} ${digitos.slice(2, 4)} ${digitos.slice(4, 9)}-${digitos.slice(9)}`;
+  }
+
+  if (digitos.length === 12 && digitos.startsWith("55")) {
+    return `+${digitos.slice(0, 2)} ${digitos.slice(2, 4)} ${digitos.slice(4, 8)}-${digitos.slice(8)}`;
+  }
+
+  return valor.startsWith("+") ? valor : `+${valor}`;
+}
+
 function WhatsappPage() {
   const queryClient = useQueryClient();
   const carregarConversas = useServerFn(listarConversasWhatsapp);
@@ -63,7 +77,7 @@ function WhatsappPage() {
   const carregarNumeros = useServerFn(listarNumerosWhatsapp);
 
   const [selecionada, setSelecionada] = useState<string | null>(null);
-  const [numeroFiltro, setNumeroFiltro] = useState<string>("todos");
+  const [numeroFiltro, setNumeroFiltro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [rascunho, setRascunho] = useState("");
 
@@ -80,10 +94,18 @@ function WhatsappPage() {
 
   const mensagens = useQuery({
     queryKey: ["whatsapp-mensagens", selecionada],
-    queryFn: () => carregarMensagens({ data: { conversaId: selecionada! } }),
+    queryFn: () => {
+      if (!selecionada) return Promise.resolve([]);
+      return carregarMensagens({ data: { conversaId: selecionada } });
+    },
     enabled: Boolean(selecionada),
     refetchInterval: selecionada ? 3_000 : false,
   });
+
+  useEffect(() => {
+    const primeiroNumero = numeros.data?.[0]?.phone_number_id;
+    if (!numeroFiltro && primeiroNumero) setNumeroFiltro(primeiroNumero);
+  }, [numeroFiltro, numeros.data]);
 
   // Tempo real: o banco avisa assim que chega ou muda uma mensagem.
   useEffect(() => {
@@ -111,8 +133,10 @@ function WhatsappPage() {
   }, [queryClient]);
 
   const enviarMutation = useMutation({
-    mutationFn: (texto: string) =>
-      enviar({ data: { conversaId: selecionada!, texto } }),
+    mutationFn: (texto: string) => {
+      if (!selecionada) throw new Error("Selecione uma conversa para enviar a mensagem.");
+      return enviar({ data: { conversaId: selecionada, texto } });
+    },
     onSuccess: () => {
       setRascunho("");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens", selecionada] });
@@ -122,8 +146,10 @@ function WhatsappPage() {
   });
 
   const atendimentoMutation = useMutation({
-    mutationFn: (manual: boolean) =>
-      alterarAtendimento({ data: { conversationId: selecionada!, manual } }),
+    mutationFn: (manual: boolean) => {
+      if (!selecionada) throw new Error("Selecione uma conversa para alterar o atendimento.");
+      return alterarAtendimento({ data: { conversationId: selecionada, manual } });
+    },
     onSuccess: (_data, manual) => {
       toast.success(manual ? "Atendimento assumido por você." : "Assistente de IA reativado.");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
@@ -146,7 +172,7 @@ function WhatsappPage() {
   const filtradas = useMemo(
     () =>
       lista
-        .filter((c) => numeroFiltro === "todos" || c.phone_number_id === numeroFiltro)
+        .filter((c) => !numeroFiltro || c.phone_number_id === numeroFiltro)
         .filter((c) =>
           `${c.contato_nome ?? ""} ${c.contato_wa_id}`
             .toLowerCase()
@@ -157,10 +183,37 @@ function WhatsappPage() {
 
   return (
     <DashboardShell>
-      <div className="flex min-h-[calc(100dvh-7rem)] flex-col">
+      <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-3">
+        {listaNumeros.length > 0 ? (
+          <div className="flex items-center gap-2 overflow-x-auto border-b border-border/60 pb-3">
+            {listaNumeros.map((numero) => {
+              const ativo = numeroFiltro === numero.phone_number_id;
+              const rotulo = numero.display_phone_number ?? numero.verified_name ?? "Número";
+
+              return (
+                <Button
+                  key={numero.id}
+                  type="button"
+                  size="sm"
+                  variant={ativo ? "default" : "outline"}
+                  className="shrink-0"
+                  onClick={() => {
+                    setNumeroFiltro(numero.phone_number_id);
+                    if (conversaSelecionada?.phone_number_id !== numero.phone_number_id) {
+                      setSelecionada(null);
+                    }
+                  }}
+                >
+                  <Smartphone />
+                  {rotulo}
+                </Button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="grid flex-1 gap-4 lg:grid-cols-[320px_1fr]">
           <Card className="border-border/60 bg-card/70">
-            <CardContent className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3 p-3">
+            <CardContent className="flex h-[calc(100dvh-10rem)] min-h-[560px] flex-col gap-3 p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -170,33 +223,6 @@ function WhatsappPage() {
                   className="pl-9"
                 />
               </div>
-              {listaNumeros.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    onClick={() => setNumeroFiltro("todos")}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      numeroFiltro === "todos"
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border/60 text-muted-foreground hover:bg-muted/60"
-                    }`}
-                  >
-                    Todos
-                  </button>
-                  {listaNumeros.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => setNumeroFiltro(n.phone_number_id)}
-                      className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                        numeroFiltro === n.phone_number_id
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border/60 text-muted-foreground hover:bg-muted/60"
-                      }`}
-                    >
-                      {n.display_phone_number ?? n.verified_name ?? "Número"}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               <ScrollArea className="flex-1">
                 {conversas.isLoading ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
@@ -243,13 +269,15 @@ function WhatsappPage() {
           </Card>
 
           <Card className="border-border/60 bg-card/70">
-            <CardContent className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col p-0">
+            <CardContent className="flex h-[calc(100dvh-10rem)] min-h-[560px] flex-col p-0">
               {selecionada ? (
                 <>
                   <div className="flex min-h-16 items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{conversaSelecionada?.contato_nome ?? conversaSelecionada?.contato_wa_id}</p>
-                      <p className="truncate text-xs text-muted-foreground">via {conversaSelecionada ? rotuloNumero(conversaSelecionada.phone_number_id) : "WhatsApp"}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {conversaSelecionada ? formatarTelefone(conversaSelecionada.contato_wa_id) : ""}
+                      </p>
                     </div>
                     {possuiIa ? (
                       <Button
@@ -268,10 +296,10 @@ function WhatsappPage() {
                       {(mensagens.data ?? []).map((m) => (
                         <Message key={m.id} from={m.direcao === "saida" ? "user" : "assistant"}>
                           <MessageContent className={m.direcao === "entrada" ? "rounded-lg bg-muted px-4 py-3" : ""}>
-                            <span>{m.texto}</span>
-                          <span className="mt-1 block text-[10px] text-muted-foreground">
-                            {hora(m.criado_em)}
-                          </span>
+                            <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+                            <span className="mt-1 block text-[10px] text-muted-foreground">
+                              {hora(m.criado_em)}
+                            </span>
                           </MessageContent>
                         </Message>
                       ))}
