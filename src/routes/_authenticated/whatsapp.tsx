@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Search, Smartphone, Square, UserRound } from "lucide-react";
+import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -76,6 +76,95 @@ type MensagemMidia = {
   media_mime?: string | null;
   media_nome?: string | null;
 };
+
+function formatarDuracao(segundos: number) {
+  if (!Number.isFinite(segundos) || segundos < 0) return "0:00";
+  const minutos = Math.floor(segundos / 60);
+  const restante = Math.floor(segundos % 60);
+  return `${minutos}:${String(restante).padStart(2, "0")}`;
+}
+
+const barrasAudio = [
+  26, 42, 68, 38, 78, 54, 34, 62, 88, 48, 72, 36, 58, 82, 44, 66, 30, 74,
+  52, 86, 40, 64, 32, 76, 56, 90, 46, 70, 38, 60, 80, 50,
+];
+
+function PlayerAudio({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [tocando, setTocando] = useState(false);
+  const [duracao, setDuracao] = useState(0);
+  const [atual, setAtual] = useState(0);
+  const progresso = duracao > 0 ? Math.min(atual / duracao, 1) : 0;
+
+  const alternar = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      await audio.play();
+    } else {
+      audio.pause();
+    }
+  };
+
+  return (
+    <div className="flex min-w-64 max-w-80 items-center gap-3 py-1">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={(event) => setDuracao(event.currentTarget.duration)}
+        onDurationChange={(event) => setDuracao(event.currentTarget.duration)}
+        onTimeUpdate={(event) => setAtual(event.currentTarget.currentTime)}
+        onPlay={() => setTocando(true)}
+        onPause={() => setTocando(false)}
+        onEnded={() => {
+          setTocando(false);
+          setAtual(0);
+        }}
+      />
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-10 w-10 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+        onClick={alternar}
+        aria-label={tocando ? "Pausar áudio" : "Reproduzir áudio"}
+      >
+        {tocando ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+      </Button>
+      <div className="min-w-0 flex-1">
+        <button
+          type="button"
+          className="flex h-8 w-full items-center gap-0.5"
+          aria-label={`Áudio em ${formatarDuracao(atual)} de ${formatarDuracao(duracao)}`}
+          onClick={(event) => {
+            const audio = audioRef.current;
+            if (!audio || duracao <= 0) return;
+            const caixa = event.currentTarget.getBoundingClientRect();
+            audio.currentTime = ((event.clientX - caixa.left) / caixa.width) * duracao;
+          }}
+        >
+          {barrasAudio.map((altura, indice) => {
+            const preenchida = indice / barrasAudio.length <= progresso;
+            return (
+              <span
+                key={`${altura}-${indice}`}
+                className={`w-1 flex-1 rounded-full transition-colors ${
+                  preenchida ? "bg-primary" : "bg-muted-foreground/35"
+                }`}
+                style={{ height: `${altura}%` }}
+              />
+            );
+          })}
+        </button>
+        <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>{formatarDuracao(atual)}</span>
+          <span>{formatarDuracao(duracao)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function arquivoParaBase64(arquivo: Blob) {
   return new Promise<string>((resolve, reject) => {
@@ -163,7 +252,7 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
     );
   }
   if (mensagem.tipo === "audio" || arquivo.data.mime.startsWith("audio/")) {
-    return <audio controls src={arquivo.data.dataUrl} className="w-56" />;
+    return <PlayerAudio src={arquivo.data.dataUrl} />;
   }
   return (
     <a
@@ -481,7 +570,9 @@ function WhatsappPage() {
                                 <MidiaMensagem mensagem={m} />
                               </div>
                             ) : null}
-                            <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+                            {!(m.tipo === "audio" && /^\s*\[?audio\]?\s*$/i.test(m.texto ?? "")) ? (
+                              <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+                            ) : null}
                             <span className="mt-1 block text-[10px] text-muted-foreground">
                               {hora(m.criado_em)}
                             </span>
