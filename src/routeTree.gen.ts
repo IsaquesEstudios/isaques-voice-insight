@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
 import { Route as AuthenticatedWhatsappNumerosRouteImport } from './routes/_authenticated/whatsapp-numeros'
+import { Route as AuthenticatedWhatsappAssistentesRouteImport } from './routes/_authenticated/whatsapp-assistentes'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthenticatedReunioesRouteImport } from './routes/_authenticated/reunioes'
 import { Route as AuthenticatedLigacaoRouteImport } from './routes/_authenticated/ligacao'
@@ -50,6 +51,12 @@ const AuthenticatedWhatsappNumerosRoute =
   AuthenticatedWhatsappNumerosRouteImport.update({
     id: '/whatsapp-numeros',
     path: '/whatsapp-numeros',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWhatsappAssistentesRoute =
+  AuthenticatedWhatsappAssistentesRouteImport.update({
+    id: '/whatsapp-assistentes',
+    path: '/whatsapp-assistentes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
@@ -130,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/ligacao': typeof AuthenticatedLigacaoRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/whatsapp-assistentes': typeof AuthenticatedWhatsappAssistentesRoute
   '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
@@ -148,6 +156,7 @@ export interface FileRoutesByTo {
   '/ligacao': typeof AuthenticatedLigacaoRoute
   '/reunioes': typeof AuthenticatedReunioesRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/whatsapp-assistentes': typeof AuthenticatedWhatsappAssistentesRoute
   '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
@@ -168,6 +177,7 @@ export interface FileRoutesById {
   '/_authenticated/ligacao': typeof AuthenticatedLigacaoRoute
   '/_authenticated/reunioes': typeof AuthenticatedReunioesRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/whatsapp-assistentes': typeof AuthenticatedWhatsappAssistentesRoute
   '/_authenticated/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/ligacao'
     | '/reunioes'
     | '/whatsapp'
+    | '/whatsapp-assistentes'
     | '/whatsapp-numeros'
     | '/reuniao/$code'
     | '/api/public/transcript'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/ligacao'
     | '/reunioes'
     | '/whatsapp'
+    | '/whatsapp-assistentes'
     | '/whatsapp-numeros'
     | '/reuniao/$code'
     | '/api/public/transcript'
@@ -225,6 +237,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ligacao'
     | '/_authenticated/reunioes'
     | '/_authenticated/whatsapp'
+    | '/_authenticated/whatsapp-assistentes'
     | '/_authenticated/whatsapp-numeros'
     | '/reuniao/$code'
     | '/api/public/transcript'
@@ -275,6 +288,13 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp-numeros'
       fullPath: '/whatsapp-numeros'
       preLoaderRoute: typeof AuthenticatedWhatsappNumerosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/whatsapp-assistentes': {
+      id: '/_authenticated/whatsapp-assistentes'
+      path: '/whatsapp-assistentes'
+      fullPath: '/whatsapp-assistentes'
+      preLoaderRoute: typeof AuthenticatedWhatsappAssistentesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/whatsapp': {
@@ -375,6 +395,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLigacaoRoute: typeof AuthenticatedLigacaoRoute
   AuthenticatedReunioesRoute: typeof AuthenticatedReunioesRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
+  AuthenticatedWhatsappAssistentesRoute: typeof AuthenticatedWhatsappAssistentesRoute
   AuthenticatedWhatsappNumerosRoute: typeof AuthenticatedWhatsappNumerosRoute
 }
 
@@ -389,6 +410,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLigacaoRoute: AuthenticatedLigacaoRoute,
   AuthenticatedReunioesRoute: AuthenticatedReunioesRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
+  AuthenticatedWhatsappAssistentesRoute: AuthenticatedWhatsappAssistentesRoute,
   AuthenticatedWhatsappNumerosRoute: AuthenticatedWhatsappNumerosRoute,
 }
 
