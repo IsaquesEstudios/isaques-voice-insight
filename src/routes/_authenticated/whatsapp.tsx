@@ -572,7 +572,12 @@ function WhatsappPage() {
                                 <MidiaMensagem mensagem={m} />
                               </div>
                             ) : null}
-                            {!(m.tipo === "audio" && /^\s*\[?audio\]?\s*$/i.test(m.texto ?? "")) ? (
+                            {m.tipo === "audio" && !m.media_id ? (
+                              <span className="flex min-w-56 items-center gap-2 py-1 text-xs text-muted-foreground">
+                                <Mic className="h-4 w-4 text-primary" />
+                                Áudio recebido sem arquivo disponível
+                              </span>
+                            ) : !(m.tipo === "audio" && /^\s*\[?audio\]?\s*$/i.test(m.texto ?? "")) ? (
                               <span className="whitespace-pre-wrap break-words">{m.texto}</span>
                             ) : null}
                             <span className="mt-1 block text-[10px] text-muted-foreground">
