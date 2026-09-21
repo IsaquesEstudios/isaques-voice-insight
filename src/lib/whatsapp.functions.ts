@@ -19,7 +19,7 @@ export const obterConfigWhatsapp = createServerFn({ method: "GET" })
 export const listarNumerosWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { data, error } = await supabaseAdmin
       .from("whatsapp_numeros")
       .select("id, waba_id, phone_number_id, display_phone_number, verified_name, status, whatsapp_ai_agent_id")
@@ -33,7 +33,7 @@ export const listarNumerosWhatsapp = createServerFn({ method: "GET" })
 export const sincronizarNumerosWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { data: contas, error: contasError } = await supabaseAdmin
       .from("whatsapp_accounts")
       .select("waba_id, access_token")
@@ -126,7 +126,7 @@ export const removerNumeroWhatsapp = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { error } = await supabaseAdmin
       .from("whatsapp_numeros")
       .delete()
@@ -227,7 +227,7 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
       throw new Error(numerosJson.error?.message ?? "Não foi possível listar os números.");
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
 
     const { error: contaError } = await supabaseAdmin.from("whatsapp_accounts").upsert(
       { user_id: context.userId, waba_id: wabaId, access_token: accessToken },
@@ -292,7 +292,7 @@ export const conectarWhatsapp = createServerFn({ method: "POST" })
 /* ----------------- Cadastro de número pelo painel ----------------- */
 
 async function tokenDaConta(userId: string, wabaId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { data } = await supabaseAdmin
     .from("whatsapp_accounts")
     .select("access_token")
@@ -318,7 +318,7 @@ async function erroMeta(res: Response, padrao: string) {
 export const listarContasWhatsapp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { data, error } = await supabaseAdmin
       .from("whatsapp_accounts")
       .select("waba_id")
@@ -375,7 +375,7 @@ export const cadastrarNumeroWhatsapp = createServerFn({ method: "POST" })
     }
     const phoneNumberId = criarJson.id;
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     await supabaseAdmin.from("whatsapp_numeros").upsert(
       {
         user_id: context.userId,
@@ -411,7 +411,7 @@ export const reenviarCodigoWhatsapp = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { data: numero } = await supabaseAdmin
       .from("whatsapp_numeros")
       .select("waba_id")
@@ -440,7 +440,7 @@ export const confirmarCodigoWhatsapp = createServerFn({ method: "POST" })
     return { phoneNumberId: input.phoneNumberId, codigo };
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { data: numero } = await supabaseAdmin
       .from("whatsapp_numeros")
       .select("waba_id")
@@ -611,7 +611,7 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
     return { conversaId: input.conversaId, texto: input.texto.trim() };
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
 
     const { data: conversa, error: conversaError } = await chatDb
@@ -712,7 +712,7 @@ function base64ParaBytes(base64: string) {
 }
 
 async function dadosDaConversa(conversaId: string, userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { chatDb } = await import("@/integrations/supabase/chat-db.server");
 
   const { data: conversa, error } = await chatDb

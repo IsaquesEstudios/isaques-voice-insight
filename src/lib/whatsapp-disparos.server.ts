@@ -13,7 +13,7 @@ export type EnvioResultado = { ok: true; waMessageId: string | null } | { ok: fa
 
 /** Descobre o token da Meta para um número do usuário. */
 export async function tokenDoNumero(userId: string, phoneNumberId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { data: numero } = await supabaseAdmin
     .from("whatsapp_numeros")
     .select("waba_id")
