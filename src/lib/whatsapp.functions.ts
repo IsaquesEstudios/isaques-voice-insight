@@ -681,11 +681,8 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
       .eq("id", conversa.id);
 
-    await chatDb.from("whatsapp_ai_conversation_controls").upsert({
-      user_id: context.userId,
-      conversation_id: conversa.id,
-      manual_takeover: true,
-    });
+    await marcarAtendimentoManual(context.userId, conversa.id);
+
 
 
 
