@@ -503,6 +503,27 @@ function tabelaAusente(error: { code?: string; message?: string }) {
   );
 }
 
+// Ao responder pelo painel, assumimos a conversa apenas quando o usuário ainda
+// não escolheu explicitamente quem atende. Se ele reativou a IA, a escolha dele
+// é preservada e a IA continua respondendo.
+async function marcarAtendimentoManual(userId: string, conversaId: string) {
+  const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+  const { data: existente } = await chatDb
+    .from("whatsapp_ai_conversation_controls")
+    .select("conversation_id")
+    .eq("user_id", userId)
+    .eq("conversation_id", conversaId)
+    .maybeSingle();
+  if (existente) return;
+  await chatDb.from("whatsapp_ai_conversation_controls").insert({
+    user_id: userId,
+    conversation_id: conversaId,
+    manual_takeover: true,
+  });
+}
+
+
+
 // Colunas de mídia são opcionais: o painel continua funcionando sem elas.
 function colunaAusente(error: { code?: string; message?: string }) {
   return (
@@ -681,11 +702,8 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
       .eq("id", conversa.id);
 
-    await chatDb.from("whatsapp_ai_conversation_controls").upsert({
-      user_id: context.userId,
-      conversation_id: conversa.id,
-      manual_takeover: true,
-    });
+    await marcarAtendimentoManual(context.userId, conversa.id);
+
 
 
 
@@ -841,11 +859,8 @@ export const enviarMidiaWhatsapp = createServerFn({ method: "POST" })
       .update({ ultima_mensagem: resumo, ultima_em: agora })
       .eq("id", conversa.id);
 
-    await chatDb.from("whatsapp_ai_conversation_controls").upsert({
-      user_id: context.userId,
-      conversation_id: conversa.id,
-      manual_takeover: true,
-    });
+    await marcarAtendimentoManual(context.userId, conversa.id);
+
 
     return { ok: true };
   });
