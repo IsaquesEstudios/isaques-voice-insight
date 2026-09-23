@@ -503,6 +503,27 @@ function tabelaAusente(error: { code?: string; message?: string }) {
   );
 }
 
+// Ao responder pelo painel, assumimos a conversa apenas quando o usuário ainda
+// não escolheu explicitamente quem atende. Se ele reativou a IA, a escolha dele
+// é preservada e a IA continua respondendo.
+async function marcarAtendimentoManual(userId: string, conversaId: string) {
+  const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+  const { data: existente } = await chatDb
+    .from("whatsapp_ai_conversation_controls")
+    .select("conversation_id")
+    .eq("user_id", userId)
+    .eq("conversation_id", conversaId)
+    .maybeSingle();
+  if (existente) return;
+  await chatDb.from("whatsapp_ai_conversation_controls").insert({
+    user_id: userId,
+    conversation_id: conversaId,
+    manual_takeover: true,
+  });
+}
+
+
+
 // Colunas de mídia são opcionais: o painel continua funcionando sem elas.
 function colunaAusente(error: { code?: string; message?: string }) {
   return (
