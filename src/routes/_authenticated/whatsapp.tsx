@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Virtuoso } from "react-virtuoso";
 import { useServerFn } from "@tanstack/react-start";
 import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
@@ -9,9 +10,7 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import { PromptInput, PromptInputBody, PromptInputFooter, PromptInputSubmit } from "@/components/ai-elements/prompt-input";
 import { Textarea } from "@/components/ui/textarea";
@@ -338,21 +337,41 @@ function WhatsappPage() {
     queryFn: () => carregarNumeros(),
   });
 
-  const conversas = useQuery({
-    queryKey: ["whatsapp-conversas"],
-    queryFn: () => carregarConversas(),
-    refetchInterval: 3_000,
+  const [buscaAtiva, setBuscaAtiva] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaAtiva(busca.trim()), 300);
+    return () => clearTimeout(t);
+  }, [busca]);
+
+  // Conversas: 30 por vez, carregando mais ao rolar (cursor por ultima_em).
+  const conversas = useInfiniteQuery({
+    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva],
+    queryFn: ({ pageParam }) =>
+      carregarConversas({ data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null } }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (ultima) => ultima.proximo,
+    enabled: Boolean(numeroFiltro) || numeros.isFetched,
+    refetchInterval: 15_000,
   });
 
-  const mensagens = useQuery({
+  // Mensagens: últimas 40, buscando as mais antigas ao rolar para cima.
+  const mensagens = useInfiniteQuery({
     queryKey: ["whatsapp-mensagens", selecionada],
-    queryFn: () => {
-      if (!selecionada) return Promise.resolve([]);
-      return carregarMensagens({ data: { conversaId: selecionada } });
-    },
+    queryFn: ({ pageParam }) =>
+      carregarMensagens({ data: { conversaId: selecionada as string, antes: pageParam } }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (primeira) => primeira.anterior,
     enabled: Boolean(selecionada),
-    refetchInterval: selecionada ? 3_000 : false,
+    refetchInterval: selecionada ? 15_000 : false,
   });
+  const listaMensagens = useMemo(
+    () => [...(mensagens.data?.pages ?? [])].reverse().flatMap((p) => p.itens),
+    [mensagens.data],
+  );
+  const totalAntigas = useMemo(
+    () => (mensagens.data?.pages ?? []).slice(1).reduce((n, p) => n + p.itens.length, 0),
+    [mensagens.data],
+  );
 
   useEffect(() => {
     const primeiroNumero = numeros.data?.[0]?.phone_number_id;
@@ -480,7 +499,10 @@ function WhatsappPage() {
   });
 
 
-  const lista = conversas.data ?? [];
+  const lista = useMemo(
+    () => (conversas.data?.pages ?? []).flatMap((p) => p.itens),
+    [conversas.data],
+  );
   const listaNumeros = numeros.data ?? [];
   const conversaSelecionada = lista.find((conversa) => conversa.id === selecionada);
   const numeroSelecionado = listaNumeros.find(
@@ -491,17 +513,7 @@ function WhatsappPage() {
     const n = listaNumeros.find((x) => x.phone_number_id === phoneNumberId);
     return n?.display_phone_number ?? n?.verified_name ?? "Número";
   };
-  const filtradas = useMemo(
-    () =>
-      lista
-        .filter((c) => !numeroFiltro || c.phone_number_id === numeroFiltro)
-        .filter((c) =>
-          `${c.contato_nome ?? ""} ${c.contato_wa_id}`
-            .toLowerCase()
-            .includes(busca.toLowerCase())
-        ),
-    [lista, busca, numeroFiltro]
-  );
+  const filtradas = lista;
 
   return (
     <DashboardShell>
@@ -545,7 +557,7 @@ function WhatsappPage() {
                   className="pl-9"
                 />
               </div>
-              <ScrollArea className="flex-1">
+              <div className="min-h-0 flex-1">
                 {conversas.isLoading ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                     Carregando conversas...
@@ -555,12 +567,24 @@ function WhatsappPage() {
                     Nenhuma conversa por aqui ainda.
                   </p>
                 ) : (
-                  <div className="flex flex-col gap-1">
-                    {filtradas.map((c) => (
+                  <Virtuoso
+                    className="h-full"
+                    data={filtradas}
+                    computeItemKey={(_i, c) => c.id}
+                    endReached={() => {
+                      if (conversas.hasNextPage && !conversas.isFetchingNextPage) conversas.fetchNextPage();
+                    }}
+                    components={{
+                      Footer: () =>
+                        conversas.isFetchingNextPage ? (
+                          <p className="py-2 text-center text-xs text-muted-foreground">Carregando...</p>
+                        ) : null,
+                    }}
+                    itemContent={(_i, c) => (
+                      <div className="pb-1">
                       <button
-                        key={c.id}
                         onClick={() => setSelecionada(c.id)}
-                        className={`rounded-lg px-3 py-2 text-left transition-colors ${
+                        className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
                           selecionada === c.id
                             ? "bg-sidebar-accent text-primary"
                             : "hover:bg-muted/60"
@@ -583,10 +607,11 @@ function WhatsappPage() {
                           via {rotuloNumero(c.phone_number_id)}
                         </p>
                       </button>
-                    ))}
-                  </div>
+                      </div>
+                    )}
+                  />
                 )}
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
 
@@ -613,10 +638,29 @@ function WhatsappPage() {
                       </Button>
                     ) : null}
                   </div>
-                  <Conversation>
-                    <ConversationContent className="gap-3 p-4">
-                      {(mensagens.data ?? []).map((m) => (
-                        <Message key={m.id} from={m.direcao === "saida" ? "user" : "assistant"}>
+                  <div className="min-h-0 flex-1">
+                    <Virtuoso
+                      key={selecionada}
+                      className="h-full"
+                      data={listaMensagens}
+                      firstItemIndex={100_000 - totalAntigas}
+                      initialTopMostItemIndex={Math.max(listaMensagens.length - 1, 0)}
+                      followOutput="smooth"
+                      alignToBottom
+                      computeItemKey={(_i, m) => m.id}
+                      startReached={() => {
+                        if (mensagens.hasNextPage && !mensagens.isFetchingNextPage) mensagens.fetchNextPage();
+                      }}
+                      components={{
+                        Header: () =>
+                          mensagens.isFetchingNextPage ? (
+                            <p className="py-2 text-center text-xs text-muted-foreground">Carregando mensagens antigas...</p>
+                          ) : <div className="h-4" />,
+                        Footer: () => <div className="h-4" />,
+                      }}
+                      itemContent={(_i, m) => (
+                        <div className="px-4 py-1.5">
+                        <Message from={m.direcao === "saida" ? "user" : "assistant"}>
                           <MessageContent className={m.direcao === "entrada" ? "rounded-lg bg-muted px-4 py-3" : ""}>
                             {m.media_id ? (
                               <div className="mb-1">
@@ -636,10 +680,10 @@ function WhatsappPage() {
                             </span>
                           </MessageContent>
                         </Message>
-                      ))}
-                    </ConversationContent>
-                    <ConversationScrollButton />
-                  </Conversation>
+                        </div>
+                      )}
+                    />
+                  </div>
                   <div className="border-t border-border/60 p-3">
                     <PromptInput
                       onSubmit={({ text }) => {
