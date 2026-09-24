@@ -24,6 +24,71 @@ import {
   listarNumerosWhatsapp,
 } from "@/lib/whatsapp.functions";
 import { setWhatsappConversationTakeover } from "@/lib/whatsapp-ai.functions";
+import { salvarCacheImagemWhatsapp } from "@/lib/whatsapp.functions";
+import {
+  alternarTagConversa,
+  criarTagWhatsapp,
+  excluirConversaWhatsapp,
+  listarTagsWhatsapp,
+} from "@/lib/whatsapp-tags.functions";
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+/** Reduz bastante uma imagem (JPEG leve) para economizar espaço e dados. */
+async function reduzirImagem(origem: Blob | string, ladoMax: number, qualidade: number): Promise<Blob> {
+  const url = typeof origem === "string" ? origem : URL.createObjectURL(origem);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Imagem inválida."));
+      el.src = url;
+    });
+    const escala = Math.min(1, ladoMax / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * escala));
+    canvas.height = Math.max(1, Math.round(img.height * escala));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Sem suporte a imagem.");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao reduzir."))), "image/jpeg", qualidade),
+    );
+  } finally {
+    if (typeof origem !== "string") URL.revokeObjectURL(url);
+  }
+}
+
+function blobParaDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result));
+    leitor.onerror = () => reject(leitor.error);
+    leitor.readAsDataURL(blob);
+  });
+}
 
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
@@ -216,13 +281,25 @@ async function converterAudioParaMp3(gravacao: Blob) {
 
 function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   const baixar = useServerFn(obterMidiaWhatsapp);
+  const guardarCache = useServerFn(salvarCacheImagemWhatsapp);
   const automatico = mensagem.tipo === "image" || mensagem.tipo === "audio";
   const [abrir, setAbrir] = useState(automatico);
   const [expandida, setExpandida] = useState(false);
 
   const arquivo = useQuery({
     queryKey: ["whatsapp-midia", mensagem.id],
-    queryFn: () => baixar({ data: { mensagemId: mensagem.id } }),
+    queryFn: async () => {
+      const r = await baixar({ data: { mensagemId: mensagem.id } });
+      if (r.emCache || !(mensagem.tipo === "image" || r.mime.startsWith("image/"))) return r;
+      // Primeira abertura: reduz bem a imagem e guarda no banco para as próximas vezes.
+      try {
+        const leve = await blobParaDataUrl(await reduzirImagem(r.dataUrl, 900, 0.55));
+        guardarCache({ data: { mensagemId: mensagem.id, dataUrl: leve } }).catch(() => undefined);
+        return { ...r, dataUrl: leve, mime: "image/jpeg" };
+      } catch {
+        return r;
+      }
+    },
     enabled: abrir,
     staleTime: 10 * 60_000,
   });
@@ -324,6 +401,51 @@ function WhatsappPage() {
   const enviar = useServerFn(enviarMensagemWhatsapp);
   const enviarMidia = useServerFn(enviarMidiaWhatsapp);
   const alterarAtendimento = useServerFn(setWhatsappConversationTakeover);
+  const carregarTags = useServerFn(listarTagsWhatsapp);
+  const criarTag = useServerFn(criarTagWhatsapp);
+  const alternarTag = useServerFn(alternarTagConversa);
+  const excluirConversa = useServerFn(excluirConversaWhatsapp);
+  const [novaTag, setNovaTag] = useState("");
+  const [paraExcluir, setParaExcluir] = useState<{ id: string; nome: string } | null>(null);
+
+  const tags = useQuery({ queryKey: ["whatsapp-tags"], queryFn: () => carregarTags() });
+  const tagsPorConversa = useMemo(() => {
+    const nomes = new Map((tags.data?.tags ?? []).map((t) => [t.id, t.nome]));
+    const mapa = new Map<string, { id: string; nome: string }[]>();
+    for (const v of tags.data?.vinculos ?? []) {
+      const nome = nomes.get(v.tag_id);
+      if (!nome) continue;
+      mapa.set(v.conversa_id, [...(mapa.get(v.conversa_id) ?? []), { id: v.tag_id, nome }]);
+    }
+    return mapa;
+  }, [tags.data]);
+
+  const criarTagMutation = useMutation({
+    mutationFn: (entrada: { nome: string; conversaId: string }) => criarTag({ data: entrada }),
+    onSuccess: () => {
+      setNovaTag("");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const alternarTagMutation = useMutation({
+    mutationFn: (entrada: { conversaId: string; tagId: string; ativo: boolean }) =>
+      alternarTag({ data: entrada }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const excluirMutation = useMutation({
+    mutationFn: (conversaId: string) => excluirConversa({ data: { conversaId } }),
+    onSuccess: (_d, conversaId) => {
+      toast.success("Conversa excluída.");
+      setParaExcluir(null);
+      if (selecionada === conversaId) setSelecionada(null);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
+      queryClient.removeQueries({ queryKey: ["whatsapp-mensagens", conversaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const carregarNumeros = useServerFn(listarNumerosWhatsapp);
 
@@ -616,6 +738,8 @@ function WhatsappPage() {
                     }}
                     itemContent={(_i, c) => (
                       <div className="pb-1">
+                      <ContextMenu>
+                      <ContextMenuTrigger asChild>
                       <button
                         onClick={() => setSelecionada(c.id)}
                         className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
@@ -640,7 +764,74 @@ function WhatsappPage() {
                         <p className="truncate text-[10px] text-muted-foreground/80">
                           via {rotuloNumero(c.phone_number_id)}
                         </p>
+                        {(tagsPorConversa.get(c.id) ?? []).length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {(tagsPorConversa.get(c.id) ?? []).map((t) => (
+                              <Badge key={t.id} variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
+                                {t.nome}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
                       </button>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent className="w-56">
+                        <ContextMenuLabel className="truncate text-xs">
+                          {c.contato_nome ?? formatarTelefone(c.contato_wa_id)}
+                        </ContextMenuLabel>
+                        <ContextMenuSeparator />
+                        <ContextMenuSub>
+                          <ContextMenuSubTrigger>Adicionar tag</ContextMenuSubTrigger>
+                          <ContextMenuSubContent className="w-56">
+                            <form
+                              className="p-1"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (novaTag.trim())
+                                  criarTagMutation.mutate({ nome: novaTag.trim(), conversaId: c.id });
+                              }}
+                            >
+                              <Input
+                                value={novaTag}
+                                onChange={(e) => setNovaTag(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                placeholder="Criar nova tag e Enter"
+                                className="h-8 text-xs"
+                                maxLength={40}
+                              />
+                            </form>
+                            {(tags.data?.tags ?? []).length > 0 ? <ContextMenuSeparator /> : null}
+                            {(tags.data?.tags ?? []).map((t) => {
+                              const ativa = (tagsPorConversa.get(c.id) ?? []).some((x) => x.id === t.id);
+                              return (
+                                <ContextMenuCheckboxItem
+                                  key={t.id}
+                                  checked={ativa}
+                                  onSelect={(e) => e.preventDefault()}
+                                  onCheckedChange={(v) =>
+                                    alternarTagMutation.mutate({ conversaId: c.id, tagId: t.id, ativo: Boolean(v) })
+                                  }
+                                >
+                                  {t.nome}
+                                </ContextMenuCheckboxItem>
+                              );
+                            })}
+                            {tags.data?.aviso ? (
+                              <p className="px-2 py-1 text-[11px] text-destructive">{tags.data.aviso}</p>
+                            ) : null}
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() =>
+                            setParaExcluir({ id: c.id, nome: c.contato_nome ?? formatarTelefone(c.contato_wa_id) })
+                          }
+                        >
+                          Excluir conversa
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                      </ContextMenu>
                       </div>
                     )}
                   />
@@ -751,12 +942,16 @@ function WhatsappPage() {
                               const arquivo = event.target.files?.[0];
                               event.target.value = "";
                               if (arquivo)
-                                midiaMutation.mutate({
-                                  arquivo,
-                                  nome: arquivo.name,
-                                  tipo: "image",
-                                  mime: arquivo.type || "image/jpeg",
-                                });
+                                reduzirImagem(arquivo, 1280, 0.65)
+                                  .then((leve) =>
+                                    midiaMutation.mutate({
+                                      arquivo: leve,
+                                      nome: arquivo.name.replace(/\.[^.]+$/, "") + ".jpg",
+                                      tipo: "image",
+                                      mime: "image/jpeg",
+                                    }),
+                                  )
+                                  .catch(() => toast.error("Não foi possível preparar a imagem."));
                             }}
                           />
                           <input
@@ -842,6 +1037,31 @@ function WhatsappPage() {
           </Card>
         </div>
       </div>
+      <AlertDialog open={Boolean(paraExcluir)} onOpenChange={(v) => !v && setParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conversa com {paraExcluir?.nome}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A conversa, todas as mensagens, arquivos e tags dela
+              serão apagados definitivamente do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluirMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={excluirMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (paraExcluir) excluirMutation.mutate(paraExcluir.id);
+              }}
+            >
+              {excluirMutation.isPending ? <Loader2 className="animate-spin" /> : null}
+              Excluir definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardShell>
   );
 }
