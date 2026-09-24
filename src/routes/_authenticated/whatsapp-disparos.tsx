@@ -283,7 +283,7 @@ function DisparosPage() {
           </TabsList>
 
           <TabsContent value="tags" className="space-y-4 pt-4">
-            <EnvioPorTag numeros={listaNumeros} />
+            <EnvioPorTag numeros={listaNumeros} modelos={aprovados} />
           </TabsContent>
 
           <TabsContent value="campanhas" className="space-y-4 pt-4">
