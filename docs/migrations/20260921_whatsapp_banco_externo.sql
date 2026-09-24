@@ -246,3 +246,26 @@ select cron.schedule(
   '* * * * *',
   $$ select net.http_post(url := 'https://app.omniasyn.com/api/public/cron/whatsapp-disparos?secret=S2Ez7u2tUMd01EW6KkPRkErfzPd5Y7XPNg9JnJgt49xc7QDb') $$
 );
+
+-- 10) Tags de conversas e cache leve de imagens -------------------------
+alter table public.whatsapp_mensagens add column if not exists media_cache text;
+
+create table if not exists public.whatsapp_tags (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  nome text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, nome)
+);
+create table if not exists public.whatsapp_conversa_tags (
+  conversa_id uuid not null references public.whatsapp_conversas(id) on delete cascade,
+  tag_id uuid not null references public.whatsapp_tags(id) on delete cascade,
+  user_id uuid not null,
+  created_at timestamptz not null default now(),
+  primary key (conversa_id, tag_id)
+);
+create index if not exists whatsapp_conversa_tags_tag_idx on public.whatsapp_conversa_tags (user_id, tag_id);
+grant all on public.whatsapp_tags to service_role;
+grant all on public.whatsapp_conversa_tags to service_role;
+alter table public.whatsapp_tags enable row level security;
+alter table public.whatsapp_conversa_tags enable row level security;

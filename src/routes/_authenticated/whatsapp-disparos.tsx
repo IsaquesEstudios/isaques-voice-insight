@@ -42,6 +42,7 @@ import {
   type ComponenteTemplate,
 } from "@/lib/whatsapp-templates.functions";
 import { listarNumerosWhatsapp } from "@/lib/whatsapp.functions";
+import { EnvioPorTag } from "@/components/whatsapp/envio-por-tag";
 
 export const Route = createFileRoute("/_authenticated/whatsapp-disparos")({
   head: () => ({
@@ -278,7 +279,12 @@ function DisparosPage() {
           <TabsList>
             <TabsTrigger value="campanhas">Campanhas</TabsTrigger>
             <TabsTrigger value="lembretes">Lembretes</TabsTrigger>
+            <TabsTrigger value="tags">Por tag</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="tags" className="space-y-4 pt-4">
+            <EnvioPorTag numeros={listaNumeros} />
+          </TabsContent>
 
           <TabsContent value="campanhas" className="space-y-4 pt-4">
             <div className="flex justify-end">
