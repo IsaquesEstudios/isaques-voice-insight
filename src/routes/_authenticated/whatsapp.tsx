@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Virtuoso } from "react-virtuoso";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, UserRound, X } from "lucide-react";
+import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -30,6 +30,7 @@ import {
   criarTagWhatsapp,
   excluirConversaWhatsapp,
   listarTagsWhatsapp,
+  excluirTagWhatsapp,
 } from "@/lib/whatsapp-tags.functions";
 import {
   ContextMenu,
@@ -417,8 +418,26 @@ function WhatsappPage() {
   const [novaTagNome, setNovaTagNome] = useState("");
   const [novaTagCor, setNovaTagCor] = useState("#00acdc");
   const [paraExcluir, setParaExcluir] = useState<{ id: string; nome: string } | null>(null);
+  const [tagParaExcluir, setTagParaExcluir] = useState<{ id: string; nome: string } | null>(null);
+  const [tagFiltro, setTagFiltro] = useState<string | null>(null);
+  const excluirTag = useServerFn(excluirTagWhatsapp);
 
   const tags = useQuery({ queryKey: ["whatsapp-tags"], queryFn: () => carregarTags() });
+  const usoTagExcluir = useMemo(
+    () => (tags.data?.vinculos ?? []).filter((v) => v.tag_id === tagParaExcluir?.id).length,
+    [tags.data, tagParaExcluir],
+  );
+  const excluirTagMutation = useMutation({
+    mutationFn: (tagId: string) => excluirTag({ data: { tagId } }),
+    onSuccess: (_d, tagId) => {
+      toast.success("Tag excluída.");
+      setTagParaExcluir(null);
+      if (tagFiltro === tagId) setTagFiltro(null);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const tagsPorConversa = useMemo(() => {
     const info = new Map((tags.data?.tags ?? []).map((t) => [t.id, { nome: t.nome, cor: t.cor ?? "#00acdc" }]));
     const mapa = new Map<string, { id: string; nome: string; cor: string }[]>();
@@ -479,9 +498,11 @@ function WhatsappPage() {
 
   // Conversas: 30 por vez, carregando mais ao rolar (cursor por ultima_em).
   const conversas = useInfiniteQuery({
-    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva],
+    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva, tagFiltro],
     queryFn: ({ pageParam }) =>
-      carregarConversas({ data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null } }),
+      carregarConversas({
+        data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null, tagId: tagFiltro },
+      }),
     initialPageParam: null as string | null,
     getNextPageParam: (ultima) => ultima.proximo,
     enabled: Boolean(numeroFiltro) || numeros.isFetched,
@@ -1117,6 +1138,33 @@ function WhatsappPage() {
             >
               {excluirMutation.isPending ? <Loader2 className="animate-spin" /> : null}
               Excluir definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={Boolean(tagParaExcluir)} onOpenChange={(v) => !v && setTagParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir a tag “{tagParaExcluir?.nome}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {usoTagExcluir > 0
+                ? `${usoTagExcluir} ${usoTagExcluir === 1 ? "contato está usando" : "contatos estão usando"} esta tag. Ela será removida de todos. `
+                : "Nenhum contato está usando esta tag. "}
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluirTagMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={excluirTagMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (tagParaExcluir) excluirTagMutation.mutate(tagParaExcluir.id);
+              }}
+            >
+              {excluirTagMutation.isPending ? <Loader2 className="animate-spin" /> : null}
+              Excluir tag
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -550,10 +550,11 @@ type ConversaLista = {
 export const listarConversasWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { antes?: string | null; numero?: string | null; busca?: string | null } | undefined) => ({
+    (input: { antes?: string | null; numero?: string | null; busca?: string | null; tagId?: string | null } | undefined) => ({
       antes: typeof input?.antes === "string" ? input.antes : null,
       numero: typeof input?.numero === "string" ? input.numero : null,
       busca: typeof input?.busca === "string" ? input.busca.slice(0, 60) : null,
+      tagId: typeof input?.tagId === "string" ? input.tagId : null,
     }),
   )
   .handler(async ({ data, context }): Promise<{ itens: ConversaLista[]; proximo: string | null }> => {
@@ -567,8 +568,38 @@ export const listarConversasWhatsapp = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (data.numero) consulta = consulta.eq("phone_number_id", data.numero);
     if (data.antes) consulta = consulta.lt("ultima_em", data.antes);
-    const termo = data.busca?.replace(/[,()%*\\]/g, " ").trim();
-    if (termo) consulta = consulta.or(`contato_nome.ilike.%${termo}%,contato_wa_id.ilike.%${termo}%`);
+    // Filtro por tag selecionada.
+    if (data.tagId) {
+      const { data: vinc } = await chatDb
+        .from("whatsapp_conversa_tags")
+        .select("conversa_id")
+        .eq("user_id", context.userId)
+        .eq("tag_id", data.tagId);
+      const idsTag = (vinc ?? []).map((v) => v.conversa_id as string);
+      if (idsTag.length === 0) return { itens: [], proximo: null };
+      consulta = consulta.in("id", idsTag);
+    }
+    const termo = data.busca?.replace(/[,()%*\\"]/g, " ").trim();
+    if (termo) {
+      // Busca por nome/número ou por nome de tag (todas as conversas com a tag).
+      const { data: tagsAchadas } = await chatDb
+        .from("whatsapp_tags")
+        .select("id")
+        .eq("user_id", context.userId)
+        .ilike("nome", `%${termo}%`);
+      let idsPorTag: string[] = [];
+      if (tagsAchadas?.length) {
+        const { data: vinc } = await chatDb
+          .from("whatsapp_conversa_tags")
+          .select("conversa_id")
+          .eq("user_id", context.userId)
+          .in("tag_id", tagsAchadas.map((t) => t.id as string));
+        idsPorTag = [...new Set((vinc ?? []).map((v) => v.conversa_id as string))].slice(0, 300);
+      }
+      const filtros = [`contato_nome.ilike.%${termo}%`, `contato_wa_id.ilike.%${termo}%`];
+      if (idsPorTag.length) filtros.push(`id.in.(${idsPorTag.join(",")})`);
+      consulta = consulta.or(filtros.join(","));
+    }
     const { data: linhas, error } = await consulta
       .order("ultima_em", { ascending: false })
       .limit(LIMITE_CONVERSAS);
