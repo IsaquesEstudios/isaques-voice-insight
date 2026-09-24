@@ -53,6 +53,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /** Reduz bastante uma imagem (JPEG leve) para economizar espaço e dados. */
 async function reduzirImagem(origem: Blob | string, ladoMax: number, qualidade: number): Promise<Blob> {
