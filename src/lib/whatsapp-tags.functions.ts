@@ -57,14 +57,21 @@ export const criarTagWhatsapp = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const chatDb = await db();
-    const { data: tag, error } = await chatDb
+    const base = { user_id: context.userId, nome: data.nome };
+    let resultado = await chatDb
       .from("whatsapp_tags")
-      .upsert(
-        { user_id: context.userId, nome: data.nome, cor: data.cor },
-        { onConflict: "user_id,nome" },
-      )
+      .upsert({ ...base, cor: data.cor }, { onConflict: "user_id,nome" })
       .select("id, nome, cor")
       .single<TagWhatsapp>();
+    // Banco antigo sem a coluna de cor: salva sem ela.
+    if (resultado.error && (resultado.error.code === "42703" || resultado.error.code === "PGRST204")) {
+      resultado = await chatDb
+        .from("whatsapp_tags")
+        .upsert(base, { onConflict: "user_id,nome" })
+        .select("id, nome")
+        .single<TagWhatsapp>();
+    }
+    const { data: tag, error } = resultado;
     if (error) throw new Error(tabelaAusente(error) ? AVISO_SQL : error.message);
     if (data.conversaId) {
       const { error: e } = await chatDb
