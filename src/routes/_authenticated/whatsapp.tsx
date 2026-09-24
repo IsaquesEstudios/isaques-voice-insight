@@ -614,6 +614,7 @@ function WhatsappPage() {
   type Pendente = { id: string; conversaId: string; texto: string; criado_em: string; erro?: boolean };
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
   const filaRef = useRef<Promise<unknown>>(Promise.resolve());
+  const lixeiraClicadaRef = useRef(false);
   const enviarMensagem = (textoBruto: string) => {
     const texto = textoBruto.trim();
     if (!texto || !selecionada) return;
