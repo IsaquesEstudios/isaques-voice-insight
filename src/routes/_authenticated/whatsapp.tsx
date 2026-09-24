@@ -1075,6 +1075,82 @@ function WhatsappPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={Boolean(novaTagDialog)} onOpenChange={(v) => !v && setNovaTagDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova tag</DialogTitle>
+            <DialogDescription>Defina o nome e a cor. A tag já sai aplicada na conversa.</DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (novaTagDialog && novaTagNome.trim())
+                criarTagMutation.mutate({
+                  nome: novaTagNome.trim(),
+                  cor: novaTagCor,
+                  conversaId: novaTagDialog.conversaId,
+                });
+            }}
+          >
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Nome</label>
+              <Input
+                value={novaTagNome}
+                onChange={(e) => setNovaTagNome(e.target.value)}
+                placeholder="Ex.: Cliente VIP"
+                maxLength={40}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Cor</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={novaTagCor}
+                  onChange={(e) => setNovaTagCor(e.target.value)}
+                  className="h-10 w-14 cursor-pointer rounded-md border border-border bg-transparent p-1"
+                  aria-label="Escolher cor"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {["#00acdc", "#2abb65", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#64748b"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNovaTagCor(c)}
+                      className="size-6 rounded-full border border-border/60 transition-transform hover:scale-110"
+                      style={{
+                        backgroundColor: c,
+                        outline: novaTagCor === c ? `2px solid ${c}` : undefined,
+                        outlineOffset: 2,
+                      }}
+                      aria-label={`Cor ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Badge
+                variant="outline"
+                className="mt-1"
+                style={{ borderColor: novaTagCor, color: novaTagCor, backgroundColor: `${novaTagCor}1a` }}
+              >
+                {novaTagNome.trim() || "Prévia da tag"}
+              </Badge>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setNovaTagDialog(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!novaTagNome.trim() || criarTagMutation.isPending}>
+                {criarTagMutation.isPending ? <Loader2 className="animate-spin" /> : null}
+                Criar tag
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
