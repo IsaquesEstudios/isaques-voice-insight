@@ -918,19 +918,35 @@ export const obterMidiaWhatsapp = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
-    const { data: mensagem, error } = await chatDb
-      .from("whatsapp_mensagens")
-      .select("conversa_id, media_id, media_mime, media_nome")
-      .eq("id", data.mensagemId)
-      .eq("user_id", context.userId)
-      .maybeSingle<{
-        conversa_id: string;
-        media_id: string | null;
-        media_mime: string | null;
-        media_nome: string | null;
-      }>();
+    type Linha = {
+      conversa_id: string;
+      media_id: string | null;
+      media_mime: string | null;
+      media_nome: string | null;
+      media_cache?: string | null;
+    };
+    const buscar = (campos: string) =>
+      chatDb
+        .from("whatsapp_mensagens")
+        .select(campos)
+        .eq("id", data.mensagemId)
+        .eq("user_id", context.userId)
+        .maybeSingle<Linha>();
+    let { data: mensagem, error } = await buscar("conversa_id, media_id, media_mime, media_nome, media_cache");
+    if (error && /media_cache/i.test(error.message ?? "")) {
+      ({ data: mensagem, error } = await buscar("conversa_id, media_id, media_mime, media_nome"));
+    }
     if (error) throw new Error(error.message);
     if (!mensagem?.media_id) throw new Error("Esta mensagem não tem arquivo salvo.");
+    // Imagem já reduzida e guardada no banco: não precisa ir até a Meta.
+    if (mensagem.media_cache) {
+      return {
+        dataUrl: mensagem.media_cache,
+        mime: "image/jpeg",
+        nome: mensagem.media_nome ?? "imagem.jpg",
+        emCache: true,
+      };
+    }
 
     const { token, conversa } = await dadosDaConversa(mensagem.conversa_id, context.userId);
     const phoneNumberId = conversa.phone_number_id;
@@ -964,5 +980,26 @@ export const obterMidiaWhatsapp = createServerFn({ method: "POST" })
       dataUrl: `data:${mime};base64,${btoa(binario)}`,
       mime,
       nome: mensagem.media_nome ?? "arquivo",
+      emCache: false,
     };
+  });
+
+/** Guarda no banco uma versão bem reduzida (JPEG leve) da imagem da mensagem. */
+export const salvarCacheImagemWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { mensagemId: string; dataUrl: string }) => {
+    if (!input?.mensagemId) throw new Error("Mensagem inválida.");
+    if (!input.dataUrl?.startsWith("data:image/jpeg;base64,")) throw new Error("Imagem inválida.");
+    if (input.dataUrl.length > 200_000) throw new Error("Imagem grande demais para guardar.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { error } = await chatDb
+      .from("whatsapp_mensagens")
+      .update({ media_cache: data.dataUrl })
+      .eq("id", data.mensagemId)
+      .eq("user_id", context.userId);
+    // Se a coluna ainda não existir no banco externo, apenas ignoramos.
+    return { ok: !error };
   });
