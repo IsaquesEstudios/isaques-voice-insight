@@ -771,7 +771,12 @@ function WhatsappPage() {
                         {(tagsPorConversa.get(c.id) ?? []).length > 0 ? (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {(tagsPorConversa.get(c.id) ?? []).map((t) => (
-                              <Badge key={t.id} variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
+                              <Badge
+                                key={t.id}
+                                variant="outline"
+                                className="h-4 px-1.5 text-[9px] font-normal"
+                                style={{ borderColor: t.cor, color: t.cor, backgroundColor: `${t.cor}1a` }}
+                              >
                                 {t.nome}
                               </Badge>
                             ))}
@@ -787,23 +792,15 @@ function WhatsappPage() {
                         <ContextMenuSub>
                           <ContextMenuSubTrigger>Adicionar tag</ContextMenuSubTrigger>
                           <ContextMenuSubContent className="w-56">
-                            <form
-                              className="p-1"
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                if (novaTag.trim())
-                                  criarTagMutation.mutate({ nome: novaTag.trim(), conversaId: c.id });
+                            <ContextMenuItem
+                              onSelect={() => {
+                                setNovaTagNome("");
+                                setNovaTagCor("#00acdc");
+                                setNovaTagDialog({ conversaId: c.id });
                               }}
                             >
-                              <Input
-                                value={novaTag}
-                                onChange={(e) => setNovaTag(e.target.value)}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                placeholder="Criar nova tag e Enter"
-                                className="h-8 text-xs"
-                                maxLength={40}
-                              />
-                            </form>
+                              Nova tag
+                            </ContextMenuItem>
                             {(tags.data?.tags ?? []).length > 0 ? <ContextMenuSeparator /> : null}
                             {(tags.data?.tags ?? []).map((t) => {
                               const ativa = (tagsPorConversa.get(c.id) ?? []).some((x) => x.id === t.id);
@@ -816,6 +813,10 @@ function WhatsappPage() {
                                     alternarTagMutation.mutate({ conversaId: c.id, tagId: t.id, ativo: Boolean(v) })
                                   }
                                 >
+                                  <span
+                                    className="mr-1 inline-block size-2.5 rounded-full"
+                                    style={{ backgroundColor: t.cor ?? "#00acdc" }}
+                                  />
                                   {t.nome}
                                 </ContextMenuCheckboxItem>
                               );
