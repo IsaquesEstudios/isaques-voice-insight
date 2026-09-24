@@ -50,17 +50,20 @@ export const listarTagsWhatsapp = createServerFn({ method: "GET" })
 /** Cria a tag (ou reaproveita se já existir com o mesmo nome) e aplica na conversa. */
 export const criarTagWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { nome: string; conversaId?: string | null }) => {
+  .inputValidator((input: { nome: string; cor?: string | null; conversaId?: string | null }) => {
     const nome = input?.nome?.trim().slice(0, 40);
     if (!nome) throw new Error("Dê um nome para a tag.");
-    return { nome, conversaId: input.conversaId ?? null };
+    return { nome, cor: corValida(input.cor), conversaId: input.conversaId ?? null };
   })
   .handler(async ({ data, context }) => {
     const chatDb = await db();
     const { data: tag, error } = await chatDb
       .from("whatsapp_tags")
-      .upsert({ user_id: context.userId, nome: data.nome }, { onConflict: "user_id,nome" })
-      .select("id, nome")
+      .upsert(
+        { user_id: context.userId, nome: data.nome, cor: data.cor },
+        { onConflict: "user_id,nome" },
+      )
+      .select("id, nome, cor")
       .single<TagWhatsapp>();
     if (error) throw new Error(tabelaAusente(error) ? AVISO_SQL : error.message);
     if (data.conversaId) {
