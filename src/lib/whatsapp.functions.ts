@@ -550,11 +550,14 @@ type ConversaLista = {
 export const listarConversasWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { antes?: string | null; numero?: string | null; busca?: string | null; tagId?: string | null } | undefined) => ({
+    (input: { antes?: string | null; numero?: string | null; busca?: string | null; tagId?: string | null; conversaIds?: string[] | null } | undefined) => ({
       antes: typeof input?.antes === "string" ? input.antes : null,
       numero: typeof input?.numero === "string" ? input.numero : null,
       busca: typeof input?.busca === "string" ? input.busca.slice(0, 60) : null,
       tagId: typeof input?.tagId === "string" ? input.tagId : null,
+      conversaIds: Array.isArray(input?.conversaIds)
+        ? input.conversaIds.filter((x): x is string => typeof x === "string").slice(0, 500)
+        : null,
     }),
   )
   .handler(async ({ data, context }): Promise<{ itens: ConversaLista[]; proximo: string | null }> => {
@@ -568,7 +571,11 @@ export const listarConversasWhatsapp = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (data.numero) consulta = consulta.eq("phone_number_id", data.numero);
     if (data.antes) consulta = consulta.lt("ultima_em", data.antes);
-    // Filtro por tag selecionada.
+    // Filtro por tags selecionadas (ids já resolvidos no navegador; user_id garante o dono).
+    if (data.conversaIds) {
+      if (data.conversaIds.length === 0) return { itens: [], proximo: null };
+      consulta = consulta.in("id", data.conversaIds);
+    }
     if (data.tagId) {
       const { data: vinc } = await chatDb
         .from("whatsapp_conversa_tags")

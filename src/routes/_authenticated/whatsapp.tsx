@@ -439,7 +439,7 @@ function WhatsappPage() {
   const [novaTagCor, setNovaTagCor] = useState("#00acdc");
   const [paraExcluir, setParaExcluir] = useState<{ id: string; nome: string } | null>(null);
   const [tagParaExcluir, setTagParaExcluir] = useState<{ id: string; nome: string } | null>(null);
-  const [tagFiltro, setTagFiltro] = useState<string | null>(null);
+  const [tagsFiltro, setTagsFiltro] = useState<string[]>([]);
   const excluirTag = useServerFn(excluirTagWhatsapp);
 
   const tags = useQuery({ queryKey: ["whatsapp-tags"], queryFn: () => carregarTags() });
@@ -452,7 +452,7 @@ function WhatsappPage() {
     onSuccess: (_d, tagId) => {
       toast.success("Tag excluída.");
       setTagParaExcluir(null);
-      if (tagFiltro === tagId) setTagFiltro(null);
+      setTagsFiltro((atual) => atual.filter((x) => x !== tagId));
       queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
       queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
     },
@@ -540,12 +540,19 @@ function WhatsappPage() {
     return () => clearTimeout(t);
   }, [busca]);
 
+  // Conversas das tags selecionadas (qualquer uma delas), calculadas com os vínculos já carregados.
+  const idsFiltro = useMemo(() => {
+    if (tagsFiltro.length === 0) return null;
+    const ids = new Set((tags.data?.vinculos ?? []).filter((v) => tagsFiltro.includes(v.tag_id)).map((v) => v.conversa_id));
+    return [...ids].sort().slice(0, 500);
+  }, [tagsFiltro, tags.data]);
+
   // Conversas: 30 por vez, carregando mais ao rolar (cursor por ultima_em).
   const conversas = useInfiniteQuery({
-    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva, tagFiltro],
+    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva, tagsFiltro, idsFiltro],
     queryFn: ({ pageParam }) =>
       carregarConversas({
-        data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null, tagId: tagFiltro },
+        data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null, conversaIds: idsFiltro },
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (ultima) => ultima.proximo,
@@ -735,9 +742,9 @@ function WhatsappPage() {
   const lista = useMemo(() => {
     const itens = (conversas.data?.pages ?? []).flatMap((p) => p.itens);
     // Com filtro ativo, some na hora quem perdeu a tag (sem esperar o banco).
-    if (!tagFiltro || !tags.data) return itens;
-    return itens.filter((c) => (tagsPorConversa.get(c.id) ?? []).some((t) => t.id === tagFiltro));
-  }, [conversas.data, tagFiltro, tags.data, tagsPorConversa],
+    if (tagsFiltro.length === 0 || !tags.data) return itens;
+    return itens.filter((c) => (tagsPorConversa.get(c.id) ?? []).some((t) => tagsFiltro.includes(t.id)));
+  }, [conversas.data, tagsFiltro, tags.data, tagsPorConversa],
   );
   const listaNumeros = numeros.data ?? [];
   const conversaSelecionada = lista.find((conversa) => conversa.id === selecionada);
@@ -796,13 +803,15 @@ function WhatsappPage() {
               {(tags.data?.tags ?? []).length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {(tags.data?.tags ?? []).map((t) => {
-                    const ativa = tagFiltro === t.id;
+                    const ativa = tagsFiltro.includes(t.id);
                     const cor = t.cor ?? "#00acdc";
                     return (
                       <button
                         key={t.id}
                         type="button"
-                        onClick={() => setTagFiltro(ativa ? null : t.id)}
+                        onClick={() =>
+                          setTagsFiltro((atual) => (ativa ? atual.filter((x) => x !== t.id) : [...atual, t.id]))
+                        }
                         className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors"
                         style={{
                           borderColor: cor,
@@ -817,7 +826,7 @@ function WhatsappPage() {
                 </div>
               ) : null}
               <div className="min-h-0 flex-1">
-                {conversas.isLoading ? (
+                {conversas.isLoading || (conversas.isFetching && !conversas.isFetchingNextPage && filtradas.length === 0) ? (
                   <TresPontos />
                 ) : filtradas.length === 0 ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
