@@ -476,6 +476,7 @@ function WhatsappPage() {
       setNovaTagNome("");
       setNovaTagCor("#00acdc");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -499,7 +500,10 @@ function WhatsappPage() {
       });
       return { anterior };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+    },
     onError: (e: Error, _vars, contexto) => {
       if (contexto?.anterior) queryClient.setQueryData(["whatsapp-tags"], contexto.anterior);
       toast.error(e.message);
@@ -728,9 +732,12 @@ function WhatsappPage() {
   });
 
 
-  const lista = useMemo(
-    () => (conversas.data?.pages ?? []).flatMap((p) => p.itens),
-    [conversas.data],
+  const lista = useMemo(() => {
+    const itens = (conversas.data?.pages ?? []).flatMap((p) => p.itens);
+    // Com filtro ativo, some na hora quem perdeu a tag (sem esperar o banco).
+    if (!tagFiltro || !tags.data) return itens;
+    return itens.filter((c) => (tagsPorConversa.get(c.id) ?? []).some((t) => t.id === tagFiltro));
+  }, [conversas.data, tagFiltro, tags.data, tagsPorConversa],
   );
   const listaNumeros = numeros.data ?? [];
   const conversaSelecionada = lista.find((conversa) => conversa.id === selecionada);
