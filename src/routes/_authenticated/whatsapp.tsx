@@ -748,15 +748,6 @@ function WhatsappPage() {
               </div>
               {(tags.data?.tags ?? []).length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setTagFiltro(null)}
-                    className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-                      !tagFiltro ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    Todas
-                  </button>
                   {(tags.data?.tags ?? []).map((t) => {
                     const ativa = tagFiltro === t.id;
                     const cor = t.cor ?? "#00acdc";
