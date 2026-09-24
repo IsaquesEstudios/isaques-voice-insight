@@ -403,18 +403,52 @@ function WhatsappPage() {
     };
   }, [queryClient]);
 
-  const enviarMutation = useMutation({
-    mutationFn: (texto: string) => {
-      if (!selecionada) throw new Error("Selecione uma conversa para enviar a mensagem.");
-      return enviar({ data: { conversaId: selecionada, texto } });
-    },
-    onSuccess: () => {
-      setRascunho("");
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens", selecionada] });
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
-    },
-    onError: (erro: Error) => toast.error(erro.message),
-  });
+  // Envio sem travar: cada mensagem aparece na hora e entra numa fila,
+  // que envia uma por vez na ordem em que foram escritas.
+  type Pendente = { id: string; conversaId: string; texto: string; criado_em: string; erro?: boolean };
+  const [pendentes, setPendentes] = useState<Pendente[]>([]);
+  const filaRef = useRef<Promise<unknown>>(Promise.resolve());
+  const enviarMensagem = (textoBruto: string) => {
+    const texto = textoBruto.trim();
+    if (!texto || !selecionada) return;
+    const item: Pendente = {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      conversaId: selecionada,
+      texto,
+      criado_em: new Date().toISOString(),
+    };
+    setRascunho("");
+    setPendentes((atual) => [...atual, item]);
+    filaRef.current = filaRef.current.then(async () => {
+      try {
+        await enviar({ data: { conversaId: item.conversaId, texto: item.texto, enviadoEm: item.criado_em } });
+        await queryClient.invalidateQueries({ queryKey: ["whatsapp-mensagens", item.conversaId] });
+        setPendentes((atual) => atual.filter((p) => p.id !== item.id));
+        queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+      } catch (erro) {
+        setPendentes((atual) => atual.map((p) => (p.id === item.id ? { ...p, erro: true } : p)));
+        toast.error(erro instanceof Error ? erro.message : "Não foi possível enviar a mensagem.");
+      }
+    });
+  };
+
+  const exibidas = useMemo(() => {
+    const doBanco = listaMensagens;
+    const locais = pendentes
+      .filter((p) => p.conversaId === selecionada)
+      .map((p) => ({
+        id: p.id,
+        direcao: "saida",
+        texto: p.texto,
+        tipo: "text",
+        status: p.erro ? "falhou" : "enviando",
+        criado_em: p.criado_em,
+        media_id: null as string | null,
+        media_mime: null as string | null,
+        media_nome: null as string | null,
+      }));
+    return [...doBanco, ...locais].sort((a, b) => a.criado_em.localeCompare(b.criado_em));
+  }, [listaMensagens, pendentes, selecionada]);
 
   const inputImagemRef = useRef<HTMLInputElement>(null);
   const inputDocumentoRef = useRef<HTMLInputElement>(null);
@@ -642,9 +676,9 @@ function WhatsappPage() {
                     <Virtuoso
                       key={selecionada}
                       className="h-full"
-                      data={listaMensagens}
+                      data={exibidas}
                       firstItemIndex={100_000 - totalAntigas}
-                      initialTopMostItemIndex={Math.max(listaMensagens.length - 1, 0)}
+                      initialTopMostItemIndex={Math.max(exibidas.length - 1, 0)}
                       followOutput="smooth"
                       alignToBottom
                       computeItemKey={(_i, m) => m.id}
@@ -677,6 +711,7 @@ function WhatsappPage() {
                             ) : null}
                             <span className="mt-1 block text-[10px] text-muted-foreground">
                               {hora(m.criado_em)}
+                              {m.status === "enviando" ? " · enviando..." : m.status === "falhou" ? " · não enviada" : ""}
                             </span>
                           </MessageContent>
                         </Message>
@@ -688,7 +723,7 @@ function WhatsappPage() {
                     <PromptInput
                       onSubmit={({ text }) => {
                         const value = (text || rascunho).trim();
-                        if (value) enviarMutation.mutate(value);
+                        if (value) enviarMensagem(value);
                       }}
                     >
                       <PromptInputBody>
@@ -698,7 +733,7 @@ function WhatsappPage() {
                           onKeyDown={(event) => {
                             if (event.key === "Enter" && !event.shiftKey) {
                               event.preventDefault();
-                              if (rascunho.trim() && !enviarMutation.isPending) enviarMutation.mutate(rascunho);
+                              enviarMensagem(rascunho);
                             }
                           }}
                           placeholder="Escreva uma mensagem"
@@ -774,7 +809,7 @@ function WhatsappPage() {
                             {gravando ? "Gravando... toque no quadrado para enviar" : "Enter para enviar · Shift + Enter para quebrar linha"}
                           </span>
                         </div>
-                        <PromptInputSubmit disabled={enviarMutation.isPending || !rascunho.trim()} status={enviarMutation.isPending ? "submitted" : "ready"} />
+                        <PromptInputSubmit disabled={!rascunho.trim()} status="ready" />
                       </PromptInputFooter>
                     </PromptInput>
                   </div>

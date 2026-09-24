@@ -662,10 +662,16 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
 
 export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { conversaId: string; texto: string }) => {
+  .inputValidator((input: { conversaId: string; texto: string; enviadoEm?: string }) => {
     if (!input?.conversaId) throw new Error("Conversa inválida.");
     if (!input?.texto?.trim()) throw new Error("Escreva uma mensagem antes de enviar.");
-    return { conversaId: input.conversaId, texto: input.texto.trim() };
+    // Horário em que o usuário apertou enviar: mantém a ordem mesmo se o salvamento atrasar.
+    const t = input.enviadoEm ? Date.parse(input.enviadoEm) : NaN;
+    const agora = Date.now();
+    const enviadoEm = new Date(
+      Number.isFinite(t) && Math.abs(agora - t) < 10 * 60_000 ? t : agora,
+    ).toISOString();
+    return { conversaId: input.conversaId, texto: input.texto.trim(), enviadoEm };
   })
   .handler(async ({ data, context }) => {
     const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
@@ -731,12 +737,14 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
       tipo: "text",
       texto: data.texto,
       status: "enviada",
+      criado_em: data.enviadoEm,
     });
 
     await chatDb
       .from("whatsapp_conversas")
-      .update({ ultima_mensagem: data.texto, ultima_em: new Date().toISOString() })
-      .eq("id", conversa.id);
+      .update({ ultima_mensagem: data.texto, ultima_em: data.enviadoEm })
+      .eq("id", conversa.id)
+      .lte("ultima_em", data.enviadoEm);
 
     await marcarAtendimentoManual(context.userId, conversa.id);
 
