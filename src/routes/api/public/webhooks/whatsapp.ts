@@ -101,6 +101,21 @@ async function responderComIa(input: {
       .maybeSingle();
     if (!account?.access_token) throw new Error("Autorização da Meta indisponível.");
 
+    // Marca como lida e mostra "digitando..." no WhatsApp do cliente (até 25s ou até a resposta).
+    await fetch(`${GRAPH}/${input.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: input.inboundMessageId,
+        typing_indicator: { type: "text" },
+      }),
+    }).catch((e) => console.error("whatsapp typing", e instanceof Error ? e.message : e));
+
     let { data: history, error: historyError }: { data: unknown[] | null; error: { message: string } | null } = await chatDb
       .from("whatsapp_mensagens")
       .select("direcao, texto, tipo, media_id, media_mime")
@@ -125,19 +140,19 @@ async function responderComIa(input: {
       tipo?: string | null;
       media_id?: string | null;
       media_mime?: string | null;
-      audio?: { mimeType: string; data: string };
+      media?: { kind: "audio" | "image"; mimeType: string; data: string };
     };
     const ordered = [...((history ?? []) as Hist[])].reverse();
 
-    // Áudios recebidos desde a última resposta: baixa da Meta e envia ao Gemini para ouvir.
+    // Áudios e imagens recebidos desde a última resposta: baixa da Meta e envia ao Gemini.
     let lastOut = -1;
     ordered.forEach((m, i) => {
       if (m.direcao !== "entrada") lastOut = i;
     });
-    let audios = 0;
-    for (let i = lastOut + 1; i < ordered.length && audios < 5; i++) {
+    let midias = 0;
+    for (let i = lastOut + 1; i < ordered.length && midias < 6; i++) {
       const m = ordered[i];
-      if (m.tipo !== "audio" || !m.media_id) continue;
+      if ((m.tipo !== "audio" && m.tipo !== "image") || !m.media_id) continue;
       try {
         const metaRes = await fetch(`${GRAPH}/${m.media_id}`, {
           headers: { Authorization: `Bearer ${account.access_token}` },
@@ -150,11 +165,16 @@ async function responderComIa(input: {
         if (!fileRes.ok) continue;
         const buf = new Uint8Array(await fileRes.arrayBuffer());
         if (buf.byteLength > 15 * 1024 * 1024) continue;
-        const mime = (meta.mime_type ?? m.media_mime ?? "audio/ogg").split(";")[0].trim();
-        m.audio = { mimeType: mime, data: Buffer.from(buf).toString("base64") };
-        audios++;
+        const fallback = m.tipo === "audio" ? "audio/ogg" : "image/jpeg";
+        const mime = (meta.mime_type ?? m.media_mime ?? fallback).split(";")[0].trim();
+        m.media = {
+          kind: m.tipo as "audio" | "image",
+          mimeType: mime,
+          data: Buffer.from(buf).toString("base64"),
+        };
+        midias++;
       } catch (e) {
-        console.error("whatsapp ai audio", e instanceof Error ? e.message : e);
+        console.error("whatsapp ai media", e instanceof Error ? e.message : e);
       }
     }
 
