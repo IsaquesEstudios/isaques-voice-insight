@@ -34,6 +34,20 @@ async function responderComIa(input: {
   const { chatDb: supabaseAdmin } = await import("@/integrations/supabase/chat-db.server");
   const { chatDb } = await import("@/integrations/supabase/chat-db.server");
 
+  // Agrupa rajadas: espera 8s e só responde se esta ainda for a última mensagem do cliente.
+  // A resposta usa todo o histórico recente, incluindo todas as mensagens desde a última da IA.
+  await new Promise((resolve) => setTimeout(resolve, 8_000));
+  const { data: ultima } = await chatDb
+    .from("whatsapp_mensagens")
+    .select("wa_message_id")
+    .eq("conversa_id", input.conversationId)
+    .eq("direcao", "entrada")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ultima?.wa_message_id && ultima.wa_message_id !== input.inboundMessageId) return;
+
+
   const { error: claimError } = await chatDb.from("whatsapp_ai_runs").insert({
     inbound_message_id: input.inboundMessageId,
     user_id: input.userId,
