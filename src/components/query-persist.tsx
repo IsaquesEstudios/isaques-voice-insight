@@ -22,11 +22,16 @@ export function useQueryCachePersistence(queryClient: QueryClient) {
       queryClient,
       persister,
       maxAge: 24 * 60 * 60 * 1000,
+      // Bump to discard caches saved with an older data shape.
+      buster: "v2",
       dehydrateOptions: {
         shouldDehydrateQuery: (query) =>
           query.state.status === "success" &&
           // never persist blobs / object URLs (recordings, audio proxies)
-          !JSON.stringify(query.queryKey).includes("recording"),
+          !JSON.stringify(query.queryKey).includes("recording") &&
+          // paginated chat lists change shape; always fetch fresh
+          query.queryKey[0] !== "whatsapp-mensagens" &&
+          query.queryKey[0] !== "whatsapp-conversas",
       },
     });
 
