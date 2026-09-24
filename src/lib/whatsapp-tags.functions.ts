@@ -232,6 +232,22 @@ export const enviarParaTagWhatsapp = createServerFn({ method: "POST" })
     const destinos = (conversas ?? []) as { id: string; contato_wa_id: string }[];
     if (destinos.length === 0) throw new Error("Nenhuma conversa com essa tag neste número.");
 
+    // A Meta só entrega mensagens livres a quem escreveu nas últimas 24h;
+    // fora disso ela aceita o pedido e depois falha em silêncio.
+    const limite = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentes } = await chatDb
+      .from("whatsapp_mensagens")
+      .select("conversa_id")
+      .in("conversa_id", destinos.map((d) => d.id))
+      .eq("direcao", "entrada")
+      .gte("criado_em", limite);
+    const naJanela = new Set((recentes ?? []).map((r) => r.conversa_id as string));
+    const foraDaJanelaPrevio = destinos.filter((d) => !naJanela.has(d.id)).length;
+    const destinosValidos = destinos.filter((d) => naJanela.has(d.id));
+    if (destinosValidos.length === 0) {
+      return { total: destinos.length, enviados: 0, foraDaJanela: foraDaJanelaPrevio, falhas: [] as string[] };
+    }
+
     // Arquivo enviado uma única vez para a Meta e reaproveitado em todos os envios.
     let mediaId: string | null = null;
     if (data.tipo !== "text") {
@@ -262,9 +278,9 @@ export const enviarParaTagWhatsapp = createServerFn({ method: "POST" })
         : (legenda ?? (data.tipo === "audio" ? "🎤 Áudio" : data.tipo === "video" ? "🎬 Vídeo" : "📷 Foto"));
 
     let enviados = 0;
-    let foraDaJanela = 0;
+    let foraDaJanela = foraDaJanelaPrevio;
     const falhas: string[] = [];
-    for (const destino of destinos) {
+    for (const destino of destinosValidos) {
       const corpo: Record<string, unknown> =
         data.tipo === "text" ? { body: legenda } : { id: mediaId };
       if (data.tipo !== "text" && data.tipo !== "audio" && legenda) corpo["caption"] = legenda;
