@@ -405,25 +405,29 @@ function WhatsappPage() {
   const criarTag = useServerFn(criarTagWhatsapp);
   const alternarTag = useServerFn(alternarTagConversa);
   const excluirConversa = useServerFn(excluirConversaWhatsapp);
-  const [novaTag, setNovaTag] = useState("");
+  const [novaTagDialog, setNovaTagDialog] = useState<{ conversaId: string } | null>(null);
+  const [novaTagNome, setNovaTagNome] = useState("");
+  const [novaTagCor, setNovaTagCor] = useState("#00acdc");
   const [paraExcluir, setParaExcluir] = useState<{ id: string; nome: string } | null>(null);
 
   const tags = useQuery({ queryKey: ["whatsapp-tags"], queryFn: () => carregarTags() });
   const tagsPorConversa = useMemo(() => {
-    const nomes = new Map((tags.data?.tags ?? []).map((t) => [t.id, t.nome]));
-    const mapa = new Map<string, { id: string; nome: string }[]>();
+    const info = new Map((tags.data?.tags ?? []).map((t) => [t.id, { nome: t.nome, cor: t.cor ?? "#00acdc" }]));
+    const mapa = new Map<string, { id: string; nome: string; cor: string }[]>();
     for (const v of tags.data?.vinculos ?? []) {
-      const nome = nomes.get(v.tag_id);
-      if (!nome) continue;
-      mapa.set(v.conversa_id, [...(mapa.get(v.conversa_id) ?? []), { id: v.tag_id, nome }]);
+      const tag = info.get(v.tag_id);
+      if (!tag) continue;
+      mapa.set(v.conversa_id, [...(mapa.get(v.conversa_id) ?? []), { id: v.tag_id, ...tag }]);
     }
     return mapa;
   }, [tags.data]);
 
   const criarTagMutation = useMutation({
-    mutationFn: (entrada: { nome: string; conversaId: string }) => criarTag({ data: entrada }),
+    mutationFn: (entrada: { nome: string; cor: string; conversaId: string }) => criarTag({ data: entrada }),
     onSuccess: () => {
-      setNovaTag("");
+      setNovaTagDialog(null);
+      setNovaTagNome("");
+      setNovaTagCor("#00acdc");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
     },
     onError: (e: Error) => toast.error(e.message),
