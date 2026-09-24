@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Virtuoso } from "react-virtuoso";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, UserRound, X } from "lucide-react";
+import { Bot, Download, FileText, ImageIcon, Loader2, MessageCircle, Mic, Paperclip, Pause, Play, Search, Smartphone, Square, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardShell } from "@/components/dashboard/shell";
@@ -30,6 +30,7 @@ import {
   criarTagWhatsapp,
   excluirConversaWhatsapp,
   listarTagsWhatsapp,
+  excluirTagWhatsapp,
 } from "@/lib/whatsapp-tags.functions";
 import {
   ContextMenu,
@@ -417,8 +418,26 @@ function WhatsappPage() {
   const [novaTagNome, setNovaTagNome] = useState("");
   const [novaTagCor, setNovaTagCor] = useState("#00acdc");
   const [paraExcluir, setParaExcluir] = useState<{ id: string; nome: string } | null>(null);
+  const [tagParaExcluir, setTagParaExcluir] = useState<{ id: string; nome: string } | null>(null);
+  const [tagFiltro, setTagFiltro] = useState<string | null>(null);
+  const excluirTag = useServerFn(excluirTagWhatsapp);
 
   const tags = useQuery({ queryKey: ["whatsapp-tags"], queryFn: () => carregarTags() });
+  const usoTagExcluir = useMemo(
+    () => (tags.data?.vinculos ?? []).filter((v) => v.tag_id === tagParaExcluir?.id).length,
+    [tags.data, tagParaExcluir],
+  );
+  const excluirTagMutation = useMutation({
+    mutationFn: (tagId: string) => excluirTag({ data: { tagId } }),
+    onSuccess: (_d, tagId) => {
+      toast.success("Tag excluída.");
+      setTagParaExcluir(null);
+      if (tagFiltro === tagId) setTagFiltro(null);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversas"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const tagsPorConversa = useMemo(() => {
     const info = new Map((tags.data?.tags ?? []).map((t) => [t.id, { nome: t.nome, cor: t.cor ?? "#00acdc" }]));
     const mapa = new Map<string, { id: string; nome: string; cor: string }[]>();
@@ -479,9 +498,11 @@ function WhatsappPage() {
 
   // Conversas: 30 por vez, carregando mais ao rolar (cursor por ultima_em).
   const conversas = useInfiniteQuery({
-    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva],
+    queryKey: ["whatsapp-conversas", numeroFiltro, buscaAtiva, tagFiltro],
     queryFn: ({ pageParam }) =>
-      carregarConversas({ data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null } }),
+      carregarConversas({
+        data: { antes: pageParam, numero: numeroFiltro, busca: buscaAtiva || null, tagId: tagFiltro },
+      }),
     initialPageParam: null as string | null,
     getNextPageParam: (ultima) => ultima.proximo,
     enabled: Boolean(numeroFiltro) || numeros.isFetched,
@@ -721,10 +742,42 @@ function WhatsappPage() {
                 <Input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar conversa"
+                  placeholder="Buscar por nome, número ou tag"
                   className="pl-9"
                 />
               </div>
+              {(tags.data?.tags ?? []).length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setTagFiltro(null)}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                      !tagFiltro ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {(tags.data?.tags ?? []).map((t) => {
+                    const ativa = tagFiltro === t.id;
+                    const cor = t.cor ?? "#00acdc";
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setTagFiltro(ativa ? null : t.id)}
+                        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+                        style={{
+                          borderColor: cor,
+                          backgroundColor: ativa ? cor : "transparent",
+                          color: ativa ? "#fff" : cor,
+                        }}
+                      >
+                        {t.nome}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
               <div className="min-h-0 flex-1">
                 {conversas.isLoading ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
@@ -825,7 +878,20 @@ function WhatsappPage() {
                                     className="mr-1 inline-block size-2.5 rounded-full"
                                     style={{ backgroundColor: t.cor ?? "#00acdc" }}
                                   />
-                                  {t.nome}
+                                  <span className="flex-1 truncate">{t.nome}</span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Excluir tag ${t.nome}`}
+                                    className="ml-2 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setTagParaExcluir({ id: t.id, nome: t.nome });
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
                                 </ContextMenuCheckboxItem>
                               );
                             })}
@@ -1071,6 +1137,33 @@ function WhatsappPage() {
             >
               {excluirMutation.isPending ? <Loader2 className="animate-spin" /> : null}
               Excluir definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={Boolean(tagParaExcluir)} onOpenChange={(v) => !v && setTagParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir a tag “{tagParaExcluir?.nome}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {usoTagExcluir > 0
+                ? `${usoTagExcluir} ${usoTagExcluir === 1 ? "contato está usando" : "contatos estão usando"} esta tag. Ela será removida de todos. `
+                : "Nenhum contato está usando esta tag. "}
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluirTagMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={excluirTagMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (tagParaExcluir) excluirTagMutation.mutate(tagParaExcluir.id);
+              }}
+            >
+              {excluirTagMutation.isPending ? <Loader2 className="animate-spin" /> : null}
+              Excluir tag
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

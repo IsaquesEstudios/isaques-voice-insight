@@ -118,6 +118,24 @@ export const alternarTagConversa = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Exclui a tag e remove de todas as conversas que a usam. */
+export const excluirTagWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { tagId: string }) => {
+    if (!input?.tagId) throw new Error("Tag inválida.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const chatDb = await db();
+    await chatDb.from("whatsapp_conversa_tags").delete().match({ user_id: context.userId, tag_id: data.tagId });
+    const { error } = await chatDb
+      .from("whatsapp_tags")
+      .delete()
+      .match({ user_id: context.userId, id: data.tagId });
+    if (error) throw new Error(tabelaAusente(error) ? AVISO_SQL : error.message);
+    return { ok: true };
+  });
+
 /** Exclui a conversa e tudo ligado a ela (mensagens, tags, controles da IA). */
 export const excluirConversaWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
