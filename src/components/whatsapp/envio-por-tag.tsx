@@ -54,11 +54,15 @@ export function EnvioPorTag({ numeros }: { numeros: Numero[] }) {
       });
     },
     onSuccess: (r) => {
-      toast.success(
+      const msg =
         `Enviado para ${r.enviados} de ${r.total}.` +
-          (r.foraDaJanela ? ` ${r.foraDaJanela} fora da janela de 24h (use um modelo em Campanhas).` : "") +
-          (r.falhas.length ? ` ${r.falhas.length} falharam.` : ""),
-      );
+        (r.foraDaJanela
+          ? ` ${r.foraDaJanela} não receberam: o contato não escreve há mais de 24h (a Meta exige um modelo aprovado — use Campanhas).`
+          : "") +
+        (r.falhas.length ? ` ${r.falhas.length} falharam.` : "");
+      if (r.enviados === 0) toast.error(msg);
+      else if (r.foraDaJanela || r.falhas.length) toast.warning(msg);
+      else toast.success(msg);
       setTexto("");
       setArquivo(null);
     },
