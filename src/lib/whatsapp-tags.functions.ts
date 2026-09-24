@@ -18,7 +18,14 @@ async function db() {
   return chatDb;
 }
 
-export type TagWhatsapp = { id: string; nome: string };
+export type TagWhatsapp = { id: string; nome: string; cor: string | null };
+
+const COR_PADRAO = "#00acdc";
+
+function corValida(cor?: string | null) {
+  const limpa = cor?.trim().toLowerCase() ?? "";
+  return /^#[0-9a-f]{6}$/.test(limpa) ? limpa : COR_PADRAO;
+}
 
 /** Todas as tags do usuário e quais conversas usam cada uma. */
 export const listarTagsWhatsapp = createServerFn({ method: "GET" })
@@ -26,7 +33,7 @@ export const listarTagsWhatsapp = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const chatDb = await db();
     const [{ data: tags, error }, { data: vinculos, error: erroVinc }] = await Promise.all([
-      chatDb.from("whatsapp_tags").select("id, nome").eq("user_id", context.userId).order("nome"),
+      chatDb.from("whatsapp_tags").select("id, nome, cor").eq("user_id", context.userId).order("nome"),
       chatDb.from("whatsapp_conversa_tags").select("conversa_id, tag_id").eq("user_id", context.userId),
     ]);
     if (error || erroVinc) {
@@ -43,18 +50,28 @@ export const listarTagsWhatsapp = createServerFn({ method: "GET" })
 /** Cria a tag (ou reaproveita se já existir com o mesmo nome) e aplica na conversa. */
 export const criarTagWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { nome: string; conversaId?: string | null }) => {
+  .inputValidator((input: { nome: string; cor?: string | null; conversaId?: string | null }) => {
     const nome = input?.nome?.trim().slice(0, 40);
     if (!nome) throw new Error("Dê um nome para a tag.");
-    return { nome, conversaId: input.conversaId ?? null };
+    return { nome, cor: corValida(input.cor), conversaId: input.conversaId ?? null };
   })
   .handler(async ({ data, context }) => {
     const chatDb = await db();
-    const { data: tag, error } = await chatDb
+    const base = { user_id: context.userId, nome: data.nome };
+    let resultado = await chatDb
       .from("whatsapp_tags")
-      .upsert({ user_id: context.userId, nome: data.nome }, { onConflict: "user_id,nome" })
-      .select("id, nome")
+      .upsert({ ...base, cor: data.cor }, { onConflict: "user_id,nome" })
+      .select("id, nome, cor")
       .single<TagWhatsapp>();
+    // Banco antigo sem a coluna de cor: salva sem ela.
+    if (resultado.error && (resultado.error.code === "42703" || resultado.error.code === "PGRST204")) {
+      resultado = await chatDb
+        .from("whatsapp_tags")
+        .upsert(base, { onConflict: "user_id,nome" })
+        .select("id, nome")
+        .single<TagWhatsapp>();
+    }
+    const { data: tag, error } = resultado;
     if (error) throw new Error(tabelaAusente(error) ? AVISO_SQL : error.message);
     if (data.conversaId) {
       const { error: e } = await chatDb

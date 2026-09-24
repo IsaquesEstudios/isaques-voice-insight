@@ -53,6 +53,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /** Reduz bastante uma imagem (JPEG leve) para economizar espaço e dados. */
 async function reduzirImagem(origem: Blob | string, ladoMax: number, qualidade: number): Promise<Blob> {
@@ -405,25 +413,29 @@ function WhatsappPage() {
   const criarTag = useServerFn(criarTagWhatsapp);
   const alternarTag = useServerFn(alternarTagConversa);
   const excluirConversa = useServerFn(excluirConversaWhatsapp);
-  const [novaTag, setNovaTag] = useState("");
+  const [novaTagDialog, setNovaTagDialog] = useState<{ conversaId: string } | null>(null);
+  const [novaTagNome, setNovaTagNome] = useState("");
+  const [novaTagCor, setNovaTagCor] = useState("#00acdc");
   const [paraExcluir, setParaExcluir] = useState<{ id: string; nome: string } | null>(null);
 
   const tags = useQuery({ queryKey: ["whatsapp-tags"], queryFn: () => carregarTags() });
   const tagsPorConversa = useMemo(() => {
-    const nomes = new Map((tags.data?.tags ?? []).map((t) => [t.id, t.nome]));
-    const mapa = new Map<string, { id: string; nome: string }[]>();
+    const info = new Map((tags.data?.tags ?? []).map((t) => [t.id, { nome: t.nome, cor: t.cor ?? "#00acdc" }]));
+    const mapa = new Map<string, { id: string; nome: string; cor: string }[]>();
     for (const v of tags.data?.vinculos ?? []) {
-      const nome = nomes.get(v.tag_id);
-      if (!nome) continue;
-      mapa.set(v.conversa_id, [...(mapa.get(v.conversa_id) ?? []), { id: v.tag_id, nome }]);
+      const tag = info.get(v.tag_id);
+      if (!tag) continue;
+      mapa.set(v.conversa_id, [...(mapa.get(v.conversa_id) ?? []), { id: v.tag_id, ...tag }]);
     }
     return mapa;
   }, [tags.data]);
 
   const criarTagMutation = useMutation({
-    mutationFn: (entrada: { nome: string; conversaId: string }) => criarTag({ data: entrada }),
+    mutationFn: (entrada: { nome: string; cor: string; conversaId: string }) => criarTag({ data: entrada }),
     onSuccess: () => {
-      setNovaTag("");
+      setNovaTagDialog(null);
+      setNovaTagNome("");
+      setNovaTagCor("#00acdc");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -767,7 +779,12 @@ function WhatsappPage() {
                         {(tagsPorConversa.get(c.id) ?? []).length > 0 ? (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {(tagsPorConversa.get(c.id) ?? []).map((t) => (
-                              <Badge key={t.id} variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
+                              <Badge
+                                key={t.id}
+                                variant="outline"
+                                className="h-4 px-1.5 text-[9px] font-normal"
+                                style={{ borderColor: t.cor, color: t.cor, backgroundColor: `${t.cor}1a` }}
+                              >
                                 {t.nome}
                               </Badge>
                             ))}
@@ -783,23 +800,15 @@ function WhatsappPage() {
                         <ContextMenuSub>
                           <ContextMenuSubTrigger>Adicionar tag</ContextMenuSubTrigger>
                           <ContextMenuSubContent className="w-56">
-                            <form
-                              className="p-1"
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                if (novaTag.trim())
-                                  criarTagMutation.mutate({ nome: novaTag.trim(), conversaId: c.id });
+                            <ContextMenuItem
+                              onSelect={() => {
+                                setNovaTagNome("");
+                                setNovaTagCor("#00acdc");
+                                setNovaTagDialog({ conversaId: c.id });
                               }}
                             >
-                              <Input
-                                value={novaTag}
-                                onChange={(e) => setNovaTag(e.target.value)}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                placeholder="Criar nova tag e Enter"
-                                className="h-8 text-xs"
-                                maxLength={40}
-                              />
-                            </form>
+                              Nova tag
+                            </ContextMenuItem>
                             {(tags.data?.tags ?? []).length > 0 ? <ContextMenuSeparator /> : null}
                             {(tags.data?.tags ?? []).map((t) => {
                               const ativa = (tagsPorConversa.get(c.id) ?? []).some((x) => x.id === t.id);
@@ -812,6 +821,10 @@ function WhatsappPage() {
                                     alternarTagMutation.mutate({ conversaId: c.id, tagId: t.id, ativo: Boolean(v) })
                                   }
                                 >
+                                  <span
+                                    className="mr-1 inline-block size-2.5 rounded-full"
+                                    style={{ backgroundColor: t.cor ?? "#00acdc" }}
+                                  />
                                   {t.nome}
                                 </ContextMenuCheckboxItem>
                               );
@@ -1062,6 +1075,82 @@ function WhatsappPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={Boolean(novaTagDialog)} onOpenChange={(v) => !v && setNovaTagDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova tag</DialogTitle>
+            <DialogDescription>Defina o nome e a cor. A tag já sai aplicada na conversa.</DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (novaTagDialog && novaTagNome.trim())
+                criarTagMutation.mutate({
+                  nome: novaTagNome.trim(),
+                  cor: novaTagCor,
+                  conversaId: novaTagDialog.conversaId,
+                });
+            }}
+          >
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Nome</label>
+              <Input
+                value={novaTagNome}
+                onChange={(e) => setNovaTagNome(e.target.value)}
+                placeholder="Ex.: Cliente VIP"
+                maxLength={40}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Cor</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={novaTagCor}
+                  onChange={(e) => setNovaTagCor(e.target.value)}
+                  className="h-10 w-14 cursor-pointer rounded-md border border-border bg-transparent p-1"
+                  aria-label="Escolher cor"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {["#00acdc", "#2abb65", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#64748b"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNovaTagCor(c)}
+                      className="size-6 rounded-full border border-border/60 transition-transform hover:scale-110"
+                      style={{
+                        backgroundColor: c,
+                        outline: novaTagCor === c ? `2px solid ${c}` : undefined,
+                        outlineOffset: 2,
+                      }}
+                      aria-label={`Cor ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Badge
+                variant="outline"
+                className="mt-1"
+                style={{ borderColor: novaTagCor, color: novaTagCor, backgroundColor: `${novaTagCor}1a` }}
+              >
+                {novaTagNome.trim() || "Prévia da tag"}
+              </Badge>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setNovaTagDialog(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!novaTagNome.trim() || criarTagMutation.isPending}>
+                {criarTagMutation.isPending ? <Loader2 className="animate-spin" /> : null}
+                Criar tag
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
