@@ -7,7 +7,20 @@ export type ComponentesCampanha = {
   header?: HeaderMidia;
   headerTexto?: string[];
   colunas?: string[]; // nomes das colunas do CSV usadas em cada variável do corpo
+  recorrencia?: "unico" | "diario" | "semanal" | "mensal";
 };
+
+/** Próxima data de um lembrete recorrente, sempre no futuro. */
+function proximaData(atual: string, recorrencia: string) {
+  const d = new Date(atual);
+  const agora = Date.now();
+  do {
+    if (recorrencia === "diario") d.setDate(d.getDate() + 1);
+    else if (recorrencia === "semanal") d.setDate(d.getDate() + 7);
+    else d.setMonth(d.getMonth() + 1);
+  } while (d.getTime() <= agora);
+  return d.toISOString();
+}
 
 export type EnvioResultado = { ok: true; waMessageId: string | null } | { ok: false; erro: string };
 
@@ -265,7 +278,7 @@ export async function processarLembrete(lembreteId: string) {
   const { data: lembrete } = await chatDb
     .from("whatsapp_lembretes")
     .select(
-      "id, user_id, nome, telefone, phone_number_id, template_name, template_lang, componentes, variaveis",
+      "id, user_id, nome, telefone, phone_number_id, template_name, template_lang, componentes, variaveis, agendado_para",
     )
     .eq("id", lembreteId)
     .maybeSingle<{
@@ -278,8 +291,10 @@ export async function processarLembrete(lembreteId: string) {
       template_lang: string;
       componentes: ComponentesCampanha | null;
       variaveis: string[] | null;
+      agendado_para: string;
     }>();
   if (!lembrete) return;
+  const recorrencia = lembrete.componentes?.recorrencia ?? "unico";
 
   try {
     const { token } = await tokenDoNumero(lembrete.user_id, lembrete.phone_number_id);
@@ -296,10 +311,13 @@ export async function processarLembrete(lembreteId: string) {
       await chatDb
         .from("whatsapp_lembretes")
         .update({
-          status: "enviado",
+          status: recorrencia === "unico" ? "enviado" : "agendado",
           erro: null,
           wa_message_id: resultado.waMessageId,
           enviado_em: new Date().toISOString(),
+          ...(recorrencia === "unico"
+            ? {}
+            : { agendado_para: proximaData(lembrete.agendado_para, recorrencia) }),
         })
         .eq("id", lembrete.id);
       await registrarNoChat({

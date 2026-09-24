@@ -218,6 +218,9 @@ function DisparosPage() {
   const [lembreteVariaveis, setLembreteVariaveis] = useState<string[]>([]);
   const [lembreteArquivo, setLembreteArquivo] = useState("");
   const [lembreteData, setLembreteData] = useState("");
+  const [lembreteRecorrencia, setLembreteRecorrencia] = useState<
+    "unico" | "diario" | "semanal" | "mensal"
+  >("unico");
 
   const templateLembrete = aprovados.find((t) => t.name === lembreteTemplate);
   const variaveisLembrete = templateLembrete
@@ -241,10 +244,12 @@ function DisparosPage() {
               ? { tipo: headerLembrete, link: lembreteArquivo }
               : null,
           agendadoPara: lembreteData,
+          recorrencia: lembreteRecorrencia,
         },
       }),
     onSuccess: () => {
       toast.success("Lembrete agendado.");
+      setLembreteRecorrencia("unico");
       setLembreteAberto(false);
       setLembreteNome("");
       setLembreteTelefone("");
@@ -283,7 +288,7 @@ function DisparosPage() {
           </TabsList>
 
           <TabsContent value="tags" className="space-y-4 pt-4">
-            <EnvioPorTag numeros={listaNumeros} />
+            <EnvioPorTag numeros={listaNumeros} modelos={aprovados} />
           </TabsContent>
 
           <TabsContent value="campanhas" className="space-y-4 pt-4">
@@ -398,6 +403,13 @@ function DisparosPage() {
                         <p className="text-xs text-muted-foreground">
                           {lembrete.telefone} · modelo {lembrete.template_name} ·{" "}
                           {new Date(lembrete.agendado_para).toLocaleString("pt-BR")}
+                          {lembrete.recorrencia && lembrete.recorrencia !== "unico"
+                            ? ` · repete ${
+                                { diario: "todo dia", semanal: "toda semana", mensal: "todo mês" }[
+                                  lembrete.recorrencia as "diario" | "semanal" | "mensal"
+                                ] ?? ""
+                              }`
+                            : ""}
                         </p>
                         {lembrete.erro ? (
                           <p className="text-xs text-destructive">{lembrete.erro}</p>
@@ -646,7 +658,24 @@ function DisparosPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Data e hora</Label>
+                <Label>Frequência</Label>
+                <Select
+                  value={lembreteRecorrencia}
+                  onValueChange={(v) => setLembreteRecorrencia(v as typeof lembreteRecorrencia)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unico">Uma vez (data fixa)</SelectItem>
+                    <SelectItem value="diario">Todo dia</SelectItem>
+                    <SelectItem value="semanal">Toda semana</SelectItem>
+                    <SelectItem value="mensal">Todo mês</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{lembreteRecorrencia === "unico" ? "Data e hora" : "Primeiro envio"}</Label>
                 <Input
                   type="datetime-local"
                   value={lembreteData}

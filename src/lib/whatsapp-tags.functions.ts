@@ -326,3 +326,78 @@ export const enviarParaTagWhatsapp = createServerFn({ method: "POST" })
     }
     return { total: destinos.length, enviados, foraDaJanela, falhas: falhas.slice(0, 10) };
   });
+
+/* ------------------- Envio de modelo aprovado por tag ------------------- */
+
+type EnvioModeloTag = {
+  tagId: string;
+  phoneNumberId: string;
+  templateName: string;
+  templateLang: string;
+  variaveis: string[];
+  header?: { tipo: "image" | "video" | "document"; link: string } | null;
+};
+
+/** Envia um modelo aprovado para todas as conversas da tag (funciona fora da janela de 24h). */
+export const enviarModeloParaTagWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: EnvioModeloTag) => {
+    if (!input?.tagId || !input?.phoneNumberId) throw new Error("Escolha o número e a tag.");
+    if (!input.templateName) throw new Error("Escolha um modelo aprovado.");
+    return { ...input, variaveis: (input.variaveis ?? []).map((v) => String(v ?? "")) };
+  })
+  .handler(async ({ data, context }) => {
+    const chatDb = await db();
+    const { tokenDoNumero, enviarTemplate, registrarNoChat } = await import(
+      "@/lib/whatsapp-disparos.server"
+    );
+    const { token } = await tokenDoNumero(context.userId, data.phoneNumberId);
+
+    const { data: vinculos, error: eV } = await chatDb
+      .from("whatsapp_conversa_tags")
+      .select("conversa_id")
+      .eq("tag_id", data.tagId)
+      .eq("user_id", context.userId);
+    if (eV) throw new Error(tabelaAusente(eV) ? AVISO_SQL : eV.message);
+    const ids = (vinculos ?? []).map((v) => v.conversa_id as string);
+    if (ids.length === 0) throw new Error("Nenhuma conversa tem essa tag.");
+
+    const { data: conversas } = await chatDb
+      .from("whatsapp_conversas")
+      .select("id, contato_wa_id, contato_nome")
+      .in("id", ids)
+      .eq("user_id", context.userId)
+      .eq("phone_number_id", data.phoneNumberId)
+      .limit(300);
+    const destinos = (conversas ?? []) as { id: string; contato_wa_id: string; contato_nome: string | null }[];
+    if (destinos.length === 0) throw new Error("Nenhuma conversa com essa tag neste número.");
+
+    let enviados = 0;
+    const falhas: string[] = [];
+    for (const destino of destinos) {
+      const r = await enviarTemplate({
+        token,
+        phoneNumberId: data.phoneNumberId,
+        telefone: destino.contato_wa_id,
+        templateName: data.templateName,
+        templateLang: data.templateLang,
+        componentes: { header: data.header ?? null },
+        variaveis: data.variaveis,
+      });
+      if (r.ok) {
+        enviados += 1;
+        await registrarNoChat({
+          userId: context.userId,
+          phoneNumberId: data.phoneNumberId,
+          telefone: destino.contato_wa_id,
+          nome: destino.contato_nome,
+          texto: `[modelo ${data.templateName}]`,
+          waMessageId: r.waMessageId,
+        });
+      } else {
+        falhas.push(`${destino.contato_wa_id}: ${r.erro}`);
+      }
+      await new Promise((res) => setTimeout(res, 350));
+    }
+    return { total: destinos.length, enviados, foraDaJanela: 0, falhas: falhas.slice(0, 10) };
+  });

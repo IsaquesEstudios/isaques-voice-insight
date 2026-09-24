@@ -144,6 +144,7 @@ const lembreteSchema = z.object({
   variaveis: z.array(z.string()).default([]),
   header: headerSchema,
   agendadoPara: z.string().min(4, "Escolha data e hora."),
+  recorrencia: z.enum(["unico", "diario", "semanal", "mensal"]).default("unico"),
 });
 
 export const listarLembretesWhatsapp = createServerFn({ method: "GET" })
@@ -153,14 +154,21 @@ export const listarLembretesWhatsapp = createServerFn({ method: "GET" })
     const { data, error } = await chatDb
       .from("whatsapp_lembretes")
       .select(
-        "id, nome, telefone, phone_number_id, template_name, template_lang, status, agendado_para, erro, enviado_em, created_at",
+        "id, nome, telefone, phone_number_id, template_name, template_lang, status, agendado_para, erro, enviado_em, created_at, componentes",
       )
       .eq("user_id", context.userId)
       .order("agendado_para", { ascending: true })
       .limit(200);
     if (tabelaAusente(error)) return [];
     if (error) throw new Error(`Não foi possível carregar os lembretes: ${error.message}`);
-    return data ?? [];
+    return ((data ?? []) as Record<string, unknown>[]).map(({ componentes, ...resto }) => ({
+      ...(resto as {
+        id: string; nome: string; telefone: string; phone_number_id: string; template_name: string;
+        template_lang: string; status: string; agendado_para: string; erro: string | null;
+        enviado_em: string | null; created_at: string;
+      }),
+      recorrencia: ((componentes as { recorrencia?: string } | null)?.recorrencia ?? "unico") as string,
+    }));
   });
 
 export const salvarLembreteWhatsapp = createServerFn({ method: "POST" })
@@ -176,7 +184,7 @@ export const salvarLembreteWhatsapp = createServerFn({ method: "POST" })
       template_name: data.templateName,
       template_lang: data.templateLang,
       variaveis: data.variaveis,
-      componentes: { header: data.header ?? null },
+      componentes: { header: data.header ?? null, recorrencia: data.recorrencia },
       agendado_para: new Date(data.agendadoPara).toISOString(),
       status: "agendado",
       erro: null,
