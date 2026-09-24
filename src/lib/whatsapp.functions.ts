@@ -533,33 +533,52 @@ function colunaAusente(error: { code?: string; message?: string }) {
   );
 }
 
-export const listarConversasWhatsapp = createServerFn({ method: "GET" })
+const LIMITE_CONVERSAS = 30;
+const LIMITE_MENSAGENS = 40;
+
+type ConversaLista = {
+  id: string;
+  phone_number_id: string;
+  contato_wa_id: string;
+  contato_nome: string | null;
+  ultima_mensagem: string | null;
+  ultima_em: string;
+  nao_lidas: number;
+  manual_takeover: boolean;
+};
+
+export const listarConversasWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator(
+    (input: { antes?: string | null; numero?: string | null; busca?: string | null } | undefined) => ({
+      antes: typeof input?.antes === "string" ? input.antes : null,
+      numero: typeof input?.numero === "string" ? input.numero : null,
+      busca: typeof input?.busca === "string" ? input.busca.slice(0, 60) : null,
+    }),
+  )
+  .handler(async ({ data, context }): Promise<{ itens: ConversaLista[]; proximo: string | null }> => {
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
-    const { data, error } = await chatDb
+    // Paginação por cursor: usa o índice (user_id, ultima_em desc) sem OFFSET.
+    let consulta = chatDb
       .from("whatsapp_conversas")
       .select(
         "id, phone_number_id, contato_wa_id, contato_nome, ultima_mensagem, ultima_em, nao_lidas"
       )
-      .eq("user_id", context.userId)
+      .eq("user_id", context.userId);
+    if (data.numero) consulta = consulta.eq("phone_number_id", data.numero);
+    if (data.antes) consulta = consulta.lt("ultima_em", data.antes);
+    const termo = data.busca?.replace(/[,()%*\\]/g, " ").trim();
+    if (termo) consulta = consulta.or(`contato_nome.ilike.%${termo}%,contato_wa_id.ilike.%${termo}%`);
+    const { data: linhas, error } = await consulta
       .order("ultima_em", { ascending: false })
-      .limit(200);
+      .limit(LIMITE_CONVERSAS);
     if (error) {
-      if (tabelaAusente(error)) return [];
+      if (tabelaAusente(error)) return { itens: [], proximo: null };
       throw new Error(error.message);
     }
-    const conversations = (data ?? []) as {
-      id: string;
-      phone_number_id: string;
-      contato_wa_id: string;
-      contato_nome: string | null;
-      ultima_mensagem: string | null;
-      ultima_em: string;
-      nao_lidas: number;
-    }[];
+    const conversations = (linhas ?? []) as Omit<ConversaLista, "manual_takeover">[];
     const ids = conversations.map((conversation) => conversation.id);
-    if (ids.length === 0) return [];
+    if (ids.length === 0) return { itens: [], proximo: null };
     const { data: controls } = await chatDb
       .from("whatsapp_ai_conversation_controls")
       .select("conversation_id, manual_takeover")
@@ -568,28 +587,48 @@ export const listarConversasWhatsapp = createServerFn({ method: "GET" })
     const manualById = new Map(
       (controls ?? []).map((control) => [control.conversation_id, control.manual_takeover]),
     );
-    return conversations.map((conversation) => ({
-      ...conversation,
-      manual_takeover: manualById.get(conversation.id) ?? false,
-    }));
+    return {
+      itens: conversations.map((conversation) => ({
+        ...conversation,
+        manual_takeover: manualById.get(conversation.id) ?? false,
+      })),
+      proximo:
+        conversations.length === LIMITE_CONVERSAS
+          ? conversations[conversations.length - 1].ultima_em
+          : null,
+    };
   });
+
+type MensagemLista = {
+  id: string;
+  direcao: string;
+  texto: string | null;
+  tipo: string;
+  status: string | null;
+  criado_em: string;
+  media_id?: string | null;
+  media_mime?: string | null;
+  media_nome?: string | null;
+};
 
 export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { conversaId: string }) => {
+  .inputValidator((input: { conversaId: string; antes?: string | null }) => {
     if (!input?.conversaId) throw new Error("Conversa inválida.");
-    return input;
+    return { conversaId: input.conversaId, antes: typeof input.antes === "string" ? input.antes : null };
   })
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<{ itens: MensagemLista[]; anterior: string | null }> => {
     const { chatDb } = await import("@/integrations/supabase/chat-db.server");
-    const consulta = (campos: string) =>
-      chatDb
+    // Cursor: busca as mais recentes antes de "antes", usando o índice (conversa_id, criado_em).
+    const consulta = (campos: string) => {
+      let q = chatDb
         .from("whatsapp_mensagens")
         .select(campos)
         .eq("conversa_id", data.conversaId)
-        .eq("user_id", context.userId)
-        .order("criado_em", { ascending: true })
-        .limit(300);
+        .eq("user_id", context.userId);
+      if (data.antes) q = q.lt("criado_em", data.antes);
+      return q.order("criado_em", { ascending: false }).limit(LIMITE_MENSAGENS);
+    };
 
     let { data: mensagens, error } = await consulta(
       "id, direcao, texto, tipo, status, criado_em, media_id, media_mime, media_nome",
@@ -600,27 +639,24 @@ export const listarMensagensWhatsapp = createServerFn({ method: "POST" })
       ));
     }
     if (error) {
-      if (tabelaAusente(error)) return [];
+      if (tabelaAusente(error)) return { itens: [], anterior: null };
       throw new Error(error.message);
     }
 
-    await chatDb
-      .from("whatsapp_conversas")
-      .update({ nao_lidas: 0 })
-      .eq("id", data.conversaId)
-      .eq("user_id", context.userId);
+    if (!data.antes) {
+      await chatDb
+        .from("whatsapp_conversas")
+        .update({ nao_lidas: 0 })
+        .eq("id", data.conversaId)
+        .eq("user_id", context.userId)
+        .gt("nao_lidas", 0);
+    }
 
-    return (mensagens ?? []) as unknown as {
-      id: string;
-      direcao: string;
-      texto: string | null;
-      tipo: string;
-      status: string | null;
-      criado_em: string;
-      media_id?: string | null;
-      media_mime?: string | null;
-      media_nome?: string | null;
-    }[];
+    const lista = ((mensagens ?? []) as unknown as MensagemLista[]).reverse();
+    return {
+      itens: lista,
+      anterior: lista.length === LIMITE_MENSAGENS ? lista[0].criado_em : null,
+    };
   });
 
 
