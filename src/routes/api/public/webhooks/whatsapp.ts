@@ -107,7 +107,7 @@ async function responderComIa(input: {
       .eq("conversa_id", input.conversationId)
       .eq("user_id", input.userId)
       .order("criado_em", { ascending: false })
-      .limit(20);
+      .limit(40);
     if (historyError) throw new Error(historyError.message);
 
     const { decryptApiKey, generateGeminiReply } = await import("@/lib/whatsapp-ai.server");
