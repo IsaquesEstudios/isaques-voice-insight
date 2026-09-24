@@ -403,6 +403,26 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   );
 }
 
+type DadosTags = {
+  tags: { id: string; nome: string; cor: string | null }[];
+  vinculos: { conversa_id: string; tag_id: string }[];
+  aviso: string | null;
+};
+
+function TresPontos() {
+  return (
+    <span className="flex items-center justify-center gap-1.5 py-6" aria-label="Carregando conversas">
+      {[0, 150, 300].map((atraso) => (
+        <span
+          key={atraso}
+          className="size-2 animate-bounce rounded-full bg-muted-foreground/70"
+          style={{ animationDelay: `${atraso}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function WhatsappPage() {
   const queryClient = useQueryClient();
   const carregarConversas = useServerFn(listarConversasWhatsapp);
@@ -462,8 +482,28 @@ function WhatsappPage() {
   const alternarTagMutation = useMutation({
     mutationFn: (entrada: { conversaId: string; tagId: string; ativo: boolean }) =>
       alternarTag({ data: entrada }),
+    // Retira ou aplica a tag na hora, sem esperar o banco responder.
+    onMutate: async (entrada) => {
+      await queryClient.cancelQueries({ queryKey: ["whatsapp-tags"] });
+      const anterior = queryClient.getQueryData<DadosTags>(["whatsapp-tags"]);
+      queryClient.setQueryData<DadosTags>(["whatsapp-tags"], (atual) => {
+        if (!atual) return atual;
+        const vinculos = entrada.ativo
+          ? atual.vinculos.some((v) => v.conversa_id === entrada.conversaId && v.tag_id === entrada.tagId)
+            ? atual.vinculos
+            : [...atual.vinculos, { conversa_id: entrada.conversaId, tag_id: entrada.tagId }]
+          : atual.vinculos.filter(
+              (v) => !(v.conversa_id === entrada.conversaId && v.tag_id === entrada.tagId),
+            );
+        return { ...atual, vinculos };
+      });
+      return { anterior };
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["whatsapp-tags"] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error, _vars, contexto) => {
+      if (contexto?.anterior) queryClient.setQueryData(["whatsapp-tags"], contexto.anterior);
+      toast.error(e.message);
+    },
   });
   const excluirMutation = useMutation({
     mutationFn: (conversaId: string) => excluirConversa({ data: { conversaId } }),
@@ -771,9 +811,7 @@ function WhatsappPage() {
               ) : null}
               <div className="min-h-0 flex-1">
                 {conversas.isLoading ? (
-                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    Carregando conversas...
-                  </p>
+                  <TresPontos />
                 ) : filtradas.length === 0 ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                     Nenhuma conversa por aqui ainda.
