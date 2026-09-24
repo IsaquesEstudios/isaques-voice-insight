@@ -14,6 +14,8 @@ type AiAgent = {
 type ConversationMessage = {
   direcao: string;
   texto: string | null;
+  tipo?: string | null;
+  audio?: { mimeType: string; data: string };
 };
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -72,11 +74,24 @@ export async function generateGeminiReply(input: {
   history: ConversationMessage[];
 }) {
   const contents = input.history
-    .filter((message) => message.texto?.trim())
-    .map((message) => ({
-      role: message.direcao === "entrada" ? "user" : "model",
-      parts: [{ text: message.texto?.trim() ?? "" }],
-    }));
+    .filter((message) => message.audio || message.texto?.trim())
+    .map((message) => {
+      const role = message.direcao === "entrada" ? "user" : "model";
+      if (message.audio) {
+        return {
+          role,
+          parts: [
+            { text: "[O cliente enviou este áudio. Ouça e responda ao que ele disse.]" },
+            { inline_data: { mime_type: message.audio.mimeType, data: message.audio.data } },
+          ],
+        };
+      }
+      const texto =
+        message.tipo === "audio"
+          ? "[O cliente enviou um áudio anteriormente.]"
+          : (message.texto?.trim() ?? "");
+      return { role, parts: [{ text: texto }] };
+    });
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,

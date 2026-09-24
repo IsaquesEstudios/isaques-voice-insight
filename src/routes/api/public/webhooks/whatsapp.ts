@@ -101,20 +101,68 @@ async function responderComIa(input: {
       .maybeSingle();
     if (!account?.access_token) throw new Error("Autorização da Meta indisponível.");
 
-    const { data: history, error: historyError } = await chatDb
+    let { data: history, error: historyError }: { data: unknown[] | null; error: { message: string } | null } = await chatDb
       .from("whatsapp_mensagens")
-      .select("direcao, texto")
+      .select("direcao, texto, tipo, media_id, media_mime")
       .eq("conversa_id", input.conversationId)
       .eq("user_id", input.userId)
       .order("criado_em", { ascending: false })
       .limit(40);
+    if (historyError) {
+      ({ data: history, error: historyError } = await chatDb
+        .from("whatsapp_mensagens")
+        .select("direcao, texto")
+        .eq("conversa_id", input.conversationId)
+        .eq("user_id", input.userId)
+        .order("criado_em", { ascending: false })
+        .limit(40));
+    }
     if (historyError) throw new Error(historyError.message);
+
+    type Hist = {
+      direcao: string;
+      texto: string | null;
+      tipo?: string | null;
+      media_id?: string | null;
+      media_mime?: string | null;
+      audio?: { mimeType: string; data: string };
+    };
+    const ordered = [...((history ?? []) as Hist[])].reverse();
+
+    // Áudios recebidos desde a última resposta: baixa da Meta e envia ao Gemini para ouvir.
+    let lastOut = -1;
+    ordered.forEach((m, i) => {
+      if (m.direcao !== "entrada") lastOut = i;
+    });
+    let audios = 0;
+    for (let i = lastOut + 1; i < ordered.length && audios < 5; i++) {
+      const m = ordered[i];
+      if (m.tipo !== "audio" || !m.media_id) continue;
+      try {
+        const metaRes = await fetch(`${GRAPH}/${m.media_id}`, {
+          headers: { Authorization: `Bearer ${account.access_token}` },
+        });
+        const meta = (await metaRes.json().catch(() => ({}))) as { url?: string; mime_type?: string };
+        if (!metaRes.ok || !meta.url) continue;
+        const fileRes = await fetch(meta.url, {
+          headers: { Authorization: `Bearer ${account.access_token}` },
+        });
+        if (!fileRes.ok) continue;
+        const buf = new Uint8Array(await fileRes.arrayBuffer());
+        if (buf.byteLength > 15 * 1024 * 1024) continue;
+        const mime = (meta.mime_type ?? m.media_mime ?? "audio/ogg").split(";")[0].trim();
+        m.audio = { mimeType: mime, data: Buffer.from(buf).toString("base64") };
+        audios++;
+      } catch (e) {
+        console.error("whatsapp ai audio", e instanceof Error ? e.message : e);
+      }
+    }
 
     const { decryptApiKey, generateGeminiReply } = await import("@/lib/whatsapp-ai.server");
     const reply = await generateGeminiReply({
       apiKey: await decryptApiKey(credential.gemini_api_key_ciphertext),
       agent,
-      history: [...(history ?? [])].reverse(),
+      history: ordered,
     });
 
     const sendResponse = await fetch(`${GRAPH}/${input.phoneNumberId}/messages`, {
@@ -283,7 +331,7 @@ async function processarEvento(body: string) {
           .eq("id", conversa.id);
 
         if (
-          mensagem.type === "text" &&
+          (mensagem.type === "text" || mensagem.type === "audio") &&
           mensagem.id &&
           numero.whatsapp_ai_agent_id
         ) {
