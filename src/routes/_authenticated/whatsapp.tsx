@@ -742,7 +742,6 @@ function WhatsappPage() {
                 <Input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar conversa"
                   placeholder="Buscar por nome, número ou tag"
                   className="pl-9"
                 />
