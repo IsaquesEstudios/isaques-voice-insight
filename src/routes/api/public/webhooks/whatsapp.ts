@@ -101,7 +101,7 @@ async function responderComIa(input: {
       .maybeSingle();
     if (!account?.access_token) throw new Error("Autorização da Meta indisponível.");
 
-    let { data: history, error: historyError } = await chatDb
+    let { data: history, error: historyError }: { data: unknown[] | null; error: { message: string } | null } = await chatDb
       .from("whatsapp_mensagens")
       .select("direcao, texto, tipo, media_id, media_mime")
       .eq("conversa_id", input.conversationId)
