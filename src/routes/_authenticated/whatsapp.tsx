@@ -915,9 +915,14 @@ function WhatsappPage() {
                                   key={t.id}
                                   checked={ativa}
                                   onSelect={(e) => e.preventDefault()}
-                                  onCheckedChange={(v) =>
-                                    alternarTagMutation.mutate({ conversaId: c.id, tagId: t.id, ativo: Boolean(v) })
-                                  }
+                                  onCheckedChange={(v) => {
+                                    // Clique na lixeira não deve ligar/desligar a tag.
+                                    if (lixeiraClicadaRef.current) {
+                                      lixeiraClicadaRef.current = false;
+                                      return;
+                                    }
+                                    alternarTagMutation.mutate({ conversaId: c.id, tagId: t.id, ativo: Boolean(v) });
+                                  }}
                                 >
                                   <span
                                     className="mr-1 inline-block size-2.5 rounded-full"
@@ -927,8 +932,16 @@ function WhatsappPage() {
                                   <button
                                     type="button"
                                     aria-label={`Excluir tag ${t.nome}`}
-                                    className="ml-2 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="ml-2 rounded p-0.5 text-muted-foreground transition-colors duration-150 hover:bg-destructive/15 hover:text-destructive focus-visible:text-destructive"
+                                    onPointerDown={(e) => {
+                                      lixeiraClicadaRef.current = true;
+                                      e.stopPropagation();
+                                    }}
+                                    onPointerUp={(e) => {
+                                      lixeiraClicadaRef.current = true;
+                                      e.stopPropagation();
+                                    }}
+                                    onMouseUp={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
