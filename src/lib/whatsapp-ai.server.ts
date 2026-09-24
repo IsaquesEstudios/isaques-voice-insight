@@ -15,7 +15,7 @@ type ConversationMessage = {
   direcao: string;
   texto: string | null;
   tipo?: string | null;
-  audio?: { mimeType: string; data: string };
+  media?: { kind: "audio" | "image"; mimeType: string; data: string };
 };
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -74,22 +74,33 @@ export async function generateGeminiReply(input: {
   history: ConversationMessage[];
 }) {
   const contents = input.history
-    .filter((message) => message.audio || message.texto?.trim())
+    .filter((message) => message.media || message.texto?.trim())
     .map((message) => {
       const role = message.direcao === "entrada" ? "user" : "model";
-      if (message.audio) {
+      if (message.media) {
+        const legenda = message.texto?.trim();
+        const instrucao =
+          message.media.kind === "audio"
+            ? "[O cliente enviou este áudio. Ouça e responda ao que ele disse.]"
+            : `[O cliente enviou esta imagem. Analise-a junto com o contexto da conversa.]${
+                legenda && !legenda.startsWith("📷") ? `\nLegenda: ${legenda}` : ""
+              }`;
         return {
           role,
           parts: [
-            { text: "[O cliente enviou este áudio. Ouça e responda ao que ele disse.]" },
-            { inline_data: { mime_type: message.audio.mimeType, data: message.audio.data } },
+            { text: instrucao },
+            { inline_data: { mime_type: message.media.mimeType, data: message.media.data } },
           ],
         };
       }
       const texto =
         message.tipo === "audio"
           ? "[O cliente enviou um áudio anteriormente.]"
-          : (message.texto?.trim() ?? "");
+          : message.tipo === "image"
+            ? `[O cliente enviou uma imagem anteriormente.]${
+                message.texto && !message.texto.startsWith("📷") ? ` Legenda: ${message.texto}` : ""
+              }`
+            : (message.texto?.trim() ?? "");
       return { role, parts: [{ text: texto }] };
     });
 
