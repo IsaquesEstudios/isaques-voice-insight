@@ -432,6 +432,24 @@ function WhatsappPage() {
     });
   };
 
+  const exibidas = useMemo(() => {
+    const doBanco = listaMensagens;
+    const locais = pendentes
+      .filter((p) => p.conversaId === selecionada)
+      .map((p) => ({
+        id: p.id,
+        direcao: "saida",
+        texto: p.texto,
+        tipo: "text",
+        status: p.erro ? "falhou" : "enviando",
+        criado_em: p.criado_em,
+        media_id: null as string | null,
+        media_mime: null as string | null,
+        media_nome: null as string | null,
+      }));
+    return [...doBanco, ...locais].sort((a, b) => a.criado_em.localeCompare(b.criado_em));
+  }, [listaMensagens, pendentes, selecionada]);
+
   const inputImagemRef = useRef<HTMLInputElement>(null);
   const inputDocumentoRef = useRef<HTMLInputElement>(null);
   const gravadorRef = useRef<MediaRecorder | null>(null);
@@ -658,9 +676,9 @@ function WhatsappPage() {
                     <Virtuoso
                       key={selecionada}
                       className="h-full"
-                      data={listaMensagens}
+                      data={exibidas}
                       firstItemIndex={100_000 - totalAntigas}
-                      initialTopMostItemIndex={Math.max(listaMensagens.length - 1, 0)}
+                      initialTopMostItemIndex={Math.max(exibidas.length - 1, 0)}
                       followOutput="smooth"
                       alignToBottom
                       computeItemKey={(_i, m) => m.id}
@@ -693,6 +711,7 @@ function WhatsappPage() {
                             ) : null}
                             <span className="mt-1 block text-[10px] text-muted-foreground">
                               {hora(m.criado_em)}
+                              {m.status === "enviando" ? " · enviando..." : m.status === "falhou" ? " · não enviada" : ""}
                             </span>
                           </MessageContent>
                         </Message>
