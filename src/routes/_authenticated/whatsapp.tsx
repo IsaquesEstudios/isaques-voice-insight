@@ -403,6 +403,12 @@ function MidiaMensagem({ mensagem }: { mensagem: MensagemMidia }) {
   );
 }
 
+type DadosTags = {
+  tags: { id: string; nome: string; cor: string | null }[];
+  vinculos: { conversa_id: string; tag_id: string }[];
+  aviso: string | null;
+};
+
 function TresPontos() {
   return (
     <span className="flex items-center justify-center gap-1.5 py-6" aria-label="Carregando conversas">
@@ -805,9 +811,7 @@ function WhatsappPage() {
               ) : null}
               <div className="min-h-0 flex-1">
                 {conversas.isLoading ? (
-                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    Carregando conversas...
-                  </p>
+                  <TresPontos />
                 ) : filtradas.length === 0 ? (
                   <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                     Nenhuma conversa por aqui ainda.
