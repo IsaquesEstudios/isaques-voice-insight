@@ -18,7 +18,14 @@ async function db() {
   return chatDb;
 }
 
-export type TagWhatsapp = { id: string; nome: string };
+export type TagWhatsapp = { id: string; nome: string; cor: string | null };
+
+const COR_PADRAO = "#00acdc";
+
+function corValida(cor?: string | null) {
+  const limpa = cor?.trim().toLowerCase() ?? "";
+  return /^#[0-9a-f]{6}$/.test(limpa) ? limpa : COR_PADRAO;
+}
 
 /** Todas as tags do usuário e quais conversas usam cada uma. */
 export const listarTagsWhatsapp = createServerFn({ method: "GET" })
@@ -26,7 +33,7 @@ export const listarTagsWhatsapp = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const chatDb = await db();
     const [{ data: tags, error }, { data: vinculos, error: erroVinc }] = await Promise.all([
-      chatDb.from("whatsapp_tags").select("id, nome").eq("user_id", context.userId).order("nome"),
+      chatDb.from("whatsapp_tags").select("id, nome, cor").eq("user_id", context.userId).order("nome"),
       chatDb.from("whatsapp_conversa_tags").select("conversa_id, tag_id").eq("user_id", context.userId),
     ]);
     if (error || erroVinc) {
