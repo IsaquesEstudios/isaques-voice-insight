@@ -1149,3 +1149,110 @@ export const respondMeetingJoinRequest = createServerFn({ method: "POST" })
     if (upErr) throw new Error(`Falha ao aprovar a entrada: ${upErr.message}`);
     return { ok: true };
   });
+
+// ---------------------------------------------------------------------------
+// Página de encerramento: transcrição + resumo/pendências gerados pelo Gemini.
+// ---------------------------------------------------------------------------
+
+export interface MeetingPendencia {
+  responsavel: string;
+  tarefa: string;
+  prazo: string | null;
+}
+
+export interface MeetingSummaryDTO {
+  resumo: string;
+  pontos_importantes: string[];
+  pendencias: MeetingPendencia[];
+  participantes: string[];
+}
+
+export type MeetingSummaryResult =
+  | { status: "not_found" }
+  | { status: "no_transcription"; name: string }
+  | { status: "pending"; name: string }
+  | { status: "no_key"; name: string; transcript: string }
+  | { status: "error"; name: string; transcript: string; message: string }
+  | {
+      status: "ready";
+      name: string;
+      transcript: string;
+      transcriptAt: string;
+      summary: MeetingSummaryDTO;
+    };
+
+/**
+ * Pública (acessível pelo link da reunião): devolve a ata e o resumo.
+ * O resumo é gerado uma única vez com a chave Gemini do organizador e
+ * guardado; só é refeito quando chega uma transcrição mais nova.
+ */
+export const getMeetingSummary = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => {
+    const code = String((data as Record<string, unknown> | null)?.code ?? "")
+      .trim()
+      .toLowerCase();
+    if (!/^reuniao-[a-z0-9-]{3,70}$/.test(code)) throw new Error("Código de reunião inválido.");
+    return { code };
+  })
+  .handler(async ({ data }): Promise<MeetingSummaryResult> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
+    const { data: meeting } = await supabaseAdmin
+      .from("meeting_rooms")
+      .select("name, user_id, transcrever")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (!meeting) return { status: "not_found" };
+    const name = meeting.name;
+
+    const semPrefixo = data.code.replace(/^reuniao-/, "");
+    const { data: rows } = await supabaseAdmin
+      .from("transcricoes_reunioes")
+      .select("conteudo, criado_em")
+      .in("nome_sala", [data.code, semPrefixo])
+      .order("criado_em", { ascending: false })
+      .limit(1);
+    const row = rows?.[0];
+    if (!row || !row.conteudo.trim()) {
+      return meeting.transcrever ? { status: "pending", name } : { status: "no_transcription", name };
+    }
+    const transcript = row.conteudo;
+
+    const { data: cached } = await supabaseAdmin
+      .from("meeting_summaries")
+      .select("summary, transcript_at")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (cached && new Date(cached.transcript_at) >= new Date(row.criado_em)) {
+      return {
+        status: "ready",
+        name,
+        transcript,
+        transcriptAt: row.criado_em,
+        summary: cached.summary as unknown as MeetingSummaryDTO,
+      };
+    }
+
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const { data: cred } = await chatDb
+      .from("whatsapp_ai_credentials")
+      .select("gemini_api_key_ciphertext")
+      .eq("user_id", meeting.user_id)
+      .maybeSingle();
+    if (!cred?.gemini_api_key_ciphertext) return { status: "no_key", name, transcript };
+
+    try {
+      const { decryptApiKey, generateMeetingSummary } = await import("./whatsapp-ai.server");
+      const apiKey = await decryptApiKey(cred.gemini_api_key_ciphertext);
+      const summary = await generateMeetingSummary({ apiKey, meetingName: name, transcript });
+      await supabaseAdmin.from("meeting_summaries").upsert({
+        code: data.code,
+        summary: summary as never,
+        transcript_at: row.criado_em,
+      });
+      return { status: "ready", name, transcript, transcriptAt: row.criado_em, summary };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha ao gerar o resumo.";
+      console.error("[meeting-summary]", message);
+      return { status: "error", name, transcript, message };
+    }
+  });
