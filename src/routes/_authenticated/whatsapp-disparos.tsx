@@ -36,6 +36,7 @@ import {
   listarLembretesWhatsapp,
   processarCampanhaAgora,
   salvarLembreteWhatsapp,
+  salvarLembretesEmMassa,
 } from "@/lib/whatsapp-disparos.functions";
 import {
   listarTemplatesWhatsapp,
@@ -70,6 +71,60 @@ function normalizarTelefone(valor: string) {
   const digitos = (valor ?? "").replace(/\D/g, "");
   if (digitos.length < 8) return null;
   return digitos.startsWith("55") ? digitos : `55${digitos}`;
+}
+
+type ContatoLista = { nome: string | null; telefone: string };
+
+/** Extrai nome (opcional) e número de cada linha de texto. */
+function contatosDeLinhas(linhas: string[][]): ContatoLista[] {
+  const vistos = new Set<string>();
+  const saida: ContatoLista[] = [];
+  for (const celulas of linhas) {
+    const limpas = celulas.map((c) => (c ?? "").trim()).filter(Boolean);
+    let telefone: string | null = null;
+    const resto: string[] = [];
+    for (const c of limpas) {
+      const digitos = c.replace(/\D/g, "");
+      if (!telefone && digitos.length >= 10 && digitos.length <= 13 && /^[\d\s()+\-.]+$/.test(c)) {
+        telefone = normalizarTelefone(c);
+      } else resto.push(c);
+    }
+    if (!telefone) {
+      // Linha única: "Maria 11999999999"
+      const junto = limpas.join(" ");
+      const m = junto.match(/\+?[\d(][\d\s()\-.]{9,18}\d/);
+      if (m && m[0].replace(/\D/g, "").length >= 10) {
+        telefone = normalizarTelefone(m[0]);
+        resto.splice(0, resto.length, junto.replace(m[0], "").replace(/[;,\-–:|]+/g, " ").trim());
+      }
+    }
+    if (!telefone || vistos.has(telefone)) continue;
+    vistos.add(telefone);
+    const nome = resto.join(" ").trim().slice(0, 120);
+    saida.push({ nome: nome || null, telefone });
+  }
+  return saida;
+}
+
+async function lerListaContatos(file: File): Promise<ContatoLista[]> {
+  if (file.name.toLowerCase().endsWith(".docx")) {
+    const { unzipSync, strFromU8 } = await import("fflate");
+    const arquivos = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    const xml = arquivos["word/document.xml"];
+    if (!xml) throw new Error("Arquivo Word inválido.");
+    const texto = strFromU8(xml)
+      .replace(/<\/w:tc>/g, "\t")
+      .replace(/<\/w:p>/g, "\n")
+      .replace(/<w:tab\/>/g, "\t")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+    return contatosDeLinhas(texto.split("\n").map((l) => l.split(/\t|;|,/)));
+  }
+  const texto = await file.text();
+  const res = Papa.parse<string[]>(texto, { skipEmptyLines: true });
+  return contatosDeLinhas(res.data);
 }
 
 function contarVariaveis(texto: string) {
