@@ -62,7 +62,7 @@ function AtaPage() {
     onSuccess: async (result) => {
       queryClient.setQueryData(["meeting-summary", code], {
         status: "finalizing",
-        name: data?.name ?? "Reunião",
+        name: data && "name" in data ? data.name : "Reunião",
         endedAt: result.endedAt,
       });
       toast.success("Reunião encerrada. Finalizando a ata…");
