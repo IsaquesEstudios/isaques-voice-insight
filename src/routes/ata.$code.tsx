@@ -53,6 +53,26 @@ function AtaPage() {
     refetchInterval: (q) => (q.state.data?.status === "pending" ? 6000 : false),
   });
 
+  const queryClient = useQueryClient();
+  const encerrar = useServerFn(closeMeeting);
+  const encerrarMutation = useMutation({
+    mutationFn: () => encerrar({ data: { code } }),
+    onSuccess: async () => {
+      toast.success("Reunião encerrada. A ata deve chegar em instantes.");
+      await queryClient.invalidateQueries({ queryKey: ["meeting-summary", code] });
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error(
+        msg.includes("Unauthorized") || msg.includes("401")
+          ? "Entre na sua conta para encerrar a reunião."
+          : msg || "Não foi possível encerrar a reunião.",
+      );
+    },
+  });
+
+
+
   const porPessoa = useMemo(() => {
     const map = new Map<string, MeetingPendencia[]>();
     if (data?.status === "ready") {
