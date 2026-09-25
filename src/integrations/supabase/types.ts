@@ -178,6 +178,27 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_summaries: {
+        Row: {
+          code: string
+          created_at: string
+          summary: Json
+          transcript_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          summary: Json
+          transcript_at: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          summary?: Json
+          transcript_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
