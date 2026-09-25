@@ -119,7 +119,8 @@ function ReunioesPage() {
   const [meetingName, setMeetingName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
-  const [transcribe, setTranscribe] = useState(false);
+  // Transcrição ligada por padrão: a ata é o principal recurso das reuniões.
+  const [transcribe, setTranscribe] = useState(true);
   const [joinCode, setJoinCode] = useState("");
   const [joinName, setJoinName] = useState("");
   const [detailsFor, setDetailsFor] = useState<MeetingDTO | null>(null);
@@ -174,7 +175,7 @@ function ReunioesPage() {
       setCreateOpen(false);
       setMeetingName("");
       setScheduledAt("");
-      setTranscribe(false);
+      setTranscribe(true);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível criar a reunião."));
     } finally {
