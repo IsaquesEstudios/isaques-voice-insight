@@ -13,6 +13,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReuniaoCodeRouteImport } from './routes/reuniao.$code'
+import { Route as AtaCodeRouteImport } from './routes/ata.$code'
 import { Route as AuthenticatedWhatsappTemplatesRouteImport } from './routes/_authenticated/whatsapp-templates'
 import { Route as AuthenticatedWhatsappNumerosRouteImport } from './routes/_authenticated/whatsapp-numeros'
 import { Route as AuthenticatedWhatsappDisparosRouteImport } from './routes/_authenticated/whatsapp-disparos'
@@ -48,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
 const ReuniaoCodeRoute = ReuniaoCodeRouteImport.update({
   id: '/reuniao/$code',
   path: '/reuniao/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtaCodeRoute = AtaCodeRouteImport.update({
+  id: '/ata/$code',
+  path: '/ata/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedWhatsappTemplatesRoute =
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp-disparos': typeof AuthenticatedWhatsappDisparosRoute
   '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/whatsapp-templates': typeof AuthenticatedWhatsappTemplatesRoute
+  '/ata/$code': typeof AtaCodeRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
   '/api/public/cron/whatsapp-disparos': typeof ApiPublicCronWhatsappDisparosRoute
@@ -184,6 +191,7 @@ export interface FileRoutesByTo {
   '/whatsapp-disparos': typeof AuthenticatedWhatsappDisparosRoute
   '/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/whatsapp-templates': typeof AuthenticatedWhatsappTemplatesRoute
+  '/ata/$code': typeof AtaCodeRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
   '/api/public/cron/whatsapp-disparos': typeof ApiPublicCronWhatsappDisparosRoute
@@ -208,6 +216,7 @@ export interface FileRoutesById {
   '/_authenticated/whatsapp-disparos': typeof AuthenticatedWhatsappDisparosRoute
   '/_authenticated/whatsapp-numeros': typeof AuthenticatedWhatsappNumerosRoute
   '/_authenticated/whatsapp-templates': typeof AuthenticatedWhatsappTemplatesRoute
+  '/ata/$code': typeof AtaCodeRoute
   '/reuniao/$code': typeof ReuniaoCodeRoute
   '/api/public/transcript': typeof ApiPublicTranscriptRoute
   '/api/public/cron/whatsapp-disparos': typeof ApiPublicCronWhatsappDisparosRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/whatsapp-disparos'
     | '/whatsapp-numeros'
     | '/whatsapp-templates'
+    | '/ata/$code'
     | '/reuniao/$code'
     | '/api/public/transcript'
     | '/api/public/cron/whatsapp-disparos'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/whatsapp-disparos'
     | '/whatsapp-numeros'
     | '/whatsapp-templates'
+    | '/ata/$code'
     | '/reuniao/$code'
     | '/api/public/transcript'
     | '/api/public/cron/whatsapp-disparos'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/_authenticated/whatsapp-disparos'
     | '/_authenticated/whatsapp-numeros'
     | '/_authenticated/whatsapp-templates'
+    | '/ata/$code'
     | '/reuniao/$code'
     | '/api/public/transcript'
     | '/api/public/cron/whatsapp-disparos'
@@ -287,6 +299,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
+  AtaCodeRoute: typeof AtaCodeRoute
   ReuniaoCodeRoute: typeof ReuniaoCodeRoute
   ApiPublicTranscriptRoute: typeof ApiPublicTranscriptRoute
   ApiPublicCronWhatsappDisparosRoute: typeof ApiPublicCronWhatsappDisparosRoute
@@ -321,6 +334,13 @@ declare module '@tanstack/react-router' {
       path: '/reuniao/$code'
       fullPath: '/reuniao/$code'
       preLoaderRoute: typeof ReuniaoCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ata/$code': {
+      id: '/ata/$code'
+      path: '/ata/$code'
+      fullPath: '/ata/$code'
+      preLoaderRoute: typeof AtaCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/whatsapp-templates': {
@@ -486,6 +506,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
+  AtaCodeRoute: AtaCodeRoute,
   ReuniaoCodeRoute: ReuniaoCodeRoute,
   ApiPublicTranscriptRoute: ApiPublicTranscriptRoute,
   ApiPublicCronWhatsappDisparosRoute: ApiPublicCronWhatsappDisparosRoute,
