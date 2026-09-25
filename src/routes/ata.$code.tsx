@@ -113,19 +113,33 @@ function AtaPage() {
     );
   }
 
+  const voltar = (
+    <Button asChild variant="outline" size="sm" className="gap-2">
+      <Link to="/reunioes">
+        <LayoutDashboard className="h-4 w-4" /> Voltar ao painel
+      </Link>
+    </Button>
+  );
+
   if (data.status === "not_found") {
     return shell(
-      <Aviso titulo="Reunião não encontrada" texto="Confira o link recebido." />,
+      <>
+        <Aviso titulo="Reunião não encontrada" texto="Confira o link recebido." />
+        <div>{voltar}</div>
+      </>,
     );
   }
 
   const header = (
-    <div className="space-y-1">
-      <Badge variant="outline" className="border-primary/40 text-primary">
-        Reunião encerrada
-      </Badge>
-      <h1 className="text-2xl font-semibold">{data.name}</h1>
-      <p className="font-mono text-xs text-muted-foreground">{code}</p>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="space-y-1">
+        <Badge variant="outline" className="border-primary/40 text-primary">
+          Reunião encerrada
+        </Badge>
+        <h1 className="text-2xl font-semibold">{data.name}</h1>
+        <p className="font-mono text-xs text-muted-foreground">{code}</p>
+      </div>
+      {voltar}
     </div>
   );
 
@@ -146,18 +160,37 @@ function AtaPage() {
       <>
         {header}
         <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
-          <CardContent className="flex items-center gap-4 py-8">
-            <Loader2 className="h-6 w-6 shrink-0 animate-spin text-primary" />
-            <div>
-              <p className="font-medium">Preparando a ata e o resumo…</p>
-              <p className="text-sm text-muted-foreground">
-                A transcrição fica pronta quando a reunião termina para todos. Deixe esta
-                página aberta — ela atualiza sozinha.
-              </p>
+          <CardContent className="space-y-4 py-8">
+            <div className="flex items-center gap-4">
+              <Loader2 className="h-6 w-6 shrink-0 animate-spin text-primary" />
+              <div>
+                <p className="font-medium">Preparando a ata e o resumo…</p>
+                <p className="text-sm text-muted-foreground">
+                  A transcrição fica pronta quando a reunião termina para todos. Se
+                  alguém ficou na sala, encerre a reunião aqui mesmo.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="destructive"
+                className="gap-2"
+                disabled={encerrarMutation.isPending}
+                onClick={() => encerrarMutation.mutate()}
+              >
+                {encerrarMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PhoneOff className="h-4 w-4" />
+                )}
+                Encerrar reunião agora
+              </Button>
+              {voltar}
             </div>
           </CardContent>
         </Card>
       </>,
+
     );
   }
 
