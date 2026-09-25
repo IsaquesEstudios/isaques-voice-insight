@@ -965,8 +965,10 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
 export const closeMeeting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(parseMeetingCode)
-  .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { deleteLivekitRoom, getLivekitEnv } = await import("./livekit.server");
+  .handler(async ({ data, context }): Promise<{ ok: true; endedAt: string }> => {
+    const { deleteLivekitRoom, getLivekitEnv, livekitRoomExists } = await import(
+      "./livekit.server"
+    );
 
     const { data: meeting, error } = await context.supabase
       .from("meeting_rooms")
@@ -976,18 +978,26 @@ export const closeMeeting = createServerFn({ method: "POST" })
     if (error) throw new Error(`Falha ao encerrar a reunião: ${error.message}`);
     if (!meeting) throw new Error("Reunião não encontrada.");
 
-    try {
+    const env = getLivekitEnv();
+    const roomWasActive = await livekitRoomExists(env, data.code);
+    if (roomWasActive) {
       await deleteLivekitRoom(getLivekitEnv(), data.code);
-    } catch {
-      // Sala já inexistente no LiveKit — apenas registra o encerramento.
+      if (await livekitRoomExists(env, data.code)) {
+        throw new Error("A sala ainda está ativa. Aguarde alguns segundos e tente novamente.");
+      }
     }
+
+    const endedAt = meeting.ended_at ?? new Date().toISOString();
     if (!meeting.ended_at) {
-      await context.supabase
+      const { error: updateError } = await context.supabase
         .from("meeting_rooms")
-        .update({ ended_at: new Date().toISOString() })
+        .update({ ended_at: endedAt })
         .eq("id", meeting.id);
+      if (updateError) {
+        throw new Error(`A sala foi fechada, mas não foi possível concluir o encerramento: ${updateError.message}`);
+      }
     }
-    return { ok: true };
+    return { ok: true, endedAt };
   });
 
 export interface MeetingJoinRequestStart {
@@ -1170,7 +1180,9 @@ export interface MeetingSummaryDTO {
 export type MeetingSummaryResult =
   | { status: "not_found" }
   | { status: "no_transcription"; name: string }
-  | { status: "pending"; name: string }
+  | { status: "pending"; name: string; phase: "meeting_active" }
+  | { status: "finalizing"; name: string; endedAt: string }
+  | { status: "empty"; name: string }
   | { status: "no_key"; name: string; transcript: string }
   | { status: "error"; name: string; transcript: string; message: string }
   | {
@@ -1198,7 +1210,7 @@ export const getMeetingSummary = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/admin.server");
     const { data: meeting } = await supabaseAdmin
       .from("meeting_rooms")
-      .select("name, user_id, transcrever")
+      .select("id, name, user_id, transcrever, ended_at")
       .eq("code", data.code)
       .maybeSingle();
     if (!meeting) return { status: "not_found" };
@@ -1213,7 +1225,31 @@ export const getMeetingSummary = createServerFn({ method: "GET" })
       .limit(1);
     const row = rows?.[0];
     if (!row || !row.conteudo.trim()) {
-      return meeting.transcrever ? { status: "pending", name } : { status: "no_transcription", name };
+      if (!meeting.transcrever) return { status: "no_transcription", name };
+
+      let endedAt = meeting.ended_at;
+      if (!endedAt) {
+        try {
+          const { getLivekitEnv, livekitRoomExists } = await import("./livekit.server");
+          const roomActive = await livekitRoomExists(getLivekitEnv(), data.code);
+          if (!roomActive) {
+            endedAt = new Date().toISOString();
+            await supabaseAdmin
+              .from("meeting_rooms")
+              .update({ ended_at: endedAt })
+              .eq("id", meeting.id);
+          }
+        } catch {
+          // Se não for possível consultar a sala, preserva o estado atual.
+        }
+      }
+
+      if (!endedAt) return { status: "pending", name, phase: "meeting_active" };
+      const finalizationDeadline = new Date(endedAt).getTime() + 45_000;
+      if (Date.now() < finalizationDeadline) {
+        return { status: "finalizing", name, endedAt };
+      }
+      return { status: "empty", name };
     }
     const transcript = row.conteudo;
 

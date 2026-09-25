@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/public/transcript")({
         if (existing && existing.length > 0) {
           const { error } = await supabaseAdmin
             .from("transcricoes_reunioes")
-            .update({ conteudo })
+            .update({ conteudo, criado_em: new Date().toISOString() })
             .eq("id", existing[0].id);
           if (error) {
             console.error("[transcript-webhook] erro ao atualizar:", error.message);
