@@ -373,7 +373,12 @@ export const startLivekitMeeting = createServerFn({ method: "POST" })
       displayName: data.displayName ?? "Organizador",
       room: roomName,
       // Papel do participante: só o organizador controla a apresentação.
-      metadata: JSON.stringify({ role: "host" }),
+      // Repete o modo da sala para workers que leem a metadata do participante.
+      metadata: JSON.stringify({
+        role: "host",
+        acao: data.withAgent ? "chamar_ia" : data.transcribe ? "transcrever" : "nenhuma",
+        transcrever: data.transcribe,
+      }),
       ttlSeconds: 14400, // 4h — reuniões duram mais que chamadas de teste
     });
 
