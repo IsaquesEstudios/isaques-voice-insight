@@ -979,12 +979,9 @@ export const closeMeeting = createServerFn({ method: "POST" })
     if (!meeting) throw new Error("Reunião não encontrada.");
 
     const env = getLivekitEnv();
-    const roomWasActive = await livekitRoomExists(env, data.code);
-    if (roomWasActive) {
-      await deleteLivekitRoom(getLivekitEnv(), data.code);
-      if (await livekitRoomExists(env, data.code)) {
-        throw new Error("A sala ainda está ativa. Aguarde alguns segundos e tente novamente.");
-      }
+    await deleteLivekitRoom(env, data.code);
+    if (await livekitRoomExists(env, data.code)) {
+      throw new Error("A sala ainda está ativa. Aguarde alguns segundos e tente novamente.");
     }
 
     const endedAt = meeting.ended_at ?? new Date().toISOString();
