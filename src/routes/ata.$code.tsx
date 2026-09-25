@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo } from "react";
 import {
   CheckCircle2,
   ClipboardList,
   FileText,
+  LayoutDashboard,
   Loader2,
+  PhoneOff,
   Share2,
   Sparkles,
   User,
@@ -16,7 +18,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getMeetingSummary, type MeetingPendencia } from "@/lib/livekit.functions";
+import {
+  closeMeeting,
+  getMeetingSummary,
+  type MeetingPendencia,
+} from "@/lib/livekit.functions";
+
 
 export const Route = createFileRoute("/ata/$code")({
   validateSearch: (search: Record<string, unknown>): { p?: string } =>
