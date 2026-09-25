@@ -36,6 +36,7 @@ import {
   listarLembretesWhatsapp,
   processarCampanhaAgora,
   salvarLembreteWhatsapp,
+  salvarLembretesEmMassa,
 } from "@/lib/whatsapp-disparos.functions";
 import {
   listarTemplatesWhatsapp,
@@ -70,6 +71,60 @@ function normalizarTelefone(valor: string) {
   const digitos = (valor ?? "").replace(/\D/g, "");
   if (digitos.length < 8) return null;
   return digitos.startsWith("55") ? digitos : `55${digitos}`;
+}
+
+type ContatoLista = { nome: string | null; telefone: string };
+
+/** Extrai nome (opcional) e número de cada linha de texto. */
+function contatosDeLinhas(linhas: string[][]): ContatoLista[] {
+  const vistos = new Set<string>();
+  const saida: ContatoLista[] = [];
+  for (const celulas of linhas) {
+    const limpas = celulas.map((c) => (c ?? "").trim()).filter(Boolean);
+    let telefone: string | null = null;
+    const resto: string[] = [];
+    for (const c of limpas) {
+      const digitos = c.replace(/\D/g, "");
+      if (!telefone && digitos.length >= 10 && digitos.length <= 13 && /^[\d\s()+\-.]+$/.test(c)) {
+        telefone = normalizarTelefone(c);
+      } else resto.push(c);
+    }
+    if (!telefone) {
+      // Linha única: "Maria 11999999999"
+      const junto = limpas.join(" ");
+      const m = junto.match(/\+?[\d(][\d\s()\-.]{9,18}\d/);
+      if (m && m[0].replace(/\D/g, "").length >= 10) {
+        telefone = normalizarTelefone(m[0]);
+        resto.splice(0, resto.length, junto.replace(m[0], "").replace(/[;,\-–:|]+/g, " ").trim());
+      }
+    }
+    if (!telefone || vistos.has(telefone)) continue;
+    vistos.add(telefone);
+    const nome = resto.join(" ").trim().slice(0, 120);
+    saida.push({ nome: nome || null, telefone });
+  }
+  return saida;
+}
+
+async function lerListaContatos(file: File): Promise<ContatoLista[]> {
+  if (file.name.toLowerCase().endsWith(".docx")) {
+    const { unzipSync, strFromU8 } = await import("fflate");
+    const arquivos = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    const xml = arquivos["word/document.xml"];
+    if (!xml) throw new Error("Arquivo Word inválido.");
+    const texto = strFromU8(xml)
+      .replace(/<\/w:tc>/g, "\t")
+      .replace(/<\/w:p>/g, "\n")
+      .replace(/<w:tab\/>/g, "\t")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+    return contatosDeLinhas(texto.split("\n").map((l) => l.split(/\t|;|,/)));
+  }
+  const texto = await file.text();
+  const res = Papa.parse<string[]>(texto, { skipEmptyLines: true });
+  return contatosDeLinhas(res.data);
 }
 
 function contarVariaveis(texto: string) {
@@ -228,27 +283,54 @@ function DisparosPage() {
     : 0;
   const headerLembrete = templateLembrete ? formatoDoHeader(templateLembrete.components) : null;
 
+  const [lembreteModo, setLembreteModo] = useState<"unico" | "massa">("unico");
+  const [lembreteLista, setLembreteLista] = useState<ContatoLista[]>([]);
+  const [lembreteListaNome, setLembreteListaNome] = useState("");
+
+  async function carregarListaLembrete(file: File) {
+    try {
+      const lista = await lerListaContatos(file);
+      setLembreteLista(lista);
+      setLembreteListaNome(file.name);
+      if (lista.length === 0) toast.error("Nenhum número válido encontrado no arquivo.");
+      else toast.success(`${lista.length} contato(s) encontrados.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível ler o arquivo.");
+    }
+  }
+
   const salvarLembrete = useMutation({
-    mutationFn: () =>
-      salvarLembreteWhatsapp({
+    mutationFn: async () => {
+      const comum = {
+        phoneNumberId: lembreteNumero,
+        templateName: lembreteTemplate,
+        templateLang: templateLembrete?.language ?? "pt_BR",
+        variaveis: lembreteVariaveis.slice(0, variaveisLembrete),
+        header:
+          headerLembrete && lembreteArquivo
+            ? { tipo: headerLembrete, link: lembreteArquivo }
+            : null,
+        agendadoPara: lembreteData,
+        recorrencia: lembreteRecorrencia,
+      };
+      if (lembreteModo === "massa") {
+        return salvarLembretesEmMassa({ data: { ...comum, contatos: lembreteLista } });
+      }
+      return salvarLembreteWhatsapp({
         data: {
+          ...comum,
           id: null,
           nome: lembreteNome,
           telefone: normalizarTelefone(lembreteTelefone) ?? lembreteTelefone,
-          phoneNumberId: lembreteNumero,
-          templateName: lembreteTemplate,
-          templateLang: templateLembrete?.language ?? "pt_BR",
-          variaveis: lembreteVariaveis.slice(0, variaveisLembrete),
-          header:
-            headerLembrete && lembreteArquivo
-              ? { tipo: headerLembrete, link: lembreteArquivo }
-              : null,
-          agendadoPara: lembreteData,
-          recorrencia: lembreteRecorrencia,
         },
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success("Lembrete agendado.");
+      toast.success(
+        lembreteModo === "massa"
+          ? `${lembreteLista.length} lembretes agendados.`
+          : "Lembrete agendado.",
+      );
       setLembreteRecorrencia("unico");
       setLembreteAberto(false);
       setLembreteNome("");
@@ -256,6 +338,8 @@ function DisparosPage() {
       setLembreteVariaveis([]);
       setLembreteArquivo("");
       setLembreteData("");
+      setLembreteLista([]);
+      setLembreteListaNome("");
       void queryClient.invalidateQueries({ queryKey: ["whatsapp-lembretes"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
@@ -629,19 +713,52 @@ function DisparosPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Nome</Label>
-                <Input value={lembreteNome} onChange={(e) => setLembreteNome(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Número</Label>
-                <Input
-                  value={lembreteTelefone}
-                  placeholder="(11) 99999-9999"
-                  onChange={(e) => setLembreteTelefone(e.target.value)}
+            <Tabs value={lembreteModo} onValueChange={(v) => setLembreteModo(v as "unico" | "massa")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="unico">Um contato</TabsTrigger>
+                <TabsTrigger value="massa">Envio em massa</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {lembreteModo === "massa" ? (
+              <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center text-sm hover:bg-muted/40">
+                <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                <span className="font-medium">
+                  {lembreteListaNome
+                    ? `${lembreteListaNome} · ${lembreteLista.length} contato(s)`
+                    : "Subir lista (.csv ou .docx)"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Uma pessoa por linha com nome (opcional) e número.
+                </span>
+                <input
+                  type="file"
+                  accept=".csv,.docx,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void carregarListaLembrete(f);
+                    e.target.value = "";
+                  }}
                 />
-              </div>
+              </label>
+            ) : null}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {lembreteModo === "unico" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Nome</Label>
+                    <Input value={lembreteNome} onChange={(e) => setLembreteNome(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Número</Label>
+                    <Input
+                      value={lembreteTelefone}
+                      placeholder="(11) 99999-9999"
+                      onChange={(e) => setLembreteTelefone(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : null}
               <div className="space-y-1.5">
                 <Label>Enviar pelo número</Label>
                 <Select value={lembreteNumero} onValueChange={setLembreteNumero}>
@@ -745,12 +862,15 @@ function DisparosPage() {
                 salvarLembrete.isPending ||
                 !lembreteTemplate ||
                 !lembreteData ||
-                lembreteNome.trim().length < 2 ||
-                !lembreteTelefone
+                (lembreteModo === "massa"
+                  ? lembreteLista.length === 0
+                  : lembreteNome.trim().length < 2 || !lembreteTelefone)
               }
             >
               {salvarLembrete.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Agendar lembrete
+              {lembreteModo === "massa" && lembreteLista.length > 0
+                ? `Agendar ${lembreteLista.length} lembretes`
+                : "Agendar lembrete"}
             </Button>
           </DialogFooter>
         </DialogContent>
