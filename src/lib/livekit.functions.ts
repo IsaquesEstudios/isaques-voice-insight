@@ -946,6 +946,30 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
           .update({ started_at: new Date().toISOString() })
           .eq("id", meeting.id);
       }
+    } else if (meeting.transcrever) {
+      // Sala já ativa (ex.: criada antes do worker subir): reforça a metadata
+      // para que o transcritor entre e não saia por falta de "acao".
+      try {
+        const { getLivekitRoomMetadata, updateLivekitRoomMetadata } = await import(
+          "./livekit.server"
+        );
+        let base: Record<string, unknown> = { tipo: "reuniao", nome: meeting.name };
+        try {
+          const atual = await getLivekitRoomMetadata(env, meeting.code);
+          if (atual) base = { ...base, ...(JSON.parse(atual) as Record<string, unknown>) };
+        } catch {
+          // metadata ausente/inválida: usa a base padrão.
+        }
+        if (base.acao !== "chamar_ia") {
+          await updateLivekitRoomMetadata(
+            env,
+            meeting.code,
+            JSON.stringify({ ...base, acao: "transcrever", transcrever: true }),
+          );
+        }
+      } catch (e) {
+        console.error("Não consegui reforçar a metadata de transcrição:", e);
+      }
     }
 
     const token = await signLivekitJwt(env, {
@@ -954,7 +978,15 @@ export const enterMeetingAsHost = createServerFn({ method: "POST" })
         .slice(2, 6)}`,
       displayName: "Organizador",
       room: meeting.code,
-      metadata: JSON.stringify({ role: "host" }),
+      metadata: JSON.stringify({
+        role: "host",
+        acao: meeting.assistente_ativa
+          ? "chamar_ia"
+          : meeting.transcrever
+            ? "transcrever"
+            : "nenhuma",
+        transcrever: meeting.transcrever,
+      }),
       ttlSeconds: 14400,
     });
 
