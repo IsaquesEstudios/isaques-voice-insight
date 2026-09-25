@@ -49,16 +49,23 @@ function AtaPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["meeting-summary", code],
     queryFn: () => fetchSummary({ data: { code } }),
-    // A ata chega quando a sala fecha; enquanto isso, consulta de novo.
-    refetchInterval: (q) => (q.state.data?.status === "pending" ? 6000 : false),
+    refetchInterval: (q) =>
+      q.state.data?.status === "pending" || q.state.data?.status === "finalizing"
+        ? 3000
+        : false,
   });
 
   const queryClient = useQueryClient();
   const encerrar = useServerFn(closeMeeting);
   const encerrarMutation = useMutation({
     mutationFn: () => encerrar({ data: { code } }),
-    onSuccess: async () => {
-      toast.success("Reunião encerrada. A ata deve chegar em instantes.");
+    onSuccess: async (result) => {
+      queryClient.setQueryData(["meeting-summary", code], {
+        status: "finalizing",
+        name: data && "name" in data ? data.name : "Reunião",
+        endedAt: result.endedAt,
+      });
+      toast.success("Reunião encerrada. Finalizando a ata…");
       await queryClient.invalidateQueries({ queryKey: ["meeting-summary", code] });
     },
     onError: (e: unknown) => {
@@ -166,8 +173,8 @@ function AtaPage() {
               <div>
                 <p className="font-medium">Preparando a ata e o resumo…</p>
                 <p className="text-sm text-muted-foreground">
-                  A transcrição fica pronta quando a reunião termina para todos. Se
-                  alguém ficou na sala, encerre a reunião aqui mesmo.
+                   A reunião ainda está ativa. Encerre-a para concluir a transcrição e
+                   gerar o resumo com o Gemini.
                 </p>
               </div>
             </div>
@@ -191,6 +198,37 @@ function AtaPage() {
         </Card>
       </>,
 
+    );
+  }
+
+  if (data.status === "finalizing") {
+    return shell(
+      <>
+        {header}
+        <Card className="border-primary/30">
+          <CardContent className="flex items-center gap-4 py-8">
+            <Loader2 className="h-6 w-6 shrink-0 animate-spin text-primary" />
+            <div>
+              <p className="font-medium">Finalizando a transcrição…</p>
+              <p className="text-sm text-muted-foreground">
+                Assim que a última fala for salva, o Gemini criará a ata automaticamente.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </>,
+    );
+  }
+
+  if (data.status === "empty") {
+    return shell(
+      <>
+        {header}
+        <Aviso
+          titulo="Reunião encerrada sem conteúdo"
+          texto="Nenhuma fala foi capturada para gerar a transcrição e o resumo."
+        />
+      </>,
     );
   }
 
