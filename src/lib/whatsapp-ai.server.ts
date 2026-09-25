@@ -134,3 +134,83 @@ export async function generateGeminiReply(input: {
   if (!text) throw new Error("O Gemini não retornou uma resposta.");
   return text;
 }
+export async function generateMeetingSummary(input: {
+  apiKey: string;
+  meetingName: string;
+  transcript: string;
+}) {
+  const prompt = [
+    `Você recebe a transcrição da reunião "${input.meetingName}". Cada linha segue o formato [Nome]: fala.`,
+    "Responda em português do Brasil, somente com base no que foi dito. Não invente nada.",
+    "- resumo: 1 a 3 parágrafos curtos sobre o que foi discutido e decidido.",
+    "- pontos_importantes: decisões, números, datas e informações relevantes (no máximo 10).",
+    "- pendencias: cada tarefa combinada (ex.: marcar próxima reunião, enviar arquivo, mandar e-mail), com o nome do responsável exatamente como aparece na transcrição (ou \"Não definido\") e o prazo citado (ou null).",
+    "- participantes: nomes de quem falou.",
+    "",
+    "Transcrição:",
+    input.transcript.slice(0, 200_000),
+  ].join("\n");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": input.apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              resumo: { type: "STRING" },
+              pontos_importantes: { type: "ARRAY", items: { type: "STRING" } },
+              pendencias: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    responsavel: { type: "STRING" },
+                    tarefa: { type: "STRING" },
+                    prazo: { type: "STRING", nullable: true },
+                  },
+                  required: ["responsavel", "tarefa"],
+                },
+              },
+              participantes: { type: "ARRAY", items: { type: "STRING" } },
+            },
+            required: ["resumo", "pontos_importantes", "pendencias", "participantes"],
+          },
+        },
+      }),
+    },
+  );
+  const payload = (await response.json().catch(() => ({}))) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    error?: { message?: string };
+  };
+  if (!response.ok) throw new Error(payload.error?.message ?? "O Gemini recusou a solicitação.");
+  const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("O Gemini não retornou um resumo válido.");
+  }
+  const strs = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()) : [];
+  return {
+    resumo: typeof parsed.resumo === "string" ? parsed.resumo : "",
+    pontos_importantes: strs(parsed.pontos_importantes),
+    pendencias: (Array.isArray(parsed.pendencias) ? parsed.pendencias : [])
+      .map((p) => p as Record<string, unknown>)
+      .filter((p) => typeof p.tarefa === "string" && p.tarefa.trim())
+      .map((p) => ({
+        responsavel:
+          typeof p.responsavel === "string" && p.responsavel.trim() ? p.responsavel.trim() : "Não definido",
+        tarefa: String(p.tarefa).trim(),
+        prazo: typeof p.prazo === "string" && p.prazo.trim() ? p.prazo.trim() : null,
+      })),
+    participantes: strs(parsed.participantes),
+  };
+}

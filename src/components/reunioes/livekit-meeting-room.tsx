@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 
 import {
   AlertDialog,
@@ -1186,7 +1187,7 @@ class MeetingErrorBoundary extends Component<
   }
 }
 
-export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
+export function LivekitMeetingRoom({ session, onLeave: onLeaveProp, onEnded: onEndedProp }: Props) {
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [aiState, setAiState] = useState<AiState>("idle");
@@ -1197,6 +1198,24 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
   const callAgent = useServerFn(callLivekitMeetingAgent);
   const dismissAgent = useServerFn(dismissLivekitMeetingAgent);
   const endMeeting = useServerFn(endLivekitMeeting);
+  const navigate = useNavigate();
+  const leftRef = useRef(false);
+
+  // Quem sai (ou é desconectado pelo encerramento) vai para a página de
+  // encerramento com a ata, o resumo e as pendências.
+  const goToSummary = () => {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    void navigate({ to: "/ata/$code", params: { code: session.roomName } });
+  };
+  const onLeave = () => {
+    onLeaveProp();
+    goToSummary();
+  };
+  const onEnded = () => {
+    onEndedProp?.();
+    goToSummary();
+  };
 
   // O papel vem do próprio token da sala — disponível antes de conectar.
   const isHost = useMemo(() => roleFromToken(session.token) === "host", [session.token]);
@@ -1309,7 +1328,7 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
             onCallAgent={handleCallAgent}
             onDismissAgent={handleDismissAgent}
             onChatChange={setShowChat}
-            onLeave={onLeave}
+            onLeave={isHost ? () => setConfirmEnd(true) : onLeave}
             onRequestEnd={() => setConfirmEnd(true)}
           />
         </LiveKitRoom>
@@ -1318,15 +1337,26 @@ export function LivekitMeetingRoom({ session, onLeave, onEnded }: Props) {
       <AlertDialog open={confirmEnd} onOpenChange={setConfirmEnd}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Encerrar reunião para todos?</AlertDialogTitle>
+            <AlertDialogTitle>Sair ou encerrar a reunião?</AlertDialogTitle>
             <AlertDialogDescription>
-              Todos os participantes serão desconectados e a sala será
-              apagada. Essa ação não pode ser desfeita — para continuar,
-              será preciso criar uma nova reunião.
+              Você pode apenas sair e deixar os outros participantes na sala,
+              ou encerrar para todos — nesse caso todos são desconectados e a
+              sala é apagada, sem como desfazer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={ending}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={ending}
+              onClick={() => {
+                setConfirmEnd(false);
+                onLeave();
+              }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Apenas sair
+            </Button>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
