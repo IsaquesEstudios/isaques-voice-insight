@@ -198,6 +198,42 @@ export const salvarLembreteWhatsapp = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+const lembretesMassaSchema = lembreteSchema
+  .omit({ id: true, nome: true, telefone: true })
+  .extend({
+    contatos: z
+      .array(z.object({ nome: z.string().trim().max(120).nullable().optional(), telefone: z.string().trim().min(8) }))
+      .min(1, "Envie ao menos um contato.")
+      .max(5000),
+  });
+
+export const salvarLembretesEmMassa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => lembretesMassaSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { chatDb } = await import("@/integrations/supabase/chat-db.server");
+    const agendado = new Date(data.agendadoPara).toISOString();
+    const registros = data.contatos.map((c) => ({
+      user_id: context.userId,
+      nome: c.nome && c.nome.length > 0 ? c.nome : c.telefone,
+      telefone: c.telefone,
+      phone_number_id: data.phoneNumberId,
+      template_name: data.templateName,
+      template_lang: data.templateLang,
+      variaveis: data.variaveis,
+      componentes: { header: data.header ?? null, recorrencia: data.recorrencia },
+      agendado_para: agendado,
+      status: "agendado",
+      erro: null,
+    }));
+    for (let i = 0; i < registros.length; i += 500) {
+      const { error } = await chatDb.from("whatsapp_lembretes").insert(registros.slice(i, i + 500));
+      if (tabelaAusente(error)) throw new Error(AVISO_TABELAS);
+      if (error) throw new Error(`Não foi possível salvar os lembretes: ${error.message}`);
+    }
+    return { ok: true as const, total: registros.length };
+  });
+
 export const excluirLembreteWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
