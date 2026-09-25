@@ -175,7 +175,7 @@ function ReunioesPage() {
       setCreateOpen(false);
       setMeetingName("");
       setScheduledAt("");
-      setTranscribe(false);
+      setTranscribe(true);
     } catch (e) {
       toast.error(translateError(e, "Não foi possível criar a reunião."));
     } finally {
