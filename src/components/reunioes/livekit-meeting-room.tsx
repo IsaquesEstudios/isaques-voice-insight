@@ -252,7 +252,7 @@ interface MeetingTileProps {
   isSelf: boolean;
   isPresenter: boolean;
   hostControls?: TileHostControls;
-  /** Chamado quando a proporção real do vídeo muda (usado no palco de foco). */
+  /** Chamado quando a proporção real do vídeo muda. */
   onRatio?: (ratio: number) => void;
 }
 
@@ -267,13 +267,12 @@ function MeetingTile({ trackRef, isSelf, isPresenter, hostControls, onRatio }: M
 
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!onRatio) return;
     const root = rootRef.current;
     if (!root) return;
     let video: HTMLVideoElement | null = null;
     const update = () => {
       if (video && video.videoWidth > 0 && video.videoHeight > 0) {
-        onRatio(video.videoWidth / video.videoHeight);
+        onRatio?.(video.videoWidth / video.videoHeight);
       }
     };
     const attach = () => {
@@ -309,7 +308,7 @@ function MeetingTile({ trackRef, isSelf, isPresenter, hostControls, onRatio }: M
       {hasVideo ? (
         <VideoTrack
           trackRef={trackRef as TrackReference}
-          className="h-full w-full object-contain"
+          className="h-full w-full !object-contain"
         />
       ) : (
         <div className="grid h-full w-full place-items-center">
@@ -385,8 +384,8 @@ function MeetingTile({ trackRef, isSelf, isPresenter, hostControls, onRatio }: M
 }
 
 // ---------------------------------------------------------------------------
-// Grade: encolhe os tiles conforme entram participantes e pagina quando
-// passa do limite visual (ninguém sai da sala, só da página atual).
+// Grade: ajusta a moldura de cada participante à proporção real da câmera,
+// sem faixas dentro do tile e sem cortar a imagem. Pagina acima do limite.
 // ---------------------------------------------------------------------------
 
 const GRID_PAGE_SIZE = 12;
@@ -404,29 +403,66 @@ interface StageProps {
 function GridStage(props: StageProps) {
   const { tracks } = props;
   const [page, setPage] = useState(0);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setStageSize({ w: Math.max(0, entry.contentRect.width - 16), h: Math.max(0, entry.contentRect.height - 16) });
+    });
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
   const pageCount = Math.max(1, Math.ceil(tracks.length / GRID_PAGE_SIZE));
   const current = Math.min(page, pageCount - 1);
   const visible = tracks.slice(current * GRID_PAGE_SIZE, current * GRID_PAGE_SIZE + GRID_PAGE_SIZE);
-  const n = Math.max(visible.length, 1);
-  const cols = n === 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4;
-  const rows = Math.ceil(n / cols);
+  const onRatios = useMemo(() => Object.fromEntries(visible.map((t) => {
+    const key = tileKey(t);
+    return [key, (ratio: number) => setRatios((prev) =>
+      Math.abs((prev[key] ?? 0) - ratio) > 0.01 ? { ...prev, [key]: ratio } : prev,
+    )];
+  })) as Record<string, (ratio: number) => void>, [visible.map(tileKey).join("|")]);
+
+  // Escolhe a disposição que mostra mais pixels úteis, mantendo cada vídeo
+  // inteiro. A troca de orientação da câmera recalcula a grade automaticamente.
+  const layout = useMemo(() => {
+    const n = visible.length;
+    if (!n || !stageSize.w || !stageSize.h) return [] as { track: TrackReferenceOrPlaceholder; width: number; height: number }[][];
+    let best: { track: TrackReferenceOrPlaceholder; width: number; height: number }[][] = [];
+    let bestArea = -1;
+    for (let rowCount = 1; rowCount <= n; rowCount++) {
+      const gap = 8;
+      const maxHeight = (stageSize.h - gap * (rowCount - 1)) / rowCount;
+      if (maxHeight <= 0) continue;
+      let offset = 0;
+      let area = 0;
+      const rows: typeof best = [];
+      for (let row = 0; row < rowCount; row++) {
+        const count = Math.floor(n / rowCount) + (row < n % rowCount ? 1 : 0);
+        const group = visible.slice(offset, offset + count);
+        offset += count;
+        const groupRatios = group.map((t) => Math.max(0.1, Math.min(5, ratios[tileKey(t)] ?? 16 / 9)));
+        const height = Math.min(maxHeight, (stageSize.w - gap * (count - 1)) / groupRatios.reduce((a, b) => a + b, 0));
+        area += groupRatios.reduce((a, b) => a + b, 0) * height * height;
+        rows.push(group.map((track, index) => ({ track, width: groupRatios[index] * height, height })));
+      }
+      if (area > bestArea) { bestArea = area; best = rows; }
+    }
+    return best;
+  }, [visible, ratios, stageSize]);
 
   return (
-    <div className="relative h-full w-full">
-      <div
-        className="grid h-full w-full gap-2 p-2"
-        style={{
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-        }}
-      >
-        {visible.map((t) => (
+    <div ref={stageRef} className="relative h-full w-full">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2">
+        {layout.map((row, index) => <div key={index} className="flex max-w-full shrink-0 items-center justify-center gap-2">
+          {row.map(({ track: t, width, height }) => <div key={tileKey(t)} className="shrink-0" style={{ width, height }}>
           <MeetingTile
-            key={tileKey(t)}
             trackRef={t}
             isSelf={t.participant.identity === props.myIdentity}
             isPresenter={props.meta.presenter === t.participant.identity}
-            onRatio={undefined}
+            onRatio={onRatios[tileKey(t)]}
             hostControls={
               props.isHost
                 ? {
@@ -443,7 +479,8 @@ function GridStage(props: StageProps) {
                 : undefined
             }
           />
-        ))}
+          </div>)}
+        </div>)}
       </div>
 
       {pageCount > 1 && (
@@ -491,6 +528,13 @@ function FocusStage(props: FocusStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [ratio, setRatio] = useState(16 / 9);
+  const [otherRatios, setOtherRatios] = useState<Record<string, number>>({});
+  const otherRatioCallbacks = useMemo(() => Object.fromEntries(others.map((t) => {
+    const key = tileKey(t);
+    return [key, (next: number) => setOtherRatios((prev) =>
+      Math.abs((prev[key] ?? 0) - next) > 0.01 ? { ...prev, [key]: next } : prev,
+    )];
+  })) as Record<string, (ratio: number) => void>, [others.map(tileKey).join("|")]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -504,7 +548,7 @@ function FocusStage(props: FocusStageProps) {
   }, []);
 
   const handleRatio = useCallback((r: number) => setRatio(r), []);
-  const clamped = Math.min(Math.max(ratio, 0.5), 2.4);
+  const clamped = Math.min(Math.max(ratio, 0.1), 5);
   const w = stageSize.h > 0 ? Math.min(stageSize.w, stageSize.h * clamped) : 0;
   const h = w > 0 ? w / clamped : 0;
 
@@ -541,13 +585,18 @@ function FocusStage(props: FocusStageProps) {
       </div>
 
       {others.length > 0 && (
-        <div className="flex h-24 shrink-0 gap-2 overflow-x-auto">
+        <div className="flex h-24 shrink-0 justify-center gap-2 overflow-x-auto">
           {others.map((t) => (
-            <div key={tileKey(t)} className="h-full w-40 shrink-0">
+            <div
+              key={tileKey(t)}
+              className="h-full shrink-0"
+              style={{ width: `${Math.max(0.1, Math.min(5, otherRatios[tileKey(t)] ?? 16 / 9)) * 96}px` }}
+            >
               <MeetingTile
                 trackRef={t}
                 isSelf={t.participant.identity === props.myIdentity}
                 isPresenter={props.meta.presenter === t.participant.identity}
+                onRatio={otherRatioCallbacks[tileKey(t)]}
                 hostControls={hostControlsFor(t)}
               />
             </div>
