@@ -443,7 +443,7 @@ function GridStage(props: StageProps) {
         const count = Math.floor(n / rowCount) + (row < n % rowCount ? 1 : 0);
         const group = visible.slice(offset, offset + count);
         offset += count;
-        const groupRatios = group.map((t) => Math.max(0.1, Math.min(5, ratios[tileKey(t)] ?? (t.source === Track.Source.ScreenShare ? 16 / 9 : 16 / 9))));
+        const groupRatios = group.map((t) => Math.max(0.1, Math.min(5, ratios[tileKey(t)] ?? 16 / 9)));
         const height = Math.min(maxHeight, (stageSize.w - gap * (count - 1)) / groupRatios.reduce((a, b) => a + b, 0));
         area += groupRatios.reduce((a, b) => a + b, 0) * height * height;
         rows.push(group.map((track, index) => ({ track, width: groupRatios[index] * height, height })));
@@ -528,6 +528,13 @@ function FocusStage(props: FocusStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [ratio, setRatio] = useState(16 / 9);
+  const [otherRatios, setOtherRatios] = useState<Record<string, number>>({});
+  const otherRatioCallbacks = useMemo(() => Object.fromEntries(others.map((t) => {
+    const key = tileKey(t);
+    return [key, (next: number) => setOtherRatios((prev) =>
+      Math.abs((prev[key] ?? 0) - next) > 0.01 ? { ...prev, [key]: next } : prev,
+    )];
+  })) as Record<string, (ratio: number) => void>, [others.map(tileKey).join("|")]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -580,11 +587,16 @@ function FocusStage(props: FocusStageProps) {
       {others.length > 0 && (
         <div className="flex h-24 shrink-0 justify-center gap-2 overflow-x-auto">
           {others.map((t) => (
-            <div key={tileKey(t)} className="h-full w-40 shrink-0">
+            <div
+              key={tileKey(t)}
+              className="h-full shrink-0"
+              style={{ width: `${Math.max(0.1, Math.min(5, otherRatios[tileKey(t)] ?? 16 / 9)) * 96}px` }}
+            >
               <MeetingTile
                 trackRef={t}
                 isSelf={t.participant.identity === props.myIdentity}
                 isPresenter={props.meta.presenter === t.participant.identity}
+                onRatio={otherRatioCallbacks[tileKey(t)]}
                 hostControls={hostControlsFor(t)}
               />
             </div>
